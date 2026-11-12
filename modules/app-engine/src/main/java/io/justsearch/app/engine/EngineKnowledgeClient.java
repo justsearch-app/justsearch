@@ -1363,8 +1363,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
 
   /**
    * {@link #enumerateRecordedRoot} for an explicit ingest resumed after a restart or a stopped
-   * attachment: it is no fresh add, so it carries no add marker and records nothing (round 8b,
-   * decision 2); a folder with no recorded volume is then refused and nothing is deleted.
+   * attachment. The Worker may finish the accepted deliberate add only where neither a volume
+   * nor traversal evidence exists. Every previously witnessed root keeps the volume guard.
    */
   CompletionStage<JobQueue.WalkEnumerationOutcome> enumerateRecoveredRecordedRoot(
       RecordedRootPlan plan, String childKey, long epoch, EngineContext context,
@@ -1378,7 +1378,8 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
     CallView view = captureCallView();
     try {
       return enumerateRecordedRoot(plan, childKey, epoch, context, cancellation,
-          WorkerIngestService.RecordedScanMode.STREAMING, view, capturedRootFence(plan, false),
+          rootAdded ? WorkerIngestService.RecordedScanMode.STREAMING
+              : WorkerIngestService.RecordedScanMode.RECOVERED, view, capturedRootFence(plan, false),
           rootAdded);
     } catch (RuntimeException | Error failure) {
       view.release();
@@ -1491,6 +1492,11 @@ public final class EngineKnowledgeClient extends KnowledgeClient {
               ? JobQueue.WalkEnumerationOutcome.CANCELLED
               : terminal.getComplete() && terminal.getTerminalReasonCode().isEmpty()
                   ? JobQueue.WalkEnumerationOutcome.COMPLETE : JobQueue.WalkEnumerationOutcome.FAILED);
+          if (mode == WorkerIngestService.RecordedScanMode.RECOVERED
+              && terminal.getTerminalReasonCode().startsWith("ROOT_")) {
+            throw new JobQueue.RecordedWalkGapException("Accepted import root is unavailable: "
+                + terminal.getTerminalReasonCode());
+          }
           if (!root.singleFile()) {
             // #758: the reindex walk records a root-level refusal
             // as the root's state at once, as the boot walk does, instead of leaving it to read

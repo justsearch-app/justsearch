@@ -1,0 +1,500 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T03:58:49.500Z",
+  "revision": "448edc33c37789bbee50f94660e24f6fa71dc916",
+  "tree": "6b345d932cf5fa5ecd6081ad8c53c402ea6d2fd6",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/TopBar.placement-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/uux40m6g/tmp/test-intent-vitest-51606-1794455881732.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 20438
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/unrequestedAi.test.ts\" \"src/shell-v0/views/LibrarySurface.ownCount.test.ts\" \"src/shell-v0/views/BrainSurface.ownCount.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/uux40m6g/tmp/test-intent-vitest-51606-1794455902170.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1954
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#the status panel opened at 900x800 stays inside as the window shrinks to 600x400 and the text grows to 200%",
+      "file": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e1508320e3aedf8ea45c5e64653a5de7492c5bbe821ad39b8ac709f5b8b0b583",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA1a what is open while the window shrinks stays inside it the status panel opened at 900x800 stays inside as the window shrinks to 600x400 and the text grows to 200%",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#More opened at 900x800 stays inside as the window shrinks to 600x400 and the text grows to 200%",
+      "file": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e1508320e3aedf8ea45c5e64653a5de7492c5bbe821ad39b8ac709f5b8b0b583",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA1a what is open while the window shrinks stays inside it More opened at 900x800 stays inside as the window shrinks to 600x400 and the text grows to 200%",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#the fixture reproduces what the real page computed: search degraded, AI not installed",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3a a fresh install whose only gap is AI nobody asked for the fixture reproduces what the real page computed: search degraded, AI not installed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#after first use the pill says keyword search is ready (semantic queue pending), never \"Checking\"",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3a a fresh install whose only gap is AI nobody asked for after first use the pill says keyword search is ready (semantic queue pending), never \"Checking\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#after first use the pill says keyword search is ready (semantic queue empty), never \"Checking\"",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3a a fresh install whose only gap is AI nobody asked for after first use the pill says keyword search is ready (semantic queue empty), never \"Checking\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#after a reload \"Checking\" lasts only until the AI install status is observed",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3a a fresh install whose only gap is AI nobody asked for after a reload \"Checking\" lasts only until the AI install status is observed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#chat switched on without AI models: not calm, and not \"Checking\" — the person asked for AI",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3a a fresh install whose only gap is AI nobody asked for chat switched on without AI models: not calm, and not \"Checking\" — the person asked for AI",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#says nothing when the only gap is AI nobody asked for (semantic queue pending or empty)",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3b the search banner above the composer says nothing when the only gap is AI nobody asked for (semantic queue pending or empty)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#stays when the person asked for AI and it cannot run: chat is switched on without AI models",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3b the search banner above the composer stays when the person asked for AI and it cannot run: chat is switched on without AI models",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#stays when the person asked for AI and it cannot run: the AI install the person started failed",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3b the search banner above the composer stays when the person asked for AI and it cannot run: the AI install the person started failed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#stays when the person asked for AI and it cannot run: the AI install the person started was interrupted",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3b the search banner above the composer stays when the person asked for AI and it cannot run: the AI install the person started was interrupted",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#announce no search warning when the only gap is AI nobody asked for",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3b the status pill's screen-reader announcements announce no search warning when the only gap is AI nobody asked for",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#still announce it when the person asked for AI and it cannot run",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3b the status pill's screen-reader announcements still announce it when the person asked for AI and it cannot run",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#interrupted, with an empty or a pending semantic queue: one Needs-you row",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3c an AI install the person started that was interrupted or failed needs them interrupted, with an empty or a pending semantic queue: one Needs-you row",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#failed, with an empty or a pending semantic queue: one Needs-you row",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3c an AI install the person started that was interrupted or failed needs them failed, with an empty or a pending semantic queue: one Needs-you row",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#the rows say what happened in the AI verdict's own words",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3c an AI install the person started that was interrupted or failed needs them the rows say what happened in the AI verdict's own words",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts#FA4a with the own count unknown (only Help and an indexed folder reported), no headline says the person's files are searchable",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b41077478db6034b848bd8a9efb0823ee6df08b0e7c6a002ebe4be66d6a28e38",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4a with the own count unknown (only Help and an indexed folder reported), no headline says the person's files are searchable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts#FA4a counts the person's own files, not the bundled Help",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f5a092a41350b1e2f764634eada9bf1566ee6674c5c80be5a33291596819b5b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4a counts the person's own files, not the bundled Help",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts#FA4a one own file reads in the singular",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f5a092a41350b1e2f764634eada9bf1566ee6674c5c80be5a33291596819b5b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4a one own file reads in the singular",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts#FA4a with no own files it says so in words, whatever Help holds",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f5a092a41350b1e2f764634eada9bf1566ee6674c5c80be5a33291596819b5b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4a with no own files it says so in words, whatever Help holds",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts#FA4a an Engine that does not report the own count: unknown in words, never a number",
+      "file": "modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f5a092a41350b1e2f764634eada9bf1566ee6674c5c80be5a33291596819b5b9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4a an Engine that does not report the own count: unknown in words, never a number",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#chat switched on, semantic queue empty: one Needs-you row says semantic search is degraded, never \"Checking\"",
+      "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:74ffcd8fd02b6c28d22e6c46f2fbded5323f6cec382ab6497ce6aa13d7db4bda",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3a a reduced search the person asked AI for chat switched on, semantic queue empty: one Needs-you row says semantic search is degraded, never \"Checking\"",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "448edc33c37789bbee50f94660e24f6fa71dc916",
+    "revision": "448edc33c37789bbee50f94660e24f6fa71dc916",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/TopBar.placement-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/uux40m6g/tmp/test-intent-vitest-51606-1794455907660.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 19867,
+        "output": "JSON report written to /home/elias/.cache/am/uux40m6g/tmp/test-intent-vitest-51606-1794455907660.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/unrequestedAi.test.ts\" \"src/shell-v0/views/LibrarySurface.ownCount.test.ts\" \"src/shell-v0/views/BrainSurface.ownCount.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/uux40m6g/tmp/test-intent-vitest-51606-1794455927528.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1702,
+        "output": "JSON report written to /home/elias/.cache/am/uux40m6g/tmp/test-intent-vitest-51606-1794455927528.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#the status panel opened at 900x800 stays inside as the window shrinks to 600x400 and the text grows to 200%",
+        "classification": "assertion",
+        "detail": "FA1a what is open while the window shrinks stays inside it the status panel opened at 900x800 stays inside as the window shrinks to 600x400 and the text grows to 200%:  AssertionError: shrink {\"left\":-28,\"right\":384,\"window\":600}: expected -28 to be greater than or equal to 0\n    at /home/elias/.cache/am/uux40m6g/tmp/test-intent-before-lFtavR/modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts:211:62\n    at runNextTicks (node:internal/process/task_"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#More opened at 900x800 stays inside as the window shrinks to 600x400 and the text grows to 200%",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#the fixture reproduces what the real page computed: search degraded, AI not installed",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#after first use the pill says keyword search is ready (semantic queue pending), never \"Checking\"",
+        "classification": "assertion",
+        "detail": "FA3a a fresh install whose only gap is AI nobody asked for after first use the pill says keyword search is ready (semantic queue pending), never \"Checking\":  AssertionError: expected { kind: 'unknown', …(2) } to deeply equal { kind: 'calm', …(2) }\n    at /home/elias/.cache/am/uux40m6g/tmp/test-intent-before-lFtavR/modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts:60:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#after first use the pill says keyword search is ready (semantic queue empty), never \"Checking\"",
+        "classification": "assertion",
+        "detail": "FA3a a fresh install whose only gap is AI nobody asked for after first use the pill says keyword search is ready (semantic queue empty), never \"Checking\":  AssertionError: expected { kind: 'unknown', …(2) } to deeply equal { kind: 'calm', …(2) }\n    at /home/elias/.cache/am/uux40m6g/tmp/test-intent-before-lFtavR/modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts:60:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#after a reload \"Checking\" lasts only until the AI install status is observed",
+        "classification": "assertion",
+        "detail": "FA3a a fresh install whose only gap is AI nobody asked for after a reload \"Checking\" lasts only until the AI install status is observed:  AssertionError: expected 'Checking search status · last seen ju…' to be 'Keyword search ready' // Object.is equality\n    at /home/elias/.cache/am/uux40m6g/tmp/test-intent-before-lFtavR/modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts:67:55\n    at file:///home/elias/dev/justsearch/.claude/work"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#chat switched on without AI models: not calm, and not \"Checking\" — the person asked for AI",
+        "classification": "assertion",
+        "detail": "FA3a a fresh install whose only gap is AI nobody asked for chat switched on without AI models: not calm, and not \"Checking\" — the person asked for AI:  AssertionError: expected 'unknown' to be 'needs' // Object.is equality\n    at /home/elias/.cache/am/uux40m6g/tmp/test-intent-before-lFtavR/modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts:72:29\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/node_modules/@"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#says nothing when the only gap is AI nobody asked for (semantic queue pending or empty)",
+        "classification": "assertion",
+        "detail": "FA3b the search banner above the composer says nothing when the only gap is AI nobody asked for (semantic queue pending or empty):  AssertionError: expected { …(5) } to be null\n    at /home/elias/.cache/am/uux40m6g/tmp/test-intent-before-lFtavR/modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts:88:59\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/node_modules/@vitest/runner/dist/chunk-a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#stays when the person asked for AI and it cannot run: chat is switched on without AI models",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#stays when the person asked for AI and it cannot run: the AI install the person started failed",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#stays when the person asked for AI and it cannot run: the AI install the person started was interrupted",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#announce no search warning when the only gap is AI nobody asked for",
+        "classification": "assertion",
+        "detail": "FA3b the status pill's screen-reader announcements announce no search warning when the only gap is AI nobody asked for:  AssertionError: expected 'Service degraded' to be null\n    at /home/elias/.cache/am/uux40m6g/tmp/test-intent-before-lFtavR/modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts:116:53\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/node_modules/@vitest/runner/d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#still announce it when the person asked for AI and it cannot run",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#interrupted, with an empty or a pending semantic queue: one Needs-you row",
+        "classification": "assertion",
+        "detail": "FA3c an AI install the person started that was interrupted or failed needs them interrupted, with an empty or a pending semantic queue: one Needs-you row:  AssertionError: empty: expected { kind: 'unknown', …(2) } to match object { kind: 'needs', …(2) }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)\n    a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#failed, with an empty or a pending semantic queue: one Needs-you row",
+        "classification": "assertion",
+        "detail": "FA3c an AI install the person started that was interrupted or failed needs them failed, with an empty or a pending semantic queue: one Needs-you row:  AssertionError: empty: expected { kind: 'problems', …(3) } to match object { kind: 'needs', …(2) }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:10)"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#the rows say what happened in the AI verdict's own words",
+        "classification": "assertion",
+        "detail": "FA3c an AI install the person started that was interrupted or failed needs them the rows say what happened in the AI verdict's own words:  AssertionError: expected [ '' ] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/uux40m6g/tmp/test-intent-before-lFtavR/modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts:138:75\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/node_modules/@vitest/ru"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts#FA4a with the own count unknown (only Help and an indexed folder reported), no headline says the person's files are searchable",
+        "classification": "assertion",
+        "detail": "FA4a with the own count unknown (only Help and an indexed folder reported), no headline says the person's files are searchable:  AssertionError: expected { …(2) } to deeply equal { …(2) }\n    at /home/elias/.cache/am/uux40m6g/tmp/test-intent-before-lFtavR/modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts:62:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/node_modules/@vi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts#FA4a counts the person's own files, not the bundled Help",
+        "classification": "assertion",
+        "detail": "FA4a counts the person's own files, not the bundled Help:  AssertionError: expected '253 files' to be '3 files' // Object.is equality\n    at /home/elias/.cache/am/uux40m6g/tmp/test-intent-before-lFtavR/modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts:57:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/no"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts#FA4a one own file reads in the singular",
+        "classification": "assertion",
+        "detail": "FA4a one own file reads in the singular:  AssertionError: expected '251 files' to be '1 file' // Object.is equality\n    at /home/elias/.cache/am/uux40m6g/tmp/test-intent-before-lFtavR/modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts:61:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/nod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts#FA4a with no own files it says so in words, whatever Help holds",
+        "classification": "assertion",
+        "detail": "FA4a with no own files it says so in words, whatever Help holds:  AssertionError: expected '250 files' to be 'None yet' // Object.is equality\n    at /home/elias/.cache/am/uux40m6g/tmp/test-intent-before-lFtavR/modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts:65:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/n"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts#FA4a an Engine that does not report the own count: unknown in words, never a number",
+        "classification": "assertion",
+        "detail": "FA4a an Engine that does not report the own count: unknown in words, never a number:  AssertionError: expected '250 files' to be 'File count unknown' // Object.is equality\n    at /home/elias/.cache/am/uux40m6g/tmp/test-intent-before-lFtavR/modules/ui-web/src/shell-v0/views/BrainSurface.ownCount.test.ts:69:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/module"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#chat switched on, semantic queue empty: one Needs-you row says semantic search is degraded, never \"Checking\"",
+        "classification": "assertion",
+        "detail": "FA3a a reduced search the person asked AI for chat switched on, semantic queue empty: one Needs-you row says semantic search is degraded, never \"Checking\":  AssertionError: expected { kind: 'unknown', …(2) } to match object { kind: 'needs', label: '1 needs you' }\n(1 matching property omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1283:"
+      }
+    ]
+  },
+  "digest": "sha256:4d7e99eb5432456d0a9259d38246d0bc36f6cb507ee8f8facf81d1a4ab38566f"
+}

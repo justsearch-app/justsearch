@@ -329,9 +329,9 @@ class RunnerTests(unittest.TestCase):
         run.args.phase = 'predecessor'
         run.args.predecessor.name = 'JustSearch_0.3.0_amd64.deb'
         run.work = '/tmp/own-run'
-        bookmark = {'id': 'authored'}
-        state = {'savedFiles': {'files': {'models/embedding.onnx': 'sha'}, 'savedViews': [bookmark]}}
-        run.facts = {'ai': {'state': 'completed'}, 'authored': True, 'bookmark': bookmark, 'beforeState': state}
+        state = {'savedFiles': {'files': {'models/embedding.onnx': 'sha'}},
+                 'settings': {'ui': {'theme': 'dark'}}}
+        run.facts = {'ai': {'state': 'completed'}, 'authored': True, 'beforeState': state}
         run.require.side_effect = lambda key: '0.3.1' if key == 'initialVersion' else {}
         run.target.run.side_effect = [types.SimpleNamespace(stdout='0.3.0'),
                                       types.SimpleNamespace(stdout='', returncode=0)]

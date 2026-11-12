@@ -28,6 +28,32 @@ public interface JobQueue extends Closeable {
     throw new UnsupportedOperationException("Source origin persistence is unavailable");
   }
 
+  /** Revocation releases a claim without recording a source failure or spending a retry. */
+  final class IngestionApprovalInterruptedException extends java.util.concurrent.CancellationException {
+    public IngestionApprovalInterruptedException() { super("Import approval is interrupted"); }
+  }
+
+  default void useIngestionBoundaryAuthority(java.util.function.BiPredicate<String, IndexJob> authority) {}
+
+  default void useImportApprovalBinding(java.util.function.Function<String, String> activeBinding) {}
+
+  /** Read-only owner verdict; absence of an owner never permits upkeep. */
+  record ImportUpkeepEligibility(boolean inactive, boolean refreshAllowed) {
+    public static final ImportUpkeepEligibility DENIED = new ImportUpkeepEligibility(false, false);
+  }
+
+  default void useImportUpkeepAuthority(
+      java.util.function.Function<io.justsearch.app.api.indexing.SourceOrigin, ImportUpkeepEligibility> authority) {}
+
+  default ImportUpkeepEligibility importUpkeepEligibility(String originId) {
+    return ImportUpkeepEligibility.DENIED;
+  }
+
+  /** A rowless, durable refresh of an existing import member, never a new producer. */
+  default boolean enqueueImportUpkeep(EnqueueEntry entry, String collection, String originId) {
+    return false;
+  }
+
   enum IngestionBoundary { TRAVERSAL, HASHING, EXTRACTION, PUBLICATION }
 
   /** P2a approval seam: today's approval verdict is allow. Consumption activates with Resume. */
@@ -266,6 +292,9 @@ public interface JobQueue extends Closeable {
         String scanId, String unitRevision, Long walkEpoch, boolean recordedForce) {
       this(path, collection, provenance, scanId, unitRevision, walkEpoch, recordedForce, null);
     }
+    /** The revision already carries scoped admission identities; old rows remain ordinary jobs. */
+    public String upkeepOriginId() { return JobQueue.upkeepOriginId(unitRevision); }
+
     /** Compatibility fixture without a force-bearing recorded admission snapshot. */
     public IndexJob(Path path, String collection, EnqueueProvenance provenance,
         String scanId, String unitRevision, Long walkEpoch) {
@@ -284,6 +313,19 @@ public interface JobQueue extends Closeable {
     public IndexJob(Path path, String collection) {
       this(path, collection, null);
     }
+  }
+
+  /** Decode only the reserved scoped upkeep admission; historical revisions stay ordinary. */
+  static String upkeepOriginId(String revision) {
+    if (revision == null || !revision.startsWith("upkeep/")) return null;
+    String[] parts = revision.split("/", -1);
+    if (parts.length != 3) throw new IllegalArgumentException("Malformed upkeep admission");
+    for (int i = 1; i < parts.length; i++) {
+      if (!java.util.UUID.fromString(parts[i]).toString().equals(parts[i])) {
+        throw new IllegalArgumentException("Malformed upkeep admission");
+      }
+    }
+    return parts[1];
   }
 
   /** Verify an issued claim still owns its durable row immediately before index publication. */

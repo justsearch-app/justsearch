@@ -662,6 +662,13 @@ public final class OperationExecutorImpl implements OperationDispatcher {
       OperationExecution execution = undoId == null
           ? invocation.handler().executePrepared(invocation.value(), provenance, authorized, record)
           : invocation.handler().undoPrepared(invocation.value(), undoId, provenance, authorized, record);
+      if (undoId == null && io.justsearch.app.api.operations.RecordedRootPlan.SCHEMA.equals(
+          invocation.value().replaySchema())) {
+        // Recorded ingestion retains its own work reference before returning. Its durable
+        // completion can outlive active work while an interrupted import waits for Resume.
+        owner.close();
+        return execution;
+      }
       return new OperationExecution(execution.response(),
           execution.completion().whenComplete((result, failure) -> owner.close()));
     } catch (RuntimeException | Error failure) {

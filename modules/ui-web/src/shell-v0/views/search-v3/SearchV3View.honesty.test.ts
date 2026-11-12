@@ -53,6 +53,7 @@ let clipboard: ReturnType<typeof vi.fn>;
 function status(over: {
   documents?: number;
   searchable?: number | null;
+  own?: number | null;
   lock?: 'locked' | 'unlocked';
 }): StatusSnapshot {
   return {
@@ -60,6 +61,7 @@ function status(over: {
       core: {
         indexedDocuments: over.documents ?? 42,
         ...(over.searchable === undefined ? {} : { searchableDocuments: over.searchable }),
+        ...(over.own === undefined ? {} : { ownSearchableDocuments: over.own }),
       },
     },
     ...(over.lock === undefined ? {} : { conversationProtection: { state: over.lock } }),
@@ -793,18 +795,8 @@ describe('a stream failure is worded by the shared mapping, and an abort is not 
 /* ── E10: a corpus of zero offers the fix ────────────────────────────────────────────────────── */
 
 describe('the landing says what there is to search, or offers the way to get some', () => {
-  it('states the default-scope population when there is one', async () => {
-    feed({ documents: 900, searchable: 12 });
-    const el = await mount();
-    const composer = await region(el, 'jf-sv3-composer');
-    const line = q(composer, 'sv3-composer-corpus');
-    expect(line?.dataset.kind).toBe('documents');
-    expect(textOf(line)).toContain('12');
-    expect(q(composer, 'sv3-composer-corpus-remedy')).toBeNull();
-  });
-
   it('offers the remedy on a REPORTED zero, and navigates to the surface that owns it', async () => {
-    feed({ documents: 0, searchable: 0 });
+    feed({ documents: 0, searchable: 0, own: 0 });
     const el = await mount();
     const composer = await region(el, 'jf-sv3-composer');
     const remedy = q(composer, 'sv3-composer-corpus-remedy') as HTMLButtonElement | null;
@@ -817,15 +809,8 @@ describe('the landing says what there is to search, or offers the way to get som
     expect(navigations).toEqual([CORPUS_REMEDY_TARGET]);
   });
 
-  it('claims nothing before a settled poll — the case the shipped landing gets wrong', async () => {
-    const el = await mount();
-    const composer = await region(el, 'jf-sv3-composer');
-    // Neither "Searching 0 files" nor the remedy: the window has not been told, so it says nothing.
-    expect(q(composer, 'sv3-composer-corpus')).toBeNull();
-  });
-
   it('spends no chrome on the corpus once the window is working', async () => {
-    feed({ documents: 900, searchable: 12 });
+    feed({ documents: 900, searchable: 12, own: 12 });
     const stream = stubStream();
     const el = await mount();
     const composer = await region(el, 'jf-sv3-composer');

@@ -131,7 +131,7 @@
           "lanes": [
             "gpu-linux"
           ],
-          "applicability": "Supported Linux NVIDIA GPU: installation through the production API request sent by Accept and download; UI install/consent qualified in CPU VMs; GPU_FULL defaults, UI activation and Start AI, chat with sources, actual CUDA providers and pack-owned mapped libraries"
+          "applicability": "Supported Linux NVIDIA GPU: installation through the production API request sent by Accept and download; UI install/consent qualified in CPU VMs; GPU_FULL defaults, UI activation and Start answers, chat with sources, actual CUDA providers and pack-owned mapped libraries"
         }
       ]
     },
@@ -164,7 +164,7 @@
             "vm-windows",
             "gpu-linux"
           ],
-          "applicability": "Linux; WebDriver restart DOM and stored bookmark; round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
+          "applicability": "Linux; WebDriver restart DOM and saved skip rule/theme (predecessor: theme only); round-two decision: X11 runs J1 only; Windows hosted and VM use NSIS, UI Automation and the production API"
         }
       ]
     },

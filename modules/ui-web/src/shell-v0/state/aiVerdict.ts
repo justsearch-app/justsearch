@@ -113,6 +113,14 @@ export interface AiEngineVerdict {
    * fell back to CPU. Absent when no ONNX model is active.
    */
   readonly activeModelPlacement?: { readonly cpuOnly: boolean; readonly gpuFallback: boolean };
+  /**
+   * Set only when `kind === 'not_installed'` and nobody has asked for AI: no install is running, failed
+   * or left bytes to resume (those are other kinds), and neither chat nor semantic search is switched
+   * on. AI is optional, so this is a settled choice, not a fault: surfaces read it to stay calm about
+   * what only AI provides (see `awaitsUnrequestedAi` in readinessNotice.ts). Absent whenever the
+   * person asked for AI.
+   */
+  readonly notRequested?: true;
 }
 
 /**
@@ -147,6 +155,8 @@ export interface AiEngineObservedInput {
    */
   readonly engineState?: string;
   readonly chatEnabledSpec?: boolean;
+  /** The Worker's semantic producer is switched on (`worker.enrichment.embeddingEnabled`): AI asked for. */
+  readonly semanticEnabled?: boolean;
   readonly procedure?: string;
   readonly engineReason?: string;
 }
@@ -318,7 +328,12 @@ function computeLifecycle(input: AiEngineObservedInput): AiEngineVerdict {
         resumableBytes: staged,
       };
     }
-    return { kind: 'not_installed', stability: { kind: 'settled' }, installFailure: null };
+    return {
+      kind: 'not_installed',
+      stability: { kind: 'settled' },
+      installFailure: null,
+      ...(chatEnabledSpec === true || input.semanticEnabled === true ? {} : { notRequested: true as const }),
+    };
   }
 
   // Legacy transitioning (pre-authority): the authored path already mapped Starting/Recovering above.

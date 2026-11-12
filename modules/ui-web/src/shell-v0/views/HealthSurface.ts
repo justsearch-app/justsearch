@@ -21,7 +21,7 @@ import { getStatusEpoch, subscribeStatusEpoch } from '../../api/statusInvalidati
 import { subscribeProfileSwitch } from '../state/UserStateDocument.js';
 import { listTasks } from '../substrates/tasks/index.js';
 import { getSeenCursor, subscribeSeenCursor } from '../substrates/recall/recallCursor.js';
-import { projectSystemHealth, unresolvedHealthOperations, getHealthRemoteObservations, subscribeHealthObservations, healthObservationCurrent, HEAD_HEALTH_MAX_AGE_MS, REMOTE_HEALTH_MAX_AGE_MS } from '../state/systemHealth.js';
+import { projectSystemHealth, unresolvedHealthOperations, getHealthRemoteObservations, subscribeHealthObservations, healthObservationCurrent, statusCurrency, healthIndexingProgress, REMOTE_HEALTH_MAX_AGE_MS } from '../state/systemHealth.js';
 import { activateOnKey } from '../utils/keyboardHandler.js';
 import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabIntent.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
@@ -76,7 +76,7 @@ import { engineLossAge } from '../components/EngineLoss.js';
 import { type Maybe, UNKNOWN } from '../state/known.js';
 import { unavailableBecause } from '../state/availability.js';
 import { readinessNotice, reasonFor } from '../state/readinessNotice.js';
-import { isWorkerReportedIndex, selectIndexingProgress } from '../state/indexingProgress.js';
+import { isWorkerReportedIndex } from '../state/indexingProgress.js';
 import '../components/IndexingControls.js';
 import {
   ENRICHMENT_BLOCKED_LABEL,
@@ -354,7 +354,7 @@ export class HealthSurface extends JfElement {
   }
 
   private recoveryCurrent(): boolean {
-    return !this.recoveryFailed && healthObservationCurrent(this.recoveryAtMs, Date.now(), REMOTE_HEALTH_MAX_AGE_MS);
+    return healthObservationCurrent(this.recoveryAtMs, Date.now(), REMOTE_HEALTH_MAX_AGE_MS, this.recoveryFailed);
   }
 
   /** Bound includes the response body, even if a transport ignores cancellation. */
@@ -407,6 +407,7 @@ export class HealthSurface extends JfElement {
     }
     .health-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(8rem, 100%), 1fr)); gap: .75rem; margin: 0; }
     .health-metrics dd { margin: .25rem 0 0; font-size: var(--font-size-lg); overflow-wrap: anywhere; }
+    .health-metrics .last-known { font-size: var(--font-size-xs); color: var(--text-secondary); }
     .health-rows { margin: 0; }
     .health-row { display: grid; grid-template-columns: minmax(8rem, 1fr) minmax(0, 3fr); gap: 1rem; padding: .8rem 0; border-bottom: 1px solid var(--border-subtle); }
     .health-row dt { font-weight: 600; }
@@ -956,8 +957,9 @@ export class HealthSurface extends JfElement {
       if (this.isConnected && this.failedRead === read && !read.signal.aborted) {
         this.failedJobs = fj.jobs; this.failedAtMs = Date.now(); this.failedReadError = false;
       }
-    } catch (err) {
-      if (this.isConnected && this.failedRead === read) { this.failedReadError = true; this.error = err instanceof Error ? err.message : String(err); }
+    } catch {
+      // A failed read is a currency fact (the Failed files card and the rows say it), never banner text.
+      if (this.isConnected && this.failedRead === read) this.failedReadError = true;
     } finally {
       clearTimeout(timer);
       if (this.failedRead === read) { this.failedRead = null; this.loading = false; this.initialPollComplete = true; }
@@ -982,17 +984,24 @@ export class HealthSurface extends JfElement {
   }
   private renderOverviewMetrics(): TemplateResult {
     const progress = this.indexingProgress();
-    const current = this.aiState?.indexingStatusLive === true;
-    const metric = (label: string, value: string) => html`<div><dt>${label}</dt><dd>${value}</dd></div>`;
+    const { head, worker } = this.statusCurrency();
+    const workerReported = isWorkerReportedIndex(this.status);
+    // A value Health holds but cannot confirm stays readable, marked as last known.
+    const metric = (label: string, value: string | null | undefined, current: boolean) => html`<div><dt>${label}</dt><dd>${
+      value == null ? '—' : current ? value : html`${value} <span class="last-known">· last known</span>`}</dd></div>`;
     return html`<dl class="health-metrics" aria-label="System measurements">
-      ${metric('Files', current ? projectFact('core.files', this.aiState).value ?? '—' : '—')}
-      ${metric('Size', current ? projectFact('core.size', this.aiState).value ?? '—' : '—')}
-      ${metric('Memory', this.headCurrent() && this.status?.memoryUsedBytes != null ? projectFact('core.memory', this.aiState).value ?? '—' : '—')}
-      ${metric('Queue', current && progress.activity.confirmed ? formatCount(progress.jobsPending) : '—')}
+      ${metric('Files', workerReported ? projectFact('core.files', this.aiState).value : undefined, worker)}
+      ${metric('Size', workerReported ? projectFact('core.size', this.aiState).value : undefined, worker)}
+      ${metric('Memory', this.status?.memoryUsedBytes != null ? projectFact('core.memory', this.aiState).value : undefined, head)}
+      ${metric('Queue', workerReported ? formatCount(progress.jobsPending) : undefined, worker)}
     </dl>`;
   }
+  /** The status read's currency, by Health's one rule (systemHealth). */
+  private statusCurrency() {
+    return statusCurrency(this.aiState, getStatusReceivedAtMs(), Date.now());
+  }
   private headCurrent(): boolean {
-    return healthObservationCurrent(getStatusReceivedAtMs(), Date.now(), HEAD_HEALTH_MAX_AGE_MS);
+    return this.statusCurrency().head;
   }
   /** The age of whichever observation is out of date: the status receipt, else the worker sample it carries. */
   private statusAges(): string {
@@ -1008,7 +1017,11 @@ export class HealthSurface extends JfElement {
     const rows = this.healthRows();
     const allFine = rows.every(row => row.status === '');
     const meaningful = rows.find(row => row.status && !row.status.toLowerCase().includes('unconfirmed'));
-    const label = allFine ? 'Everything is working' : meaningful?.status ?? 'Checking system status';
+    // A failed status read is said in words; the error itself is never shown.
+    const unread = this.aiState?.statusReadFailed !== true ? null : this.status
+      ? 'Can’t get current status from the Engine. Showing what was last observed.'
+      : 'Can’t get status from the Engine. Health keeps checking.';
+    const label = allFine ? 'Everything is working' : meaningful?.status ?? unread ?? 'Checking system status';
     return html`
       <div class="header">
         <div class="header-left">
@@ -1087,10 +1100,7 @@ export class HealthSurface extends JfElement {
    * comes from the ONE indexing-progress projection — this card derives none of it privately.
    */
   private indexingProgress() {
-    return selectIndexingProgress(
-      this.status, this.aiState?.indexingStatusLive ?? false,
-      this.aiState?.episodeMaxPendingJobs ?? 0, this.aiState?.enrichSettleSamples ?? [],
-    );
+    return healthIndexingProgress(this.aiState, this.statusCurrency());
   }
 
   private queueSubLabel(queue: number, known: boolean): string {
@@ -1132,12 +1142,7 @@ export class HealthSurface extends JfElement {
     const memRatio = memoryKnown ? memUsed / memMax : 0;
     // 813 §3b — the Queue card's number comes from the ONE indexing-progress projection, the same
     // authority `queueSubLabel` reads, so the card's value and its sub-text cannot disagree.
-    const progress = selectIndexingProgress(
-      this.status,
-      this.aiState?.indexingStatusLive ?? false,
-      this.aiState?.episodeMaxPendingJobs ?? 0,
-      this.aiState?.enrichSettleSamples ?? [],
-    );
+    const progress = this.indexingProgress();
     const queue = progress.jobsPending;
     const memColor = memRatio > 0.9 ? 'red' : memRatio > 0.8 ? 'amber' : 'green';
     const memDot = !memoryKnown ? 'neutral' : memRatio > 0.9 ? 'error' : memRatio > 0.8 ? 'warning' : 'healthy';
@@ -1997,7 +2002,7 @@ export class HealthSurface extends JfElement {
   }
 
   private renderFailed(): TemplateResult | typeof nothing {
-    const current = !this.failedReadError && healthObservationCurrent(this.failedAtMs, Date.now(), REMOTE_HEALTH_MAX_AGE_MS);
+    const current = healthObservationCurrent(this.failedAtMs, Date.now(), REMOTE_HEALTH_MAX_AGE_MS, this.failedReadError);
     if (this.failedJobs.length === 0) return current ? nothing : html`<section class="card section"><h3>Failed files</h3><p>Failed-file status unconfirmed.</p></section>`;
     return html`
       <div class="card section">
@@ -2031,7 +2036,7 @@ export class HealthSurface extends JfElement {
     return html`
       <div class="card section">
         <h3>Recent events</h3>
-        ${!this.eventsConnected || !healthObservationCurrent(this.eventsAtMs, Date.now(), REMOTE_HEALTH_MAX_AGE_MS) ? html`<p>Last observed events, received ${formatRelativeMs(this.eventsAtMs)} — current stream unconfirmed.</p>` : nothing}
+        ${!healthObservationCurrent(this.eventsAtMs, Date.now(), REMOTE_HEALTH_MAX_AGE_MS, !this.eventsConnected) ? html`<p>Last observed events, received ${formatRelativeMs(this.eventsAtMs)} — current stream unconfirmed.</p>` : nothing}
         <div class="events-list">
           ${this.events
             .slice(-30)
@@ -2128,7 +2133,7 @@ export class HealthSurface extends JfElement {
       ${this.renderHeader()}
       <div class="body">
         ${refusal ? nothing : html`<div data-testid="health-indexing-pause">
-          ${progress.pause || !progress.activity.confirmed ? html`<p>${progress.activity.summary} — ${progress.activity.detail}</p>` : nothing}
+          ${progress.pause || !progress.activity.confirmed ? html`<p>${[progress.activity.summary, progress.activity.detail].filter(Boolean).join(' — ')}</p>` : nothing}
           <jf-indexing-controls .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
         </div>`}
         ${this.error && !refusal
@@ -2151,7 +2156,7 @@ export class HealthSurface extends JfElement {
         </section>`)}
         <details .open=${this.diagnosticsOpen} @toggle=${(event: Event) => { this.diagnosticsOpen = (event.target as HTMLDetailsElement).open; diagnosticsExpanded = this.diagnosticsOpen; }}>
           <summary>Diagnostics</summary>
-          ${!this.headCurrent() || !this.aiState?.indexingStatusLive ? html`<p class="diagnostic-currency">Diagnostic values are last observed (${this.statusAges()}); current status is unconfirmed.</p>` : nothing}
+          ${!this.statusCurrency().worker ? html`<p class="diagnostic-currency">Diagnostic values are last observed (${this.statusAges()}); current status is unconfirmed.</p>` : nothing}
         ${this.renderStats()}
         <!-- Tempdoc 596 §16.5 — "what can I do right now": every capability affordance's availability +
              its inline remedy, projected from the same authority the live controls read. -->

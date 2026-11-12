@@ -50,6 +50,8 @@ import {
   COMPOSER_PLACEHOLDER,
   COMPOSER_STATE_DEFAULT,
   CORPUS_ADD_FOLDERS,
+  CORPUS_NONE,
+  CORPUS_UNKNOWN,
   CORPUS_REMEDY_TARGET,
   HERO_HEADLINE,
   SV3_DEGRADATION_DETAIL_ID,
@@ -2086,11 +2088,11 @@ export class Sv3Composer extends JfElement {
    * The hero intro: the headline, and what the next question can actually be answered from
    * (tempdoc 822 Phase F7; inventory E10 / tempdoc 811 C-4).
    *
-   * THREE outcomes, and the third is silence. A corpus of zero offers the REMEDY instead of letting
-   * the window imply it will search something; a known corpus states its size; and an `unknown` one
-   * says nothing at all, because a window that has not been told the count must not fill the gap with
-   * either claim. The remedy is a real navigation the window performs — the composer announces it,
-   * exactly as it announces a send.
+   * THREE outcomes, all counting only the person's own files. A corpus of zero says so and offers the
+   * REMEDY instead of letting the window imply it will search something; a known corpus states its
+   * size; and an `unknown` one says that it is not known, never a number, because a window that has
+   * not been told the count must not fill the gap with either claim. The remedy is a real navigation
+   * the window performs — the composer announces it, exactly as it announces a send.
    */
   private landing(): TemplateResult {
     return html`
@@ -2103,7 +2105,10 @@ export class Sv3Composer extends JfElement {
 
   private corpusLine(): TemplateResult | typeof nothing {
     const setup = getFirstUse();
-    if (setup.coreVisible && setup.progress && !setup.empty || this.corpus.kind === 'unknown') return nothing;
+    if (setup.coreVisible && setup.progress && !setup.empty) return nothing;
+    if (this.corpus.kind === 'unknown') {
+      return html`<p class="corpus" data-testid="sv3-composer-corpus" data-kind="unknown">${CORPUS_UNKNOWN}</p>`;
+    }
     if (this.corpus.kind === 'documents') {
       return html`<p class="corpus" data-testid="sv3-composer-corpus" data-kind="documents">
         Searching ${this.corpus.count.toLocaleString()}
@@ -2111,6 +2116,7 @@ export class Sv3Composer extends JfElement {
       </p>`;
     }
     return html`<p class="corpus" data-testid="sv3-composer-corpus" data-kind="empty">
+      ${CORPUS_NONE}
       <jf-control
         class="corpus-remedy"
         data-testid="sv3-composer-corpus-remedy"

@@ -113,7 +113,7 @@ describe('the corpus tells "none" apart from "not reported"', () => {
     snapshot({
       lastSettledIndex: {
         documentCount: 0,
-        searchableDocumentCount: null,
+        ownDocumentCount: null,
         indexSizeBytes: null,
         ...over,
       },
@@ -124,27 +124,13 @@ describe('the corpus tells "none" apart from "not reported"', () => {
     expect(projectSv3Corpus(snapshot({ lastSettledIndex: null }))).toEqual(SV3_CORPUS_UNKNOWN);
   });
 
-  it('prefers the DEFAULT-SCOPE population over the whole-index count', () => {
-    expect(projectSv3Corpus(index({ documentCount: 900, searchableDocumentCount: 12 }))).toEqual({
-      kind: 'documents',
-      count: 12,
-    });
-  });
-
-  it('falls back to the whole-index count when the scope population is not reported', () => {
-    expect(projectSv3Corpus(index({ documentCount: 7, searchableDocumentCount: null }))).toEqual({
-      kind: 'documents',
-      count: 7,
-    });
-  });
-
   it('treats a REPORTED zero as real (811 C-4) — the remedy case, not the unknown one', () => {
-    expect(projectSv3Corpus(index({ documentCount: 0, searchableDocumentCount: 0 }))).toEqual({
+    expect(projectSv3Corpus(index({ documentCount: 0, ownDocumentCount: 0 }))).toEqual({
       kind: 'empty',
     });
     // ...and a scoped zero over a non-empty index is still zero to search: the number that matters
     // is the one the next question runs against.
-    expect(projectSv3Corpus(index({ documentCount: 900, searchableDocumentCount: 0 }))).toEqual({
+    expect(projectSv3Corpus(index({ documentCount: 900, ownDocumentCount: 0 }))).toEqual({
       kind: 'empty',
     });
   });
@@ -368,7 +354,7 @@ describe("the tail's sources trigger says only what the panel actually holds", (
 
 it.each(['unknown', 'stale'])('does not present a retained zero as the current search corpus when %s', state => {
   const previous = {
-    lastSettledIndex: { documentCount: 7, searchableDocumentCount: 0, indexSizeBytes: 10 },
+    lastSettledIndex: { documentCount: 7, ownDocumentCount: 0, indexSizeBytes: 10 },
     status: { worker: { countObservations: { searchable: { state, observedAtMs: 1234 } } } },
   } as unknown as AiState;
   expect(projectSv3Corpus(previous)).toEqual(SV3_CORPUS_UNKNOWN);

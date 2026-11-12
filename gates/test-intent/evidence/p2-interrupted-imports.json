@@ -1,0 +1,470 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:f91ac7d8acc22bba9a639652759bbc5ee9779f4122e1d7ebba88ca43ff5222b6"
+  },
+  "createdAt": "2026-11-12T04:28:48.434Z",
+  "revision": "317831ee434b4b45bf37e782904128086916b6ab",
+  "tree": "0825b28e7ace7befb34125d88220e758c853bfd8",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.twoInterruptedImportsDoNotBlockFreshDispatch\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 113803
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.resumeRefusedAtFullCapacityKeepsTheImportVisible\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3786
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.acceptedResumeWithoutWorkCapacityRelatchesTheSameImport\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3405
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.interruptedImportKeepsCapacityUntilProducerAndIssuedClaimsDrain\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3539
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.overlappingImportCannotTakeRetainedWalkMembers\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3618
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.acceptedPartitionedImportsRetainOriginAndApprovalAfterHistoryExpiry\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3784
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.recoveryCannotRecreateOrEnumerateContradictoryChildEvidence\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 4308
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.indexReplacementKeepsPendingWorkButDropsFreshCapsuleAuthority\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3244
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.bootFailedChildRepairsMissingOrStaleParentCheckpointBeforeFailure\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3205
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.bootCancelledChildRepairsParentAndPropagatesCancellationWithoutAdmission\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3004
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.bootParentWithMoreConfirmedUnitsThanChildFailsUnavailableAndPreservesCheckpoint\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2904
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.malformedParentCannotAcknowledgeHiddenTerminalChildOrOutrunIssuedSibling\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3045
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.bothStoresReopenUnderNewOwnersAndResumeTheOriginalPreparedOperation\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3810
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.refusedRecoveryRetainsUnsettledUnitsAfterEnumerationAlreadyCompleted\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3704
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.liveRefusalSurvivesAuthorityRestorationAndCountCheckpointsAfterAnIssuedClaimDrains\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 2935
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-engine:test --tests \"io.justsearch.app.engine.RecordedIngestionCoordinatorTest.registeredPreparedRecoveryRefusesStaleGenerationAndRevokedAuthorityWithoutEffect\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3326
+    },
+    {
+      "command": "js-gradle-slot -w 3600 ./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.registry.operations.CoreOperationCatalogTest.definitionsContainTheExpectedSeedEntries\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 3304
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#twoInterruptedImportsDoNotBlockFreshDispatch",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "twoInterruptedImportsDoNotBlockFreshDispatch(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "twoInterruptedImportsDoNotBlockFreshDispatch(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#resumeRefusedAtFullCapacityKeepsTheImportVisible",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "resumeRefusedAtFullCapacityKeepsTheImportVisible()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#acceptedResumeWithoutWorkCapacityRelatchesTheSameImport",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "acceptedResumeWithoutWorkCapacityRelatchesTheSameImport()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#interruptedImportKeepsCapacityUntilProducerAndIssuedClaimsDrain",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "interruptedImportKeepsCapacityUntilProducerAndIssuedClaimsDrain(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "interruptedImportKeepsCapacityUntilProducerAndIssuedClaimsDrain(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#overlappingImportCannotTakeRetainedWalkMembers",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "overlappingImportCannotTakeRetainedWalkMembers(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "overlappingImportCannotTakeRetainedWalkMembers(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#acceptedPartitionedImportsRetainOriginAndApprovalAfterHistoryExpiry",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "acceptedPartitionedImportsRetainOriginAndApprovalAfterHistoryExpiry(String) [1] auto",
+          "status": "passed"
+        },
+        {
+          "name": "acceptedPartitionedImportsRetainOriginAndApprovalAfterHistoryExpiry(String) [2] family",
+          "status": "passed"
+        },
+        {
+          "name": "acceptedPartitionedImportsRetainOriginAndApprovalAfterHistoryExpiry(String) [3] session",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#recoveryCannotRecreateOrEnumerateContradictoryChildEvidence",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "recoveryCannotRecreateOrEnumerateContradictoryChildEvidence(String) [1] missing-checkpointed-walk",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryCannotRecreateOrEnumerateContradictoryChildEvidence(String) [2] missing-unit-walk",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryCannotRecreateOrEnumerateContradictoryChildEvidence(String) [3] missing-receipted-walk",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryCannotRecreateOrEnumerateContradictoryChildEvidence(String) [4] mismatched-plan",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryCannotRecreateOrEnumerateContradictoryChildEvidence(String) [5] decreased-completed",
+          "status": "passed"
+        },
+        {
+          "name": "recoveryCannotRecreateOrEnumerateContradictoryChildEvidence(String) [6] decreased-failed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#indexReplacementKeepsPendingWorkButDropsFreshCapsuleAuthority",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "indexReplacementKeepsPendingWorkButDropsFreshCapsuleAuthority()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#bootFailedChildRepairsMissingOrStaleParentCheckpointBeforeFailure",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootFailedChildRepairsMissingOrStaleParentCheckpointBeforeFailure(boolean) [1] false",
+          "status": "passed"
+        },
+        {
+          "name": "bootFailedChildRepairsMissingOrStaleParentCheckpointBeforeFailure(boolean) [2] true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#bootCancelledChildRepairsParentAndPropagatesCancellationWithoutAdmission",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootCancelledChildRepairsParentAndPropagatesCancellationWithoutAdmission()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#bootParentWithMoreConfirmedUnitsThanChildFailsUnavailableAndPreservesCheckpoint",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bootParentWithMoreConfirmedUnitsThanChildFailsUnavailableAndPreservesCheckpoint()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#malformedParentCannotAcknowledgeHiddenTerminalChildOrOutrunIssuedSibling",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "malformedParentCannotAcknowledgeHiddenTerminalChildOrOutrunIssuedSibling()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#bothStoresReopenUnderNewOwnersAndResumeTheOriginalPreparedOperation",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "bothStoresReopenUnderNewOwnersAndResumeTheOriginalPreparedOperation(boolean, boolean) [1] false, false",
+          "status": "passed"
+        },
+        {
+          "name": "bothStoresReopenUnderNewOwnersAndResumeTheOriginalPreparedOperation(boolean, boolean) [2] true, false",
+          "status": "passed"
+        },
+        {
+          "name": "bothStoresReopenUnderNewOwnersAndResumeTheOriginalPreparedOperation(boolean, boolean) [3] false, true",
+          "status": "passed"
+        },
+        {
+          "name": "bothStoresReopenUnderNewOwnersAndResumeTheOriginalPreparedOperation(boolean, boolean) [4] true, true",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#refusedRecoveryRetainsUnsettledUnitsAfterEnumerationAlreadyCompleted",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusedRecoveryRetainsUnsettledUnitsAfterEnumerationAlreadyCompleted(String) [1] none",
+          "status": "passed"
+        },
+        {
+          "name": "refusedRecoveryRetainsUnsettledUnitsAfterEnumerationAlreadyCompleted(String) [2] before-marker",
+          "status": "passed"
+        },
+        {
+          "name": "refusedRecoveryRetainsUnsettledUnitsAfterEnumerationAlreadyCompleted(String) [3] after-marker",
+          "status": "passed"
+        },
+        {
+          "name": "refusedRecoveryRetainsUnsettledUnitsAfterEnumerationAlreadyCompleted(String) [4] after-retirement",
+          "status": "passed"
+        },
+        {
+          "name": "refusedRecoveryRetainsUnsettledUnitsAfterEnumerationAlreadyCompleted(String) [5] after-terminal",
+          "status": "passed"
+        },
+        {
+          "name": "refusedRecoveryRetainsUnsettledUnitsAfterEnumerationAlreadyCompleted(String) [6] exhausted",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#liveRefusalSurvivesAuthorityRestorationAndCountCheckpointsAfterAnIssuedClaimDrains",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "liveRefusalSurvivesAuthorityRestorationAndCountCheckpointsAfterAnIssuedClaimDrains()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#registeredPreparedRecoveryRefusesStaleGenerationAndRevokedAuthorityWithoutEffect",
+      "file": "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:f5a154358301903b1c67d475fbbb24af35946b444a72adcd99ee9ecd09c05992",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "registeredPreparedRecoveryRefusesStaleGenerationAndRevokedAuthorityWithoutEffect(RegisteredRecoveryRefusalCase) [1] INGEST_STALE_GENERATION",
+          "status": "passed"
+        },
+        {
+          "name": "registeredPreparedRecoveryRefusesStaleGenerationAndRevokedAuthorityWithoutEffect(RegisteredRecoveryRefusalCase) [2] REINDEX_STALE_GENERATION",
+          "status": "passed"
+        },
+        {
+          "name": "registeredPreparedRecoveryRefusesStaleGenerationAndRevokedAuthorityWithoutEffect(RegisteredRecoveryRefusalCase) [3] INGEST_REVOKED_AUTHORITY",
+          "status": "passed"
+        },
+        {
+          "name": "registeredPreparedRecoveryRefusesStaleGenerationAndRevokedAuthorityWithoutEffect(RegisteredRecoveryRefusalCase) [4] REINDEX_REVOKED_AUTHORITY",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/CoreOperationCatalogTest.java#definitionsContainTheExpectedSeedEntries",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/CoreOperationCatalogTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:2613e7905b054e1d470edc4698a25e2a35c3b7e1ef8626d89d719b6364b94acf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "definitionsContainTheExpectedSeedEntries()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:96e5fdee8ac6e0776938be7f35cc22a4abf2a1e4b35cfa27c88f7d2a71395d3b"
+}

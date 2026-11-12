@@ -50,16 +50,14 @@ class WindowsEvidenceTests(unittest.TestCase):
         from contextlib import ExitStack
         import linux
         from runner import Unavailable, Run as SharedRun
-        state = {'savedFiles': {'files': {'models/embedding.onnx': 'digest'},
-                                'savedViews': [{'id': 'bookmark'}]}}
+        state = {'savedFiles': {'files': {'models/embedding.onnx': 'digest'}},
+                 'settings': {'ui': {'theme': 'dark'}}}
         complete = {'initialPackage': {'version': '0.3.0'}, 'initialVersion': '0.3.1',
-                    'ai': {'state': 'completed'}, 'authored': True, 'bookmark': {'id': 'bookmark'},
+                    'ai': {'state': 'completed'}, 'authored': True,
                     'beforeState': state}
         cases = [dict(complete, ai=None), dict(complete, authored=False),
-                 dict(complete, bookmark={}), dict(complete, beforeState={'savedFiles': {'files': {},
-                        'savedViews': [{'id': 'bookmark'}]}}),
-                 dict(complete, beforeState={'savedFiles': {'files': {'models/embedding.onnx': 'digest'},
-                        'savedViews': []}})]
+                 dict(complete, beforeState=dict(state, savedFiles={'files': {}})),
+                 dict(complete, beforeState=dict(state, settings={'ui': {'theme': 'system'}}))]
         for adapter in (windows, linux):
             for original in cases:
                 facts = dict(original)
@@ -85,21 +83,21 @@ class WindowsEvidenceTests(unittest.TestCase):
                         with self.assertRaises(Unavailable):
                             dependent(run)
 
-    def test_j5_rechecks_prepared_model_bytes_and_bookmarks_before_update(self):
+    def test_j5_rechecks_prepared_model_bytes_and_theme_before_update(self):
         from pathlib import Path
         from unittest.mock import Mock, patch
         from runner import Unavailable
         import linux
-        bookmark = {'id': 'authored'}
-        before = {'savedFiles': {'files': {'models/embedding.onnx': 'sha'}, 'savedViews': [bookmark]}}
+        before = {'savedFiles': {'files': {'models/embedding.onnx': 'sha'}},
+                  'settings': {'ui': {'theme': 'dark'}}}
         cases = [(before, True),
-                 ({'savedFiles': {'files': {}, 'savedViews': [bookmark]}}, False),
-                 ({'savedFiles': {'files': {'models/embedding.onnx': 'changed'}, 'savedViews': [bookmark]}}, False),
-                 ({'savedFiles': {'files': {'models/embedding.onnx': 'sha'}, 'savedViews': []}}, False)]
+                 (dict(before, savedFiles={'files': {}}), False),
+                 (dict(before, savedFiles={'files': {'models/embedding.onnx': 'changed'}}), False),
+                 (dict(before, settings={'ui': {'theme': 'light'}}), False)]
         for current, ready in cases:
             with self.subTest(current=current):
                 run = Mock(facts={'ai': {'state': 'completed'}, 'authored': True,
-                                  'bookmark': bookmark, 'beforeState': before,
+                                  'beforeState': before,
                                   'initialPackage': {'version': '0.3.0'}, 'initialVersion': '0.3.1'})
                 if not ready:
                     run.facts.update(updateOffered=True, updateCancelled=True)
@@ -656,30 +654,32 @@ class WindowsOperationalTests(unittest.TestCase):
                 self.assertEqual(evidence['exitCode'], code)
                 self.assertEqual(evidence['process'], run.facts['installerProcesses'][0])
 
-    def test_windows_state_reads_bookmarks_from_own_web_storage_and_model_bytes(self):
+    def test_windows_state_reads_engine_settings_and_model_bytes(self):
         with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp);(root/'models').mkdir();(root/'models/model.onnx').write_bytes(b'actual model')
+            root = Path(temp); (root/'models').mkdir(); (root/'models/model.onnx').write_bytes(b'actual model')
             run = Mock(data=str(root))
-            bookmark = {'id': 'authored', 'label': 'Library'}
-            run.wd.execute.return_value = [bookmark]
-            run.api.return_value = {'results': ['JustSearch-journey-orchid-open.txt']}
+            settings = {'ui': {'theme': 'dark', 'excludePatterns': [linux.SKIP_RULE]}}
+            run.api.return_value = settings
             with patch.object(linux, 'search_api', return_value={'results': ['fixture']}):
                 state = windows.Run.state_snapshot(run)
-            self.assertEqual(state['savedFiles']['savedViews'], [bookmark])
+            self.assertEqual(state['settings'], settings)
             self.assertEqual(len(state['savedFiles']['files']), 1)
-            self.assertIn('localStorage.getItem', run.wd.execute.call_args[0][0])
+            self.assertNotIn('savedViews', state['savedFiles'])
+            run.wd.execute.assert_not_called()
 
-    def test_windows_restart_uses_shared_state_contract_and_storage_dom(self):
-        run = Mock(platform='windows', facts={'windowShownAt': 1})
-        bookmark = {'id': 'saved', 'label': 'Library', 'surfaceId': 'core.library-surface', 'url': 'justsearch://library'}
-        before = {'savedFiles': {'files': {'model': 'sha'}, 'savedViews': [bookmark]}, 'settings': {'ui': {'theme': 'dark'}},
+    def test_windows_restart_uses_shared_state_contract_and_rule_dom(self):
+        run = Mock(platform='windows', facts={'windowShownAt': 1}, args=SimpleNamespace(phase='candidate'))
+        rule = linux.SKIP_RULE
+        before = {'savedFiles': {'files': {'model': 'sha'}},
+                  'settings': {'ui': {'theme': 'dark', 'excludePatterns': [rule]}},
                   'roots': {'path': r'C:\corpus'}, 'search': {'results': ['JustSearch-journey-orchid-open.txt']}}
-        run.require.side_effect = lambda k: {'beforeState': before, 'bookmark': bookmark, 'corpus': r'C:\corpus'}[k]
+        run.require.side_effect = lambda k: {'beforeState': before, 'skipRule': rule, 'corpus': r'C:\corpus'}[k]
         run.state_snapshot.return_value = before
-        with patch.object(linux, 'stored_bookmarks', return_value=[bookmark]), patch.object(linux, 'bookmark_entry', return_value={'label': 'Library'}), patch.object(linux, 'interaction_observation'):
+        with patch.object(linux, 'skip_rule_entry', return_value={'pattern': rule}) as entry, patch.object(linux, 'interaction_observation'):
             self.assertEqual(linux.restart(run), before)
+        entry.assert_called_once_with(run, rule)
         run.start_ui.assert_called_once()
-        run.state_snapshot.return_value = dict(before, savedFiles={'files': {'model': 'changed'}, 'savedViews': [bookmark]})
+        run.state_snapshot.return_value = dict(before, savedFiles={'files': {'model': 'changed'}})
         with self.assertRaises(AssertionError):
             linux.assert_state(run)
 
@@ -745,24 +745,15 @@ class WindowsOperationalTests(unittest.TestCase):
 
 
 class WindowsUpdateAndCrashTests(unittest.TestCase):
-    def test_cached_j4_preserves_checkpoint_bookmark_instead_of_reauthoring(self):
-        bookmark={'id':'fixture-id','label':'Library','url':'app://library'}
-        run=Mock(args=SimpleNamespace(resume='checkpoint.json'),
-                 facts={'ui':True,'folder':True,'authored':True,'bookmark':bookmark,'beforeState':{'retained':True}})
-        run.require.side_effect=lambda key:run.facts[key]
-        run.wd.click.side_effect=Infrastructure('Bookmark this view absent because already bookmarked')
-        with patch.object(linux,'stored_bookmarks',return_value=[bookmark]), \
-             patch.object(linux,'assert_state',return_value={'retained':True}) as state:
-            self.assertEqual(windows.author_state(run),{'retained':True})
-        state.assert_called_once_with(run)
+    def test_cached_j4_preserves_checkpoint_rule_and_theme_instead_of_reauthoring(self):
+        run = Mock(args=SimpleNamespace(resume='checkpoint.json'), facts={'authored': True})
+        with patch.object(linux, 'assert_state', return_value={'retained': True}) as state:
+            self.assertEqual(windows.author_state(run), {'retained': True})
+            state.assert_called_once_with(run)
+            state.side_effect = ProductFailure('UI-authored skip rule disappeared')
+            with self.assertRaisesRegex(ProductFailure, 'skip rule disappeared'):
+                windows.author_state(run)
         run.wd.click.assert_not_called()
-        with patch.object(linux,'stored_bookmarks',return_value=[]), \
-             self.assertRaisesRegex(ProductFailure,'missing from Web Storage'):
-            windows.author_state(run)
-        with patch.object(linux,'stored_bookmarks',return_value=[bookmark]), \
-             patch.object(linux,'assert_state',side_effect=ProductFailure('Settings changed')), \
-             self.assertRaisesRegex(ProductFailure,'Settings changed'):
-            windows.author_state(run)
 
     def test_fresh_j4_still_authors_through_the_ui(self):
         for resume, authored in ((None,False),('checkpoint.json',False)):

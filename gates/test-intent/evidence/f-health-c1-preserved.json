@@ -1,0 +1,76 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T06:32:23.108Z",
+  "revision": "ac7ad2beb168c3e68c1cae2d47aada804026f8ed",
+  "tree": "95cb8ead1ed8979ce2adf1bf678cb208037dcab4",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/SurfaceReach-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/l14ouwz8/tmp/test-intent-vitest-30809-1794465123856.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 19250
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts#Health at 1280x720: the header stays fixed while the body scrolls on its own",
+      "file": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a3668bc24e539a4e9c1683f6e52fb1fb2eb13a32a543097501f4444d91382c59",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC5 a short window with large text keeps every surface reachable Health at 1280x720: the header stays fixed while the body scrolls on its own",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts#Logs at 1280x720: the header stays fixed while the body scrolls on its own",
+      "file": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a3668bc24e539a4e9c1683f6e52fb1fb2eb13a32a543097501f4444d91382c59",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC5 a short window with large text keeps every surface reachable Logs at 1280x720: the header stays fixed while the body scrolls on its own",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts#Library › Browse at 1280x720: the header stays fixed while the body scrolls on its own",
+      "file": "modules/ui-web/src/shell-v0/views/SurfaceReach-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a3668bc24e539a4e9c1683f6e52fb1fb2eb13a32a543097501f4444d91382c59",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC5 a short window with large text keeps every surface reachable Library › Browse at 1280x720: the header stays fixed while the body scrolls on its own",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:9dddb40345b1aed44389f8aaba47457bff58c4e93ad6615ad4884c08a52bdf87"
+}

@@ -60,6 +60,8 @@ public final class CoreOperationCatalog implements OperationCatalog {
 
   public static final OperationRef RECOVER_COMPONENT = new OperationRef("core.recover-component");
   public static final OperationRef BULK_REINDEX = new OperationRef("core.bulk-reindex");
+  public static final OperationRef RESUME_IMPORT = new OperationRef("core.resume-import");
+  public static final OperationRef CANCEL_IMPORT = new OperationRef("core.cancel-import");
   public static final OperationRef ACCEPT_GAPS = new OperationRef("core.accept-gaps");
   public static final OperationRef CANCEL_REINDEX = new OperationRef("core.cancel-reindex");
   public static final OperationRef FORGET_INDEXED_PATH = new OperationRef("core.forget-indexed-path");
@@ -363,6 +365,8 @@ public final class CoreOperationCatalog implements OperationCatalog {
       recoverComponent(),
       bulkReindex(),
       acceptGaps(),
+      resumeImport(),
+      cancelImport(),
       rebuildIndex(),
       cancelReindex(),
       forgetIndexedPath(),
@@ -467,6 +471,35 @@ public final class CoreOperationCatalog implements OperationCatalog {
         Set.of(ExecutorTag.UI, ExecutorTag.AGENT),
         // Slice 481 §7 step 2: admin migration; not user-self-service.
         Audience.OPERATOR);
+  }
+
+  private static Operation resumeImport() {
+    return new Operation(RESUME_IMPORT, Presentation.forId(RESUME_IMPORT),
+        Interface.inputsOnly("""
+            {"type":"object","additionalProperties":false,"properties":{
+              "operationKey":{"type":"string","minLength":36,"maxLength":36},
+              "interruptionRevision":{"type":"integer","minimum":1}},
+             "required":["operationKey","interruptionRevision"]}
+            """),
+        new OperationPolicy(RiskTier.MEDIUM, ConfirmStrategy.Inline.INSTANCE,
+            AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false)
+            .withRecordKind(io.justsearch.agent.api.registry.OperationKind.INGEST)
+            .withDeclaredSurvival(EngineContext.Survival.DURABLE),
+        OperationAvailability.empty(), OperationLineage.empty(), Binding.of(RESUME_IMPORT),
+        Provenance.core("1.0"), Set.of(ExecutorTag.UI), Audience.USER);
+  }
+
+  private static Operation cancelImport() {
+    return new Operation(CANCEL_IMPORT, Presentation.forId(CANCEL_IMPORT),
+        Interface.inputsOnly("""
+            {"type":"object","additionalProperties":false,"properties":{
+              "operationKey":{"type":"string","minLength":36,"maxLength":36}},
+             "required":["operationKey"]}
+            """),
+        new OperationPolicy(RiskTier.MEDIUM, ConfirmStrategy.Inline.INSTANCE,
+            AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false),
+        OperationAvailability.empty(), OperationLineage.empty(), Binding.of(CANCEL_IMPORT),
+        Provenance.core("1.0"), Set.of(ExecutorTag.UI), Audience.USER);
   }
 
   private static Operation acceptGaps() {

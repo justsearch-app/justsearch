@@ -17,7 +17,7 @@ final class SqliteSourceOrigins {
 
   static java.util.Optional<String> find(Connection connection, JobQueue.IndexJob claim, String operation,
       List<io.justsearch.app.api.knowledge.IngestCollectionPolicy.RootBinding> declared,
-      boolean currentDeclarations) throws SQLException {
+      boolean currentDeclarations, String activeBinding) throws SQLException {
     Path watched = watchedOwner(claim.path(), declared);
     if (watched != null) return watched(connection, watched);
     if (claim.ingestionRoot() == null) return java.util.Optional.empty();
@@ -25,9 +25,9 @@ final class SqliteSourceOrigins {
     if (claim.scanId() != null) {
       try (var query = connection.prepareStatement("""
           SELECT origin_id, normalized_root FROM source_origin
-          WHERE kind='IMPORT' AND operation_key=?
+          WHERE kind='IMPORT' AND operation_key=? AND approval_binding_id IS ?
           """)) {
-        query.setString(1, operation);
+        query.setString(1, operation); query.setString(2, activeBinding);
         try (var rows = query.executeQuery()) {
           while (rows.next()) {
             if (root.equals(PathNormalizer.normalizeKey(Path.of(rows.getString(2))))) {

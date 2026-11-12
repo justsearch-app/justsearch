@@ -25,6 +25,7 @@ import { isMac } from '../commands/KeybindingRegistry.js';
 import { TransientController } from '../primitives/transientController.js';
 import { icon, type IconName } from '../components/Icon.js';
 import { hasWindowLayer } from '../../utils/windowLayer.js';
+import { cssLength, shiftIntoWindow } from './menuPlacement.js';
 
 /** One place the bar can open: an area in the switcher, or a window listed in the More menu. */
 export interface TopBarDestination {
@@ -155,8 +156,10 @@ export class TopBar extends JfElement {
     /* The pill may give way only through the notice beside it (which wraps); its own words never shrink. */
     ::slotted([slot='status']) { flex: 0 1 auto; min-width: 0; }
     .menu-anchor { position: relative; flex: none; }
+    /* Under its button; placeMenu() moves it along the bar only as far as keeps it inside the window. */
     .menu { position: absolute; top: calc(100% + var(--jf-space-2)); z-index: var(--z-overlay-transient);
-      min-inline-size: var(--frame-menu-width); max-inline-size: calc(100vw - 2 * var(--jf-space-2));
+      translate: var(--top-bar-menu-shift, 0px) 0;
+      min-inline-size: min(var(--frame-menu-width), 100vw - 2 * var(--jf-space-2)); max-inline-size: calc(100vw - 2 * var(--jf-space-2));
       max-block-size: calc(100dvh - var(--frame-topbar-height) - var(--jf-space-4)); overflow-y: auto;
       box-sizing: border-box; padding: var(--jf-space-2); background: var(--surface-1); color: var(--text-primary);
       border: var(--frame-hairline) solid var(--border-emphasized); border-radius: var(--frame-panel-radius);
@@ -217,21 +220,22 @@ export class TopBar extends JfElement {
     }
   `;
 
-  /** The minimal bar is the only one with the area menu's button; this watches it come and go. */
-  private triggerSize: ResizeObserver | null = null;
+  /** The bar's own size and the area menu's button (only the minimal bar has one) as they come and go. */
+  private sizes: ResizeObserver | null = null;
   /** Interactive parts opt out of the bar's drag region (only present with the window layer). */
   private readonly noDrag = hasWindowLayer() ? 'false' : nothing;
 
   override connectedCallback(): void {
     super.connectedCallback();
     if (hasWindowLayer()) this.setAttribute('data-tauri-drag-region', 'deep');
-    this.triggerSize = typeof ResizeObserver === 'function' ? new ResizeObserver(this.minimalChange) : null;
+    this.sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(this.resized) : null;
+    this.sizes?.observe(this);
     if (this.hasUpdated) this.observeTrigger();
   }
 
   override disconnectedCallback(): void {
-    this.triggerSize?.disconnect();
-    this.triggerSize = null;
+    this.sizes?.disconnect();
+    this.sizes = null;
     super.disconnectedCallback();
   }
 
@@ -241,23 +245,37 @@ export class TopBar extends JfElement {
 
   private observeTrigger(): void {
     const trigger = this.shadowRoot?.querySelector('.area-trigger');
-    if (trigger) this.triggerSize?.observe(trigger);
+    if (trigger) this.sizes?.observe(trigger);
   }
 
   /**
-   * The bar gained room past the minimal layout (a wider window or smaller text): the area menu's
-   * button is gone, so its menu closes rather than staying open apart from it. Focus inside it moves
-   * to the active area in the switcher.
+   * The window or the text size changed. An open menu is placed again. When the bar gained room past
+   * the minimal layout, the area menu's button is gone, so its menu closes rather than staying open
+   * apart from it; focus inside it moves to the active area in the switcher.
    */
-  private readonly minimalChange = (): void => {
+  private readonly resized = (): void => {
     const trigger = this.shadowRoot?.querySelector('.area-trigger');
-    if (this.openMenu !== 'areas' || !trigger || trigger.getClientRects().length > 0) return;
-    const focusInside = this.shadowRoot?.activeElement?.closest('[role="menu"]') != null;
-    this.closeMenu(false);
-    if (focusInside) this.shadowRoot?.querySelector<HTMLButtonElement>('.segment[aria-current="page"]')?.focus();
+    if (this.openMenu === 'areas' && trigger && trigger.getClientRects().length === 0) {
+      const focusInside = this.shadowRoot?.activeElement?.closest('[role="menu"]') != null;
+      this.closeMenu(false);
+      if (focusInside) this.shadowRoot?.querySelector<HTMLButtonElement>('.segment[aria-current="page"]')?.focus();
+      return;
+    }
+    this.placeMenu();
   };
 
+  /** The one placement of the bar's menus: see {@link shiftIntoWindow}. */
+  private placeMenu(): void {
+    const menu = this.shadowRoot?.querySelector<HTMLElement>('.menu');
+    if (!menu) return;
+    this.style.setProperty('--top-bar-menu-shift', '0px');
+    const shift = shiftIntoWindow(menu.getBoundingClientRect(), cssLength(this, '--jf-space-2'));
+    this.style.setProperty('--top-bar-menu-shift', `${shift}px`);
+  }
+
   protected override updated(changed: PropertyValues): void {
+    // Any change while a menu is open (rows added from another window, the backend address shown) can change its width.
+    this.placeMenu();
     if (changed.has('openMenu')) {
       if (this.openMenu) {
         this.transient.open();

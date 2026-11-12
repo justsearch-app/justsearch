@@ -1,0 +1,79 @@
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java
+index 4eb3a0437a..57bf7ca7e7 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/operations/OperationStore.java
+@@ -251,6 +251,10 @@ public interface OperationStore extends AutoCloseable {
+     return java.util.Optional.empty();
+   }
+ 
++  default boolean interruptImport(long id, String reason) {
++    throw new UnsupportedOperationException("Import interruption is unavailable");
++  }
++
+   /** Open rows for owner-scoped reconciliation, in acceptance order. */
+   java.util.List<OperationRecord> openRecords();
+ 
+diff --git a/modules/app-api/src/main/java/io/justsearch/app/api/operations/RecordedIngestionService.java b/modules/app-api/src/main/java/io/justsearch/app/api/operations/RecordedIngestionService.java
+index 794ebc49f1..7a735c5042 100644
+--- a/modules/app-api/src/main/java/io/justsearch/app/api/operations/RecordedIngestionService.java
++++ b/modules/app-api/src/main/java/io/justsearch/app/api/operations/RecordedIngestionService.java
+@@ -10,6 +10,11 @@ public interface RecordedIngestionService {
+   /** Permanent composition fact; a real owner remains present while its index runtime is offline. */
+   default boolean hasOwner() { return true; }
+ 
++  record InterruptedImport(String operationKey, long interruptionRevision, String reason,
++      java.util.List<RecordedRootPlan.Root> folders, boolean resumeAvailable) {}
++
++  default java.util.List<InterruptedImport> interruptedImports() { return java.util.List.of(); }
++
+   /** Called only from a registered prepared parent's winning runner body with its admitted context. */
+   OperationExecution execute(OperationRecordHandle parent, EngineContext context);
+ 
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/CoreOperationCatalog.java b/modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/CoreOperationCatalog.java
+index 9842cf1eb7..0f0642e619 100644
+--- a/modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/CoreOperationCatalog.java
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/CoreOperationCatalog.java
+@@ -60,6 +60,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
+ 
+   public static final OperationRef RECOVER_COMPONENT = new OperationRef("core.recover-component");
+   public static final OperationRef BULK_REINDEX = new OperationRef("core.bulk-reindex");
++  public static final OperationRef RESUME_IMPORT = new OperationRef("core.resume-import");
+   public static final OperationRef ACCEPT_GAPS = new OperationRef("core.accept-gaps");
+   public static final OperationRef CANCEL_REINDEX = new OperationRef("core.cancel-reindex");
+   public static final OperationRef FORGET_INDEXED_PATH = new OperationRef("core.forget-indexed-path");
+diff --git a/modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ResumeImportHandler.java b/modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ResumeImportHandler.java
+new file mode 100644
+index 0000000000..812559dc69
+--- /dev/null
++++ b/modules/app-services/src/main/java/io/justsearch/app/services/registry/operations/handlers/ResumeImportHandler.java
+@@ -0,0 +1,15 @@
++/* SPDX-License-Identifier: Apache-2.0 */
++package io.justsearch.app.services.registry.operations.handlers;
++
++import io.justsearch.agent.api.registry.OperationHandler;
++import io.justsearch.agent.api.registry.OperationResult;
++import io.justsearch.app.api.operations.RecordedIngestionService;
++import io.justsearch.core.context.EngineContext;
++
++public final class ResumeImportHandler implements OperationHandler {
++  public ResumeImportHandler(RecordedIngestionService ingestion) {}
++
++  @Override public OperationResult execute(String arguments, EngineContext context) {
++    throw new UnsupportedOperationException("Import resume is unavailable");
++  }
++}
+diff --git a/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java b/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java
+index 0330b49dc6..c2f2698910 100644
+--- a/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java
++++ b/modules/worker-core/src/main/java/io/justsearch/indexerworker/queue/JobQueue.java
+@@ -30,6 +30,10 @@ public interface JobQueue extends Closeable {
+ 
+   enum IngestionBoundary { TRAVERSAL, HASHING, EXTRACTION, PUBLICATION }
+ 
++  final class IngestionApprovalInterruptedException extends java.util.concurrent.CancellationException {
++    public IngestionApprovalInterruptedException() { super("Import approval is interrupted"); }
++  }
++
+   /** P2a approval seam: today's approval verdict is allow. Consumption activates with Resume. */
+   default boolean allowsIngestionBoundary(IngestionBoundary boundary, String operationKey, IndexJob claim) {
+     return true;

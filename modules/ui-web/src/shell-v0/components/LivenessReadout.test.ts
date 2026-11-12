@@ -1,16 +1,21 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import './LivenessReadout.js';
 import { LivenessReadout } from './LivenessReadout.js';
-import type { AiState } from '../state/aiStateStore.js';
+import { __feedForTest, __resetAiStateForTest, type AiState, type StatusSnapshot } from '../state/aiStateStore.js';
 
-// Only `statusTone` (dot tone) + `statusLabel` (live text) are read by the readout; a partial AiState
-// is sufficient to exercise the tone mapping.
+// `statusTone` (dot tone) + `statusLabel` (live text) are read by the readout, over a current status
+// read; a partial AiState is sufficient to exercise the tone mapping.
+const status = {} as StatusSnapshot;
 function partial(tone: AiState['statusTone'], label = 'x'): AiState {
-  return { statusTone: tone, statusLabel: label } as unknown as AiState;
+  return { statusTone: tone, statusLabel: label, status } as unknown as AiState;
 }
+beforeEach(() => {
+  __resetAiStateForTest();
+  __feedForTest({ status });
+});
 
 async function mount(): Promise<LivenessReadout> {
   const el = document.createElement('jf-liveness-readout') as LivenessReadout;

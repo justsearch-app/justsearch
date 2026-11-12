@@ -111,6 +111,12 @@ final class OriginApprovalEvaluatorTest {
     assertFalse(OperationAuthority.inMemory().evaluateImportApproval(origin, active, proof), "new process cannot reuse live ownership");
     var other = origin(new OperationAuthorizationBasis.EphemeralCapsule(), TransportTag.MCP);
     assertFalse(authority.evaluateImportApproval(other, active, proof));
+    var successorBinding = new ImportApprovalBinding(1, OperationKeys.generate(CLOCK), row.key(),
+        binding.id(), binding.planHash(), 1);
+    var successor = new SourceOrigin(UUID.randomUUID().toString(), origin.kind(), origin.root(), origin.approval(),
+        origin.acceptedAt(), new SourceOrigin.RestartBinding(1, successorBinding.id(), binding.planHash(), origin.id()));
+    assertFalse(authority.evaluateImportApproval(successor, new ImportApprovalState(successorBinding, 1, null), proof),
+        "a previous live proof cannot authorize the selected renewal");
     live.set(false);
     assertFalse(authority.evaluateImportApproval(origin, active, proof));
     assertThrows(IllegalArgumentException.class, () -> authority.liveOriginApproval(row, plan, live::get));
@@ -119,9 +125,10 @@ final class OriginApprovalEvaluatorTest {
   private SourceOrigin origin(OperationAuthorizationBasis basis, TransportTag transport) {
     var root = new RecordedRootPlan.Root(directory.resolve("import"), "docs", false, false, List.of(), List.of());
     String hash = CanonicalOperationArguments.digest(new RecordedRootPlan("generation", List.of(root)).toReplayPayload());
+    String key = OperationKeys.generate(CLOCK);
     return new SourceOrigin(UUID.randomUUID().toString(), SourceOrigin.Kind.IMPORT, root,
-        SourceOrigin.Approval.gated(context(basis, transport), "core.ingest-files", OperationKeys.generate(CLOCK)), 1,
-        new SourceOrigin.RestartBinding(1, UUID.randomUUID().toString(), hash, null));
+        SourceOrigin.Approval.gated(context(basis, transport), "core.ingest-files", key), 1,
+        new SourceOrigin.RestartBinding(1, key, hash, null));
   }
 
   private static EngineContext context(OperationAuthorizationBasis basis, TransportTag transport) {

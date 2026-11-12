@@ -170,6 +170,12 @@ export interface AiIndex {
    * falls back to `documentCount` there, but a KNOWN `0` is a real value and must be shown as 0.
    */
   searchableDocumentCount: Maybe<number>;
+  /**
+   * The person's own files: the searchable documents outside the bundled Help
+   * (`ownSearchableDocuments`). What a "Searching N files" string reads. UNKNOWN when the backend
+   * does not report it (an older Engine) or could not count — never the Help-inclusive count, never 0.
+   */
+  ownDocumentCount: Maybe<number>;
   pendingJobs: Maybe<number>;
   embeddingPending: Maybe<number>;
   embeddingBlocked: Maybe<boolean>;
@@ -271,6 +277,11 @@ export interface AiState {
   /** Indexing observation is within its freshness window, independently of inference/SSE contact. */
   indexingStatusLive: boolean;
   /**
+   * The latest completed status read failed (refused, aborted, an error answer): the held body is a
+   * past measurement from then on. A later answered read clears it; a read that never completes does not set it.
+   */
+  statusReadFailed: boolean;
+  /**
    * Spec A step 9 — the AI readiness reason when the Engine unloaded the chat model for another GPU
    * user (`inference.unloaded_gpu_pressure` / `inference.unloaded_game_mode`), else null. Chat is
    * then not offline: a person's chat request loads it again, and the chat window offers "Load
@@ -303,13 +314,12 @@ export interface AiState {
    * stops reading as data loss. `null` until the first settled poll. Stamped imperatively in
    * `onStatusUpdate` (the poll callback), never written by a `computed`, so the graph is acyclic.
    *
-   * <p>811 C-4: `searchableDocumentCount` is the default-search-scope population (see
-   * {@link AiIndex}); `null` means the backend did not report it, NOT "zero searchable documents" —
-   * a consumer falls back to `documentCount` on `null` and shows a real `0` as `0`.
+   * <p>`ownDocumentCount` is the person's own searchable files (see {@link AiIndex}); `null` means
+   * the backend did not report it, NOT "zero files" — a real `0` is retained as `0`.
    */
   lastSettledIndex: {
     documentCount: number;
-    searchableDocumentCount: number | null;
+    ownDocumentCount: number | null;
     indexSizeBytes: number | null;
   } | null;
   /**
@@ -380,6 +390,7 @@ const inferenceSig = signal<InferenceSnapshot | null>(null);
 const statusSig = signal<StatusSnapshot | null>(null);
 const lastInferenceSuccessSig = signal<number | null>(null);
 const lastStatusSuccessSig = signal<number | null>(null);
+const statusReadFailedSig = signal(false);
 const activitySig = signal<AiActivity>(INITIAL_ACTIVITY);
 const installStateSig = signal<Maybe<{ installed: boolean; installing: boolean }>>(UNKNOWN);
 // 663 Stage 3 — raw install/runtime/pack snapshots from the shared `aiInstallPoll`.
@@ -393,7 +404,7 @@ const packStatusSig = signal<PackImportStatus | null>(null);
 // callback (`onStatusUpdate`), read by `buildSnapshot`; no computed writes it.
 const lastSettledIndexSig = signal<{
   documentCount: number;
-  searchableDocumentCount: number | null;
+  ownDocumentCount: number | null;
   indexSizeBytes: number | null;
 } | null>(null);
 // 813 §19 (W2) — the drain episode's high-water backlog. Written ONLY by the poll
@@ -673,6 +684,15 @@ function verdictOwnsStatus(verdict: SystemHealthVerdict): boolean {
 }
 
 /**
+ * What `statusLabel`'s words are about, by the same precedence `computeStatusLabel` uses: an answer in
+ * progress and the AI-engine arm speak of the AI models; the verdict arm speaks of the system.
+ */
+export function statusLabelSubject(state: Pick<AiState, 'activity' | 'verdict'>): 'system' | 'ai' {
+  if (['thinking', 'streaming', 'extracting'].includes(state.activity?.state ?? '')) return 'ai';
+  return !state.verdict || verdictOwnsStatus(state.verdict) ? 'system' : 'ai';
+}
+
+/**
  * Tempdoc 807 A.3 (round-13 R13-F2) — the ONE liveness predicate: "is what we last observed still a
  * LIVE observation, or only a past measurement?". Sibling of {@link verdictOwnsStatus}: both are pure
  * projections of the SAME verdict authority, so a surface can never invent a second detection
@@ -768,6 +788,9 @@ function computeIndex(): AiIndex {
     searchableDocumentCount: documentCountUnknown(status, 'searchable')
       ? UNKNOWN
       : fromStatus(status?.worker?.core?.searchableDocuments),
+    ownDocumentCount: documentCountUnknown(status, 'searchable')
+      ? UNKNOWN
+      : fromStatus(status?.worker?.core?.ownSearchableDocuments),
     pendingJobs: fromStatus(status?.worker?.core?.pendingJobs),
     embeddingPending: fromStatus(status?.embedding?.pendingCount),
     embeddingBlocked:
@@ -962,6 +985,7 @@ function buildSnapshot(): AiState {
     chatEnabledSpec: status?.inference?.chatEnabledSpec,
     procedure: status?.inference?.procedure,
     engineReason: status?.inference?.engineReason,
+    semanticEnabled: status?.worker?.enrichment?.embeddingEnabled,
   });
   const statusLabel = computeStatusLabel(verdict, runtime, activity, aiEngine);
   const statusTier = computeStatusTier(verdict, runtime);
@@ -984,6 +1008,7 @@ function buildSnapshot(): AiState {
     snapshotLive,
     status,
     indexingStatusLive: computeIndexingStatusLive(snapshotLive),
+    statusReadFailed: statusReadFailedSig.get(),
     inference: inferenceSig.get(),
     lastSettledIndex: lastSettledIndexSig.get(),
     episodeMaxPendingJobs: episodeMaxPendingJobsSig.get(),
@@ -1091,6 +1116,8 @@ function onStatusUpdate(snap: StatusSnapshot | null, invalidated = false): void 
     statusSig.set(null);
     ingestInferenceSnapshot(null);
   }
+  // An invalidation is the producer's own announcement, not a failed read.
+  statusReadFailedSig.set(!snap && !invalidated);
   if (snap) {
     statusSig.set(snap);
     lastStatusSuccessSig.set(Date.now());
@@ -1154,9 +1181,9 @@ function stampSettledIndex(snap: StatusSnapshot): void {
   if (documentCount == null) return;
   lastSettledIndexSig.set({
     documentCount,
-    // 811 C-4: `null` = the backend never reported it (fall back to documentCount); a reported 0 is
-    // a real "the default scope searches nothing" and is retained as 0.
-    searchableDocumentCount: snap.worker?.core?.searchableDocuments ?? null,
+    // `null` = the backend never reported it (an older Engine); a reported 0 is a real "none of the
+    // person's files are searchable" and is retained as 0.
+    ownDocumentCount: snap.worker?.core?.ownSearchableDocuments ?? null,
     // Honesty: a size that was never observed stays `null` (renderers show "…" for Size, not
     // a confident "0 B"). Files retention is gated on documentCount above, the primary path.
     indexSizeBytes: snap.worker?.core?.indexSizeBytes ?? null,
@@ -1246,6 +1273,7 @@ export function stopAiStateStore(): void {
   started = false;
   // The stopped poller has discarded its epoch and replay state.
   statusSig.set(null);
+  statusReadFailedSig.set(false);
 }
 
 export function subscribeAiState(listener: (s: AiState) => void): () => void {
@@ -1312,6 +1340,7 @@ export function __feedForTest(opts: {
     statusSig.set(opts.status);
     if (opts.status) {
       lastStatusSuccessSig.set(Date.now());
+      statusReadFailedSig.set(false);
       stampSettledIndex(opts.status); // E2 — mirror the production poll-callback stamp.
       stampEpisodeMaxPendingJobs(opts.status); // 813 §19 W2 — same mirror, same reason.
       stampEnrichSettleSamples(opts.status); // 813 §20 — same mirror, same reason.
@@ -1346,6 +1375,7 @@ export function __resetAiStateForTest(): void {
   statusSig.set(null);
   lastInferenceSuccessSig.set(null);
   lastStatusSuccessSig.set(null);
+  statusReadFailedSig.set(false);
   activitySig.set(INITIAL_ACTIVITY);
   installStateSig.set(UNKNOWN);
   installObservationSig.set(undefined);

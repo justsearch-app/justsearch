@@ -96,6 +96,9 @@ public final class JobBatchWriter {
   private final Supplier<RunningRuntime> activeLexicalSource;
   private final FileMutationFence fileMutationFence;
   private io.justsearch.indexerworker.services.StorageObservationSnapshot storageSnapshot;
+  private DocumentFieldOps sourceFields;
+
+  void useSourceFields(DocumentFieldOps fields) { sourceFields = Objects.requireNonNull(fields); }
   private final BatchServiceFailures writeFailures = new BatchServiceFailures();
 
 
@@ -200,7 +203,9 @@ public final class JobBatchWriter {
         batchStats.recordSkipped();
         return;
       }
-      if (ingestionAuthority.excludes(ex.filePath(), ex.claim().ingestionRoot(), ex.collection())) {
+      if (ex.claim().upkeepOriginId() != null && !ingestionAuthority.upkeepCurrent(
+          ex.claim(), jobQueue, sourceFields)
+          || ingestionAuthority.excludes(ex.filePath(), ex.claim().ingestionRoot(), ex.collection())) {
         journal.recordOutcomeSafely(ex.filePath(), "EXCLUDED_BEFORE_WRITE",
             () -> jobQueue.markClaimDone(ex.claim(),
                 journal.skipped(io.justsearch.indexerworker.ingest.IngestionSkipPolicy.isProtected(
@@ -327,6 +332,8 @@ public final class JobBatchWriter {
           ex.artifact().result().content() != null ? ex.artifact().result().content().length() : 0);
       log.debug("Indexed successfully: {} in {}ms", ex.filePath(), latencyMs);
 
+    } catch (JobQueue.IngestionApprovalInterruptedException interrupted) {
+      jobQueue.returnUnfinishedClaims(java.util.List.of(ex.claim()));
     } catch (RuntimeException | Error e) {
       if (e instanceof VirtualMachineError fatal) throw fatal;
       // An observer failure after handoff cannot turn an already written effect into a retry

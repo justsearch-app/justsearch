@@ -5,17 +5,37 @@ import { folderAttention, folderStatus } from './folderStatus.js';
 import type { IndexedRootsObservation } from './indexedRoots.js';
 import type { DurableStatusOperation } from './frameStatus.js';
 import type { PresenceRun } from '../controllers/AgentSessionController.js';
-import { selectIndexingProgress } from './indexingProgress.js';
+import { selectIndexingProgress, type IndexingProgress } from './indexingProgress.js';
 import { presentVerdict } from './verdict.js';
 import { presentAiEngineVerdict } from './aiVerdict.js';
 
 // Two expected head reads; other REST sources get their cadence plus their read bound.
-export const HEAD_HEALTH_MAX_AGE_MS = 20_000;
+const HEAD_HEALTH_MAX_AGE_MS = 20_000;
 export const REMOTE_HEALTH_MAX_AGE_MS = 15_000;
 const AI_HEALTH_MAX_AGE_MS = 10_000;
-export function healthObservationCurrent(at: number | null | undefined, now: number, bound: number): boolean {
-  return at != null && Number.isFinite(at) && at <= now && now - at <= bound;
+/**
+ * The one currency rule for Health's facts: a source's facts are current while its last answer is
+ * within the source's bound and no later read of it failed definitively (refused, aborted, an error
+ * answer). Expiry stays the fallback when reads simply stop answering.
+ */
+export function healthObservationCurrent(at: number | null | undefined, now: number, bound: number, readFailed = false): boolean {
+  return !readFailed && at != null && Number.isFinite(at) && at <= now && now - at <= bound;
 }
+/** The status read's facts (Engine, graphics card, memory), and the worker sample it carries (folders, index, counts). */
+export interface StatusCurrency {
+  readonly head: boolean;
+  readonly worker: boolean;
+}
+export function statusCurrency(ai: AiState | null, statusAtMs: number | null, now: number): StatusCurrency {
+  const head = !!ai?.status && healthObservationCurrent(statusAtMs, now, HEAD_HEALTH_MAX_AGE_MS, ai.statusReadFailed);
+  return { head, worker: head && ai!.indexingStatusLive };
+}
+/** The shared indexing projection over the status Health holds, confirmed only while that status is current. */
+export function healthIndexingProgress(ai: AiState | null, currency: StatusCurrency): IndexingProgress {
+  return selectIndexingProgress(ai?.status ?? null, currency.worker, ai?.episodeMaxPendingJobs ?? 0, ai?.enrichSettleSamples ?? []);
+}
+// Read-freshness causes describe Health's reads, not the index: they never stand as the index's or a folder's state.
+const READ_CAUSES: readonly string[] = ['updating', 'channel-stale', 'initial-load'];
 export interface HealthRemoteObservations {
   readonly presence: readonly PresenceRun[];
   readonly presenceAtMs: number | null;
@@ -55,21 +75,23 @@ export interface HealthInput {
 }
 export function projectSystemHealth(input: HealthInput): HealthRow[] {
   const { ai, now, roots, remote } = input;
-  const headCurrent = !!ai?.status && healthObservationCurrent(input.statusAtMs, now, HEAD_HEALTH_MAX_AGE_MS);
-  const progress = selectIndexingProgress(ai?.status ?? null, ai?.indexingStatusLive ?? false,
-    ai?.episodeMaxPendingJobs ?? 0, ai?.enrichSettleSamples ?? []);
+  const currency = statusCurrency(ai, input.statusAtMs, now);
+  const headCurrent = currency.head;
+  const progress = healthIndexingProgress(ai, currency);
   const verdict = ai ? presentVerdict(ai.verdict) : null;
-  const workerCurrent = !!ai?.indexingStatusLive && progress.activity.confirmed;
-  const runtimeCurrent = !!ai?.runtimeObservationLive && healthObservationCurrent(ai.runtimeObservedAtMs, now, AI_HEALTH_MAX_AGE_MS);
-  const installCurrent = !!ai?.installObservationLive && healthObservationCurrent(ai.installObservedAtMs, now, AI_HEALTH_MAX_AGE_MS);
+  const workerCurrent = progress.activity.confirmed;
+  const readsBehind = ai?.stability.kind === 'provisional' && READ_CAUSES.includes(ai.stability.cause);
+  const indexProvisional = workerCurrent && ai?.stability.kind === 'provisional' && !readsBehind;
+  const runtimeCurrent = !!ai && healthObservationCurrent(ai.runtimeObservedAtMs, now, AI_HEALTH_MAX_AGE_MS, !ai.runtimeObservationLive);
+  const installCurrent = !!ai && healthObservationCurrent(ai.installObservedAtMs, now, AI_HEALTH_MAX_AGE_MS, !ai.installObservationLive);
   const row = (id: string, label: string, status: string, destination: string, action: string): HealthRow =>
     ({ id, label, status, destination, action });
   const engine = !headCurrent ? 'Engine status unconfirmed' : !ai?.connection.reachable ? 'Engine unavailable'
     : ai.status?.status === 'ok' || ai.status?.readiness?.engineComponents?.['api']?.state === 'READY' ? '' : 'Engine status unconfirmed';
-  const rootsCurrent = roots.confirmed && healthObservationCurrent(roots.receivedAtMs, now, REMOTE_HEALTH_MAX_AGE_MS);
+  const rootsCurrent = healthObservationCurrent(roots.receivedAtMs, now, REMOTE_HEALTH_MAX_AGE_MS, !roots.confirmed);
   const folders = roots.roots.map(root => {
     const state = folderStatus(root, { relativeTime: '', verifiedRelativeTime: '',
-      provisional: ai?.stability.kind === 'provisional', enrichmentStages: progress.stages,
+      provisional: indexProvisional, enrichmentStages: progress.stages,
       enrichmentPending: progress.enrichingPending > 0, enrichmentBlocked: progress.phase === 'blocked',
       enrichmentBlockedDetail: progress.phase === 'blocked' ? progress.activity.detail : null,
       retryWaiting: progress.phase === 'waiting', indexingPaused: progress.pause?.state === 'paused',
@@ -81,7 +103,8 @@ export function projectSystemHealth(input: HealthInput): HealthRow[] {
   }).filter(Boolean).join('; ');
   const folderWords = !rootsCurrent || !workerCurrent ? `${folders ? `Last observed: ${folders}. ` : ''}Folder status unconfirmed` : folders;
   // The shared indexing projection's own wording when its observation is unconfirmed.
-  const index = !workerCurrent ? (progress.activity.confirmed ? 'Index status unconfirmed' : progress.activity.summary) : ai?.verdict.kind !== 'operational'
+  // A transition that is only Health's reads falling behind is no index state.
+  const index = !workerCurrent ? progress.activity.summary : ai?.verdict.kind === 'transitioning' && readsBehind ? 'Index status unconfirmed' : ai?.verdict.kind !== 'operational'
     ? [verdict?.headline, verdict?.body].filter(Boolean).join(' — ')
     : !input.recoveryCurrent ? 'Recovery conditions unconfirmed' : input.recoveryCount > 0 ? 'Recovery actions available'
     : ai?.status?.worker?.core?.indexHealthy !== true ? 'Index health unconfirmed' : '';
@@ -104,7 +127,7 @@ export function projectSystemHealth(input: HealthInput): HealthRow[] {
   const operationWords = operations.map(operation => !operation.fresh || !operation.outcome || ['unknown', 'expired'].includes(operation.outcome.state)
     ? `${operation.label}: outcome unconfirmed` : operation.outcome.phase === 'awaiting_acceptance'
       ? `${operation.label}: review before continuing` : `${operation.label}: ${operation.outcome.state}`).join('; ');
-  const presenceCurrent = remote.presenceLive && healthObservationCurrent(remote.presenceAtMs, now, REMOTE_HEALTH_MAX_AGE_MS);
+  const presenceCurrent = healthObservationCurrent(remote.presenceAtMs, now, REMOTE_HEALTH_MAX_AGE_MS, !remote.presenceLive);
   const runs = remote.presence.filter(run => !['DONE', 'ERROR'].includes(run.state));
   // Known work and holds keep their shared explanation (SH8); only an unconfirmed idle stays unconfirmed.
   const indexingWork = workerCurrent && (progress.pause || !['ready', 'idle'].includes(progress.phase))

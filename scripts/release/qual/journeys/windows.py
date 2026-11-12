@@ -680,11 +680,11 @@ foreach($d in $disks) {$devices[$d.Name]=[long]$d.DiskWriteBytesPersec;$total+=[
         return ps_json(memory_counters())
 
     def state_snapshot(self):
-        from linux import search_api, stored_bookmarks
+        from linux import search_api
         files = {str(p.relative_to(self.data)): digest(p) for p in Path(self.data).rglob('*')
                  if p.is_file() and (p.suffix in ('.onnx', '.gguf', '.safetensors') or p == Path(self.data) / 'ui/settings.json')}
         return {'settings': self.api('/api/settings/v2'), 'roots': self.api('/api/indexing/roots'),
-                'savedFiles': {'files': files, 'savedViews': stored_bookmarks(self)}, 'search': search_api(self)}
+                'savedFiles': {'files': files}, 'search': search_api(self)}
 
     def crash_records(self, since=None):
         start_ns = self.crash_since_ns if since is None else since
@@ -1015,7 +1015,13 @@ def first_run(run):
     buttons = run.wd.execute("return all(document,'button').map(e=>e.textContent.trim())")
     if 'Get started' in buttons:
         run.wd.click('button', 'Get started')
-    if run.wd.execute("return all(document,'jf-walkthrough-card').some(e=>!e.hidden)"):
+    # The legacy host remains mounted even when its card renders nothing.
+    if run.wd.execute("""
+return all(document,'jf-walkthrough-card').some(card => card.shadowRoot &&
+ all(card.shadowRoot,'button[aria-label="Dismiss"]').some(button => {
+  const r=button.getBoundingClientRect();return r.width>0 && r.height>0;
+ }));
+"""):
         run.wd.click('button[aria-label="Dismiss"]')
     run.native.shot('J1-first-run')
     raise OwnerValidation('Installed shell has an identified UIA window and ready Engine; validate normal-launch first-run text in J1-desktop-first-run.png')
@@ -1024,7 +1030,8 @@ def first_run(run):
 def add_folder(run):
     run.require('ui')
     run.nav('Library')
-    run.wd.click('button[aria-label="Add Folder"]')
+    # v0.3.2 predecessor preparation still uses the capital-F label.
+    run.wd.click('button[aria-label="Add folder"],button[aria-label="Add Folder"]')
     picker = run.native.select_folder(run.require('corpus'))
     run.evidence('J2-picker', picker)
     wait_for(lambda: run.wd.execute("return all(document,'input[aria-label=\"Folder path\"]').some(e=>e.value===arguments[0])", [run.require('corpus')]),
@@ -1096,7 +1103,7 @@ def search_open(run):
         raise Infrastructure('OS default text viewer differs from qualification provisioning: ' + repr(association))
     before = ps_json(PROCESSES, array=True)
     run.nav('Search')
-    run.wd.click('button[aria-label="Mode: Search"]')
+    run.wd.click('button[data-testid="sv3-composer-tier"]')
     run.wd.click('button[data-tier="search"]')
     run.wd.keys('textarea[data-testid="sv3-composer-input"]', QUERY + '\ue007')
     hit = wait_for(lambda: run.wd.execute("""
@@ -1477,16 +1484,11 @@ from linux import install_ai as shared_install_ai, author_state as shared_author
 
 def author_state(run):
     if run.args.resume and run.facts.get('authored'):
-        from linux import assert_state, stored_bookmarks
-        # Development checkpoints already contain the UI-authored record.
-        # Preserve its identity instead of trying the now-absent add control.
-        bookmark = run.require('bookmark')
-        run.require('beforeState')
-        if bookmark not in stored_bookmarks(run):
-            raise ProductFailure('Checkpoint-authored bookmark missing from Web Storage')
+        from linux import assert_state
+        # Preserve the checkpoint's UI-authored state rather than saving it again.
         state = assert_state(run)
-        run.evidence('J4-restored-authored-state', {'bookmark': bookmark, 'state': state,
-            'source': 'UI-authored prerequisite retained in the stopped checkpoint; Web Storage and Engine rechecked'})
+        run.evidence('J4-restored-authored-state', {'state': state,
+            'source': 'UI-authored prerequisite retained in the stopped checkpoint; Engine rechecked'})
         return state
     return shared_author_state(run)
 

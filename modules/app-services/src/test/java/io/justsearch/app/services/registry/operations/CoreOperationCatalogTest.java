@@ -79,6 +79,8 @@ final class CoreOperationCatalogTest {
             "core.start-ai-install",
             "core.activate-installed-models",
             "core.accept-gaps",
+            "core.resume-import",
+            "core.cancel-import",
             "core.cancel-ai-install",
             "core.repair-ai-install",
             "core.remove-ai-files",
