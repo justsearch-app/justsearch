@@ -673,7 +673,6 @@ describe('A15 / amendment 13 — the journal arrival lands on this window\'s rec
     expect(takeActivitySection(el)).toBeNull();
     expect(testid(feedRoot(el), 'feed-scope')?.dataset.scope).toBe('local');
     expect(entries(el)).toHaveLength(1);
-    expect(entries(el)[0]!.textContent).toContain('Open pane "here"');
     expect(feedRoot(el).activeElement).toBe(entries(el)[0]);
   });
 

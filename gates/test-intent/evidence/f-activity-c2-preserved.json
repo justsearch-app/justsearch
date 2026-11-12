@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-12T09:40:41.943Z",
-  "revision": "a3457998b6d695c614e696712bdfa6c275824e32",
-  "tree": "c88cc9354be4f04f1d4866319361bb1275f657ca",
+  "createdAt": "2026-11-12T15:05:33.511Z",
+  "revision": "18780a75a81a8cad673c7f6469c6666b5433adb0",
+  "tree": "ed7d8075753ffe58031772513656b3444513c56c",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts\" \"src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/8jrt7cf8/tmp/test-intent-vitest-31834-1794476356401.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts\" \"src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/53_yf817/tmp/test-intent-vitest-4-1794495847871.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 82517
+      "durationMs": 82725
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts\" \"src/shell-v0/state/pillAnnouncements.test.ts\" \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8jrt7cf8/tmp/test-intent-vitest-31834-1794476438920.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts\" \"src/shell-v0/state/pillAnnouncements.test.ts\" \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/53_yf817/tmp/test-intent-vitest-4-1794495930597.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 3022
+      "durationMs": 2913
     }
   ],
   "checks": [
@@ -155,7 +155,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a pointer to the journal resets the feed's filters to this window's records and puts the keyboard there",
       "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:93230696b5603c10e9562c2f2f5ef58c26e8e5b983d175b5c562e7050c85eb43",
+      "contentDigest": "sha256:7bfb487f1635208058d25e19c12f9790c5f1784b403e1f9925430c67efbc19f9",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -183,5 +183,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:f9f40f50493c3d64943f3ae31e2816c1aebd97a1ee82e1340e60f8ede8e4d10b"
+  "digest": "sha256:6bea82db18785a7926ff6f0957fe51932a7667ca3977226554ed22f3ed4c784e"
 }

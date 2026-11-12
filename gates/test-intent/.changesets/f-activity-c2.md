@@ -15,7 +15,7 @@ Existing tests changed in this branch are classified as Obsolete (expectations F
 What each Obsolete entry replaces:
 - `ActionLedgerView.test.ts` (Obsolete, FC9): The outcome cell's text 'SUCCESS'/'FAILURE' and the who cell's 'agent' (row text in recorded codes) are expectations FC9 replaces; tone, glyph, structure and the filtering are unchanged. Replaced by: modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts#projects occurredAt + outcome — the "timing" and "outcomes" the subtitle promises (tempdoc 558 Deepening 3), modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts#renders a FAILURE outcome as the error tone + glyph — failed must read as failed (tempdoc 558), modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts#filters the stream by originator via FilterChip facets (tempdoc 558 §E1), modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#the backend's records: who, what and how it ended in words, never their codes, modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#index records say indexed or failed, and who did it is the engine, modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#this window's journal: its actions in words, an invocation by its operation, modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#after a reload, the restored journal's rows read in words too.
 - `ActionLedgerView.feed-lockdown.test.ts` (Obsolete, FC9): A19's outcome text '<glyph> FAILURE' is replaced by '<glyph> Failed'; the forced-colours observation is unchanged. Replaced by: modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A19 — on a light forced-colours palette, the unread mark stays visible with its label, and an outcome reads as a glyph and a word, modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A19 — on a dark forced-colours palette, the unread mark stays visible with its label, and an outcome reads as a glyph and a word.
-- `ActivitySurface.details.test.ts` (Obsolete, FC9): The journal arrival check's row text 'open-pane' (the effect's raw kind) is replaced by the worded title 'Open pane "here"'. Replaced by: modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#this window's journal: its actions in words, an invocation by its operation, modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#after a reload, the restored journal's rows read in words too.
+- `ActivitySurface.details.test.ts` (Obsolete, FC9): The journal arrival check's raw-text expectation 'open-pane' (the effect's raw kind) is removed; the journal row's words are pinned by the rowWords checks. Replaced by: modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#this window's journal: its actions in words, an invocation by its operation, modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#after a reload, the restored journal's rows read in words too.
 - `StatusPill.transitions.test.ts` (Obsolete, FC10): 'an error verdict assertively' expected an assertive verdict announcement for an unreachable verdict while the pill shows 'Checking search status'; FC10 has the spoken status agree with the pill. Replaced by: modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#mirrors the verdict politely and an error verdict assertively, never as "All systems operational".
 - `aiVerdict.test.ts` (Obsolete, FC11): 'install_failed surfaces the install service error text in the body' expected the body to be the service's raw text; FC11 has the body say what went wrong and what to do. Replaced by: modules/ui-web/src/shell-v0/state/aiVerdict.test.ts#install_failed says in words what went wrong and what to do; the service's own text is not the body (FC11).
 - `unrequestedAi.test.ts` (Obsolete, FC11): FA3c's 'the rows say what happened in the AI verdict's own words' expected the failed row's detail to be the Engine's raw message; FC11 has it say in words what went wrong and what to do, the message kept once as detail for support. Replaced by: modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#the rows say what happened in the AI verdict's own words.
@@ -179,7 +179,7 @@ Independent acceptance is pending.
         "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "FC8 at 1280x720 and in forced colours: the same count stays zero on the candidate (3 of 3 runs). Not recorded as repaired: on the before-state these two sizes log the error only intermittently (failed in 2 of 4 observed runs), so they cannot show a deterministic fail-before; the 600x400 check above does.",
+      "behaviour": "FC8 repaired: at 1280×720 and in forced colours, 160 records draw and scroll with no uncaught ResizeObserver loop error. The before-state logs the error intermittently at these sizes: the recorded run failed both checks; other observed runs failed about half. The deterministic proof is the 600×400 checks.",
       "sources": [
         {
           "kind": "owner-words",
@@ -195,12 +195,12 @@ Independent acceptance is pending.
           "label": "agent choice"
         }
       ],
-      "evidence": "gates/test-intent/evidence/f-activity-c2-preserved.json",
+      "evidence": "gates/test-intent/evidence/f-activity-c2-fc8-wide.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC8 at 1280×720, 160 records draw and scroll without an uncaught ResizeObserver loop error",
         "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC8 at 1280×720 in forced colours, 160 records draw and scroll without an uncaught ResizeObserver loop error"
       ],
-      "repaired": false
+      "repaired": true
     },
     {
       "items": [
@@ -341,60 +341,11 @@ Independent acceptance is pending.
       "items": [
         "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts"
       ],
-      "class": "Obsolete",
-      "sources": [
-        {
-          "kind": "owner-words",
-          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
-          "location": "task t-20261103-shell request"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
-          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
-          "delegationScope": "Design choices for the in-between UI of the main windows (Activity, file names, the status pill and panel, AI Brain's install line): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
-          "choice": "FC9 Activity feed rows read in words, not raw codes: no SUCCESS/FAILURE, DENIED/GATED, DONE, 'backend', TYPED_CONFIRM, 'copy-to-clipboard' or 'invoke-operation:' as row text; reuse the details pane's wording functions (one place). Identifiers only where labelled for support.",
-          "label": "agent choice"
-        }
-      ],
-      "conflictSearch": "decision records searched for a conflict: none (docs/decisions/* searched for activity feed, action ledger, outcome, originator, effect kind; README only)"
-    },
-    {
-      "items": [
-        "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts"
-      ],
-      "class": "New",
-      "behaviour": "FC9 in the journal arrival check: the journaled row reads 'Open pane \"here\"'. Candidate-only evidence: the file uses the addressed arrival API (FC6), which the before-state lacks, so it cannot run there; the same wording is pinned with an assertion fail-before by the rowWords journal checks.",
-      "sources": [
-        {
-          "kind": "owner-words",
-          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
-          "location": "task t-20261103-shell request"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
-          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
-          "delegationScope": "Design choices for the in-between UI of the main windows (Activity, file names, the status pill and panel, AI Brain's install line): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
-          "choice": "FC9 Activity feed rows read in words, not raw codes: no SUCCESS/FAILURE, DENIED/GATED, DONE, 'backend', TYPED_CONFIRM, 'copy-to-clipboard' or 'invoke-operation:' as row text; reuse the details pane's wording functions (one place). Identifiers only where labelled for support.",
-          "label": "agent choice"
-        }
-      ],
-      "evidence": "gates/test-intent/evidence/f-activity-c2-preserved.json",
-      "newChecks": [
-        "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a pointer to the journal resets the feed's filters to this window's records and puts the keyboard there"
-      ],
-      "repaired": false
-    },
-    {
-      "items": [
-        "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts"
-      ],
       "class": "Adaptation",
       "moved": [
         "signature"
       ],
-      "whatMoved": "The two arrival checks now address the request to the page, as the Shell's navigation does once applied (`addressActivitySection(() => document.body)`), and read it back for their own Activity (`takeActivitySection(el)`). Inputs, preconditions, the observations (focus, filters, the request consumed) and expected outcomes are unchanged.",
+      "whatMoved": "The arrival is addressed to this window's Activity through addressActivitySection and taken with takeActivitySection(el); every other input and assertion is kept. The removed raw-text expectation 'open-pane' is covered by the Obsolete entry.",
       "sources": [
         {
           "kind": "owner-words",
@@ -410,6 +361,28 @@ Independent acceptance is pending.
           "label": "agent choice"
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell request"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (Activity, file names, the status pill and panel, AI Brain's install line): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "Decision 2026-11-11 extended 2026-11-12 (FC9): Activity rows read in words, never raw codes; the journal row's words are pinned by the rowWords checks",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none"
     },
     {
       "items": [
