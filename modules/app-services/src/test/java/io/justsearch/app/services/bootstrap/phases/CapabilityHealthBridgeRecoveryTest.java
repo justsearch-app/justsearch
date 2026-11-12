@@ -14,8 +14,10 @@ import io.justsearch.app.services.worker.RecoveryContext;
 import io.justsearch.app.services.worker.RecoveryOccurrence;
 import io.justsearch.core.component.ComponentState;
 import io.justsearch.core.component.TestEngineComponents;
-import java.util.ArrayList;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -68,8 +70,12 @@ final class CapabilityHealthBridgeRecoveryTest {
   @Test
   void registryTransitionsNeverFabricateRecoveryOccurrences() throws Exception {
     HealthEventChangeRegistry changes = new HealthEventChangeRegistry(Executors.newVirtualThreadPerTaskExecutor());
-    var kinds = new ArrayList<HealthEventChangeRegistry.Kind>();
-    var subscription = changes.subscribeTyped(change -> kinds.add(change.kind()));
+    var kinds = new CopyOnWriteArrayList<HealthEventChangeRegistry.Kind>();
+    var delivered = new Semaphore(0);
+    var subscription = changes.subscribeTyped(change -> {
+      kinds.add(change.kind());
+      delivered.release();
+    });
     try {
       try (var components = TestEngineComponents.fourComponents();
           AutoCloseable ignored = CapabilityHealthBridge.wireListeners(
@@ -83,6 +89,12 @@ final class CapabilityHealthBridgeRecoveryTest {
             ComponentState.FAILED, "component.recovery_exhausted", "attempts exhausted");
         components.handle("index").transition(ComponentState.READY, null, "recovered");
 
+        // Condition notifications run on the channel's delivery threads. Check the entire
+        // published sequence, rather than whichever callbacks happened to run already.
+        int published = Math.toIntExact(changes.currentSeq());
+        assertTrue(published > 0, "registry transitions must publish condition changes");
+        assertTrue(delivered.tryAcquire(published, 10, TimeUnit.SECONDS),
+            "all published changes must reach the observer before checking their kinds");
         assertTrue(
             kinds.stream().noneMatch(
                 kind -> kind == HealthEventChangeRegistry.Kind.OCCURRENCE_APPENDED),
