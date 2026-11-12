@@ -89,7 +89,9 @@ export function mountBootApplication(root: HTMLElement, application: HTMLElement
       if (application.parentElement !== root || owner && needsRecovery(owner.recovery.supervisor)) return;
       // Recovery/reset may have replaced both nodes while Lit was pending. Never reclaim their root.
       if (frame.parentElement === root) {
-        root.replaceChildren(application);
+        // Remove only the cover. Re-inserting the application would disconnect it, and a modal
+        // <dialog> it opened while covered (Settings restored at launch) would leave the top layer.
+        for (const node of [...root.childNodes]) if (node !== application) node.remove();
         releaseInput();
         application.inert = false;
       }
