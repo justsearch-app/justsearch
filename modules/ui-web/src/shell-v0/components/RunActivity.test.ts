@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
-// DP3 — the retrospective's background runs and "this run", now in Activity.
+// DP3 — the retrospective's background runs, now an Activity utility. ("This run" is the feed's run
+// scope: views/ActivitySurface.details.test.ts.)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import './RunActivity.js';
 import type { RunActivity } from './RunActivity.js';
@@ -131,25 +132,5 @@ describe('Background runs', () => {
     const section = el.shadowRoot!.querySelector('[data-testid="activity-background-runs"]')!;
     expect(text(section)).toContain('Done · 1');
     expect(text(section)).toContain("Couldn't refresh background runs. Showing the list last seen");
-  });
-});
-
-describe('This run', () => {
-  const section = (el: RunActivity): Element => el.shadowRoot!.querySelector('[data-testid="activity-this-run"]')!;
-
-  it('814 — says what record it answers from, and an empty list names what fills it', async () => {
-    const el = await mount([]);
-    expect(text(section(el))).toContain('What the agent did in the run open right now.');
-    expect(text(section(el))).toContain('Each tool the agent uses in the current run');
-  });
-
-  it('a failed read says so instead of reading as empty, and old rows stay', async () => {
-    const el = await mount([]);
-    (ctrl() as unknown as { sessionId: string }).sessionId = 'run-1';
-    ledger = async () => new Response('nope', { status: 500 });
-    await ctrl().loadHistory();
-    await settle(el);
-    expect(text(section(el))).toContain("Couldn't refresh this run.");
-    expect(text(section(el))).not.toContain('Each tool the agent uses');
   });
 });

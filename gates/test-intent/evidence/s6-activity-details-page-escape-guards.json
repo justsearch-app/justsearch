@@ -1,0 +1,152 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-11T21:28:07.534Z",
+  "revision": "fedc486273a61e3269dff3fac90dfd56a4f87788",
+  "tree": "e9d5e2e704d15239db717a0645e3e4fcdb38a78d",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/xg5tl05a/tmp/test-intent-vitest-11406-1794432365010.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 63073
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#a dialog open: Escape is the dialog's, Activity's details stay open",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:067890725b40773e3758434461e68866d2330c016667293e806f10993070f36e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a dialog open: Escape is the dialog's, Activity's details stay open",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#the command palette open: Escape is the palette's, Activity's details stay open",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:067890725b40773e3758434461e68866d2330c016667293e806f10993070f36e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the command palette open: Escape is the palette's, Activity's details stay open",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#Settings open: Escape is Settings', Activity's details stay open",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:067890725b40773e3758434461e68866d2330c016667293e806f10993070f36e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Settings open: Escape is Settings', Activity's details stay open",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#Activity not on show: Escape on the page leaves its details as they were",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:067890725b40773e3758434461e68866d2330c016667293e806f10993070f36e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Activity not on show: Escape on the page leaves its details as they were",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#System in the second pane: Escape on the page closes Activity's details only when that pane is the window in use",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:067890725b40773e3758434461e68866d2330c016667293e806f10993070f36e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "System in the second pane: Escape on the page closes Activity's details only when that pane is the window in use",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "fedc486273",
+    "revision": "fedc486273a61e3269dff3fac90dfd56a4f87788",
+    "overlays": [],
+    "patches": [
+      {
+        "path": "gates/test-intent/evidence/s6-activity-details-p3-before.patch",
+        "contentDigest": "sha256:a62b1e85f9d3f4ea1c71be0ba8fda31fa8226740c88ebe13fd3e487bd6e12801"
+      }
+    ],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/xg5tl05a/tmp/test-intent-vitest-11406-1794432429503.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 57669,
+        "output": "JSON report written to /home/elias/.cache/am/xg5tl05a/tmp/test-intent-vitest-11406-1794432429503.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#a dialog open: Escape is the dialog's, Activity's details stay open",
+        "classification": "assertion",
+        "detail": "a dialog open: Escape is the dialog's, Activity's details stay open:  AssertionError: Activity's details stay open: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/xg5tl05a/tmp/test-intent-before-F9MF9N/modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts:349:55\n    at file:///home/elias/dev/justsearch/.claude/wor"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#the command palette open: Escape is the palette's, Activity's details stay open",
+        "classification": "assertion",
+        "detail": "the command palette open: Escape is the palette's, Activity's details stay open:  AssertionError: Activity's details stay open: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/xg5tl05a/tmp/test-intent-before-F9MF9N/modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts:364:55\n    at file:///home/elias/dev/justsearch/.claude/wor"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#Settings open: Escape is Settings', Activity's details stay open",
+        "classification": "assertion",
+        "detail": "Settings open: Escape is Settings', Activity's details stay open:  AssertionError: Activity's details stay open: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/xg5tl05a/tmp/test-intent-before-F9MF9N/modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts:379:55\n    at file:///home/elias/dev/justsearch/.claude/wor"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#Activity not on show: Escape on the page leaves its details as they were",
+        "classification": "assertion",
+        "detail": "Activity not on show: Escape on the page leaves its details as they were:  AssertionError: back on Activity, its details are still open: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/xg5tl05a/tmp/test-intent-before-F9MF9N/modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts:396:70\n    at file:///home/elias/dev/justse"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#System in the second pane: Escape on the page closes Activity's details only when that pane is the window in use",
+        "classification": "assertion",
+        "detail": "System in the second pane: Escape on the page closes Activity's details only when that pane is the window in use:  AssertionError: the window in use is the other pane: Activity's details stay: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/xg5tl05a/tmp/test-intent-before-F9MF9N/modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts:328:104\n    at file:///home"
+      }
+    ]
+  },
+  "digest": "sha256:8aeee14f7910805480646cc47e56a5c6bd5633ea6075b54e54625815215f1661"
+}

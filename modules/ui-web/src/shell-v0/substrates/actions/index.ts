@@ -429,6 +429,23 @@ export function applyEffect(
 }
 
 /**
+ * The copy-to-clipboard effect, written by the one clipboard authority, for a caller that says
+ * whether the copy happened: resolves `true` only once the clipboard took the text, `false` when it
+ * was refused or there is no clipboard. (`applyEffect` answers before the clipboard does, so its
+ * `true` is not a copy.) The journal records what was done, and it has no way to mark an effect as
+ * refused, so the copy is journaled once the clipboard took it and a refused copy not at all.
+ */
+export async function applyClipboardEffect(
+  text: string,
+  invokedBy: Provenance = CORE_PROVENANCE,
+  originator: EffectOriginator = 'user',
+): Promise<boolean> {
+  const copied = await copyToClipboard(text);
+  if (copied) recordEffect({ kind: 'copy-to-clipboard', text }, invokedBy, { originator });
+  return copied;
+}
+
+/**
  * 543-fwd #1 (redo) — dispatch an effect to chrome WITHOUT writing to the
  * Effect Journal. This is the journal-suppressed path the cursor-based undo /
  * redo use: moving the undo cursor re-applies side-effects (the original effect
@@ -551,8 +568,8 @@ export function dispatchEffectToChrome(
     case 'copy-to-clipboard': {
       // 574 B2 — route the clipboard effect through the one clipboard authority.
       // Tempdoc 613 §6 — a copy confirmation is a RECEIPT (locality: at-control), flashed in the
-      // control via ReceiptController by the caller — NOT a window toast. The effect no longer carries
-      // a `successMessage` window toast (the lone caller, EffectAuditLog, now flashes a receipt).
+      // control via ReceiptController by the caller — NOT a window toast. Dispatch cannot wait for the
+      // clipboard's answer; a caller that confirms the copy applies it through applyClipboardEffect.
       void copyToClipboard(effect.text);
       return true;
     }

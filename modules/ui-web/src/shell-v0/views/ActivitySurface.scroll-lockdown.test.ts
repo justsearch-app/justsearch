@@ -158,16 +158,29 @@ function loadedEntries(page: Page): Promise<number> {
 
 /** The one scroller that holds `tag`, its position and its box; fails unless there is exactly one, inside the window. */
 async function theScroller(page: Page, tag: string): Promise<{ top: number; max: number; box: { x: number; y: number; width: number; height: number } }> {
-  const found = await page.evaluate((tag) => {
+  const { diagnosis, ...found } = await page.evaluate((tag) => {
     const el = window.__deep(tag)!;
     const scrollers = window.__scrollers(el);
     const one = scrollers[0];
-    if (scrollers.length !== 1 || !one) return { count: scrollers.length, names: scrollers.map((s) => s.localName + '.' + s.className) };
+    if (scrollers.length !== 1 || !one) {
+      const items = (window.__deep('jf-action-ledger')?.shadowRoot?.querySelector('lit-virtualizer') as
+        unknown as { items?: unknown[] } | null)?.items?.length ?? 0;
+      const lines = [`viewport=${window.innerWidth}×${window.innerHeight} devicePixelRatio=${window.devicePixelRatio} items=${items}`];
+      let node: Node | null = el;
+      while (node) {
+        if (node instanceof Element) {
+          const style = getComputedStyle(node);
+          lines.push(`${node.localName} class=${JSON.stringify(node.getAttribute('class') ?? '')} overflowY=${style.overflowY} display=${style.display} clientHeight=${node.clientHeight} scrollHeight=${node.scrollHeight}`);
+        }
+        node = node instanceof ShadowRoot ? node.host : (node as Element).assignedSlot ?? node.parentNode;
+      }
+      return { count: scrollers.length, names: scrollers.map((s) => s.localName + '.' + s.className), diagnosis: `\n${lines.join('\n')}` };
+    }
     const r = one.getBoundingClientRect();
-    return { count: 1, top: one.scrollTop, max: one.scrollHeight - one.clientHeight,
+    return { count: 1, diagnosis: '', top: one.scrollTop, max: one.scrollHeight - one.clientHeight,
       box: { x: r.x, y: r.y, width: r.width, height: r.height }, bottom: r.bottom, innerHeight: window.innerHeight };
   }, tag);
-  expect(found.count, `exactly one scroller holds ${tag} (found ${JSON.stringify(found)})`).toBe(1);
+  expect(found.count, `exactly one scroller holds ${tag} (found ${JSON.stringify(found)})${diagnosis}`).toBe(1);
   const { top, max, box, bottom, innerHeight } = found as { top: number; max: number; bottom: number; innerHeight: number;
     box: { x: number; y: number; width: number; height: number } };
   expect(bottom, 'the scroller ends inside the window').toBeLessThanOrEqual(innerHeight + 0.5);
@@ -205,6 +218,8 @@ for (const [width, height, text] of [[1280, 720, ''], [600, 400, '200%']] as con
 
   it(`at ${size}, one scroller holds the Activity feed, and the wheel, touch and keys reach both ends`, async () => {
     const page = await open(width, height, text);
+    await expect.poll(() => page.evaluate(() => window.__scrollers(window.__deep('jf-action-ledger')!).length),
+      { timeout: 15_000 }).toBe(1);
     const start = await theScroller(page, 'jf-action-ledger');
     expect(start.max, 'the feed is taller than its scroller').toBeGreaterThan(start.box.height);
 
@@ -250,6 +265,9 @@ for (const [width, height, text] of [[1280, 720, ''], [600, 400, '200%']] as con
     expect(record, 'reading on reaches the records').not.toBeNull();
     await page.mouse.click(record!.x, record!.y);
     await settle(page, 200);
+    // The click also opens the record's details (a sheet at 600×400); Escape closes them and puts
+    // the keyboard back on the record.
+    await press(page, 'Escape');
     expect(await focusedEntry(page), 'a click on a record focuses it').not.toBeNull();
     for (const [key, pos] of [['Control+End', 'last'], ['Control+Home', 1], ['End', 'last'], ['Home', 1]] as const) {
       await press(page, key);

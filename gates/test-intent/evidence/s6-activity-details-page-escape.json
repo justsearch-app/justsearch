@@ -1,0 +1,147 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-11T21:25:49.264Z",
+  "revision": "fedc486273a61e3269dff3fac90dfd56a4f87788",
+  "tree": "f74750321f357ed443a22a93d9f374debeaabedd",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/xg5tl05a/tmp/test-intent-vitest-10497-1794432226381.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 57826
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#at 1280×720, Escape with the keyboard on the page closes Activity's details and returns the keyboard to the record",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:067890725b40773e3758434461e68866d2330c016667293e806f10993070f36e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "at 1280×720, Escape with the keyboard on the page closes Activity's details and returns the keyboard to the record",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#the windowed list dropped the record's row: Escape on the page still returns the keyboard to that record",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:067890725b40773e3758434461e68866d2330c016667293e806f10993070f36e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the windowed list dropped the record's row: Escape on the page still returns the keyboard to that record",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#at 600×400 with 200% text, Escape on the page closes the sheet, the window behind is live again, and the keyboard is on the record",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:067890725b40773e3758434461e68866d2330c016667293e806f10993070f36e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "at 600×400 with 200% text, Escape on the page closes the sheet, the window behind is live again, and the keyboard is on the record",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#in forced colours, Escape on the page closes the details: the record loses its selection bar and shows the focus ring",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:067890725b40773e3758434461e68866d2330c016667293e806f10993070f36e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "in forced colours, Escape on the page closes the details: the record loses its selection bar and shows the focus ring",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#System in the second pane: Escape on the page closes Activity's details only when that pane is the window in use",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:067890725b40773e3758434461e68866d2330c016667293e806f10993070f36e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "System in the second pane: Escape on the page closes Activity's details only when that pane is the window in use",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "fedc486273",
+    "revision": "fedc486273a61e3269dff3fac90dfd56a4f87788",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/xg5tl05a/tmp/test-intent-vitest-10497-1794432285506.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 63431,
+        "output": "JSON report written to /home/elias/.cache/am/xg5tl05a/tmp/test-intent-vitest-10497-1794432285506.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#at 1280×720, Escape with the keyboard on the page closes Activity's details and returns the keyboard to the record",
+        "classification": "assertion",
+        "detail": "at 1280×720, Escape with the keyboard on the page closes Activity's details and returns the keyboard to the record:  AssertionError: Escape on the page closes the details: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/xg5tl05a/tmp/test-intent-before-vxytgD/modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts:255:80\n    at file:///home/elias/dev/justsearch/.c"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#the windowed list dropped the record's row: Escape on the page still returns the keyboard to that record",
+        "classification": "assertion",
+        "detail": "the windowed list dropped the record's row: Escape on the page still returns the keyboard to that record:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/xg5tl05a/tmp/test-intent-before-vxytgD/modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts:273:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/mod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#at 600×400 with 200% text, Escape on the page closes the sheet, the window behind is live again, and the keyboard is on the record",
+        "classification": "assertion",
+        "detail": "at 600×400 with 200% text, Escape on the page closes the sheet, the window behind is live again, and the keyboard is on the record:  AssertionError: Escape on the page closes the sheet: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/xg5tl05a/tmp/test-intent-before-vxytgD/modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts:287:61\n    at file:///home/elias/dev/justsearch/.cla"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#in forced colours, Escape on the page closes the details: the record loses its selection bar and shows the focus ring",
+        "classification": "assertion",
+        "detail": "in forced colours, Escape on the page closes the details: the record loses its selection bar and shows the focus ring:  AssertionError: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/xg5tl05a/tmp/test-intent-before-vxytgD/modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts:306:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/mod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts#System in the second pane: Escape on the page closes Activity's details only when that pane is the window in use",
+        "classification": "assertion",
+        "detail": "System in the second pane: Escape on the page closes Activity's details only when that pane is the window in use:  AssertionError: System's pane in use: Escape closes Activity's details: expected true to be false // Object.is equality\n    at /home/elias/.cache/am/xg5tl05a/tmp/test-intent-before-vxytgD/modules/ui-web/src/shell-v0/views/ActivitySurface.page-escape-lockdown.test.ts:335:99\n    at file:///home/elias/"
+      }
+    ]
+  },
+  "digest": "sha256:db22f1bbb1b39873c2090cb9a6ff16877fa9d93a27388cb5c34ecd146e80a3f7"
+}

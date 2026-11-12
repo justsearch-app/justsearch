@@ -600,6 +600,13 @@ export class AgentSessionController implements CoreAgentRunHandlers {
   /** Whether each run list is what the backend last said (`runListLoad.ts`). */
   sessionsLoad: RunListLoad = RUN_LIST_UNREAD;
   historyLoad: RunListLoad = RUN_LIST_UNREAD;
+  /**
+   * The run's ledger records as the session-filtered read returned them (that read filters before it
+   * limits, so it can hold records the general ledger window no longer does). Activity's run scope
+   * joins them into its feed. `historySessionId` is the run they belong to.
+   */
+  historyRecords: BackendLedgerEntry[] = [];
+  historySessionId: string | null = null;
   presenceLoad: RunListLoad = RUN_LIST_UNREAD;
   available: boolean | null = null;
   // Tempdoc 577 §2.13 #17 / §2.14 Root III — the agent's AUTHORITY SPACE. `/api/chat/agent/tools`
@@ -2717,8 +2724,11 @@ export class AgentSessionController implements CoreAgentRunHandlers {
    * History while the record is non-empty is unrepresentable.
    */
   async loadHistory(): Promise<void> {
-    if (!this.sessionId) {
+    const sessionId = this.sessionId;
+    if (!sessionId) {
       this.history = [];
+      this.historyRecords = [];
+      this.historySessionId = null;
       this.historyLoad = runListLoaded();
       this.notify();
       return;
@@ -2726,20 +2736,22 @@ export class AgentSessionController implements CoreAgentRunHandlers {
     try {
       const res = await this.transport.request(
         `${this.apiBase}/api/action-ledger?originator=agent&correlationId=${encodeURIComponent(
-          this.sessionId,
+          sessionId,
         )}`,
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as { entries?: BackendLedgerEntry[] };
+      // A run switched while this read was out: its answer belongs to the previous run.
+      if (this.sessionId !== sessionId) return;
       const rows = data.entries ?? [];
+      this.historyRecords = rows.filter((r) => r.kind === 'operation').slice(-HISTORY_LIMIT);
+      this.historySessionId = sessionId;
       // tempdoc 558 §S1 — project through the ONE shared projection (projectBackend), so History and
       // the Activity surface render the same record identically rather than forking a HistoryEntry.
-      this.history = rows
-        .filter((r) => r.kind === 'operation')
-        .slice(-HISTORY_LIMIT)
-        .map(projectBackend);
+      this.history = this.historyRecords.map(projectBackend);
       this.historyLoad = runListLoaded();
     } catch {
+      if (this.sessionId !== sessionId) return;
       this.historyLoad = runListFailed(this.historyLoad);
     }
     this.notify();

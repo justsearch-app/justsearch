@@ -199,7 +199,7 @@ export interface UnifiedActionEntry {
 }
 
 /** "6m 12s" / "45s" / "1h 03m" — a scan's duration at human altitude (millis are not). */
-function formatScanDuration(ms: number | undefined): string {
+export function formatScanDuration(ms: number | undefined): string {
   if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) return '';
   const totalSec = Math.round(ms / 1000);
   if (totalSec < 60) return `${totalSec}s`;
@@ -397,13 +397,15 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
 /** Map a FE Effect Journal entry to a unified row. */
 export function projectEffect(j: JournalEntry): UnifiedActionEntry {
   const e = j.effect;
-  // §2.A: route the operation id / navigation target through the display projector (Q7).
-  const detail =
+  // §2.A: route the operation id / navigation target through the display projector (Q7). An
+  // invocation is titled by its operation, as the ledger's own operation rows are, never by the
+  // effect kind in front of it.
+  const what =
     e.kind === 'invoke-operation'
-      ? `: ${present({ kind: 'operation', id: e.operationId }).label}`
+      ? present({ kind: 'operation', id: e.operationId }).label
       : e.kind === 'navigate'
-        ? `: ${present({ kind: 'route', target: e.to }).label}`
-        : '';
+        ? `${e.kind}: ${present({ kind: 'route', target: e.to }).label}`
+        : e.kind;
   // A proposal marker records a DECISION, not a dispatch: a rejected one never ran.
   const decision = j.pendingOutcome === 'rejected' ? 'Proposal rejected · '
     : j.pendingOutcome === 'accepted' ? 'Proposal accepted · ' : '';
@@ -414,7 +416,7 @@ export function projectEffect(j: JournalEntry): UnifiedActionEntry {
     kind: e.kind,
     occurredAt: j.invokedAt,
     originator: j.originator,
-    label: `${decision}${e.kind}${detail}`,
+    label: `${decision}${what}`,
     // Tempdoc 613 §6/§10 — a raw FE `navigate` journal row is routine direct-user navigation.
     ...(isRoutineActivity(e.kind, j.originator) ? { isRoutine: true } : {}),
   };

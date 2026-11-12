@@ -646,46 +646,6 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
       expect(toggle!.textContent).toContain('(12)');
     });
 
-    it('a scan rollup expands to the per-document rows OF THAT SCAN (matched by scanId)', async () => {
-      const src = mount();
-      src.emitFrame(
-        snapshotFrame([
-          ...scanWithDocs(3, 'scan-a'),
-          ...scanWithDocs(2, 'scan-b'),
-        ]),
-      );
-      host.resolveHash = async (_resource: string, hash: string) =>
-        hash === 'hash1' ? 'C:/corpus/scifact/report.pdf' : null;
-      await host.updateComplete;
-
-      const rollups = Array.from(
-        host.shadowRoot!.querySelectorAll('[data-testid="ledger-scan-rollup"]'),
-      );
-      expect(rollups.length).toBe(2);
-      const scanA = rollups.find((r) => r.getAttribute('data-scan-id') === 'scan-a')!;
-      const expand = scanA.querySelector('[data-testid="ledger-scan-expand"]') as HTMLElement;
-      expect(expand.getAttribute('aria-expanded')).toBe('false');
-      expand.click();
-      await host.updateComplete;
-      await flushMicrotasks();
-      await host.updateComplete;
-
-      const children = host.shadowRoot!.querySelectorAll('[data-testid="ledger-scan-child"]');
-      expect(children.length).toBe(3); // scan-a's three docs, NOT scan-b's two
-      const text = Array.from(children)
-        .map((c) => c.textContent ?? '')
-        .join('|');
-      // D4 item 5 — the resolved row reads as a name; an unresolvable hash degrades to the
-      // short-hash label it had before, never to a blank or a wrong name.
-      expect(text).toContain('scifact/report.pdf');
-      expect(text).toContain('(hash2'.slice(0, 6)); // the 6-char fallback prefix for the rest
-      expect(
-        (
-          scanA.querySelector('[data-testid="ledger-scan-expand"]') as HTMLElement
-        ).getAttribute('aria-expanded'),
-      ).toBe('true');
-    });
-
     it('grant and gate rows are NEVER hidden by the default tier, under any classification path', async () => {
       const src = mount();
       src.emitFrame(

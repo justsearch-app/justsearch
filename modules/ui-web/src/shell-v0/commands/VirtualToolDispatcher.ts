@@ -58,8 +58,8 @@ export async function dispatchVirtualToolCall(
     // §28.W13 — agent-originated invocation. invokeCommandWithResult
     // threads originator='agent' through invokeAndApply → applyEffect
     // → recordEffect so the resulting Journal entries attribute to
-    // the AI agent. "Undo last AI action" in EffectAuditLog reaches
-    // these; the audit log filter shows them under the 'agent' chip.
+    // the AI agent. Activity's "Undo last AI action" reaches these; its
+    // feed shows them under Agents.
     result = await invokeCommandWithResult(commandId, { originator: 'agent' });
   }
   // POST result back to backend regardless of outcome — the agent

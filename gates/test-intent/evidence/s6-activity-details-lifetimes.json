@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-11T23:28:45.876Z",
+  "revision": "d5d95eb7d62c72aa211688b02c4d5fcc56a89c2c",
+  "tree": "81f2e95c593f51cd36046b6f5ada52558b108380",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-12625-1794439718635.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3082
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a receipt read answered after Activity closed does not reach the reopened Activity or move focus",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "amendment 6 — leaving Activity during reads: obsolete answers change nothing a receipt read answered after Activity closed does not reach the reopened Activity or move focus",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "95434de9c0",
+    "revision": "95434de9c04e63fbfda4880aa7288ba5a34b7805",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-12625-1794439722996.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2653,
+        "output": "JSON report written to /home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-12625-1794439722996.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a receipt read answered after Activity closed does not reach the reopened Activity or move focus",
+        "classification": "assertion",
+        "detail": "amendment 6 — leaving Activity during reads: obsolete answers change nothing a receipt read answered after Activity closed does not reach the reopened Activity or move focus:  AssertionError: a receipt read for 019a0000-0000-7000-8000-000000000001 is waiting: expected 0 to be greater than 0\n    at receipt (/home/elias/.cache/am/4isn2edh/tmp/test-intent-before-Miv1kO/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:128:63)\n    at /home/elias/.cache/am/4isn"
+      }
+    ]
+  },
+  "digest": "sha256:2e32fd02416e5804a82ca562111e687cb64365d1df94075fa60740d9d73827c2"
+}

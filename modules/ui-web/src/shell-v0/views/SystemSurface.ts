@@ -18,7 +18,7 @@
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import '../components/SurfaceTabs.js';
-import type { SurfaceTabItem } from '../components/SurfaceTabs.js';
+import type { SurfaceTabItem, SurfaceTabs } from '../components/SurfaceTabs.js';
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { present } from '../display/present.js';
 import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabIntent.js';
@@ -72,6 +72,11 @@ export class SystemSurface extends JfElement {
     super.disconnectedCallback();
     this.memberTabUnsub?.();
     this.memberTabUnsub = null;
+  }
+
+  /** Escape with the keyboard on the page: the member on show closes its details (Activity's). */
+  closeDetails(): boolean {
+    return this.renderRoot.querySelector<SurfaceTabs>('jf-surface-tabs')?.closeDetails() ?? false;
   }
 
   override render(): TemplateResult {

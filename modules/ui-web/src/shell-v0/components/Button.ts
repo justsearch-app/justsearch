@@ -69,6 +69,9 @@ export class JfButton extends JfElement {
     operationId: { type: String, attribute: 'operation-id' },
     disabled: { type: Boolean, reflect: true },
     availability: { attribute: false },
+    // Reactive: a caller re-rendering with a new action (the same label, another record) must reach
+    // the composed jf-control, or a click would run the action the button was first drawn with.
+    onActivate: { attribute: false },
   };
 
   declare variant: ButtonVariant;
@@ -91,10 +94,11 @@ export class JfButton extends JfElement {
    * thenable, the composed `jf-control` tracks it and shows the in-flight `busy` overlay until it settles.
    * Forwarded verbatim to `jf-control`; a `void` return is unchanged.
    */
-  onActivate: (() => void | Promise<unknown>) | null = null;
+  declare onActivate: (() => void | Promise<unknown>) | null;
 
   constructor() {
     super();
+    this.onActivate = null;
     this.variant = 'secondary';
     this.size = 'md';
     this.disabled = false;

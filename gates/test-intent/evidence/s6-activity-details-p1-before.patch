@@ -1,0 +1,3159 @@
+diff --git a/modules/ui-web/src/shell-v0/commands/VirtualToolDispatcher.ts b/modules/ui-web/src/shell-v0/commands/VirtualToolDispatcher.ts
+index 8571d75085..6cd1a26763 100644
+--- a/modules/ui-web/src/shell-v0/commands/VirtualToolDispatcher.ts
++++ b/modules/ui-web/src/shell-v0/commands/VirtualToolDispatcher.ts
+@@ -58,8 +58,8 @@ export async function dispatchVirtualToolCall(
+     // §28.W13 — agent-originated invocation. invokeCommandWithResult
+     // threads originator='agent' through invokeAndApply → applyEffect
+     // → recordEffect so the resulting Journal entries attribute to
+-    // the AI agent. "Undo last AI action" in EffectAuditLog reaches
+-    // these; the audit log filter shows them under the 'agent' chip.
++    // the AI agent. Activity's "Undo last AI action" reaches these; its
++    // feed shows them under Agents.
+     result = await invokeCommandWithResult(commandId, { originator: 'agent' });
+   }
+   // POST result back to backend regardless of outcome — the agent
+diff --git a/modules/ui-web/src/shell-v0/components/ActionLedgerView.ts b/modules/ui-web/src/shell-v0/components/ActionLedgerView.ts
+index c6f2169807..2ac1a27afc 100644
+--- a/modules/ui-web/src/shell-v0/components/ActionLedgerView.ts
++++ b/modules/ui-web/src/shell-v0/components/ActionLedgerView.ts
+@@ -18,7 +18,15 @@
+  *
+  * Filters: one quick choice (All / Agents / Your actions / Indexing / Problems) and advanced
+  * originator, outcome, proposal-decision, routine and date constraints (values OR within a
+- * dimension, dimensions AND together).
++ * dimension, dimensions AND together), within a scope: everything loaded, the records this window's
++ * journal holds, or the current agent run (whose session-filtered read joins the feed too).
++ *
++ * Selection: the feed is a list box whose records are its options; a click, Enter or Space selects
++ * one (`feed-select`). The owner holds the selection (`selectedKey`) and shows its details; after
++ * every change the feed says what the selected key now stands for (`feed-record`): the joined row
++ * found through any of its identities, a burst's or a scan's member records, the records of the
++ * same approval request, or null once no loaded record answers to it. Rows hold no controls of
++ * their own.
+  */
+ 
+ import { html, css, nothing, type PropertyValues, type TemplateResult } from 'lit';
+@@ -42,6 +50,8 @@ import {
+   type FeedFilter,
+   type FeedNote,
+   type FeedRow,
++  type FeedScope,
++  type SelectedRecord,
+   historyLedgerId,
+   type OperationHistoryRow,
+   type QuickFilter,
+@@ -87,6 +97,12 @@ function isBurst(row: FeedRow | IndexBurstSummary): row is IndexBurstSummary {
+   return (row as IndexBurstSummary).summary === true;
+ }
+ 
++/** What a burst summary says: how many were indexed, failed or are of unknown state, and where. */
++function burstLabel(burst: IndexBurstSummary): string {
++  return [`Indexed ${burst.indexed}`, burst.failed ? `${burst.failed} failed` : '',
++    burst.unknown ? `${burst.unknown} with unknown state` : '', burst.collection].filter(Boolean).join(' · ');
++}
++
+ /** The nearest scrolling ancestor across shadow boundaries, else the document's scroller. */
+ function scrollerOf(start: Element): Element {
+   let node: Node | null = start;
+@@ -138,6 +154,11 @@ const NOTE_TEXT: Record<FeedNote, string> = {
+   'outcome-unavailable': 'Outcome unavailable',
+ };
+ 
++const SCOPE_WORDS: Record<Exclude<FeedScope, 'all'>, string> = {
++  local: 'Showing what was recorded in this window.',
++  run: 'Showing the current agent run.',
++};
++
+ const SOURCE_NAMES = { ledger: 'Activity ledger', history: 'Operation history' } as const;
+ 
+ export class ActionLedgerView extends JfElement {
+@@ -155,9 +176,11 @@ export class ActionLedgerView extends JfElement {
+     journal: { state: true },
+     // tempdoc 612 §UX — the seen-cursor snapshot, mirrored so "new" marks re-fold when it advances.
+     seenCursor: { state: true },
+-    expanded: { state: true },
+-    // tempdoc 812 D4 — pathHash → friendly name, filled lazily by core.resolve-path-hash.
+-    resolvedNames: { state: true },
++    selectedKey: { attribute: false },
++    runRecords: { attribute: false },
++    currentRun: { attribute: false },
++    // tempdoc 812 D4 — pathHash → resolved path, filled lazily by core.resolve-path-hash.
++    resolvedPaths: { state: true },
+   } as const;
+ 
+   declare apiBase: string;
+@@ -172,9 +195,13 @@ export class ActionLedgerView extends JfElement {
+   declare historyState: SourceState;
+   declare journal: readonly JournalEntry[];
+   declare seenCursor: string;
+-  /** Scan rollups and bursts the person expanded, by key. */
+-  declare expanded: readonly string[];
+-  declare resolvedNames: Record<string, string>;
++  /** The selected record's key, held by the owner; null when none is selected. */
++  declare selectedKey: string | null;
++  /** The current run's records from its session-filtered read, joined into the feed. */
++  declare runRecords: readonly BackendLedgerEntry[];
++  /** The current agent run's session id, when there is one: the run scope offers it. */
++  declare currentRun: string | null;
++  declare resolvedPaths: Record<string, string>;
+ 
+   /** Hashes asked for and not yet answered or answered with a name; a failed answer is retried later. */
+   private readonly resolvingHashes = new Set<string>();
+@@ -214,8 +241,10 @@ export class ActionLedgerView extends JfElement {
+     this.historyState = 'loading';
+     this.journal = [];
+     this.seenCursor = getSeenCursor();
+-    this.expanded = [];
+-    this.resolvedNames = {};
++    this.selectedKey = null;
++    this.runRecords = [];
++    this.currentRun = null;
++    this.resolvedPaths = {};
+   }
+ 
+   // tempdoc 558 §S1 — the row styles are single-sourced in eventRow.ts (shared with the History tab).
+@@ -273,7 +302,6 @@ export class ActionLedgerView extends JfElement {
+       }
+       .quick button:focus-visible,
+       .link:focus-visible,
+-      .expand:focus-visible,
+       .entry:focus-visible,
+       summary:focus-visible,
+       select:focus-visible {
+@@ -286,7 +314,6 @@ export class ActionLedgerView extends JfElement {
+         }
+         .quick button:focus-visible,
+         .link:focus-visible,
+-        .expand:focus-visible,
+         .entry:focus-visible,
+         summary:focus-visible,
+         select:focus-visible {
+@@ -336,24 +363,10 @@ export class ActionLedgerView extends JfElement {
+       .notes span + span::before {
+         content: ' · ';
+       }
+-      /* tempdoc 812 D4 — the rollup/burst expand control reads as the row's label: same type and
+-         colour, only the disclosure caret is added. */
+-      .expand {
+-        flex: 1;
+-        min-width: 0;
+-        padding: 0;
+-        border: 0;
+-        background: none;
+-        color: inherit;
+-        font: inherit;
+-        text-align: left;
+-        cursor: pointer;
+-      }
+-      .child {
+-        padding-left: 1.25rem;
+-      }
+-      .child.empty {
+-        padding: 0.25rem 0 0.25rem 1.25rem;
++      .members {
++        flex: none;
++        color: var(--text-secondary);
++        font-size: var(--font-size-xs);
+       }
+       .row,
+       .label {
+@@ -366,10 +379,32 @@ export class ActionLedgerView extends JfElement {
+       lit-virtualizer {
+         width: 100%;
+       }
+-      /* An entry spans the row, so a click anywhere on it focuses it for the feed's keys. */
++      /* An entry spans the row, so a click anywhere on it focuses and selects it. */
+       .entry {
+         box-sizing: border-box;
+         width: 100%;
++        padding-inline-start: calc(var(--jf-space-2) + 2 * var(--frame-focus-width));
++        cursor: pointer;
++      }
++      /* Selected reads by a bar at the start as well as by tint: only the selected record has a border
++         there, so forced colours, which paint every border, still tell it apart. */
++      .entry[aria-selected='true'] {
++        padding-inline-start: var(--jf-space-2);
++        border-inline-start: calc(2 * var(--frame-focus-width)) solid var(--accent);
++        background: var(--accent-tint-16);
++      }
++      .scope {
++        display: inline-flex;
++        align-items: center;
++        gap: var(--jf-space-1);
++        font-size: var(--font-size-xs);
++        color: var(--text-primary);
++        font-weight: 600;
++      }
++      @media (forced-colors: active) {
++        .entry[aria-selected='true'] {
++          border-inline-start-color: Highlight;
++        }
+       }
+     `,
+   ];
+@@ -529,8 +564,9 @@ export class ActionLedgerView extends JfElement {
+    */
+   protected override willUpdate(changed: PropertyValues<this>): void {
+     this.readingAnchor = null;
+-    const arrivals = changed.has('ledger') || changed.has('history') || changed.has('journal') || changed.has('seed');
+-    if (!arrivals || changed.has('filter') || changed.has('expanded') || this.getBoundingClientRect().top >= 0) return;
++    const arrivals = changed.has('ledger') || changed.has('history') || changed.has('journal') || changed.has('seed')
++      || changed.has('runRecords');
++    if (!arrivals || changed.has('filter') || this.getBoundingClientRect().top >= 0) return;
+     let best: { key: string; top: number } | null = null;
+     for (const row of this.renderRoot.querySelectorAll<HTMLElement>('[data-key]')) {
+       const top = row.getBoundingClientRect().top;
+@@ -539,7 +575,12 @@ export class ActionLedgerView extends JfElement {
+     this.readingAnchor = best;
+   }
+ 
+-  protected override updated(): void {
++  protected override updated(changed: PropertyValues<this>): void {
++    if (this.selectedKey !== null && ['selectedKey', 'ledger', 'history', 'journal', 'seed', 'runRecords', 'resolvedPaths', 'filter']
++      .some((name) => changed.has(name as keyof ActionLedgerView))) {
++      this.dispatchEvent(new CustomEvent<{ key: string; record: SelectedRecord | null }>('feed-record',
++        { detail: { key: this.selectedKey, record: this.recordFor(this.selectedKey) } }));
++    }
+     const anchor = this.readingAnchor;
+     if (!anchor) return;
+     this.readingAnchor = null;
+@@ -575,9 +616,13 @@ export class ActionLedgerView extends JfElement {
+   /** The ledger rows this view holds: the stream's after its first snapshot, else the seed plus live rows. */
+   private ledgerRows(): readonly BackendLedgerEntry[] {
+     const live = this.ledger?.rows ?? [];
+-    if (this.ledger?.snapshotApplied || !this.seed) return live;
+-    const ids = new Set(live.map((e) => e.id).filter(Boolean));
+-    return [...this.seed.filter((e) => !e.id || !ids.has(e.id)), ...live];
++    const streamed = this.ledger?.snapshotApplied || !this.seed ? live : (() => {
++      const ids = new Set(live.map((e) => e.id).filter(Boolean));
++      return [...this.seed!.filter((e) => !e.id || !ids.has(e.id)), ...live];
++    })();
++    // The run's own read can hold records the general window no longer does; the feed joins by id,
++    // so a record in both is one row (the stream's copy first).
++    return this.runRecords.length ? [...streamed, ...this.runRecords] : streamed;
+   }
+ 
+   private historyRows(): readonly OperationHistoryRow[] {
+@@ -598,14 +643,14 @@ export class ActionLedgerView extends JfElement {
+    * forgotten so a later render can ask again once the resolver recovers.
+    */
+   private ensureResolvedName(pathHash: string): void {
+-    if (!pathHash || this.resolvingHashes.has(pathHash) || this.resolvedNames[pathHash]) return;
++    if (!pathHash || this.resolvingHashes.has(pathHash) || this.resolvedPaths[pathHash]) return;
+     this.resolvingHashes.add(pathHash);
+     const generation = this.mountGeneration;
+     const resolve = this.resolveHash ?? resolvePathLazy;
+     void resolve(INDEXING_JOBS_RESOURCE, pathHash)
+       .then((path) => {
+         if (path && generation === this.mountGeneration) {
+-          this.resolvedNames = { ...this.resolvedNames, [pathHash]: friendlyPathName(path) };
++          this.resolvedPaths = { ...this.resolvedPaths, [pathHash]: path };
+         } else this.resolvingHashes.delete(pathHash);
+       })
+       .catch(() => { this.resolvingHashes.delete(pathHash); });
+@@ -615,13 +660,56 @@ export class ActionLedgerView extends JfElement {
+   private withResolvedLabel(row: UnifiedActionEntry): UnifiedActionEntry {
+     if (row.kind !== 'index' || !row.pathHash) return row;
+     this.ensureResolvedName(row.pathHash);
+-    const name = this.resolvedNames[row.pathHash];
+-    if (!name) return row;
+-    return { ...row, label: indexLabel(row.indexState, name) };
++    const path = this.resolvedPaths[row.pathHash];
++    if (!path) return row;
++    return { ...row, label: indexLabel(row.indexState, friendlyPathName(path)) };
++  }
++
++  /** A feed row as the list and the details show it: its file named once resolved. */
++  private shown(row: FeedRow): FeedRow {
++    const entry = this.withResolvedLabel(row.entry);
++    return entry === row.entry ? row : { ...row, entry };
++  }
++
++  /** The projection the last render drew: every loaded row, and the visible items in order. */
++  private drawn: { feed: readonly FeedRow[]; items: ReadonlyArray<FeedRow | IndexBurstSummary> } = { feed: [], items: [] };
++
++  /** What `key` stands for now, or null when no loaded record answers to it. */
++  private recordFor(key: string): SelectedRecord | null {
++    const { feed, items } = this.drawn;
++    const paths = this.resolvedPaths;
++    const burst = items.find((item): item is IndexBurstSummary => isBurst(item) && item.key === key);
++    if (burst) {
++      return { key, kind: 'burst', label: burstLabel(burst), occurredAt: burst.occurredAt,
++        members: burst.members.map((m) => this.shown(m)), related: [], paths };
++    }
++    const found = feed.find((r) => r.key === key);
++    if (!found) return null;
++    const row = this.shown(found);
++    if (row.entry.isScanRollup) {
++      const members = feed.filter((r) => r.entry.kind === 'index' && !!row.entry.scanId && r.entry.scanId === row.entry.scanId);
++      return { key: row.key, kind: 'scan', row, label: row.entry.label, occurredAt: row.entry.occurredAt,
++        members: members.map((m) => this.shown(m)), related: [], paths };
++    }
++    const request = row.ledger?.pendingId;
++    const related = request ? feed.filter((r) => r !== found && r.ledger?.pendingId === request) : [];
++    return { key: row.key, kind: 'record', row, label: row.entry.label, occurredAt: row.entry.occurredAt,
++      members: [], related, paths };
+   }
+ 
+-  private toggleExpanded(key: string): void {
+-    this.expanded = this.expanded.includes(key) ? this.expanded.filter((k) => k !== key) : [...this.expanded, key];
++  /** Put the keyboard on the record `key` (bringing it into the windowed list); false when not shown. */
++  async focusRecord(key: string): Promise<boolean> {
++    await this.updateComplete;
++    const items = this.drawn.items;
++    let index = items.findIndex((item) => item.key === key);
++    if (index < 0) index = items.findIndex((item) => !isBurst(item) && item.aliases.includes(key));
++    if (index < 0) return false;
++    await this.focusEntry(index, items.length, 'nearest');
++    return (this.renderRoot as ShadowRoot).activeElement?.classList.contains('entry') ?? false;
++  }
++
++  private select(key: string): void {
++    this.dispatchEvent(new CustomEvent<{ key: string }>('feed-select', { detail: { key } }));
+   }
+ 
+   private setFilter(change: Partial<FeedFilter>): void {
+@@ -693,7 +781,7 @@ export class ActionLedgerView extends JfElement {
+           @click=${() => toggle(dim, f.value)}>${f.value} <span class="chip-count">(${f.count})</span></jf-filter-chip>`)}
+       </div>`;
+     const active = this.filter.originators.length + this.filter.outcomes.length + this.filter.proposals.length
+-      + (this.filter.routine !== 'auto' ? 1 : 0) + (this.filter.date !== 'all' ? 1 : 0);
++      + (this.filter.routine !== 'auto' ? 1 : 0) + (this.filter.date !== 'all' ? 1 : 0) + (this.filter.scope !== 'all' ? 1 : 0);
+     return html`<details class="advanced" data-testid="feed-advanced">
+       <summary>Filter${active ? ` (${active} active)` : ''}</summary>
+       <div class="filters" data-testid="ledger-filters">
+@@ -709,6 +797,13 @@ export class ActionLedgerView extends JfElement {
+             <option value="hide" ?selected=${this.filter.routine === 'hide'}>Always hide, in every view</option>
+           </select>
+         </div>
++        <div class="group" data-testid="feed-scope-choices">
++          <span class="group-label">records</span>
++          <jf-filter-chip ?active=${this.filter.scope === 'local'} data-testid="feed-scope-local"
++            @click=${() => this.setScope(this.filter.scope === 'local' ? 'all' : 'local')}>Recorded in this window</jf-filter-chip>
++          ${this.currentRun ? html`<jf-filter-chip ?active=${this.filter.scope === 'run'} data-testid="feed-scope-run"
++            @click=${() => this.setScope(this.filter.scope === 'run' ? 'all' : 'run')}>This run</jf-filter-chip>` : nothing}
++        </div>
+         <div class="group">
+           <span class="group-label">date</span>
+           <jf-filter-chip ?active=${this.filter.date === 'today'} data-testid="feed-date-today"
+@@ -718,6 +813,18 @@ export class ActionLedgerView extends JfElement {
+     </details>`;
+   }
+ 
++  /** The scope's words, and the way back to everything loaded. */
++  private renderScope(): TemplateResult | typeof nothing {
++    const scope = this.filter.scope;
++    if (scope === 'all') return nothing;
++    return html`<span class="scope" data-testid="feed-scope" data-scope=${scope}>${SCOPE_WORDS[scope]}
++      <button type="button" class="link" data-testid="feed-scope-clear" @click=${() => this.setScope('all')}>Show all activity</button></span>`;
++  }
++
++  private setScope(scope: FeedScope): void {
++    this.setFilter(scope === 'run' && this.currentRun ? { scope, runId: this.currentRun } : { scope });
++  }
++
+   private renderSourceStates(feed: readonly FeedRow[]): TemplateResult {
+     const states: Array<[keyof typeof SOURCE_NAMES, SourceState]> = [['ledger', this.ledgerState()], ['history', this.historyState]];
+     const affected = states.filter(([, state]) => state !== 'live');
+@@ -742,47 +849,34 @@ export class ActionLedgerView extends JfElement {
+   }
+ 
+   /**
+-   * tempdoc 812 D4 — one scan = one collapsible row, expandable to the per-document rows of that
+-   * scan still retained. The rollup is the durable record; the children are surviving detail.
++   * tempdoc 812 D4 — one scan = one row; the per-document rows of that scan still retained are its
++   * members, listed in its details. The rollup is the durable record; the members are surviving detail.
+    */
+   private renderScanRollup(row: FeedRow, feed: readonly FeedRow[]): TemplateResult {
+     const scanId = row.entry.scanId ?? '';
+-    const key = `scan:${scanId}`;
+-    const expanded = this.expanded.includes(key);
+-    const children = expanded ? feed.filter((r) => r.entry.kind === 'index' && r.entry.scanId === scanId) : [];
++    const members = feed.filter((r) => r.entry.kind === 'index' && r.entry.scanId === scanId).length;
+     const isNew = this.isNew(row.entry.occurredAt);
+     return html`<div class="row" data-testid="ledger-scan-rollup" data-kind="scan" data-scan-id=${scanId} data-key=${row.key}
+         ?data-new=${isNew} ?data-problem=${row.problem}>
+         ${this.newDot(isNew)}
+         <span class="who" data-originator=${row.entry.originator}>${row.entry.originator}</span>
+-        <button type="button" class="expand" data-testid="ledger-scan-expand" aria-expanded=${expanded ? 'true' : 'false'}
+-          @click=${() => this.toggleExpanded(key)}>${expanded ? '▾' : '▸'} ${row.entry.label}</button>
++        <span class="label">${row.entry.label}</span>
++        <span class="members" data-testid="ledger-scan-members">${members ? `${members} document${members === 1 ? '' : 's'} retained` : 'no documents retained'}</span>
+         <span class="src">backend</span>
+         ${renderEventWhen(row.entry.occurredAt)}
+-      </div>
+-      ${expanded && children.length === 0
+-        ? html`<div class="child empty" data-testid="ledger-scan-empty">No per-document rows retained for this scan.</div>` : nothing}
+-      ${children.map((child) => html`<div class="child" data-testid="ledger-scan-child">
+-        ${renderEventRow(this.withResolvedLabel(child.entry), { apiBase: this.apiBase })}</div>`)}`;
++      </div>`;
+   }
+ 
+-  /** A burst summary that says how many failed, expandable to every member it stands for. */
++  /** A burst summary that says how many failed; its members are listed in its details. */
+   private renderBurst(burst: IndexBurstSummary): TemplateResult {
+-    const key = `burst:${burst.key}`;
+-    const expanded = this.expanded.includes(key);
+     const isNew = this.isNew(burst.occurredAt);
+-    const label = [`Indexed ${burst.indexed}`, burst.failed ? `${burst.failed} failed` : '',
+-      burst.unknown ? `${burst.unknown} with unknown state` : '', burst.collection].filter(Boolean).join(' · ');
+-    return html`<div class="row" data-testid="ledger-burst" data-kind="index" ?data-new=${isNew} ?data-problem=${burst.failed > 0}>
++    return html`<div class="row" data-testid="ledger-burst" data-kind="index" data-key=${burst.key} ?data-new=${isNew} ?data-problem=${burst.failed > 0}>
+         ${this.newDot(isNew)}
+         <span class="who" data-originator="system">system</span>
+-        <button type="button" class="expand" data-testid="ledger-burst-expand" aria-expanded=${expanded ? 'true' : 'false'}
+-          @click=${() => this.toggleExpanded(key)}>${expanded ? '▾' : '▸'} <span class="label">${label}</span></button>
++        <span class="label">${burstLabel(burst)}</span>
+         <span class="src">backend</span>
+         ${renderEventWhen(burst.occurredAt)}
+-      </div>
+-      ${expanded ? burst.members.map((member) => html`<div class="child" data-testid="ledger-burst-member">
+-        ${renderEventRow(this.withResolvedLabel(member.entry), { apiBase: this.apiBase })}</div>`) : nothing}`;
++      </div>`;
+   }
+ 
+   private renderItem(item: FeedRow | IndexBurstSummary, feed: readonly FeedRow[]): TemplateResult {
+@@ -791,7 +885,9 @@ export class ActionLedgerView extends JfElement {
+     // tempdoc 612 §UX — the "new" mark is an additive opt-in; History/Timeline render the row without it.
+     const sources = [item.ledger ? 'ledger' : '', item.history.length ? 'history' : '', item.journal ? 'journal' : '']
+       .filter(Boolean).join(' ');
+-    return html`<div class="item" data-key=${item.key} data-sources=${sources} ?data-problem=${item.problem}>${renderEventRow(this.withResolvedLabel(item.entry),
++    // The receipt is read in the record's details, not on every row.
++    const { operationOutcomeKey: _receipt, ...entry } = this.withResolvedLabel(item.entry);
++    return html`<div class="item" data-key=${item.key} data-sources=${sources} ?data-problem=${item.problem}>${renderEventRow(entry,
+       { isNew: this.isNew(item.entry.occurredAt, item.entry.isRoutine), apiBase: this.apiBase })}${this.renderNotes(item)}</div>`;
+   }
+ 
+@@ -805,6 +901,11 @@ export class ActionLedgerView extends JfElement {
+     if (e.altKey || e.shiftKey || e.metaKey) return;
+     const target = e.target as Element;
+     if (target.closest('input, select, textarea, [contenteditable]')) return;
++    if ((e.key === 'Enter' || e.key === ' ') && !e.ctrlKey && !isImeComposition(e)) {
++      const key = target.closest<HTMLElement>('.entry')?.dataset.entryKey;
++      if (key) { e.preventDefault(); this.select(key); }
++      return;
++    }
+     const current = Number(target.closest<HTMLElement>('.entry')?.dataset.index ?? this.tabStop);
+     let next: number;
+     switch (e.key) {
+@@ -969,12 +1070,16 @@ export class ActionLedgerView extends JfElement {
+   }
+ 
+   private renderEntry(item: FeedRow | IndexBurstSummary, index: number, count: number, feed: readonly FeedRow[]): TemplateResult {
+-    return html`<div class="entry" role="listitem" data-index=${index} aria-posinset=${index + 1} aria-setsize=${count}
+-      tabindex=${index === Math.min(this.tabStop, count - 1) ? '0' : '-1'}>${this.renderItem(item, feed)}</div>`;
++    const selected = this.selectedKey !== null && item.key === this.selectedKey;
++    return html`<div class="entry" role="option" data-index=${index} data-entry-key=${item.key}
++      aria-selected=${selected ? 'true' : 'false'} aria-posinset=${index + 1} aria-setsize=${count}
++      tabindex=${index === Math.min(this.tabStop, count - 1) ? '0' : '-1'}
++      @click=${() => this.select(item.key)}>${this.renderItem(item, feed)}</div>`;
+   }
+ 
+   override render(): TemplateResult {
+     const feed = projectActivityFeed(this.ledgerRows(), this.historyRows(), this.journal);
++    this.drawn = { feed, items: [] };
+     const now = new Date();
+     const showRoutine = routineShown(this.filter);
+     const matching = feed.filter((row) => matchesFilter(row, this.filter, now));
+@@ -989,6 +1094,7 @@ export class ActionLedgerView extends JfElement {
+     const header = html`
+       <div class="controls">
+         ${this.renderQuick()}
++        ${this.renderScope()}
+         ${routineCount > 0 ? html`<jf-filter-chip ?active=${showRoutine} data-testid="ledger-routine-toggle"
+           @click=${() => this.setFilter({ routine: showRoutine ? 'hide' : 'show' })}>routine
+           <span class="chip-count">(${routineCount})</span></jf-filter-chip>` : nothing}
+@@ -1009,6 +1115,10 @@ export class ActionLedgerView extends JfElement {
+           ? html`<div class="empty" data-testid="ledger-loading">Loading activity…</div>`
+           : html`<div class="empty" data-testid="ledger-empty">No activity in loaded records.</div>`}`;
+     }
++    if (visible.length === 0 && this.filter.scope === 'local' && !feed.some((row) => row.journal)) {
++      return html`${header}<div class="empty" data-testid="ledger-empty">Nothing recorded in this window yet. What you or
++        the assistant does here is listed as it happens.</div>`;
++    }
+     if (visible.length === 0) {
+       const onlyRoutineHidden = !showRoutine && routineCount > 0 && matching.every((row) => row.entry.isRoutine);
+       return html`${header}<div class="empty" data-testid="ledger-empty">
+@@ -1022,9 +1132,10 @@ export class ActionLedgerView extends JfElement {
+     // summary that keeps its members and counts its failures.
+     const projected = collapseBursts<FeedRow, IndexBurstSummary>(visible, {
+       keyOf: (row) => (row.entry.kind === 'index' ? (row.entry.groupKey ?? 'default') : null),
++      // Keyed by its oldest member, which newer arrivals above it do not change.
+       summarize: (groupKey, items) => ({
+         summary: true,
+-        key: `${groupKey}:${items[0]?.key ?? ''}`,
++        key: `burst:${groupKey}:${items[items.length - 1]?.key ?? ''}`,
+         collection: items[0]?.entry.collection ?? groupKey,
+         members: items,
+         indexed: items.filter((item) => indexResultOf(item.entry.indexState) === 'indexed').length,
+@@ -1033,8 +1144,9 @@ export class ActionLedgerView extends JfElement {
+         occurredAt: items[0]?.entry.occurredAt ?? '',
+       }),
+     });
++    this.drawn = { feed, items: projected };
+     const count = projected.length;
+-    return html`${header}<div class="list" data-testid="feed-list" role="list" aria-label="Activity"
++    return html`${header}<div class="list" data-testid="feed-list" role="listbox" aria-label="Activity"
+       @keydown=${(e: KeyboardEvent) => this.onListKey(e, count)}
+       @focusin=${(e: FocusEvent) => {
+         const entry = (e.target as Element).closest<HTMLElement>('.entry');
+@@ -1042,7 +1154,7 @@ export class ActionLedgerView extends JfElement {
+       }}>${count <= VIRTUALIZE_ABOVE
+       ? projected.map((item, index) => this.renderEntry(item, index, count, feed))
+       : html`<lit-virtualizer .items=${projected}
+-          .keyFunction=${(item: FeedRow | IndexBurstSummary) => (isBurst(item) ? `burst:${item.key}` : item.key)}
++          .keyFunction=${(item: FeedRow | IndexBurstSummary) => item.key}
+           .renderItem=${(item: FeedRow | IndexBurstSummary, index: number) => this.renderEntry(item, index, count, feed)}></lit-virtualizer>`}</div>`;
+   }
+ }
+diff --git a/modules/ui-web/src/shell-v0/components/ActivityDetails.ts b/modules/ui-web/src/shell-v0/components/ActivityDetails.ts
+new file mode 100644
+index 0000000000..5ef9f4f38a
+--- /dev/null
++++ b/modules/ui-web/src/shell-v0/components/ActivityDetails.ts
+@@ -0,0 +1,551 @@
++// SPDX-License-Identifier: Apache-2.0
++/**
++ * <jf-activity-details> — what Activity's details pane shows for the selected feed record (S6
++ * Activity, draft §4). Activity composes it inside the shared `jf-details-pane`; it is content, not
++ * a pane, and holds no selection of its own.
++ *
++ * Every record says when it happened, how long it took, who did it, where it came from and which
++ * records it joins. By kind:
++ *   - an operation reads its receipt (`/api/operation-history/{key}`) through a {@link ReceiptWatch},
++ *     which follows a running invocation and never moves back from a terminal state; a receipt that
++ *     is unknown, expired or unreadable is said as such, never as a failed execution;
++ *   - a record this window journaled carries the journal's actions: Ask the engine to undo (an
++ *     execution association, also one restored after a reload), Restore to this point and Undo this
++ *     turn (each previewed, naming what cannot be undone), the causation trace, and a place in the
++ *     macro / export selection. A proposal decision is a decision, never something to undo;
++ *   - a backend copy of another window's effect has none of those, and says so;
++ *   - gate and grant decisions list the other records of the same request;
++ *   - index records, bursts and scans name their files once resolved, and offer Open file and Show
++ *     in folder only where the runtime can do it (the desktop app);
++ *   - a record from an agent run links to it: Replay in Search for a finished background run, the
++ *     run scope for the current run, and nothing invented for an outside caller.
++ */
++import { html, css, nothing, type PropertyValues, type TemplateResult } from 'lit';
++import { JfElement } from '../primitives/JfElement.js';
++import './Button.js';
++import './EffectLine.js';
++import {
++  contributionsOf,
++  durationOf,
++  operationKeyOf,
++  runOf,
++  transportOf,
++  type FeedRow,
++  type SelectedRecord,
++} from '../operations/activityFeed.js';
++import { formatScanDuration, indexResultOf } from '../operations/ActionLedgerClient.js';
++import { ReceiptWatch, isPending, isTerminalReceipt, type ReceiptState } from '../operations/operationReceipt.js';
++import {
++  getCausationChain,
++  getGroupRoot,
++  getUndoableOperation,
++  listJournal,
++  previewUndoGroup,
++  previewUndoToEntry,
++  requestOperationUndo,
++  undoEntries,
++  type JournalEntry,
++  type OperationRequestOutcome,
++} from '../substrates/effects/index.js';
++import { applyEffect } from '../substrates/actions/index.js';
++import { reportUndoRun } from './undoReport.js';
++import { present } from '../display/present.js';
++import { formatDateTime } from '../display/format.js';
++import { isTauriRuntime } from '../../utils/tauriRuntime.js';
++import { detailsDocumentActions } from './detailsPane/detailsDocumentActions.js';
++import { getAgentSessionController } from '../state/agentSessionStore.js';
++import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
++
++const SEARCH_WINDOW = 'core.search-v3-surface';
++
++/** A journal preview awaiting confirmation: restoring to an entry, or undoing its turn. */
++interface JournalPreview {
++  readonly kind: 'restore' | 'turn';
++  readonly entryId: number;
++  /** For a turn, its causation root. */
++  readonly root?: number;
++  readonly entries: readonly JournalEntry[];
++}
++
++const SOURCE_WORDS: Record<string, string> = {
++  BUTTON: 'You, in the app',
++  KEYBOARD: 'You, from the keyboard',
++  COMMAND_PALETTE: 'You, from the command palette',
++  LLM_EMISSION: 'The assistant',
++  AGENT_LOOP: 'The assistant',
++  WORKFLOW: 'A workflow',
++  MCP: 'An outside assistant (MCP)',
++  HTTP_API: 'The local API',
++  SYSTEM_INTERNAL: 'The engine',
++  SCHEDULED: 'A schedule',
++  RULE_ENGINE: 'A rule',
++};
++
++const RECORD_WORDS = { ledger: 'Activity ledger', history: 'Operation history', journal: "This window's journal" } as const;
++
++const WHO_WORDS: Record<string, string> = { user: 'You', agent: 'The assistant', system: 'The engine' };
++
++const GATE_WORDS: Record<string, string> = {
++  GATED: 'Asked for approval', APPROVED: 'Approved', DENIED: 'Denied',
++  EXPIRED: 'Expired without an answer', WITHDRAWN: 'Withdrawn',
++};
++
++const GRANT_WORDS: Record<string, string> = {
++  ISSUED: 'Permission granted', CONSUMED: 'Permission used', REVOKED: 'Permission withdrawn',
++};
++
++const RECEIPT_WORDS: Record<string, string> = {
++  accepted: 'Accepted; waiting to run', running: 'Running', complete: 'Completed', failed: 'Failed',
++};
++
++function count(n: number, noun: string): string {
++  return `${n} ${noun}${n === 1 ? '' : 's'}`;
++}
++
++function when(iso: string): string {
++  const parsed = new Date(iso);
++  return Number.isNaN(parsed.getTime()) ? iso : formatDateTime(parsed);
++}
++
++export class ActivityDetails extends JfElement {
++  static properties = {
++    record: { attribute: false },
++    evicted: { type: Boolean },
++    apiBase: { type: String, attribute: 'api-base' },
++    journalSelection: { attribute: false },
++    receipt: { state: true },
++    preview: { state: true },
++    undoRequest: { state: true },
++  };
++
++  declare record: SelectedRecord | null;
++  /** No loaded record answers to the selection any more: what it last showed stays, without actions. */
++  declare evicted: boolean;
++  declare apiBase: string;
++  /** Journal entry ids chosen for a macro or an export (held by Activity, across records). */
++  declare journalSelection: ReadonlySet<number>;
++  declare private receipt: ReceiptState | null;
++  declare private preview: JournalPreview | null;
++  /** The backend undo asked for from these details, by journal entry, and the Engine's answer once given. */
++  declare private undoRequest: { readonly entryId: number; readonly answer: OperationRequestOutcome | 'asked' | 'unobservable' } | null;
++
++  private watch: ReceiptWatch | null = null;
++  /** Bumped when the record changes or the details close: an answer for an earlier record changes nothing. */
++  private generation = 0;
++
++  constructor() {
++    super();
++    this.record = null;
++    this.evicted = false;
++    this.apiBase = '';
++    this.journalSelection = new Set();
++    this.receipt = null;
++    this.preview = null;
++    this.undoRequest = null;
++  }
++
++  override disconnectedCallback(): void {
++    super.disconnectedCallback();
++    this.generation += 1;
++    this.watch?.stop();
++    this.watch = null;
++  }
++
++  override connectedCallback(): void {
++    super.connectedCallback();
++    // Reattached after an update: follow the receipt again from a fresh read (the first update starts it).
++    if (this.hasUpdated && this.record) this.follow(this.record.row ? operationKeyOf(this.record.row) : undefined, true);
++  }
++
++  protected override willUpdate(changed: PropertyValues<this>): void {
++    if (!changed.has('record')) return;
++    const before = changed.get('record') as SelectedRecord | null | undefined;
++    // Another record (not the same one updated in place, which keeps its key or gains an alias).
++    const same = !!before && !!this.record && (before.key === this.record.key || !!this.record.row?.aliases.includes(before.key));
++    if (!same) {
++      this.generation += 1;
++      this.preview = null;
++      this.undoRequest = null;
++    }
++    this.follow(this.record?.row ? operationKeyOf(this.record.row) : undefined, !same);
++  }
++
++  /** Follow the receipt for `key`; a different key starts over, so a previous record's answer cannot show. */
++  private follow(key: string | undefined, restart: boolean): void {
++    if (!restart && this.watch !== null && this.watch.operationKey === key) return;
++    this.watch?.stop();
++    this.watch = null;
++    this.receipt = null;
++    if (!key || !this.isConnected) return;
++    const watch = new ReceiptWatch(this.apiBase, key, (state) => { this.receipt = state; });
++    this.watch = watch;
++    watch.read();
++  }
++
++  static styles = css`
++    :host {
++      display: block;
++      padding: var(--jf-space-3) var(--jf-space-4);
++      overflow-wrap: anywhere;
++      font-size: var(--font-size-sm);
++      color: var(--text-primary);
++    }
++    h3 { margin: 0 0 var(--jf-space-2); font-size: var(--font-size-md); font-weight: 600; }
++    h4 {
++      margin: var(--jf-space-4) 0 var(--jf-space-1);
++      font-size: var(--font-size-xs);
++      font-weight: 600;
++      letter-spacing: 0.03em;
++      text-transform: uppercase;
++      color: var(--text-secondary);
++    }
++    dl { display: grid; grid-template-columns: minmax(6rem, max-content) 1fr; gap: var(--jf-space-1) var(--jf-space-3); margin: 0; }
++    dt { color: var(--text-secondary); }
++    dd { margin: 0; min-inline-size: 0; }
++    p { margin: var(--jf-space-1) 0; }
++    .note { color: var(--text-secondary); }
++    .alert { color: var(--text-danger); }
++    ul, ol { margin: 0; padding-inline-start: var(--jf-space-4); }
++    li { padding-block: var(--jf-space-1); }
++    .actions { display: flex; flex-wrap: wrap; gap: var(--jf-space-2); margin-block: var(--jf-space-2); }
++    .confirm {
++      margin-block: var(--jf-space-2);
++      padding: var(--jf-space-2) var(--jf-space-3);
++      border: var(--frame-hairline) solid var(--border-default);
++      border-radius: var(--frame-control-radius);
++    }
++    label.choose { display: flex; align-items: center; gap: var(--jf-space-2); margin-block: var(--jf-space-2); }
++    .evicted {
++      padding: var(--jf-space-2) var(--jf-space-3);
++      border: var(--frame-hairline) solid var(--border-default);
++      border-radius: var(--frame-control-radius);
++    }
++  `;
++
++  override render(): TemplateResult | typeof nothing {
++    const record = this.record;
++    if (!record) return nothing;
++    return html`<div data-testid="activity-details" data-kind=${record.kind}>
++      <h3 data-testid="activity-details-title">${record.label}</h3>
++      ${this.evicted ? html`<p class="evicted" role="status" data-testid="activity-details-evicted">This record is no longer
++        among the loaded records. What it showed when it was last loaded is kept below; its actions are not offered.</p>` : nothing}
++      ${record.row ? this.renderFacts(record.row) : html`<dl><dt>When</dt><dd>${when(record.occurredAt)}</dd></dl>`}
++      ${record.row ? this.renderKind(record.row, record) : nothing}
++      ${record.members.length || record.kind !== 'record' ? this.renderMembers(record) : nothing}
++      ${record.related.length ? this.renderRelated(record.related) : nothing}
++      ${record.row && !this.evicted ? this.renderRun(record.row) : nothing}
++      ${record.row?.journal && !this.evicted ? this.renderJournal(record.row.journal) : nothing}
++      ${record.row && !record.row.journal && record.row.ledger?.kind === 'effect' ? html`<p class="note" data-testid="activity-details-elsewhere">
++        Recorded by another window or app. Its local details, proposal status and undo are only available there.</p>` : nothing}
++    </div>`;
++  }
++
++  /** When, how long, who, from where, and which records this row joins. */
++  private renderFacts(row: FeedRow): TemplateResult {
++    const duration = durationOf(row) ?? this.receiptDuration();
++    const transport = transportOf(row);
++    return html`<dl data-testid="activity-details-facts">
++      <dt>When</dt><dd>${when(row.entry.occurredAt)}</dd>
++      <dt>Duration</dt><dd data-testid="activity-details-duration">${duration !== undefined
++        ? (formatScanDuration(duration) || 'Under a second') : 'Not recorded'}</dd>
++      <dt>Who</dt><dd>${WHO_WORDS[row.entry.originator] ?? row.entry.originator}</dd>
++      <dt>Source</dt><dd data-testid="activity-details-source">${transport ? (SOURCE_WORDS[transport] ?? transport)
++        : row.journal ? 'This window' : 'Not recorded'}</dd>
++      <dt>Recorded in</dt><dd data-testid="activity-details-records">${contributionsOf(row).map((r) => RECORD_WORDS[r]).join(' · ')}</dd>
++      ${row.entry.kind === 'operation' || operationKeyOf(row) ? html`<dt>Outcome</dt><dd data-testid="activity-details-outcome">${this.outcomeWords(row)}</dd>` : nothing}
++    </dl>`;
++  }
++
++  private receiptDuration(): number | undefined {
++    const outcome = this.receipt?.outcome;
++    return outcome?.acceptedAt !== undefined && outcome.completedAt !== undefined && outcome.completedAt >= outcome.acceptedAt
++      ? outcome.completedAt - outcome.acceptedAt : undefined;
++  }
++
++  /**
++   * The committed outcome is the authority once recorded; before that, the receipt's terminal state,
++   * then its progress. A receipt still running behind a committed outcome is a stale sample.
++   */
++  private outcomeWords(row: FeedRow): string {
++    const committed = row.history[0]?.outcome ?? (row.ledger?.kind === 'operation' ? row.ledger.outcome : undefined);
++    if (committed) return committed;
++    const outcome = this.receipt?.outcome;
++    if (outcome && (isTerminalReceipt(outcome.state) || isPending(outcome)) && RECEIPT_WORDS[outcome.state]) return RECEIPT_WORDS[outcome.state]!;
++    if (row.journal?.pendingOutcome === 'rejected') return 'Not carried out (the proposal was rejected)';
++    if (row.journal && !row.ledger && !row.history.length) return 'Asked for in this window; no result recorded yet';
++    return 'Outcome unavailable';
++  }
++
++  private renderKind(row: FeedRow, record: SelectedRecord): TemplateResult | typeof nothing {
++    const ledger = row.ledger;
++    if (ledger?.kind === 'gate') {
++      return html`<h4>Approval</h4><dl data-testid="activity-details-gate">
++        <dt>Decision</dt><dd>${GATE_WORDS[ledger.disposition ?? ''] ?? ledger.disposition ?? 'Not recorded'}</dd>
++        <dt>Operation</dt><dd>${present({ kind: 'operation', id: ledger.operationId ?? '' }).label}</dd>
++        ${ledger.gateBehavior ? html`<dt>Asked as</dt><dd>${ledger.gateBehavior}</dd>` : nothing}
++        ${ledger.pendingId ? html`<dt>Request</dt><dd>${ledger.pendingId}</dd>` : nothing}
++      </dl>`;
++    }
++    if (ledger?.kind === 'grant') {
++      return html`<h4>Permission</h4><dl data-testid="activity-details-grant">
++        <dt>What happened</dt><dd>${GRANT_WORDS[ledger.action ?? ''] ?? ledger.action ?? 'Not recorded'}</dd>
++        ${ledger.subject ? html`<dt>For</dt><dd>${present({ kind: 'operation', id: ledger.subject }).label}</dd>` : nothing}
++      </dl>`;
++    }
++    if (ledger?.kind === 'navigation') {
++      const target = ledger.targetSurface;
++      return html`<h4>Navigation</h4>
++        <p>Went to ${target ? present({ kind: 'surface', id: target }).label : 'a page not recorded'}.</p>
++        ${target && !this.evicted ? html`<div class="actions"><jf-button size="sm" variant="ghost" data-testid="activity-details-go"
++          label="Go there" .onActivate=${() => requestSurfaceNavigation(target)}>Go there</jf-button></div>` : nothing}`;
++    }
++    if (row.entry.kind === 'index') return this.renderIndex(row, record.paths);
++    if (ledger?.kind === 'operation' || row.history.length || operationKeyOf(row)) return this.renderOperation(row);
++    return nothing;
++  }
++
++  /** The receipt's metadata, and what it means when there is none. */
++  private renderOperation(row: FeedRow): TemplateResult {
++    const key = operationKeyOf(row);
++    const folder = row.entry.removedFolder?.path;
++    const message = row.history.find((h) => h.message)?.message;
++    return html`<h4>Operation</h4>
++      <p>${present({ kind: 'operation', id: row.entry.operationId ?? row.history[0]?.operationId ?? '' }).label}</p>
++      ${message ? html`<p data-testid="activity-details-message">${message}</p>` : nothing}
++      ${key ? this.renderReceipt(!!(row.history[0]?.outcome ?? (row.ledger?.kind === 'operation' ? row.ledger.outcome : undefined))) : html`<p class="note" data-testid="activity-details-receipt" data-state="none">No detailed
++        receipt can be read for this record: it carries no invocation key.</p>`}
++      ${folder ? html`<p>Folder: ${folder}</p>${this.fileActions(folder)}` : nothing}`;
++  }
++
++  /** `committed`: the record already has its recorded outcome, which a receipt still running cannot undo. */
++  private renderReceipt(committed: boolean): TemplateResult {
++    const receipt = this.receipt;
++    const outcome = receipt?.outcome ?? null;
++    const retry = html`<jf-button size="sm" variant="ghost" data-testid="activity-details-receipt-retry" label="Try again"
++      .onActivate=${() => this.watch?.read()}>Try again</jf-button>`;
++    if (!outcome) {
++      if (receipt?.readFailed) {
++        return html`<p role="status" data-testid="activity-details-receipt" data-state="unreadable">The receipt could not be
++          read. That says nothing about how the operation ended. ${retry}</p>`;
++      }
++      return html`<p class="note" data-testid="activity-details-receipt" data-state="loading">Reading the receipt…</p>`;
++    }
++    if (outcome.state === 'unknown') {
++      return html`<p class="note" data-testid="activity-details-receipt" data-state="unknown">The engine keeps no detailed
++        receipt for this operation. That does not mean it failed.</p>`;
++    }
++    if (outcome.state === 'expired') {
++      return html`<p class="note" data-testid="activity-details-receipt" data-state="expired">The detailed receipt has expired.
++        The record above remains.</p>`;
++    }
++    if (committed && isPending(outcome)) {
++      return html`<p class="note" data-testid="activity-details-receipt" data-state="behind">Finished as recorded above; its
++        receipt has not caught up yet.</p>`;
++    }
++    const code = outcome.result?.code ?? outcome.reason;
++    return html`<dl data-testid="activity-details-receipt" data-state=${outcome.state}>
++      <dt>Receipt</dt><dd>${RECEIPT_WORDS[outcome.state] ?? outcome.state}${outcome.phase ? ` · ${outcome.phase}` : ''}</dd>
++      ${outcome.unitsCompleted !== undefined || outcome.unitsFailed !== undefined ? html`<dt>Items</dt><dd>${
++        [outcome.unitsCompleted !== undefined ? `${outcome.unitsCompleted} done` : '',
++          outcome.unitsFailed ? `${outcome.unitsFailed} failed` : ''].filter(Boolean).join(' · ')}</dd>` : nothing}
++      ${outcome.message ? html`<dt>Message</dt><dd class=${outcome.state === 'failed' ? 'alert' : ''}>${outcome.message}</dd>` : nothing}
++      ${code ? html`<dt>Code</dt><dd>${code}</dd>` : nothing}
++      ${outcome.result?.gaps?.length ? html`<dt>Gaps</dt><dd>${count(outcome.result.gaps.length, 'item')} could not be completed</dd>` : nothing}
++    </dl>
++    ${receipt?.readFailed ? html`<p role="status" data-testid="activity-details-receipt-stale">The latest read failed; this is
++      the last receipt read. ${retry}</p>` : nothing}`;
++  }
++
++  private renderIndex(row: FeedRow, paths: Readonly<Record<string, string>>): TemplateResult {
++    const state = row.entry.indexState;
++    const result = indexResultOf(state);
++    const path = row.entry.pathHash ? paths[row.entry.pathHash] : undefined;
++    return html`<h4>Indexing</h4><dl data-testid="activity-details-index">
++      <dt>Result</dt><dd>${result === 'indexed' ? 'Indexed' : result === 'failed'
++        ? (state === 'RETRY_EXHAUSTED' ? 'Gave up after retrying' : 'Failed') : `Unknown${state ? ` (${state})` : ''}`}</dd>
++      <dt>Collection</dt><dd>${row.entry.collection ?? 'default'}</dd>
++      <dt>File</dt><dd data-testid="activity-details-file">${path ?? 'Not resolved yet'}</dd>
++    </dl>${path ? this.fileActions(path) : nothing}`;
++  }
++
++  /**
++   * Open file and Show in folder only where they can work: the desktop app opens and reveals local
++   * files; a browser can do neither for a file on the engine's disk, so it is said instead.
++   */
++  private fileActions(path: string): TemplateResult | typeof nothing {
++    if (this.evicted) return nothing;
++    return isTauriRuntime()
++      ? html`<div class="actions" data-testid="activity-details-file-actions">${detailsDocumentActions(path)}</div>`
++      : html`<p class="note" data-testid="activity-details-file-unavailable">Open file and Show in folder are available in the
++        desktop app.</p>`;
++  }
++
++  private renderMembers(record: SelectedRecord): TemplateResult {
++    const failed = record.members.filter((m) => m.problem).length;
++    return html`<h4>${record.kind === 'scan' ? 'Documents retained' : 'Records'}</h4>
++      ${record.members.length === 0 ? html`<p class="note" data-testid="activity-details-members-none">No per-document records
++        are retained for this scan.</p>` : html`
++        ${failed ? html`<p data-testid="activity-details-members-failed">${count(failed, 'record')} failed.</p>` : nothing}
++        <ul data-testid="activity-details-members">${record.members.map((member) => html`<li data-testid="activity-details-member"
++          ?data-problem=${member.problem}>${member.entry.label} · ${when(member.entry.occurredAt)}</li>`)}</ul>`}`;
++  }
++
++  private renderRelated(related: readonly FeedRow[]): TemplateResult {
++    return html`<h4>Same request</h4><ul data-testid="activity-details-related">${related.map((r) => html`<li>${r.entry.label}${
++      r.entry.gate ? ` · ${GATE_WORDS[r.entry.gate.disposition] ?? r.entry.gate.disposition}` : ''}${
++      r.entry.grant ? ` · ${GRANT_WORDS[r.entry.grant.action] ?? r.entry.grant.action}` : ''}${
++      r.entry.outcome ? ` · ${r.entry.outcome}` : ''} · ${when(r.entry.occurredAt)}</li>`)}</ul>`;
++  }
++
++  /** The agent run a record names, linked only where Activity knows that run. */
++  private renderRun(row: FeedRow): TemplateResult | typeof nothing {
++    const sessionId = runOf(row);
++    if (!sessionId) return nothing;
++    const ctrl = getAgentSessionController(this.apiBase);
++    const run = ctrl.presence.find((candidate) => candidate.sessionId === sessionId);
++    const terminal = run && (run.state === 'DONE' || run.state === 'ERROR');
++    const current = ctrl.sessionId === sessionId;
++    return html`<h4>Run</h4><div data-testid="activity-details-run">
++      ${terminal ? html`<p>A background run that has finished.</p><div class="actions"><jf-button size="sm" data-testid="activity-details-replay"
++        label="Replay in Search" .onActivate=${() => { void ctrl.loadReplay(sessionId); requestSurfaceNavigation(SEARCH_WINDOW); }}>Replay in Search</jf-button></div>`
++        : current ? html`<p>Part of the current agent run.</p><div class="actions"><jf-button size="sm" variant="ghost" data-testid="activity-details-run-scope"
++          label="Show this run's records" .onActivate=${() => this.dispatchEvent(new CustomEvent('activity-run-scope', { bubbles: true, composed: true }))}
++          >Show this run's records</jf-button></div>`
++          : run ? html`<p>Part of a background run that is still ${run.state === 'WAITING_APPROVAL' ? 'waiting for approval' : 'working'}.</p>`
++            : html`<p class="note">Recorded with the run identifier ${sessionId}. Activity has no run of this name to open.</p>`}
++    </div>`;
++  }
++
++  /** The journal's record and its actions: undo, restore, the turn, the trace and the selection. */
++  private renderJournal(entry: JournalEntry): TemplateResult {
++    const rejected = entry.pendingOutcome === 'rejected';
++    const undoable = rejected ? undefined : getUndoableOperation(entry.id);
++    const chain = entry.causation !== undefined ? getCausationChain(entry.id) : [];
++    return html`<h4>Recorded in this window</h4>
++      <jf-effect-line .effect=${entry.effect} .timestamp=${entry.invokedAt} showDetail></jf-effect-line>
++      <dl data-testid="activity-details-journal">
++        <dt>Recorded by</dt><dd>${entry.invokedBy?.contributorId
++          ? `${entry.invokedBy.contributorId} (${entry.invokedBy.tier})` : 'Not recorded'}</dd>
++        ${entry.pendingOutcome ? html`<dt>Proposal</dt><dd data-testid="activity-details-proposal">${rejected
++          ? 'Rejected. It was never carried out, so there is nothing to undo.'
++          : 'Accepted. This records the decision; carrying it out is recorded on its own.'}</dd>` : nothing}
++        <dt>Undo</dt><dd data-testid="activity-details-reversible">${rejected ? 'Nothing to undo'
++          : entry.inverse !== null ? 'Can be reversed in this window'
++            : undoable ? 'The engine can be asked to undo it; it decides whether that is still possible' : 'Cannot be undone'}</dd>
++      </dl>
++      ${chain.length ? html`<h4>Why this happened</h4><ol data-testid="activity-details-trace">${[...chain, entry].map((step, i) =>
++        html`<li data-testid="activity-details-trace-step">${i === 0 ? 'Started by: ' : ''}${present({ kind: 'effect', effect: step.effect }).label}</li>`)}</ol>` : nothing}
++      <div class="actions">
++        ${undoable ? html`<jf-button size="sm" data-testid="activity-details-undo-operation" label="Ask the engine to undo"
++          .disabled=${this.undoRequest?.entryId === entry.id && this.undoRequest.answer === 'asked'}
++          .onActivate=${() => this.askUndo(entry.id)}>Ask the engine to undo</jf-button>` : nothing}
++        <jf-button size="sm" variant="ghost" data-testid="activity-details-restore" label="Restore to this point"
++          title="Reverse everything done after this action that can be reversed"
++          .onActivate=${() => this.stage('restore', entry)}>Restore to this point</jf-button>
++        ${entry.causation !== undefined ? html`<jf-button size="sm" variant="ghost" data-testid="activity-details-undo-turn"
++          label="Undo this AI turn" .onActivate=${() => this.stage('turn', entry)}>Undo this AI turn</jf-button>` : nothing}
++      </div>
++      ${this.renderUndoAnswer(entry.id)}
++      ${this.preview?.entryId === entry.id ? this.renderPreview(this.preview) : nothing}
++      <label class="choose"><input type="checkbox" data-testid="activity-details-choose" .checked=${this.journalSelection.has(entry.id)}
++        @change=${(event: Event) => this.dispatchEvent(new CustomEvent<{ id: number; chosen: boolean }>('journal-choose',
++          { detail: { id: entry.id, chosen: (event.target as HTMLInputElement).checked }, bubbles: true, composed: true }))}>
++        Include in a macro or export</label>`;
++  }
++
++  private renderUndoAnswer(entryId: number): TemplateResult | typeof nothing {
++    const request = this.undoRequest;
++    if (!request || request.entryId !== entryId) return nothing;
++    const words = request.answer === 'asked' ? 'Asked the engine to undo this action…'
++      : request.answer === 'confirmed' ? 'The engine undid this action.'
++        : request.answer === 'not-done' ? 'The engine did not undo this action.'
++          : 'Asked the engine to undo this action; its answer is not shown here.';
++    return html`<p role="status" data-testid="activity-details-undo-answer" data-answer=${request.answer}>${words}</p>`;
++  }
++
++  /** One request per click: the button stays unavailable until the Engine answers. */
++  private askUndo(entryId: number): void {
++    if (this.undoRequest?.entryId === entryId && this.undoRequest.answer === 'asked') return;
++    const generation = this.generation;
++    const run = requestOperationUndo(entryId, (effect) => applyEffect(effect));
++    const request = run.requested[0];
++    if (!request) {
++      this.undoRequest = null;
++      applyEffect({ kind: 'toast', message: 'This action can no longer be undone', severity: 'warning' });
++      return;
++    }
++    if (!request.settled) { this.undoRequest = { entryId, answer: 'unobservable' }; return; }
++    this.undoRequest = { entryId, answer: 'asked' };
++    void request.settled.then((answer) => {
++      if (generation === this.generation && this.isConnected) this.undoRequest = { entryId, answer };
++    });
++  }
++
++  private stage(kind: JournalPreview['kind'], entry: JournalEntry): void {
++    if (kind === 'restore') {
++      const entries = previewUndoToEntry(entry.id);
++      if (!entries.length) { applyEffect({ kind: 'toast', message: 'Nothing to undo after this point', severity: 'info' }); return; }
++      this.preview = { kind, entryId: entry.id, entries };
++      return;
++    }
++    const root = getGroupRoot(entry.id);
++    const entries = root === null ? [] : previewUndoGroup(root);
++    if (root === null || !entries.length) { applyEffect({ kind: 'toast', message: 'Nothing reversible in this turn', severity: 'info' }); return; }
++    this.preview = { kind, entryId: entry.id, root, entries };
++  }
++
++  /** DE6 — what the preview will not undo, said before the person commits. */
++  private remainder(preview: JournalPreview): number {
++    return listJournal().filter((e) => e.pendingOutcome !== 'rejected' && !preview.entries.some((p) => p.id === e.id)
++      && (preview.kind === 'restore' ? e.id > preview.entryId : getGroupRoot(e.id) === preview.root)).length;
++  }
++
++  private renderPreview(preview: JournalPreview): TemplateResult {
++    const remainder = this.remainder(preview);
++    const restore = preview.kind === 'restore';
++    return html`<section class="confirm" data-testid="activity-details-preview" data-preview=${preview.kind}
++      aria-label=${restore ? 'Confirm restore' : 'Confirm undo turn'}>
++      <p>${restore ? `Restore to this point — reverse these ${count(preview.entries.length, 'action')} done after it?`
++        : `Undo this AI turn — reverse these ${count(preview.entries.length, 'action')}?`}</p>
++      <ul>${preview.entries.map((e) => html`<li data-testid="activity-details-preview-row">${present({ kind: 'effect', effect: e.effect }).label}</li>`)}</ul>
++      ${remainder ? html`<p data-testid="activity-details-irreversible">${remainder} other action${remainder === 1 ? '' : 's'} can't be
++        undone and will remain.</p>` : nothing}
++      <div class="actions">
++        <jf-button size="sm" variant="danger" data-testid="activity-details-preview-confirm" label=${restore ? 'Restore' : 'Undo turn'}
++          .onActivate=${() => this.confirm()}>${restore ? 'Restore' : 'Undo turn'}</jf-button>
++        <jf-button size="sm" data-testid="activity-details-preview-cancel" label="Cancel"
++          .onActivate=${() => { this.preview = null; }}>Cancel</jf-button>
++      </div>
++    </section>`;
++  }
++
++  /** DE6 — exactly the previewed entries, once; a second activation finds the preview gone. */
++  private confirm(): void {
++    const preview = this.preview;
++    this.preview = null;
++    if (!preview) return;
++    const scope = preview.kind === 'turn' ? ' in this turn' : '';
++    reportUndoRun(undoEntries(preview.entries, (effect) => applyEffect(effect)),
++      (reversed) => `Reverted ${reversed} action${reversed === 1 ? '' : 's'}${scope}`);
++  }
++
++  /** Close what is open for the record: a preview, a request's pending answer. */
++  settle(): void {
++    this.generation += 1;
++    this.preview = null;
++    this.undoRequest = null;
++    this.watch?.stop();
++    this.watch = null;
++    this.receipt = null;
++  }
++}
++
++if (typeof customElements !== 'undefined' && !customElements.get('jf-activity-details')) {
++  customElements.define('jf-activity-details', ActivityDetails);
++}
++
++declare global {
++  interface HTMLElementTagNameMap {
++    'jf-activity-details': ActivityDetails;
++  }
++}
+diff --git a/modules/ui-web/src/shell-v0/components/EffectAuditLog.ts b/modules/ui-web/src/shell-v0/components/EffectAuditLog.ts
+deleted file mode 100644
+index 7ddcea2017..0000000000
+--- a/modules/ui-web/src/shell-v0/components/EffectAuditLog.ts
++++ /dev/null
+@@ -1,863 +0,0 @@
+-// SPDX-License-Identifier: Apache-2.0
+-/**
+- * <jf-effect-audit-log> — Tempdoc 543 §25.δ2.
+- *
+- * Per-action audit log surface. Reads from the Effect Journal and
+- * renders a filterable, scrollable list. Filter dimensions:
+- *   - originator: all | user | agent | system
+- *   - outcome: all | normal | accepted | rejected
+- *
+- * A section of Activity (design system §1: "History → System › Activity"); the
+- * "core.action.shell.show-audit-log" Action arrives at it. Subscribes to journal
+- * appends so new entries surface live.
+- */
+-
+-import { html, css, nothing, type TemplateResult } from 'lit';
+-import { JfElement } from '../primitives/JfElement.js';
+-import './Button.js';
+-import './StatusBadge.js';
+-// Tempdoc 613 §6 — the in-control RECEIPT surface (export-to-clipboard ack is a receipt, not a toast).
+-import { ReceiptController } from '../primitives/receiptController.js';
+-import {
+-  listJournal,
+-  subscribeJournal,
+-  undoEntries,
+-  listJournalByOriginator,
+-  peekLastUndoableByOriginator,
+-  previewUndoAllByOriginator,
+-  getUndoableOperation,
+-  getCausationChain,
+-  previewUndoToEntry,
+-  exportJournalArchive,
+-  importJournalArchive,
+-  getGroupRoot,
+-  previewUndoGroup,
+-  type JournalEntry,
+-  type EffectOriginator,
+-} from '../substrates/effects/index.js';
+-import { present } from '../display/present.js';
+-import { unavailableBecause } from '../state/availability.js';
+-// 543-fwd #6 — fold the flat journal into causation-rooted turns for display.
+-import { groupJournalForDisplay, type DisplayTurn } from '../substrates/effects/journalView.js';
+-// 543-fwd UPDATE 10 P1 — the shared effect-presentation primitive (label + relative
+-// time + structured detail) replaces this row's bare kind + raw-JSON payload.
+-import './EffectLine.js';
+-// §28.W4 — dispatch inverse effects through the kernel.
+-import { applyEffect } from '../substrates/actions/index.js';
+-import { reportUndoRun } from './undoReport.js';
+-// 543-fwd #19 — import archive → define a replayable macro (interactive prompt).
+-import { elicit } from '../substrates/elicit/index.js';
+-import { defineMacro } from '../substrates/macros/index.js';
+-// §28.W5 — macro authoring + elicit for the name prompt.
+-import { defineMacroFromEffects } from '../substrates/macros/index.js';
+-
+-type OriginatorFilter = 'all' | EffectOriginator;
+-type OutcomeFilter = 'all' | 'normal' | 'accepted' | 'rejected';
+-
+-export class EffectAuditLog extends JfElement {
+-  static properties = {
+-    originator: { state: true },
+-    outcome: { state: true },
+-    entries: { state: true },
+-    // §28.W5 — selected entry ids for "save as macro".
+-    selectedIds: { state: true },
+-    // 543-fwd #8 — entries staged for the mass-undo confirm; empty = not confirming.
+-    undoAllPreview: { state: true },
+-    // 543-fwd #6 — entry id whose "why did this happen" causation chain is expanded.
+-    tracedId: { state: true },
+-    // 543-fwd #5 — time-travel: target entry id + the entries a restore would reverse.
+-    restoreTargetId: { state: true },
+-    restorePreview: { state: true },
+-    // 543-fwd #7 — grouped undo: causation-root + the turn's entries to reverse.
+-    groupRootId: { state: true },
+-    groupPreview: { state: true },
+-    // 543-fwd #6 — turn rootIds the user has collapsed (members hidden). Default expanded.
+-    collapsedTurns: { state: true },
+-  };
+-
+-  declare originator: OriginatorFilter;
+-  declare outcome: OutcomeFilter;
+-  declare entries: ReadonlyArray<JournalEntry>;
+-  declare selectedIds: ReadonlySet<number>;
+-  declare undoAllPreview: ReadonlyArray<JournalEntry>;
+-  declare tracedId: number | null;
+-  declare restoreTargetId: number | null;
+-  declare restorePreview: ReadonlyArray<JournalEntry>;
+-  declare groupRootId: number | null;
+-  declare groupPreview: ReadonlyArray<JournalEntry>;
+-  declare collapsedTurns: ReadonlySet<number>;
+-
+-  private unsubJournal: (() => void) | null = null;
+-
+-  constructor() {
+-    super();
+-    this.originator = 'all';
+-    this.outcome = 'all';
+-    this.entries = [];
+-    this.selectedIds = new Set<number>();
+-    this.undoAllPreview = [];
+-    this.tracedId = null;
+-    this.restoreTargetId = null;
+-    this.restorePreview = [];
+-    this.groupRootId = null;
+-    this.groupPreview = [];
+-    this.collapsedTurns = new Set<number>();
+-  }
+-
+-  // 543-fwd #6 — collapse/expand a turn's member rows (default expanded).
+-  private toggleTurnCollapse(rootId: number): void {
+-    const next = new Set(this.collapsedTurns);
+-    if (next.has(rootId)) next.delete(rootId);
+-    else next.add(rootId);
+-    this.collapsedTurns = next;
+-  }
+-
+-  // 543-fwd #7 — stage a confirm to undo a whole agent turn (the causation group
+-  // this entry belongs to), reversing its reversible/compensable members atomically.
+-  private handleUndoTurn(id: number): void {
+-    const root = getGroupRoot(id);
+-    if (root === null) return;
+-    const preview = previewUndoGroup(root);
+-    if (preview.length === 0) {
+-      applyEffect({ kind: 'toast', message: 'Nothing reversible in this turn', severity: 'info' });
+-      return;
+-    }
+-    this.groupRootId = root;
+-    this.groupPreview = preview;
+-  }
+-
+-  private cancelUndoTurn(): void {
+-    this.groupRootId = null;
+-    this.groupPreview = [];
+-  }
+-
+-  private confirmUndoTurn(): void {
+-    const previewed = this.groupPreview;
+-    this.groupRootId = null;
+-    this.groupPreview = [];
+-    if (!previewed.length) return;
+-    // DE6 — exactly the previewed turn members, nothing that joined the turn since.
+-    this.reportUndone(undoEntries(previewed, (effect) => applyEffect(effect)), ' in this turn');
+-  }
+-
+-  /** The outcome of a confirmed undo preview, including what could no longer be undone. */
+-  private reportUndone(run: ReturnType<typeof undoEntries>, scope = ''): void {
+-    reportUndoRun(run, (reversed) => `Reverted ${reversed} action${reversed === 1 ? '' : 's'}${scope}`);
+-  }
+-
+-  /** DE6 — the entries in a preview's scope that will NOT be reversed, said before the person commits. */
+-  private irreversibleNote(count: number): TemplateResult | typeof nothing {
+-    return count > 0 ? html`<p class="confirm-note" data-testid="undo-irreversible">${count} other
+-      action${count === 1 ? '' : 's'} can't be undone and will remain.</p>` : nothing;
+-  }
+-
+-  // 543-fwd #6 — toggle the bottom-up "why did this happen" causation trace.
+-  private toggleTrace(id: number): void {
+-    this.tracedId = this.tracedId === id ? null : id;
+-  }
+-
+-  // 543-fwd #5 — time-travel: stage a confirm listing everything a "restore to
+-  // here" would reverse (reversible/compensable entries after this one).
+-  private handleRestoreToHere(id: number): void {
+-    const preview = previewUndoToEntry(id);
+-    if (preview.length === 0) {
+-      applyEffect({ kind: 'toast', message: 'Nothing to undo after this point', severity: 'info' });
+-      return;
+-    }
+-    this.restoreTargetId = id;
+-    this.restorePreview = preview;
+-  }
+-
+-  private cancelRestore(): void {
+-    this.restoreTargetId = null;
+-    this.restorePreview = [];
+-  }
+-
+-  private confirmRestore(): void {
+-    const previewed = this.restorePreview;
+-    this.restoreTargetId = null;
+-    this.restorePreview = [];
+-    if (!previewed.length) return;
+-    // DE6 — exactly the previewed entries, nothing recorded after the preview was drawn.
+-    this.reportUndone(undoEntries(previewed, (effect) => applyEffect(effect)));
+-  }
+-
+-  // §28.W4 — undo the last reversible effect from a given originator.
+-  // The button "Undo last AI action" wires through here.
+-  // 543-fwd #4 — peek first so the confirmation toast can NAME what was undone.
+-  private handleUndoLastByOriginator(originator: EffectOriginator): void {
+-    const target = peekLastUndoableByOriginator(originator);
+-    if (!target) {
+-      applyEffect({ kind: 'toast', message: 'Nothing to undo', severity: 'info' });
+-      return;
+-    }
+-    // The same walk as undoLastEffectByOriginator, through the one run that tells an Engine request
+-    // (said as asked, then answered) from a reversal applied here.
+-    reportUndoRun(undoEntries([target], (effect) => applyEffect(effect)),
+-      () => `Undid: ${present({ kind: 'effect', effect: target.effect }).label}`);
+-  }
+-
+-  // §28.W4 — undo ALL reversible effects from a given originator.
+-  // 543-fwd #8 — first click stages a confirm preview; nothing is undone yet.
+-  private handleUndoAllByOriginator(originator: EffectOriginator): void {
+-    const preview = previewUndoAllByOriginator(originator);
+-    if (preview.length === 0) {
+-      applyEffect({ kind: 'toast', message: 'Nothing to undo', severity: 'info' });
+-      return;
+-    }
+-    this.undoAllPreview = preview;
+-  }
+-
+-  private cancelUndoAll(): void {
+-    this.undoAllPreview = [];
+-  }
+-
+-  // 543-fwd #4 + #8 — commit the confirmed mass-undo + count toast.
+-  private confirmUndoAll(): void {
+-    const previewed = this.undoAllPreview;
+-    this.undoAllPreview = [];
+-    if (!previewed.length) return;
+-    // DE6 — exactly the previewed AI actions; a repeated click finds the preview gone and does nothing.
+-    reportUndoRun(undoEntries(previewed, (effect) => applyEffect(effect)),
+-      (reversed) => `Undid ${reversed} AI action${reversed === 1 ? '' : 's'}`);
+-  }
+-
+-  // §28.W5 — toggle one entry's membership in the selection set.
+-  private toggleSelection(id: number): void {
+-    const next = new Set(this.selectedIds);
+-    if (next.has(id)) next.delete(id);
+-    else next.add(id);
+-    this.selectedIds = next;
+-  }
+-
+-  // §28.W5 — "Save selected as macro" — prompts via elicit for a name,
+-  // calls defineMacro with the selected entries' effects in journal-order.
+-  private async handleSaveAsMacro(): Promise<void> {
+-    if (this.selectedIds.size === 0) return;
+-    const orderedEffects = this.entries
+-      .filter((e) => this.selectedIds.has(e.id))
+-      .map((e) => e.effect);
+-    // 543-fwd #9 — shared interactive author (elicit name → defineMacro).
+-    const macro = await defineMacroFromEffects(orderedEffects);
+-    if (macro) this.selectedIds = new Set<number>(); // clear selection on success
+-  }
+-
+-  // 543-fwd #19 — export the selected entries as a portable JSON archive (copied
+-  // to the clipboard). A no-sync-infra way to move/share a session's actions.
+-  private handleExportArchive(): void {
+-    const entries = this.entries.filter((e) => this.selectedIds.has(e.id));
+-    if (entries.length === 0) return;
+-    const json = exportJournalArchive(entries);
+-    // Tempdoc 613 §6 — copy WITHOUT a window toast; the confirmation is a RECEIPT flashed in the
+-    // Export button (`routePushSurface('at-control') === 'receipt'`; a copy ack is not history).
+-    applyEffect({ kind: 'copy-to-clipboard', text: json });
+-    this.exportReceipt.flash(
+-      `Exported ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`,
+-    );
+-  }
+-
+-  // 543-fwd #19 — paste a previously-exported archive and replay it: parse the
+-  // effects and materialize a reusable macro (the macro engine is the replay
+-  // mechanism). Reuses the now-working elicit text input.
+-  private async handleImportArchive(): Promise<void> {
+-    const form = await elicit({
+-      title: 'Import journal archive',
+-      description: 'Paste a journal archive (JSON) to replay it as a reusable macro.',
+-      schema: {
+-        type: 'object',
+-        properties: {
+-          // 543-fwd #2 — a pasted archive is long; render it as a multiline textarea.
+-          // `x-ui` is a JSON Schema extension keyword (read by defaultUiSchemaFor at
+-          // runtime); cast past the JsonSchema type which omits extension keywords.
+-          json: { type: 'string', title: 'Archive JSON', 'x-ui': { multi: true } } as {
+-            type: 'string';
+-            title: string;
+-          },
+-          label: { type: 'string', title: 'Macro label' },
+-        },
+-        required: ['json', 'label'],
+-      },
+-      initialData: { json: '', label: '' },
+-    });
+-    if (!form) return;
+-    const { json, label } = form as { json?: string; label?: string };
+-    const effects = importJournalArchive(json ?? '');
+-    const name = label?.trim();
+-    if (effects.length === 0 || !name) {
+-      applyEffect({ kind: 'toast', message: 'No valid entries in that archive', severity: 'warning' });
+-      return;
+-    }
+-    try {
+-      defineMacro({ id: `import.${Date.now()}`, label: name, effects });
+-      applyEffect({ kind: 'toast', message: `Imported ${effects.length} action(s) as macro "${name}"`, severity: 'success' });
+-    } catch {
+-      applyEffect({ kind: 'toast', message: 'Import failed (duplicate id)', severity: 'error' });
+-    }
+-  }
+-
+-  connectedCallback(): void {
+-    super.connectedCallback();
+-    this.entries = listJournal();
+-    if (!this.unsubJournal) {
+-      this.unsubJournal = subscribeJournal(() => {
+-        this.entries = listJournal();
+-      });
+-    }
+-  }
+-
+-  disconnectedCallback(): void {
+-    super.disconnectedCallback();
+-    this.unsubJournal?.();
+-    this.unsubJournal = null;
+-  }
+-
+-  /** Tempdoc 613 §6 — the export confirmation is a RECEIPT (a direct copy-to-clipboard ack), flashed
+-   *  in the Export button, NOT a window toast. */
+-  private readonly exportReceipt = new ReceiptController(this);
+-
+-  static styles = css`
+-    :host {
+-      display: block;
+-    }
+-    .panel {
+-      display: flex;
+-      flex-direction: column;
+-      border: var(--frame-hairline) solid var(--border-default);
+-      border-radius: var(--frame-control-radius);
+-      background: var(--surface-1);
+-      color: var(--text-primary);
+-    }
+-    header {
+-      padding: 0.75rem 1rem;
+-      border-bottom: 1px solid var(--border-default);
+-      display: flex;
+-      align-items: center;
+-      justify-content: space-between;
+-    }
+-    header h3 {
+-      margin: 0;
+-      font-size: var(--font-size-md);
+-      font-weight: 600;
+-    }
+-    .filters {
+-      padding: 0.5rem 1rem;
+-      display: flex;
+-      gap: 1rem;
+-      flex-wrap: wrap;
+-      border-bottom: 1px solid var(--border-subtle);
+-      font-size: var(--font-size-xs);
+-    }
+-    .filters label {
+-      display: flex;
+-      gap: 0.375rem;
+-      align-items: center;
+-      color: var(--text-secondary);
+-    }
+-    select {
+-      background: var(--surface-2);
+-      color: inherit;
+-      border: 1px solid var(--border-default);
+-      border-radius: 0.25rem;
+-      padding: 0.125rem 0.375rem;
+-      font: inherit;
+-      font-size: var(--font-size-xs);
+-    }
+-    .list {
+-      flex: 1;
+-      overflow-y: auto;
+-      padding: 0.5rem;
+-    }
+-    .entry {
+-      padding: 0.5rem 0.75rem;
+-      border-radius: 0.25rem;
+-      margin-bottom: 0.25rem;
+-      background: var(--surface-2);
+-      font-size: var(--font-size-sm);
+-    }
+-    .entry-head {
+-      display: flex;
+-      gap: 0.5rem;
+-      align-items: flex-start;
+-      margin-bottom: 0.25rem;
+-    }
+-    /* 543-fwd UPDATE 10 P1 — the effect content (label + time + structured detail)
+-       is owned by <jf-effect-line>; the row composes chrome around it. */
+-    .grow {
+-      flex: 1;
+-      min-width: 0;
+-    }
+-    .actions {
+-      display: flex;
+-      gap: 0.375rem;
+-      align-items: center;
+-      flex-shrink: 0;
+-    }
+-    button:disabled {
+-      opacity: 0.5;
+-      cursor: not-allowed;
+-    }
+-    /* 543-fwd #6 — causation turn grouping. */
+-    .turn {
+-      margin-bottom: 0.25rem;
+-      border: 1px solid var(--border-subtle);
+-      border-radius: 0.25rem;
+-      overflow: hidden;
+-    }
+-    .turn-head {
+-      display: flex;
+-      align-items: center;
+-      gap: 0.5rem;
+-      width: 100%;
+-      padding: 0.375rem 0.5rem;
+-      background: var(--surface-3);
+-      border: none;
+-      color: var(--text-secondary);
+-      font: inherit;
+-      font-size: var(--font-size-xs);
+-      cursor: pointer;
+-      text-align: left;
+-    }
+-    .turn-head:hover {
+-      background: var(--surface-2);
+-    }
+-    .turn-caret {
+-      width: 0.75rem;
+-      flex-shrink: 0;
+-    }
+-    .turn-label {
+-      font-weight: 600;
+-    }
+-    .turn-body {
+-      padding: 0.25rem;
+-    }
+-    /* 543-fwd #6 — clickable causation chip + the expanded "why" trace. */
+-    button.chip-trace {
+-      font-family: inherit;
+-      font-size: var(--font-size-xs);
+-      padding: 0.0625rem 0.375rem;
+-      border-radius: 9999px;
+-      background: var(--surface-3);
+-      border: none;
+-      cursor: pointer;
+-      color: var(--text-secondary);
+-    }
+-    button.chip-trace:hover {
+-      background: var(--surface-3);
+-    }
+-    .trace {
+-      margin-top: 0.375rem;
+-      padding: 0.5rem 0.625rem;
+-      border-left: 2px solid var(--accent-info);
+-      background: var(--surface-3);
+-      border-radius: 0.25rem;
+-    }
+-    .trace-title {
+-      font-size: var(--font-size-xs);
+-      font-weight: 600;
+-      color: var(--text-secondary);
+-      margin-bottom: 0.25rem;
+-    }
+-    .trace-chain {
+-      list-style: none;
+-      margin: 0;
+-      padding: 0;
+-      font-size: var(--font-size-xs);
+-    }
+-    .trace-chain li {
+-      padding: 0.125rem 0;
+-    }
+-    .trace-step-n {
+-      font-family: var(--font-mono);
+-      color: var(--text-tertiary);
+-      margin-right: 0.375rem;
+-    }
+-    /* 574 B1 — the per-entry restore/undo-turn/undo-op + the close + confirm-bar buttons are
+-       jf-button atoms now (size="sm"/ghost-icon/danger); their per-surface skins are deleted.
+-       The bare action buttons (undo last/all, save/export/import) were browser-default-styled —
+-       jf-button gives them proper token styling. .chip-trace + .turn-head stay (trace toggle +
+-       turn disclosure are bespoke affordances, not the action-button base). */
+-    .empty {
+-      padding: 2rem 1rem;
+-      text-align: center;
+-      color: var(--text-tertiary);
+-      font-size: var(--font-size-sm);
+-    }
+-    /* 543-fwd #8 — mass-undo confirm bar. */
+-    .undo-all-confirm {
+-      padding: 0.5rem 1rem;
+-      border-bottom: 1px solid var(--border-subtle);
+-      background: var(--surface-2);
+-    }
+-    .confirm-title {
+-      font-size: var(--font-size-sm);
+-      font-weight: 600;
+-      margin-bottom: 0.375rem;
+-    }
+-    .confirm-list {
+-      list-style: none;
+-      margin: 0 0 0.5rem;
+-      padding: 0;
+-      max-height: 8rem;
+-      overflow-y: auto;
+-      font-size: var(--font-size-xs);
+-      color: var(--text-secondary);
+-    }
+-    .confirm-list li {
+-      padding: 0.125rem 0;
+-    }
+-    .confirm-actions {
+-      display: flex;
+-      gap: 0.5rem;
+-    }
+-  `;
+-
+-  private filteredEntries(): ReadonlyArray<JournalEntry> {
+-    return this.entries.filter((e) => {
+-      if (this.originator !== 'all' && e.originator !== this.originator) {
+-        return false;
+-      }
+-      if (this.outcome === 'normal' && e.pendingOutcome !== undefined) return false;
+-      if (this.outcome === 'accepted' && e.pendingOutcome !== 'accepted') return false;
+-      if (this.outcome === 'rejected' && e.pendingOutcome !== 'rejected') return false;
+-      return true;
+-    });
+-  }
+-
+-  render(): TemplateResult {
+-    const filtered = this.filteredEntries();
+-    // 543-fwd #3 — the AI-undo buttons are actionable only when reversible agent
+-    // entries exist; otherwise they're a no-op dead-end. Mirror save/export gating.
+-    const agentUndoableCount = previewUndoAllByOriginator('agent').length;
+-    return html`
+-      <section class="panel" aria-label="Effect Journal" data-testid="effect-audit-journal" tabindex="-1">
+-        <header>
+-          <h3>Effect Journal</h3>
+-        </header>
+-        <div class="filters">
+-          <label>
+-            originator
+-            <select
+-              .value=${this.originator}
+-              @change=${(e: Event) =>
+-                (this.originator = (e.target as HTMLSelectElement)
+-                  .value as OriginatorFilter)}
+-            >
+-              <option value="all">all</option>
+-              <option value="user">user</option>
+-              <option value="agent">agent</option>
+-              <option value="system">system</option>
+-            </select>
+-          </label>
+-          <label>
+-            outcome
+-            <select
+-              .value=${this.outcome}
+-              @change=${(e: Event) =>
+-                (this.outcome = (e.target as HTMLSelectElement)
+-                  .value as OutcomeFilter)}
+-            >
+-              <option value="all">all</option>
+-              <option value="normal">normal</option>
+-              <option value="accepted">accepted</option>
+-              <option value="rejected">rejected</option>
+-            </select>
+-          </label>
+-          <span style="margin-left:auto;color:var(--text-tertiary)">
+-            ${filtered.length} / ${this.entries.length}
+-          </span>
+-        </div>
+-        <div class="filters" style="border-top:1px solid var(--border-subtle);">
+-          <jf-button
+-            size="sm"
+-            data-testid="undo-last-agent"
+-            label="Undo last AI action"
+-            .availability=${agentUndoableCount === 0
+-              ? unavailableBecause('No reversible AI actions to undo')
+-              : undefined}
+-            .onActivate=${() => this.handleUndoLastByOriginator('agent')}
+-          >Undo last AI action</jf-button>
+-          <jf-button
+-            size="sm"
+-            data-testid="undo-all-agent"
+-            .label=${`Undo all AI actions${agentUndoableCount > 0 ? ` (${agentUndoableCount})` : ''}`}
+-            .availability=${agentUndoableCount === 0
+-              ? unavailableBecause('No reversible AI actions to undo')
+-              : undefined}
+-            .onActivate=${() => this.handleUndoAllByOriginator('agent')}
+-          >Undo all AI actions${agentUndoableCount > 0 ? ` (${agentUndoableCount})` : ''}</jf-button>
+-          <jf-button
+-            size="sm"
+-            data-testid="save-as-macro"
+-            .label=${`Save selected (${this.selectedIds.size}) as macro`}
+-            .availability=${this.selectedIds.size === 0
+-              ? unavailableBecause('Select one or more entries to save as a macro')
+-              : undefined}
+-            .onActivate=${() => void this.handleSaveAsMacro()}
+-          >Save selected (${this.selectedIds.size}) as macro</jf-button>
+-          <jf-button
+-            size="sm"
+-            data-testid="export-archive"
+-            .label=${this.exportReceipt.active
+-              ? `✓ ${this.exportReceipt.active.message}`
+-              : `Export selected (${this.selectedIds.size})`}
+-            .availability=${this.selectedIds.size === 0
+-              ? unavailableBecause('Select one or more entries to export')
+-              : undefined}
+-            .onActivate=${() => this.handleExportArchive()}
+-            >${this.exportReceipt.active
+-              ? `✓ ${this.exportReceipt.active.message}`
+-              : `Export selected (${this.selectedIds.size})`}</jf-button
+-          >
+-          <jf-button
+-            size="sm"
+-            data-testid="import-archive"
+-            label="Import archive"
+-            .onActivate=${() => void this.handleImportArchive()}
+-            title="543-fwd #19 — paste a journal archive to replay it as a macro"
+-          >Import archive</jf-button>
+-        </div>
+-        ${this.undoAllPreview.length > 0 ? this.renderUndoAllConfirm() : nothing}
+-        ${this.restoreTargetId !== null ? this.renderRestoreConfirm() : nothing}
+-        ${this.groupRootId !== null ? this.renderUndoTurnConfirm() : nothing}
+-        <div class="list">
+-          ${filtered.length === 0
+-            ? this.entries.length === 0
+-              ? html`<div class="empty">
+-                  No actions recorded yet — anything you or the AI does will
+-                  appear here, newest first.
+-                </div>`
+-              : html`<div class="empty">No entries match the current filter</div>`
+-            : groupJournalForDisplay([...filtered].reverse()).map((turn) => {
+-                if (turn.grouped) return this.renderTurn(turn);
+-                const only = turn.members[0];
+-                return only ? this.renderEntryRow(only) : nothing;
+-              })}
+-        </div>
+-      </section>
+-    `;
+-  }
+-
+-  // 543-fwd #6 — a causation turn: a collapsible header (originator + step count)
+-  // over its member rows. Default expanded; the header toggles collapse.
+-  private renderTurn(turn: DisplayTurn): TemplateResult {
+-    const collapsed = this.collapsedTurns.has(turn.rootId);
+-    return html`
+-      <div class="turn" data-testid="turn-${turn.rootId}">
+-        <button
+-          class="turn-head"
+-          type="button"
+-          aria-expanded=${collapsed ? 'false' : 'true'}
+-          data-testid="turn-toggle-${turn.rootId}"
+-          @click=${() => this.toggleTurnCollapse(turn.rootId)}
+-        >
+-          <span class="turn-caret">${collapsed ? '▸' : '▾'}</span>
+-          <jf-status-badge origin=${turn.originator}>${turn.originator}</jf-status-badge>
+-          <span class="turn-label">${turn.members.length}-step turn</span>
+-        </button>
+-        ${collapsed
+-          ? nothing
+-          : html`<div class="turn-body">
+-              ${turn.members.map((m) => this.renderEntryRow(m))}
+-            </div>`}
+-      </div>
+-    `;
+-  }
+-
+-  // 543-fwd — a single journal entry row (label + time + detail via <jf-effect-line>),
+-  // with selection, the causation chip, and the per-entry undo affordances. Every entry
+-  // gets its own row (Fix C — no run-collapse hiding rows/actions).
+-  private renderEntryRow(e: JournalEntry): TemplateResult {
+-    return html`
+-      <div class="entry" data-entry-id=${e.id}>
+-        <div class="entry-head">
+-          <input
+-            type="checkbox"
+-            data-testid="entry-select-${e.id}"
+-            ?checked=${this.selectedIds.has(e.id)}
+-            @change=${() => this.toggleSelection(e.id)}
+-          />
+-          <jf-status-badge origin=${e.originator}>${e.originator}</jf-status-badge>
+-          ${e.pendingOutcome
+-            ? html`<jf-status-badge status=${e.pendingOutcome}>${e.pendingOutcome}</jf-status-badge>`
+-            : nothing}
+-          <jf-effect-line
+-            class="grow"
+-            .effect=${e.effect}
+-            .timestamp=${e.invokedAt}
+-            showDetail
+-          ></jf-effect-line>
+-          <span class="actions">
+-            ${e.causation !== undefined
+-              ? html`<button
+-                  class="chip-trace"
+-                  data-testid="causation-${e.id}"
+-                  title="Why did this happen? Show the causation chain to the root (§32 R-E3)"
+-                  @click=${() => this.toggleTrace(e.id)}
+-                  >↳ #${e.causation} why?</button
+-                >`
+-              : nothing}
+-            ${this.renderUndoOp(e)}
+-            <jf-button
+-              size="sm"
+-              data-testid="restore-to-${e.id}"
+-              label="Restore to this point"
+-              title="Restore to this point — reverse everything done after this action (reversible / compensable only)"
+-              .onActivate=${() => this.handleRestoreToHere(e.id)}
+-            >↶ restore</jf-button>
+-            ${e.causation !== undefined
+-              ? html`<jf-button
+-                  size="sm"
+-                  data-testid="undo-turn-${e.id}"
+-                  label="Undo this AI turn"
+-                  title="543-fwd #7 — undo this whole AI turn (all steps sharing its causation root) in one step"
+-                  .onActivate=${() => this.handleUndoTurn(e.id)}
+-                >↶ undo turn</jf-button>`
+-              : nothing}
+-          </span>
+-        </div>
+-        ${this.tracedId === e.id ? this.renderTrace(e) : nothing}
+-      </div>
+-    `;
+-  }
+-
+-  // 543-fwd #6 — the bottom-up "why did this happen" causation trace: the chain
+-  // of ancestor effects from the root down to this entry. Powered by
+-  // getCausationChain (513 lazy-pointer DAG walk). For a real agent turn this is
+-  // the tool-call sequence that led here (bridge enrichment chains them).
+-  private renderTrace(entry: JournalEntry): TemplateResult {
+-    const ancestors = getCausationChain(entry.id); // root … direct parent
+-    const lineage = [...ancestors, entry]; // root → … → this
+-    return html`
+-      <div class="trace" data-testid="trace-${entry.id}">
+-        <div class="trace-title">Why this happened</div>
+-        <ol class="trace-chain">
+-          ${lineage.map(
+-            (n, i) => html`<li data-testid="trace-step-${entry.id}">
+-              <span class="trace-step-n">${i === 0 ? 'root' : `#${n.id}`}</span>
+-              ${present({ kind: 'effect', effect: n.effect }).label}
+-            </li>`,
+-          )}
+-        </ol>
+-      </div>
+-    `;
+-  }
+-
+-  // 543-fwd #8 — the confirm bar shown before committing "Undo all AI actions".
+-  private renderUndoAllConfirm(): TemplateResult {
+-    return html`
+-      <div class="undo-all-confirm" data-testid="undo-all-confirm">
+-        <div class="confirm-title">
+-          Undo these ${this.undoAllPreview.length} AI
+-          action${this.undoAllPreview.length === 1 ? '' : 's'}?
+-        </div>
+-        <ul class="confirm-list">
+-          ${this.undoAllPreview.map(
+-            (e) => html`<li data-testid="undo-all-row">${present({ kind: 'effect', effect: e.effect }).label}</li>`,
+-          )}
+-        </ul>
+-        ${this.irreversibleNote(listJournalByOriginator('agent').filter((e) => e.pendingOutcome !== 'rejected'
+-          && !this.undoAllPreview.some((p) => p.id === e.id)).length)}
+-        <div class="confirm-actions">
+-          <jf-button
+-            variant="danger"
+-            size="sm"
+-            data-testid="undo-all-confirm-yes"
+-            label="Undo all"
+-            .onActivate=${() => this.confirmUndoAll()}
+-          >Undo all</jf-button>
+-          <jf-button
+-            size="sm"
+-            data-testid="undo-all-confirm-cancel"
+-            label="Cancel"
+-            .onActivate=${() => this.cancelUndoAll()}
+-          >Cancel</jf-button>
+-        </div>
+-      </div>
+-    `;
+-  }
+-
+-  // 543-fwd #5 — the restore (time-travel) confirm bar: list everything a
+-  // "restore to here" would reverse before committing.
+-  private renderRestoreConfirm(): TemplateResult {
+-    return html`
+-      <div class="undo-all-confirm" data-testid="restore-confirm">
+-        <div class="confirm-title">
+-          Restore to this point — reverse these ${this.restorePreview.length}
+-          action${this.restorePreview.length === 1 ? '' : 's'} done after it?
+-        </div>
+-        <ul class="confirm-list">
+-          ${this.restorePreview.map(
+-            (e) => html`<li data-testid="restore-row">${present({ kind: 'effect', effect: e.effect }).label}</li>`,
+-          )}
+-        </ul>
+-        ${this.irreversibleNote(this.entries.filter((e) => this.restoreTargetId !== null && e.id > this.restoreTargetId
+-          && e.pendingOutcome !== 'rejected' && !this.restorePreview.some((p) => p.id === e.id)).length)}
+-        <div class="confirm-actions">
+-          <jf-button
+-            variant="danger"
+-            size="sm"
+-            data-testid="restore-confirm-yes"
+-            label="Restore"
+-            .onActivate=${() => this.confirmRestore()}
+-          >Restore</jf-button>
+-          <jf-button
+-            size="sm"
+-            data-testid="restore-confirm-cancel"
+-            label="Cancel"
+-            .onActivate=${() => this.cancelRestore()}
+-          >Cancel</jf-button>
+-        </div>
+-      </div>
+-    `;
+-  }
+-
+-  // 543-fwd #7 — confirm bar for "undo this AI turn" (the causation group).
+-  private renderUndoTurnConfirm(): TemplateResult {
+-    return html`
+-      <div class="undo-all-confirm" data-testid="undo-turn-confirm">
+-        <div class="confirm-title">
+-          Undo this AI turn — reverse these ${this.groupPreview.length}
+-          action${this.groupPreview.length === 1 ? '' : 's'}?
+-        </div>
+-        <ul class="confirm-list">
+-          ${this.groupPreview.map(
+-            (e) => html`<li data-testid="undo-turn-row">${present({ kind: 'effect', effect: e.effect }).label}</li>`,
+-          )}
+-        </ul>
+-        ${this.irreversibleNote(this.entries.filter((e) => this.groupRootId !== null && getGroupRoot(e.id) === this.groupRootId
+-          && e.pendingOutcome !== 'rejected' && !this.groupPreview.some((p) => p.id === e.id)).length)}
+-        <div class="confirm-actions">
+-          <jf-button variant="danger" size="sm" data-testid="undo-turn-confirm-yes" label="Undo turn" .onActivate=${() => this.confirmUndoTurn()}>Undo turn</jf-button>
+-          <jf-button size="sm" data-testid="undo-turn-confirm-cancel" label="Cancel" .onActivate=${() => this.cancelUndoTurn()}>Cancel</jf-button>
+-        </div>
+-      </div>
+-    `;
+-  }
+-
+-  // §32 U2 — "Undo" affordance for an invoke-operation entry whose backend
+-  // executionId was captured (undoSupported ops). Dispatches an
+-  // undo-operation Effect → Shell jf-undo-operation listener → OperationClient
+-  // .undoWithConsent → POST /api/undo/{operationId} (trust-gated; tempdoc 875 §C.7).
+-  private renderUndoOp(e: JournalEntry): TemplateResult | typeof nothing {
+-    const u = getUndoableOperation(e.id);
+-    if (!u) return nothing;
+-    return html`<jf-button
+-      class="undo-op"
+-      size="sm"
+-      data-testid="undo-op-${e.id}"
+-      label="Undo operation"
+-      title="reverse this operation on the backend"
+-      .onActivate=${() => this.handleUndoOp(u.operationId, u.executionId)}
+-    >
+-      Undo
+-    </jf-button>`;
+-  }
+-
+-  private handleUndoOp(operationId: string, executionId: string): void {
+-    applyEffect({ kind: 'undo-operation', operationId, executionId });
+-  }
+-}
+-
+-if (!customElements.get('jf-effect-audit-log')) {
+-  customElements.define('jf-effect-audit-log', EffectAuditLog);
+-}
+diff --git a/modules/ui-web/src/shell-v0/components/OperationOutcomeDetail.ts b/modules/ui-web/src/shell-v0/components/OperationOutcomeDetail.ts
+index d5b169b766..56211b41c3 100644
+--- a/modules/ui-web/src/shell-v0/components/OperationOutcomeDetail.ts
++++ b/modules/ui-web/src/shell-v0/components/OperationOutcomeDetail.ts
+@@ -1,9 +1,8 @@
+ // SPDX-License-Identifier: Apache-2.0
+ import { html, css, type PropertyValues, type TemplateResult } from 'lit';
+ import { JfElement } from '../primitives/JfElement.js';
+-import { authorizedFetch } from '../api/authorizedFetch.js';
+-import { operationOutcomeViewSchema, type OperationOutcomeView } from '../../api/generated/schema-types/index.js';
+-import { parseWireContract } from '../../api/schemas.js';
++import type { OperationOutcomeView } from '../../api/generated/schema-types/index.js';
++import { OPERATION_KEY_PATTERN, readOperationReceipt } from '../operations/operationReceipt.js';
+ 
+ /** Follows a recorded operation through acceptance to its retained outcome details. */
+ export class OperationOutcomeDetail extends JfElement {
+@@ -49,17 +48,15 @@ export class OperationOutcomeDetail extends JfElement {
+   private async load(): Promise<void> {
+     const serial = ++this.requestSerial;
+     clearTimeout(this.pollTimer);
+-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(this.operationKey)) return;
++    if (!OPERATION_KEY_PATTERN.test(this.operationKey)) return;
+     let pending = true;
+     try {
+-      const response = await authorizedFetch(`${this.apiBase.replace(/\/$/, '')}/api/operation-history/${encodeURIComponent(this.operationKey)}`);
+-      if (!response.ok) return;
+-      const outcome = parseWireContract(operationOutcomeViewSchema, await response.json(), 'operation outcome');
++      const outcome = await readOperationReceipt(this.apiBase, this.operationKey);
+       if (serial !== this.requestSerial) return;
+       pending = ['accepted', 'running'].includes(outcome.state);
+       this.outcome = outcome.state === 'failed' ? outcome : null;
+     } catch {
+-      // A restart can briefly interrupt outcome reads while the recorded operation continues.
++      // A refused or failed read, or a restart briefly interrupting reads: the operation may continue.
+     } finally {
+       if (pending && serial === this.requestSerial && this.isConnected) {
+         this.pollTimer = setTimeout(() => void this.load(), 4_000);
+diff --git a/modules/ui-web/src/shell-v0/components/RunActivity.ts b/modules/ui-web/src/shell-v0/components/RunActivity.ts
+index d9e54fc128..3a243065e3 100644
+--- a/modules/ui-web/src/shell-v0/components/RunActivity.ts
++++ b/modules/ui-web/src/shell-v0/components/RunActivity.ts
+@@ -1,10 +1,9 @@
+ // SPDX-License-Identifier: Apache-2.0
+ /**
+- * <jf-run-activity> — what agent runs did and are doing, in Activity (design system §1: "History →
+- * System › Activity"). Background runs: the cross-conversation list (`/api/presence`) and the
+- * run-in-background launcher. This run: what the agent did in the run open right now
+- * (`/api/action-ledger` by correlation id). Both read the ONE shared `AgentSessionController`, so this
+- * is a consumer, not a second authority. Machine-wide history is the ledger beside it in Activity.
++ * <jf-run-activity> — Activity's background-runs utility (design system §1: "History → System ›
++ * Activity"): the cross-conversation list (`/api/presence`) and the run-in-background launcher. It
++ * reads the ONE shared `AgentSessionController`, so it is a consumer, not a second authority. What a
++ * run did is Activity's feed, scoped to that run.
+  *
+  * A failed read keeps the rows it had and says so; empty only ever means the backend said empty.
+  */
+@@ -16,7 +15,6 @@ import { getAgentSessionController, subscribeAgentSession } from '../state/agent
+ import { runListNotice, type RunListLoad } from '../controllers/runListLoad.js';
+ import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
+ import { activateOnKey } from '../utils/keyboardHandler.js';
+-import { renderEventRow, eventRowStyles } from './eventRow.js';
+ import type { PresenceRun } from '../controllers/AgentSessionController.js';
+ import type { PluginHostApi } from '../plugin-api/plugin-types.js';
+ 
+@@ -68,7 +66,6 @@ export class RunActivity extends JfElement {
+     super.connectedCallback();
+     this.unsubscribe = subscribeAgentSession(() => this.requestUpdate());
+     void this.ctrl().loadPresence();
+-    void this.ctrl().loadHistory();
+   }
+ 
+   override disconnectedCallback(): void {
+@@ -154,25 +151,11 @@ export class RunActivity extends JfElement {
+     </section>`;
+   }
+ 
+-  private thisRun(): TemplateResult {
+-    const ctrl = this.ctrl();
+-    const history = ctrl.history;
+-    return html`<section aria-label="This run" data-testid="activity-this-run">
+-      <div class="section-label">This run</div>
+-      <p class="scope-note">What the agent did in the run open right now.</p>
+-      ${this.notice(ctrl.historyLoad, 'this run', () => void ctrl.loadHistory())}
+-      ${history.length === 0 && !ctrl.historyLoad.failed
+-        ? html`<p class="empty">Each tool the agent uses in the current run is listed here — the run has used none yet.</p>`
+-        : history.map(entry => renderEventRow(entry, { apiBase: this.apiBase }))}
+-    </section>`;
+-  }
+-
+   override render(): TemplateResult {
+-    return html`${this.backgroundRuns()}${this.thisRun()}`;
++    return this.backgroundRuns();
+   }
+ 
+   static styles = [
+-    eventRowStyles,
+     css`
+       :host { display: block; }
+       section:focus { outline: none; }
+diff --git a/modules/ui-web/src/shell-v0/controllers/AgentSessionController.ts b/modules/ui-web/src/shell-v0/controllers/AgentSessionController.ts
+index 7e436889b2..c00dc1a2d8 100644
+--- a/modules/ui-web/src/shell-v0/controllers/AgentSessionController.ts
++++ b/modules/ui-web/src/shell-v0/controllers/AgentSessionController.ts
+@@ -600,6 +600,13 @@ export class AgentSessionController implements CoreAgentRunHandlers {
+   /** Whether each run list is what the backend last said (`runListLoad.ts`). */
+   sessionsLoad: RunListLoad = RUN_LIST_UNREAD;
+   historyLoad: RunListLoad = RUN_LIST_UNREAD;
++  /**
++   * The run's ledger records as the session-filtered read returned them (that read filters before it
++   * limits, so it can hold records the general ledger window no longer does). Activity's run scope
++   * joins them into its feed. `historySessionId` is the run they belong to.
++   */
++  historyRecords: BackendLedgerEntry[] = [];
++  historySessionId: string | null = null;
+   presenceLoad: RunListLoad = RUN_LIST_UNREAD;
+   available: boolean | null = null;
+   // Tempdoc 577 §2.13 #17 / §2.14 Root III — the agent's AUTHORITY SPACE. `/api/chat/agent/tools`
+@@ -2717,8 +2724,11 @@ export class AgentSessionController implements CoreAgentRunHandlers {
+    * History while the record is non-empty is unrepresentable.
+    */
+   async loadHistory(): Promise<void> {
+-    if (!this.sessionId) {
++    const sessionId = this.sessionId;
++    if (!sessionId) {
+       this.history = [];
++      this.historyRecords = [];
++      this.historySessionId = null;
+       this.historyLoad = runListLoaded();
+       this.notify();
+       return;
+@@ -2726,20 +2736,20 @@ export class AgentSessionController implements CoreAgentRunHandlers {
+     try {
+       const res = await this.transport.request(
+         `${this.apiBase}/api/action-ledger?originator=agent&correlationId=${encodeURIComponent(
+-          this.sessionId,
++          sessionId,
+         )}`,
+       );
+       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+       const data = (await res.json()) as { entries?: BackendLedgerEntry[] };
+       const rows = data.entries ?? [];
++      this.historyRecords = rows.filter((r) => r.kind === 'operation').slice(-HISTORY_LIMIT);
++      this.historySessionId = sessionId;
+       // tempdoc 558 §S1 — project through the ONE shared projection (projectBackend), so History and
+       // the Activity surface render the same record identically rather than forking a HistoryEntry.
+-      this.history = rows
+-        .filter((r) => r.kind === 'operation')
+-        .slice(-HISTORY_LIMIT)
+-        .map(projectBackend);
++      this.history = this.historyRecords.map(projectBackend);
+       this.historyLoad = runListLoaded();
+     } catch {
++      if (this.sessionId !== sessionId) return;
+       this.historyLoad = runListFailed(this.historyLoad);
+     }
+     this.notify();
+diff --git a/modules/ui-web/src/shell-v0/operations/ActionLedgerClient.ts b/modules/ui-web/src/shell-v0/operations/ActionLedgerClient.ts
+index 9b8279c813..3ef6c1feb5 100644
+--- a/modules/ui-web/src/shell-v0/operations/ActionLedgerClient.ts
++++ b/modules/ui-web/src/shell-v0/operations/ActionLedgerClient.ts
+@@ -199,7 +199,7 @@ export interface UnifiedActionEntry {
+ }
+ 
+ /** "6m 12s" / "45s" / "1h 03m" — a scan's duration at human altitude (millis are not). */
+-function formatScanDuration(ms: number | undefined): string {
++export function formatScanDuration(ms: number | undefined): string {
+   if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) return '';
+   const totalSec = Math.round(ms / 1000);
+   if (totalSec < 60) return `${totalSec}s`;
+diff --git a/modules/ui-web/src/shell-v0/operations/activityFeed.ts b/modules/ui-web/src/shell-v0/operations/activityFeed.ts
+index 2a6259f1bb..409f1c58ad 100644
+--- a/modules/ui-web/src/shell-v0/operations/activityFeed.ts
++++ b/modules/ui-web/src/shell-v0/operations/activityFeed.ts
+@@ -19,6 +19,7 @@
+  */
+ import { journalEventId, type JournalEntry, type EffectOriginator } from '../substrates/effects/index.js';
+ import { compareInstants } from '../primitives/instant.js';
++import { OPERATION_KEY_PATTERN } from './operationReceipt.js';
+ import {
+   indexResultOf,
+   projectBackend,
+@@ -254,6 +255,11 @@ function finish(d: Draft): FeedRow {
+ // ============================================================
+ 
+ export type QuickFilter = 'all' | 'agents' | 'mine' | 'indexing' | 'problems';
++/**
++ * Which records the feed is scoped to: everything loaded, the records this window's journal holds
++ * (where the retired journal list's arrivals now land), or one agent run's records by its session id.
++ */
++export type FeedScope = 'all' | 'local' | 'run';
+ /** `auto` follows the quick filter; an explicit choice overrides it in every quick filter. */
+ export type RoutineChoice = 'auto' | 'show' | 'hide';
+ type DateScope = 'all' | 'today';
+@@ -266,12 +272,28 @@ export interface FeedFilter {
+   readonly proposals: readonly ProposalDecision[];
+   readonly routine: RoutineChoice;
+   readonly date: DateScope;
++  readonly scope: FeedScope;
++  /** The run a `run` scope shows, by its session id. */
++  readonly runId?: string;
+ }
+ 
+ export const DEFAULT_FEED_FILTER: FeedFilter = {
+-  quick: 'all', originators: [], outcomes: [], proposals: [], routine: 'auto', date: 'all',
++  quick: 'all', originators: [], outcomes: [], proposals: [], routine: 'auto', date: 'all', scope: 'all',
+ };
+ 
++/** The agent run (session id) a row's backend records name, if any. */
++export function runOf(row: FeedRow): string | undefined {
++  return row.ledger?.correlationId ?? row.history.find((h) => h.provenance?.correlationId)?.provenance?.correlationId ?? undefined;
++}
++
++function matchesScope(row: FeedRow, filter: FeedFilter): boolean {
++  switch (filter.scope) {
++    case 'local': return !!row.journal;
++    case 'run': return !!filter.runId && runOf(row) === filter.runId;
++    default: return true;
++  }
++}
++
+ /**
+  * Whether routine rows show. In `auto`, All and Agents keep the curated default (routine hidden);
+  * Your actions, Indexing and Problems reveal their routine members (per-file indexing events,
+@@ -307,6 +329,7 @@ export function startOfLocalDay(now: Date): Date {
+ 
+ /** Every constraint except routine; the caller counts what routine alone hides. */
+ export function matchesFilter(row: FeedRow, filter: FeedFilter, now: Date): boolean {
++  if (!matchesScope(row, filter)) return false;
+   if (!matchesQuick(row, filter.quick)) return false;
+   if (filter.originators.length && !filter.originators.includes(row.entry.originator)) return false;
+   if (filter.outcomes.length && !(row.entry.outcome && filter.outcomes.includes(row.entry.outcome))) return false;
+@@ -315,3 +338,57 @@ export function matchesFilter(row: FeedRow, filter: FeedFilter, now: Date): bool
+       && compareInstants(row.entry.occurredAt, startOfLocalDay(now).toISOString()) < 0) return false;
+   return true;
+ }
++
++// ============================================================
++// What a selected record's details say
++// ============================================================
++
++/** The invocation key a row answers to (history, ledger identity or the journal's association). */
++export function operationKeyOf(row: FeedRow): string | undefined {
++  const keyed = row.history.find((h) => h.operationKey)?.operationKey;
++  if (keyed) return keyed;
++  if (row.ledger?.kind === 'operation' && row.ledger.id.startsWith('operation:')) {
++    const key = row.ledger.id.slice('operation:'.length);
++    if (OPERATION_KEY_PATTERN.test(key)) return key;
++  }
++  return row.journal?.operationKey;
++}
++
++/** How long the recorded work took: the committed start and end, else a recorded duration. */
++export function durationOf(row: FeedRow): number | undefined {
++  const committed = row.history.find((h) => h.startTime && h.endTime);
++  if (committed) {
++    const ms = Date.parse(committed.endTime) - Date.parse(committed.startTime!);
++    if (Number.isFinite(ms) && ms >= 0) return ms;
++  }
++  const recorded = row.ledger?.durationMs;
++  return typeof recorded === 'number' && Number.isFinite(recorded) && recorded >= 0 ? recorded : undefined;
++}
++
++/** The transport a record names as its source, if any (history provenance, else the ledger's). */
++export function transportOf(row: FeedRow): string | undefined {
++  return row.history.find((h) => h.provenance?.transport)?.provenance?.transport ?? row.ledger?.transport ?? undefined;
++}
++
++/** The records a row's contributions came from, in the order the details name them. */
++export function contributionsOf(row: FeedRow): Array<'ledger' | 'history' | 'journal'> {
++  return [...(row.ledger ? ['ledger' as const] : []), ...(row.history.length ? ['history' as const] : []),
++    ...(row.journal ? ['journal' as const] : [])];
++}
++
++/** What a selected key stands for: one record, a collapsed indexing burst, or a legacy scan rollup. */
++export interface SelectedRecord {
++  readonly key: string;
++  readonly kind: 'record' | 'burst' | 'scan';
++  /** The record itself (absent for a burst, which is a summary of its members). */
++  readonly row?: FeedRow;
++  /** As the feed words it, with resolved file names. */
++  readonly label: string;
++  readonly occurredAt: string;
++  /** A burst's members, or the per-document records a scan still has retained. */
++  readonly members: readonly FeedRow[];
++  /** Other records of the same approval request (gate decisions, grants, the execution). */
++  readonly related: readonly FeedRow[];
++  /** Index paths resolved so far, by path hash. */
++  readonly paths: Readonly<Record<string, string>>;
++}
+diff --git a/modules/ui-web/src/shell-v0/operations/operationReceipt.ts b/modules/ui-web/src/shell-v0/operations/operationReceipt.ts
+new file mode 100644
+index 0000000000..636769527e
+--- /dev/null
++++ b/modules/ui-web/src/shell-v0/operations/operationReceipt.ts
+@@ -0,0 +1,100 @@
++// SPDX-License-Identifier: Apache-2.0
++/**
++ * Reading one operation's receipt (`GET /api/operation-history/{operationKey}`): the metadata the
++ * Engine retains for an invocation — state, phase, unit counts, reason, result code — and nothing
++ * richer. Shared by the inline failure reader on ledger rows and Activity's details.
++ *
++ * A watch follows one key: it reads again every few seconds while the invocation is accepted or
++ * running, keeps the last answer it had when a read fails, and never moves back from a terminal
++ * state (complete, failed, expired) to an earlier one: a read that started before the terminal one
++ * and answers after it is a sample of the past. An answer from a stopped watch changes nothing.
++ */
++import { authorizedFetch } from '../api/authorizedFetch.js';
++import { operationOutcomeViewSchema, type OperationOutcomeView } from '../../api/generated/schema-types/index.js';
++import { parseWireContract } from '../../api/schemas.js';
++
++/** An invocation key (a UUIDv7): the only kind of key the receipt endpoint answers for. */
++export const OPERATION_KEY_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
++
++const POLL_MS = 4_000;
++const TERMINAL = new Set<OperationOutcomeView['state']>(['complete', 'failed', 'expired']);
++
++/** The invocation has not finished: accepted, or running. */
++export function isPending(outcome: OperationOutcomeView | null): boolean {
++  return outcome !== null && (outcome.state === 'accepted' || outcome.state === 'running');
++}
++
++export function isTerminalReceipt(state: OperationOutcomeView['state']): boolean {
++  return TERMINAL.has(state);
++}
++
++/** One read. Throws when the request fails or the answer is not a receipt. */
++export async function readOperationReceipt(apiBase: string, operationKey: string): Promise<OperationOutcomeView> {
++  const response = await authorizedFetch(`${apiBase.replace(/\/$/, '')}/api/operation-history/${encodeURIComponent(operationKey)}`);
++  if (!response.ok) throw new Error(`HTTP ${response.status}`);
++  return parseWireContract(operationOutcomeViewSchema, await response.json(), 'operation outcome');
++}
++
++export interface ReceiptState {
++  /** The latest answer that is not older than a terminal one; null before the first. */
++  readonly outcome: OperationOutcomeView | null;
++  /** A read is outstanding. */
++  readonly reading: boolean;
++  /** The latest read failed (the last answer, if any, is kept). */
++  readonly readFailed: boolean;
++}
++
++export class ReceiptWatch {
++  private state: ReceiptState = { outcome: null, reading: false, readFailed: false };
++  private serial = 0;
++  private timer: ReturnType<typeof setTimeout> | undefined;
++  private stopped = false;
++
++  constructor(
++    private readonly apiBase: string,
++    readonly operationKey: string,
++    private readonly onChange: (state: ReceiptState) => void,
++  ) {}
++
++  get current(): ReceiptState {
++    return this.state;
++  }
++
++  /** Read now (also a retry after a failed read). Does nothing for a key the endpoint cannot answer. */
++  read(): void {
++    if (this.stopped || !OPERATION_KEY_PATTERN.test(this.operationKey)) return;
++    clearTimeout(this.timer);
++    const serial = ++this.serial;
++    this.set({ ...this.state, reading: true });
++    void readOperationReceipt(this.apiBase, this.operationKey).then(
++      (outcome) => {
++        void serial;
++        const held = this.state.outcome;
++        const regresses = held !== null && isTerminalReceipt(held.state) && !isTerminalReceipt(outcome.state);
++        this.set({ outcome: regresses ? held : outcome, reading: false, readFailed: false });
++        if (isPending(this.state.outcome)) this.schedule();
++      },
++      () => {
++        if (this.stopped || serial !== this.serial) return;
++        this.set({ ...this.state, reading: false, readFailed: true });
++        // A restart can briefly interrupt reads while a running invocation continues.
++        if (isPending(this.state.outcome)) this.schedule();
++      },
++    );
++  }
++
++  stop(): void {
++    this.stopped = true;
++    this.serial += 1;
++    clearTimeout(this.timer);
++  }
++
++  private schedule(): void {
++    this.timer = setTimeout(() => this.read(), POLL_MS);
++  }
++
++  private set(state: ReceiptState): void {
++    this.state = state;
++    this.onChange(state);
++  }
++}
+diff --git a/modules/ui-web/src/shell-v0/renderers/component-vocabulary.generated.ts b/modules/ui-web/src/shell-v0/renderers/component-vocabulary.generated.ts
+index e9a02c1c47..2501abf93f 100644
+--- a/modules/ui-web/src/shell-v0/renderers/component-vocabulary.generated.ts
++++ b/modules/ui-web/src/shell-v0/renderers/component-vocabulary.generated.ts
+@@ -11,6 +11,7 @@
+ export type ComponentTag =
+   | 'jf-action-button'
+   | 'jf-action-ledger'
++  | 'jf-activity-details'
+   | 'jf-activity-surface'
+   | 'jf-advisory-inbox-drawer'
+   | 'jf-advisory-rail-badge'
+@@ -52,7 +53,6 @@ export type ComponentTag =
+   | 'jf-dispatch-source'
+   | 'jf-document-pane'
+   | 'jf-drag-overlay'
+-  | 'jf-effect-audit-log'
+   | 'jf-effect-line'
+   | 'jf-elicit-host'
+   | 'jf-engine-loss'
+@@ -175,6 +175,7 @@ export type ComponentTag =
+ export const COMPONENT_TAGS: readonly ComponentTag[] = [
+   'jf-action-button',
+   'jf-action-ledger',
++  'jf-activity-details',
+   'jf-activity-surface',
+   'jf-advisory-inbox-drawer',
+   'jf-advisory-rail-badge',
+@@ -216,7 +217,6 @@ export const COMPONENT_TAGS: readonly ComponentTag[] = [
+   'jf-dispatch-source',
+   'jf-document-pane',
+   'jf-drag-overlay',
+-  'jf-effect-audit-log',
+   'jf-effect-line',
+   'jf-elicit-host',
+   'jf-engine-loss',
+diff --git a/modules/ui-web/src/shell-v0/substrates/README.md b/modules/ui-web/src/shell-v0/substrates/README.md
+index 8fb166932d..de1d42e345 100644
+--- a/modules/ui-web/src/shell-v0/substrates/README.md
++++ b/modules/ui-web/src/shell-v0/substrates/README.md
+@@ -56,8 +56,8 @@ inverse, and (§21.E) `originator: 'user' | 'agent' | 'system'`.
+ Per-Pending entries carry `pendingOutcome: 'accepted' | 'rejected'`
+ when they originated from a `proposeEffect` lifecycle event.
+ 
+-Consumers: undo cursor (`undoLastEffect`), audit log
+-(`<jf-effect-audit-log>` chrome surface), per-originator filter
++Consumers: undo cursor (`undoLastEffect`), Activity (its feed and the
++selected record's details), per-originator filter
+ (`listJournalByOriginator`), macros (replay via `runMacro`).
+ 
+ Cross-session persistence via localStorage (500-entry LRU cap).
+@@ -164,8 +164,8 @@ management list using `listAllConsents` + `revokeConsent`.
+ `defineMacro({id, label, effects})` registers a macro + auto-registers
+ as a palette Action under `core.action.macro.<id>`. `runMacro(id)`
+ dispatches each effect in sequence via `applyEffect`. Persists to
+-localStorage. `<jf-effect-audit-log>` (§28.W5) provides the
+-multi-select + save UI.
++localStorage. Activity's details (§28.W5) let journal records be chosen
++and saved or exported in journal order.
+ 
+ ## Layer placement (per §19 KCS direction)
+ 
+diff --git a/modules/ui-web/src/shell-v0/substrates/actions/index.ts b/modules/ui-web/src/shell-v0/substrates/actions/index.ts
+index e982ec1627..476d4b6ce5 100644
+--- a/modules/ui-web/src/shell-v0/substrates/actions/index.ts
++++ b/modules/ui-web/src/shell-v0/substrates/actions/index.ts
+@@ -552,7 +552,7 @@ export function dispatchEffectToChrome(
+       // 574 B2 — route the clipboard effect through the one clipboard authority.
+       // Tempdoc 613 §6 — a copy confirmation is a RECEIPT (locality: at-control), flashed in the
+       // control via ReceiptController by the caller — NOT a window toast. The effect no longer carries
+-      // a `successMessage` window toast (the lone caller, EffectAuditLog, now flashes a receipt).
++      // a `successMessage` window toast (the lone caller, Activity's export of chosen records, flashes a receipt).
+       void copyToClipboard(effect.text);
+       return true;
+     }
+diff --git a/modules/ui-web/src/shell-v0/substrates/effects/index.ts b/modules/ui-web/src/shell-v0/substrates/effects/index.ts
+index a87f4342d3..a223caf5d7 100644
+--- a/modules/ui-web/src/shell-v0/substrates/effects/index.ts
++++ b/modules/ui-web/src/shell-v0/substrates/effects/index.ts
+@@ -1031,6 +1031,29 @@ function isEngineRequest(effect: Effect): boolean {
+ export function undoEntries(
+   previewed: readonly JournalEntry[],
+   applyFn: (effect: Effect) => void,
++): UndoRun {
++  return reverseEntries(previewed, undoEffectFor, applyFn);
++}
++
++/**
++ * Ask the Engine to undo the execution an entry's invocation returned — the per-record backend
++ * Undo, also for an association restored after a reload. Only a request: the Engine decides
++ * (consent, an expired execution), and its answer arrives through {@link RequestedReversal.settled}.
++ * A rejected proposal never ran, so it is never undone; an entry without an execution is skipped.
++ */
++export function requestOperationUndo(entryId: number, applyFn: (effect: Effect) => void): UndoRun {
++  const entry = getJournalEntry(entryId);
++  if (!entry) return { reversed: 0, requested: [], skipped: [] };
++  return reverseEntries([entry], (current) => {
++    const operation = current.pendingOutcome === 'rejected' ? undefined : getUndoableOperation(current.id);
++    return operation ? { kind: 'undo-operation', operationId: operation.operationId, executionId: operation.executionId } : null;
++  }, applyFn);
++}
++
++function reverseEntries(
++  previewed: readonly JournalEntry[],
++  undoFor: (entry: JournalEntry) => Effect | null,
++  applyFn: (effect: Effect) => void,
+ ): UndoRun {
+   let reversed = 0;
+   const requested: RequestedReversal[] = [];
+@@ -1038,7 +1061,7 @@ export function undoEntries(
+   for (let i = 0; i < previewed.length; i++) {
+     const shown = previewed[i]!;
+     const entry = getJournalEntry(shown.id);
+-    const undo = entry && entry.pendingOutcome !== 'rejected' ? undoEffectFor(entry) : null;
++    const undo = entry && entry.pendingOutcome !== 'rejected' ? undoFor(entry) : null;
+     if (undo === null) { skipped.push(shown); continue; }
+     const firstNewId = _nextId;
+     try {
+diff --git a/modules/ui-web/src/shell-v0/substrates/effects/journalView.ts b/modules/ui-web/src/shell-v0/substrates/effects/journalView.ts
+deleted file mode 100644
+index 63ef9e33e8..0000000000
+--- a/modules/ui-web/src/shell-v0/substrates/effects/journalView.ts
++++ /dev/null
+@@ -1,84 +0,0 @@
+-// SPDX-License-Identifier: Apache-2.0
+-/**
+- * journalView — Tempdoc 543-fwd UPDATE 10, #6 (turn grouping).
+- *
+- * A PURE view-model that folds the flat append-only journal into causation-rooted
+- * "turns" for display. The journal itself stays the flat source of truth; this is
+- * presentation only, derived from the entries handed in (no global state — the causation
+- * root is resolved within the passed set, so it's deterministic + testable).
+- *
+- * A *turn* is a maximal run of consecutive entries sharing the same causation root (an
+- * agent tool-call sequence chains via `causation`; a standalone user/system action is its
+- * own root). `grouped` is true when the turn has >1 member — those render under a
+- * collapsible header; singletons render as a plain row.
+- *
+- * NOTE (Fix C): an earlier version collapsed consecutive identical effects into a single
+- * row with a repeat count. That silently dropped the per-entry rows for the collapsed-away
+- * entries, losing their selection / restore / undo-turn affordances while the header still
+- * claimed "N steps". Correctness wins over density: every member entry is preserved as its
+- * own row. Scale is handled by render performance (measured fine), not by hiding entries.
+- */
+-
+-import type { JournalEntry, EffectOriginator } from './index.js';
+-
+-export interface DisplayTurn {
+-  /** The causation root id shared by every member (resolved within the passed set). */
+-  readonly rootId: number;
+-  /** Originator of the turn's first member (turns are single-originator runs). */
+-  readonly originator: EffectOriginator;
+-  /** True when the turn has >1 member — render under a collapsible header. */
+-  readonly grouped: boolean;
+-  /** Every member entry, in display order — none dropped. */
+-  readonly members: readonly JournalEntry[];
+-}
+-
+-/**
+- * Group `entries` (already filtered + in display order) into turns. Pure: the causation
+- * root is resolved only via `causation` pointers present in `entries` (a filtered-out
+- * ancestor stops the walk at the highest present ancestor).
+- */
+-export function groupJournalForDisplay(
+-  entries: readonly JournalEntry[],
+-): DisplayTurn[] {
+-  const byId = new Map<number, JournalEntry>();
+-  for (const e of entries) byId.set(e.id, e);
+-
+-  const rootOf = (start: JournalEntry): number => {
+-    let cur = start;
+-    const seen = new Set<number>();
+-    while (
+-      cur.causation !== undefined &&
+-      byId.has(cur.causation) &&
+-      !seen.has(cur.id)
+-    ) {
+-      seen.add(cur.id);
+-      cur = byId.get(cur.causation) as JournalEntry;
+-    }
+-    return cur.id;
+-  };
+-
+-  const turns: DisplayTurn[] = [];
+-  let members: JournalEntry[] = [];
+-  let rootId = -1;
+-  let originator: EffectOriginator = 'system';
+-
+-  const flush = (): void => {
+-    if (members.length === 0) return;
+-    turns.push({ rootId, originator, grouped: members.length > 1, members });
+-    members = [];
+-  };
+-
+-  for (const e of entries) {
+-    const root = rootOf(e);
+-    if (members.length > 0 && root === rootId) {
+-      members.push(e);
+-    } else {
+-      flush();
+-      rootId = root;
+-      originator = e.originator;
+-      members = [e];
+-    }
+-  }
+-  flush();
+-  return turns;
+-}
+diff --git a/modules/ui-web/src/shell-v0/views/ActivitySurface.ts b/modules/ui-web/src/shell-v0/views/ActivitySurface.ts
+index 3094a7138a..f00c2f4268 100644
+--- a/modules/ui-web/src/shell-v0/views/ActivitySurface.ts
++++ b/modules/ui-web/src/shell-v0/views/ActivitySurface.ts
+@@ -1,11 +1,19 @@
+ // SPDX-License-Identifier: Apache-2.0
+ /**
+- * ActivitySurface — Lit-side Activity surface (slice 486 F15-narrow; S6 one feed).
++ * ActivitySurface — Lit-side Activity surface (slice 486 F15-narrow; S6 one feed and details).
+  *
+  * One chronological feed (`<jf-action-ledger>`) joins the action ledger, the committed
+- * `core.operation-history` stream and this window's Effect Journal by exact identities, with the
+- * Activity utilities beside it: own reversals, the AI-wide undo/preview and macro actions, background
+- * runs, and the local effect journal (its per-entry actions and archive).
++ * `core.operation-history` stream and this window's Effect Journal by exact identities. Selecting a
++ * record opens its details in the shared details pane (`jf-details-pane`, with Activity's own
++ * content `<jf-activity-details>`): inline from 980 px of this window's width, a sheet over the
++ * window below, at the width every window's pane shares. Each Activity holds its own selection.
++ *
++ * Per-record actions live in the details: the receipt, Ask the engine to undo, the causation trace,
++ * Restore to this point, Undo this AI turn, related files and the run link, and choosing journal
++ * records for a macro or an export (saved or exported from the details' footer in journal order).
++ * What is not about one record stays a utility of Activity: your own reversals, the AI-wide undo and
++ * its preview, saving recent AI actions as a macro, importing a journal archive, and background
++ * runs with their launcher. What one run did, and what this window recorded, are scopes of the feed.
+  *
+  * Side-effect registers `<jf-activity-surface>` for the chrome dispatcher.
+  *
+@@ -15,58 +23,151 @@
+  * `core.operation-history`.
+  */
+ 
+-import { html, css, nothing, type TemplateResult } from 'lit';
++import { html, css, nothing, type PropertyValues, type TemplateResult } from 'lit';
+ import { JfElement } from '../primitives/JfElement.js';
+ import { surfaceLayoutStyles } from '../primitives/surfaceLayout.js';
+ // Tempdoc 550 thesis II: mount the unified action-ledger read-view (the Outcome face — one
+ // chronological, originator-attributed, LIVE stream over operations + navigations + gates + FE
+ // effects). Side-effect import registers <jf-action-ledger>.
+ import '../components/ActionLedgerView.js';
++import type { ActionLedgerView } from '../components/ActionLedgerView.js';
+ import '../components/RunActivity.js';
+ import type { RunActivity } from '../components/RunActivity.js';
+-import '../components/EffectAuditLog.js';
++import '../components/ActivityDetails.js';
++import type { ActivityDetails } from '../components/ActivityDetails.js';
++import '../components/detailsPane/DetailsPane.js';
++import type { DetailsPane } from '../components/detailsPane/DetailsPane.js';
++import {
++  DETAILS_PANE_DEFAULT_PX,
++  DETAILS_PANE_KEY_STEP_PX,
++  clampDetailsPaneWidth,
++  detailsPaneIsInline,
++  forgetDetailsPaneWidth,
++  readDetailsPaneWidth,
++  storeDetailsPaneWidth,
++} from '../components/detailsPane/detailsPaneSizing.js';
+ import { peekActivitySection, subscribeActivitySection, takeActivitySection } from '../state/activitySection.js';
+ import '../components/Button.js';
+ import '../components/EffectLine.js';
+-import { listJournalByOriginator, previewUndoAllByOriginator, undoEntries, subscribeJournal,
+-  type JournalEntry } from '../substrates/effects/index.js';
++import { exportJournalArchive, importJournalArchive, listJournal, listJournalByOriginator, peekLastUndoableByOriginator,
++  previewUndoAllByOriginator, undoEntries, subscribeJournal, type JournalEntry } from '../substrates/effects/index.js';
+ import { applyEffect } from '../substrates/actions/index.js';
+-import { defineMacroFromEffects } from '../substrates/macros/index.js';
++import { defineMacro, defineMacroFromEffects } from '../substrates/macros/index.js';
++import { elicit } from '../substrates/elicit/index.js';
+ import { isNewSinceSeen } from '../substrates/recall/recallCursor.js';
+ import { reportUndoRun } from '../components/undoReport.js';
+ import { listOpenReversals, subscribeReversals } from '../state/ownReversals.js';
++import { getAgentSessionController, subscribeAgentSession } from '../state/agentSessionStore.js';
++import { subscribeProfileSwitch } from '../state/UserStateDocument.js';
++import { DEFAULT_FEED_FILTER, type SelectedRecord } from '../operations/activityFeed.js';
++import { present } from '../display/present.js';
++import { ReceiptController } from '../primitives/receiptController.js';
++import { modalOwnsFocus } from '../primitives/modality.js';
++import { deepActiveElement } from '../utils/keyboardHandler.js';
++
++const DETAILS_TAB = 'record';
++/** One empty list, so a re-render without run records is not a change the feed must answer. */
++const NO_RUN_RECORDS: readonly never[] = [];
+ 
+ export class ActivitySurface extends JfElement {
+   static properties = {
+     apiBase: { type: String, attribute: 'api-base' },
+     undoPreview: { state: true },
++    selectedKey: { state: true },
++    record: { state: true },
++    evicted: { state: true },
++    overlay: { type: Boolean, reflect: true },
++    widthPx: { state: true },
++    chosen: { state: true },
+   } as const;
+ 
+   declare apiBase: string;
+   declare undoPreview: readonly JournalEntry[];
+-  private stopJournal: (() => void) | undefined;
+-  private stopReversals: (() => void) | undefined;
+-  private stopSection: (() => void) | undefined;
++  /** The selected feed record's key; null when no details are open. */
++  declare selectedKey: string | null;
++  /** What the selected key stood for when last loaded. */
++  declare record: SelectedRecord | null;
++  /** No loaded record answers to the selection any more. */
++  declare evicted: boolean;
++  /** Details are a sheet over this window (below 980 px of its width), not a pane beside the feed. */
++  declare overlay: boolean;
++  declare widthPx: number;
++  /** Journal entry ids chosen in details for a macro or an export. */
++  declare chosen: ReadonlySet<number>;
++
++  private stops: Array<() => void> = [];
++  private observer: ResizeObserver | null = null;
++  /** The run whose session-filtered read this Activity asked for last (one read per run). */
++  private askedRun: string | null = null;
+ 
+   constructor() {
+     super();
+     this.apiBase = '';
+     this.undoPreview = [];
++    this.selectedKey = null;
++    this.record = null;
++    this.evicted = false;
++    this.overlay = false;
++    this.widthPx = clampDetailsPaneWidth(readDetailsPaneWidth() ?? DETAILS_PANE_DEFAULT_PX);
++    this.chosen = new Set();
+   }
+ 
+   override connectedCallback(): void {
+     super.connectedCallback();
+-    this.stopJournal = subscribeJournal(() => this.requestUpdate());
+-    this.stopReversals = subscribeReversals(() => this.requestUpdate());
+-    this.stopSection = subscribeActivitySection(() => this.arriveAtSection());
++    this.stops = [
++      subscribeJournal(() => this.requestUpdate()),
++      subscribeReversals(() => this.requestUpdate()),
++      subscribeActivitySection(() => this.arriveAtSection()),
++      subscribeAgentSession(() => this.onAgentSession()),
++      // Activity's records are not a profile's (the journal, the seen cursor and macros are shared):
++      // a switch relabels nothing. What was open — the details, a receipt read, an undo preview, the
++      // records chosen — was drawn before it, so it is closed rather than confirmed after it.
++    ];
++    if (typeof ResizeObserver !== 'undefined') {
++      this.observer = new ResizeObserver(() => this.measure());
++      this.observer.observe(this);
++    }
++    this.measure();
++    this.onAgentSession();
+     this.arriveAtSection();
+   }
+ 
++  override disconnectedCallback(): void {
++    for (const stop of this.stops.splice(0)) stop();
++    this.observer?.disconnect();
++    this.observer = null;
++    super.disconnectedCallback();
++  }
++
++  private ctrl() {
++    return getAgentSessionController(this.apiBase);
++  }
++
++  /** The current run's own read: asked once per run, so a failed read cannot loop on its own notice. */
++  private onAgentSession(): void {
++    const ctrl = this.ctrl();
++    if (ctrl.sessionId && ctrl.sessionId !== this.askedRun) {
++      this.askedRun = ctrl.sessionId;
++      void ctrl.loadHistory();
++    }
++    this.requestUpdate();
++  }
++
++  private measure(): void {
++    const width = this.getBoundingClientRect().width;
++    this.overlay = !detailsPaneIsInline(width > 0 ? width : Number.POSITIVE_INFINITY);
++  }
++
++  private feed(): ActionLedgerView | null {
++    return this.renderRoot.querySelector<ActionLedgerView>('jf-action-ledger');
++  }
++
+   /**
+    * A pointer from elsewhere (the status panel, Ctrl+K) lands on the section it named. The request
+    * is taken only by an Activity that is still on screen once rendered, so a second Activity (another
+-   * pane) or one closing meanwhile cannot consume it without revealing it. The journal's own filters
+-   * are cleared on arrival, so a filter left from earlier cannot hide what the pointer named.
++   * pane) or one closing meanwhile cannot consume it without revealing it. The journal's arrival
++   * shows the feed scoped to what this window recorded, with every other filter cleared, so a filter
++   * left from earlier cannot hide what the pointer named.
+    */
+   private arriveAtSection(): void {
+     if (!this.isConnected || peekActivitySection() === null) return;
+@@ -80,22 +181,150 @@ export class ActivitySurface extends JfElement {
+         runs?.revealBackgroundRuns();
+         return;
+       }
+-      const journal = this.renderRoot.querySelector<HTMLElement & { updateComplete?: Promise<unknown>;
+-        originator?: string; outcome?: string }>('jf-effect-audit-log');
+-      if (journal) { journal.originator = 'all'; journal.outcome = 'all'; }
+-      await journal?.updateComplete;
+-      const panel = journal?.shadowRoot?.querySelector<HTMLElement>('[data-testid="effect-audit-journal"]');
+-      panel?.scrollIntoView?.({ block: 'start' });
+-      panel?.focus();
++      const feed = this.feed();
++      if (!feed) return;
++      feed.filter = { ...DEFAULT_FEED_FILTER, scope: 'local' };
++      await feed.updateComplete;
++      feed.scrollIntoView?.({ block: 'start' });
++      const target = feed.shadowRoot?.querySelector<HTMLElement>('.entry[tabindex="0"]')
++        ?? feed.shadowRoot?.querySelector<HTMLElement>('[data-testid="feed-scope"] button');
++      target?.focus();
+     });
+   }
+-  override disconnectedCallback(): void {
+-    this.stopJournal?.(); this.stopJournal = undefined;
+-    this.stopReversals?.(); this.stopReversals = undefined;
+-    this.stopSection?.(); this.stopSection = undefined;
+-    super.disconnectedCallback();
++
++  // ---------------------------------------------------------------- selection and details
++
++  private onSelect(key: string): void {
++    if (key === this.selectedKey) return;
++    const opening = this.selectedKey === null;
++    this.selectedKey = key;
++    this.evicted = false;
++    if (opening && this.overlay) void this.focusPane();
++  }
++
++  private onRecord(key: string, record: SelectedRecord | null): void {
++    if (key !== this.selectedKey) return;
++    if (record === null) { this.evicted = this.record !== null; return; }
++    this.evicted = false;
++    this.record = record;
++    // The record gained a partner and answers to a new key: the selection follows it.
++    if (record.key !== key) this.selectedKey = record.key;
++  }
++
++  private async focusPane(): Promise<void> {
++    // The record arrives from the feed's own update, which follows this one.
++    await this.updateComplete;
++    await this.feed()?.updateComplete;
++    await this.updateComplete;
++    const pane = this.renderRoot.querySelector<DetailsPane>('jf-details-pane');
++    await pane?.updateComplete;
++    pane?.focusActiveTab();
++  }
++
++  /**
++   * Close the details and put the keyboard back on the record they were for: the feed brings it
++   * back into its windowed list if it scrolled away; if it is no longer shown, the list itself.
++   */
++  closeDetails(): boolean {
++    const key = this.selectedKey;
++    if (key === null) return false;
++    const returnFocus = this.matches(':focus-within') || deepActiveElement() === null;
++    this.selectedKey = null;
++    this.record = null;
++    this.evicted = false;
++    if (returnFocus) {
++      void this.updateComplete.then(async () => {
++        const feed = this.feed();
++        if (!feed || !this.isConnected) return;
++        if (!(await feed.focusRecord(key))) feed.shadowRoot?.querySelector<HTMLElement>('[data-testid="feed-list"], .empty')?.focus();
++      });
++    }
++    return true;
+   }
+ 
++  private readonly onKeydown = (event: KeyboardEvent): void => {
++    if (event.key !== 'Escape' || event.isComposing || event.defaultPrevented || this.selectedKey === null || modalOwnsFocus()) return;
++    event.preventDefault();
++    event.stopPropagation();
++    this.closeDetails();
++  };
++
++  /** A profile switch closes what was open, without confirming anything drawn before it. */
++  private settleOpenWork(): void {
++    this.renderRoot.querySelector<ActivityDetails>('jf-activity-details')?.settle();
++    this.undoPreview = [];
++    this.chosen = new Set();
++    this.selectedKey = null;
++    this.record = null;
++    this.evicted = false;
++  }
++
++  private setWidth(px: number): void {
++    this.widthPx = clampDetailsPaneWidth(px);
++    storeDetailsPaneWidth(this.widthPx);
++  }
++
++  private readonly onGripPointerDown = (event: PointerEvent): void => {
++    if (event.button !== 0) return;
++    event.preventDefault();
++    const startX = event.clientX;
++    const startWidth = this.widthPx;
++    const move = (moved: PointerEvent): void => { this.widthPx = clampDetailsPaneWidth(startWidth - (moved.clientX - startX)); };
++    const end = (): void => {
++      window.removeEventListener('pointermove', move);
++      window.removeEventListener('pointerup', end);
++      window.removeEventListener('pointercancel', end);
++      storeDetailsPaneWidth(this.widthPx);
++    };
++    window.addEventListener('pointermove', move);
++    window.addEventListener('pointerup', end);
++    window.addEventListener('pointercancel', end);
++  };
++
++  private readonly onGripKeydown = (event: KeyboardEvent): void => {
++    if (event.key === 'Home') {
++      event.preventDefault();
++      forgetDetailsPaneWidth();
++      this.widthPx = DETAILS_PANE_DEFAULT_PX;
++    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
++      event.preventDefault();
++      // Right-anchored: LEFT grows the pane, the direction the pointer drags it.
++      this.setWidth(this.widthPx + (event.key === 'ArrowLeft' ? DETAILS_PANE_KEY_STEP_PX : -DETAILS_PANE_KEY_STEP_PX));
++    }
++  };
++
++  // ---------------------------------------------------------------- the journal selection
++
++  private choose(id: number, chosen: boolean): void {
++    const next = new Set(this.chosen);
++    if (chosen) next.add(id); else next.delete(id);
++    this.chosen = next;
++  }
++
++  /** The chosen entries in journal order, whatever order they were chosen in. */
++  private chosenEntries(): JournalEntry[] {
++    return listJournal().filter((entry) => this.chosen.has(entry.id));
++  }
++
++  private async saveChosen(): Promise<void> {
++    const entries = this.chosenEntries();
++    if (!entries.length) return;
++    const macro = await defineMacroFromEffects(entries.map((entry) => entry.effect));
++    if (macro) this.chosen = new Set();
++  }
++
++  /** Tempdoc 613 §6 — the export confirmation is a receipt flashed in its button, not a window toast. */
++  private readonly exportReceipt = new ReceiptController(this);
++
++  private exportChosen(): void {
++    const entries = this.chosenEntries();
++    if (!entries.length) return;
++    applyEffect({ kind: 'copy-to-clipboard', text: exportJournalArchive(entries) });
++    this.exportReceipt.flash(`Exported ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'}`);
++  }
++
++  // ---------------------------------------------------------------- Activity utilities
++
+   /** DE6 — runs exactly the previewed set (nothing that arrived since), once, and says what was not undone. */
+   private confirmUndo(): void {
+     const previewed = this.undoPreview;
+@@ -104,6 +333,18 @@ export class ActivitySurface extends JfElement {
+     reportUndoRun(undoEntries(previewed, (effect) => applyEffect(effect)),
+       (reversed) => `Undid ${reversed} AI action${reversed === 1 ? '' : 's'}`);
+   }
++
++  /** The newest reversible AI action, through the one run that tells an Engine request from a reversal here. */
++  private undoLastAiAction(): void {
++    const target = peekLastUndoableByOriginator('agent');
++    if (!target) {
++      applyEffect({ kind: 'toast', message: 'Nothing to undo', severity: 'info' });
++      return;
++    }
++    reportUndoRun(undoEntries([target], (effect) => applyEffect(effect)),
++      () => `Undid: ${present({ kind: 'effect', effect: target.effect }).label}`);
++  }
++
+   /** DE6 — your own recent actions that can still be reversed in this window, with their reversal. */
+   private renderOwnReversals(): TemplateResult | typeof nothing {
+     const open = listOpenReversals();
+@@ -123,15 +364,86 @@ export class ActivitySurface extends JfElement {
+     });
+   }
+ 
++  /** 543-fwd #19 — paste a previously exported archive and keep it as a reusable macro. */
++  private async importArchive(): Promise<void> {
++    const form = await elicit({
++      title: 'Import journal archive',
++      description: 'Paste a journal archive (JSON) to replay it as a reusable macro.',
++      schema: {
++        type: 'object',
++        properties: {
++          // A pasted archive is long: a multiline field (`x-ui`, read by defaultUiSchemaFor).
++          json: { type: 'string', title: 'Archive JSON', 'x-ui': { multi: true } } as { type: 'string'; title: string },
++          label: { type: 'string', title: 'Macro label' },
++        },
++        required: ['json', 'label'],
++      },
++      initialData: { json: '', label: '' },
++    });
++    if (!form) return;
++    const { json, label } = form as { json?: string; label?: string };
++    const effects = importJournalArchive(json ?? '');
++    const name = label?.trim();
++    if (effects.length === 0 || !name) {
++      applyEffect({ kind: 'toast', message: 'No valid entries in that archive', severity: 'warning' });
++      return;
++    }
++    try {
++      defineMacro({ id: `import.${Date.now()}`, label: name, effects });
++      applyEffect({ kind: 'toast', message: `Imported ${effects.length} action(s) as macro "${name}"`, severity: 'success' });
++    } catch {
++      applyEffect({ kind: 'toast', message: 'Import failed (duplicate id)', severity: 'error' });
++    }
++  }
++
++  private renderAiActions(): TemplateResult | typeof nothing {
++    if (!listJournalByOriginator('agent').some(e => e.pendingOutcome !== 'rejected')) return nothing;
++    const reversible = previewUndoAllByOriginator('agent').length;
++    return html`<div class="agent-actions">
++      ${reversible ? html`<jf-button size="sm" label="Undo last AI action" data-testid="activity-undo-last"
++        .onActivate=${() => this.undoLastAiAction()}>Undo last AI action</jf-button>
++      <jf-button size="sm" label="Undo all AI actions" data-testid="activity-undo-all"
++        .onActivate=${() => { this.undoPreview = previewUndoAllByOriginator('agent');
++          if (!this.undoPreview.length) applyEffect({ kind: 'toast', message: 'Nothing to undo', severity: 'info' }); }}>Undo all AI actions</jf-button>` : nothing}
++      <jf-button size="sm" label="Save as macro" data-testid="activity-save-macro"
++        .onActivate=${() => void this.saveMacro()}>Save as macro</jf-button>
++    </div>`;
++  }
++
++  private renderUndoPreview(): TemplateResult | typeof nothing {
++    if (!this.undoPreview.length) return nothing;
++    const remainder = listJournalByOriginator('agent').filter(e => e.pendingOutcome !== 'rejected'
++      && !this.undoPreview.some(p => p.id === e.id)).length;
++    return html`<section class="undo-preview" aria-label="Confirm undo AI actions" data-testid="activity-undo-confirm">
++      <p>Undo these ${this.undoPreview.length} AI actions?</p>
++      <ul>${this.undoPreview.map(e => html`<li data-testid="activity-undo-row"><jf-effect-line .effect=${e.effect}></jf-effect-line></li>`)}</ul>
++      ${remainder ? html`<p data-testid="activity-irreversible">${remainder} other actions can't be undone and will remain.</p>` : nothing}
++      <jf-button size="sm" variant="danger" label="Undo all" data-testid="activity-undo-confirm-yes" .onActivate=${() => this.confirmUndo()}>Undo all</jf-button>
++      <jf-button size="sm" label="Cancel" data-testid="activity-undo-confirm-cancel" .onActivate=${() => { this.undoPreview = []; }}>Cancel</jf-button>
++    </section>`;
++  }
++
++  // ---------------------------------------------------------------- layout
++
+   // Tempdoc 559 Authority I: the :host / .header / .body region contract is
+   // owned by surfaceLayoutStyles (the one layout authority); only bespoke rules
+   // live here.
+   static styles = [
+     surfaceLayoutStyles,
+     css`
+-    /* One scroller, the surface itself, holds the header and the feed: at 600×400 with 200% text a
+-       fixed header would leave the feed a sliver of the window. */
++    /* The window holds the feed's column and, from 980 px, the details pane beside it. One scroller,
++       the column, holds the header and the feed: at 600×400 with 200% text a fixed header would
++       leave the feed a sliver of the window. */
+     :host {
++      position: relative;
++      flex-direction: row;
++      overflow: hidden;
++    }
++    .main {
++      flex: 1 1 auto;
++      min-inline-size: 0;
++      display: flex;
++      flex-direction: column;
+       overflow-y: auto;
+     }
+     .body {
+@@ -153,56 +465,116 @@ export class ActivitySurface extends JfElement {
+     .section-label:first-child {
+       margin-top: 0;
+     }
+-    .agent-actions { display: flex; flex-wrap: wrap; gap: var(--jf-space-2); margin-block: var(--jf-space-3); }
++    .agent-actions, .utilities { display: flex; flex-wrap: wrap; gap: var(--jf-space-2); margin-block: var(--jf-space-3); }
+     .undo-preview { padding: var(--jf-space-3); border: var(--frame-hairline) solid var(--border-default); }
+     .own-reversals ul { margin: 0; padding: 0; list-style: none; }
+     .own-reversals li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-2); padding-block: var(--jf-space-1); }
++    .side {
++      position: relative;
++      flex: none;
++      inline-size: var(--details-width);
++      max-inline-size: 50%;
++      min-block-size: 0;
++    }
++    .side jf-details-pane { block-size: 100%; }
++    .grip {
++      position: absolute;
++      inset-block: 0;
++      inset-inline-start: calc(-1 * var(--jf-space-2));
++      z-index: var(--z-base);
++      inline-size: var(--jf-space-4);
++      padding: 0;
++      border: 0;
++      background: transparent;
++      cursor: col-resize;
++    }
++    .grip:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); }
++    jf-activity-details { flex: 1 1 auto; min-block-size: 0; overflow-y: auto; }
++    .chosen { display: flex; flex-wrap: wrap; gap: var(--jf-space-2); }
++    .details { display: contents; }
+   `,
+   ];
+ 
++  protected override updated(changed: PropertyValues<this>): void {
++    if (changed.has('widthPx')) this.style.setProperty('--details-width', `${this.widthPx}px`);
++    // Opened while inline, then the window narrowed into a sheet: the keyboard goes to the sheet.
++    if (changed.has('overlay') && this.overlay && this.selectedKey !== null && changed.get('overlay') === false) void this.focusPane();
++  }
++
++  private renderDetails(): TemplateResult | typeof nothing {
++    const record = this.record;
++    if (this.selectedKey === null || record === null) return nothing;
++    const chosen = this.chosen.size;
++    const pane = html`<jf-details-pane ?overlay=${this.overlay} region-label="Activity details" close-label="Close details"
++        data-testid="activity-details-pane"
++        .tabs=${[{ id: DETAILS_TAB, label: record.label }]} .activeTab=${DETAILS_TAB}
++        @details-close=${() => this.closeDetails()}>
++        <jf-activity-details .record=${record} ?evicted=${this.evicted} api-base=${this.apiBase} .journalSelection=${this.chosen}
++          @journal-choose=${(event: CustomEvent<{ id: number; chosen: boolean }>) => this.choose(event.detail.id, event.detail.chosen)}
++          @activity-run-scope=${() => this.scopeToRun()}></jf-activity-details>
++        ${chosen ? html`<div slot="actions" class="chosen" data-testid="activity-details-chosen">
++          <jf-button size="sm" data-testid="activity-save-chosen" label=${`Save chosen (${chosen}) as macro`}
++            .onActivate=${() => void this.saveChosen()}>Save chosen (${chosen}) as macro</jf-button>
++          <jf-button size="sm" data-testid="activity-export-chosen"
++            .label=${this.exportReceipt.active ? `✓ ${this.exportReceipt.active.message}` : `Export chosen (${chosen})`}
++            .onActivate=${() => this.exportChosen()}>${this.exportReceipt.active ? `✓ ${this.exportReceipt.active.message}` : `Export chosen (${chosen})`}</jf-button>
++          <jf-button size="sm" variant="ghost" data-testid="activity-clear-chosen" label="Clear choice"
++            .onActivate=${() => { this.chosen = new Set(); }}>Clear choice</jf-button>
++        </div>` : nothing}
++      </jf-details-pane>`;
++    return this.overlay ? pane : html`<div class="side">
++      <button type="button" class="grip" data-testid="details-pane-grip"
++        aria-label="Resize details — arrow keys resize, Home returns to automatic"
++        title="Resize details — arrow keys resize, Home returns to automatic"
++        @pointerdown=${this.onGripPointerDown} @keydown=${this.onGripKeydown}></button>${pane}</div>`;
++  }
++
++  private scopeToRun(): void {
++    const feed = this.feed();
++    const run = this.ctrl().sessionId;
++    if (feed && run) feed.filter = { ...feed.filter, scope: 'run', runId: run };
++  }
++
+   override render(): TemplateResult {
++    const ctrl = this.ctrl();
++    const run = ctrl.sessionId;
++    const sheet = this.overlay && this.selectedKey !== null && this.record !== null;
+     return html`
+-      <div class="header">
+-        <!-- Tempdoc 571 §11 / 578: shell topbar owns the page <h1>; <h2> here so this TRUST surface
+-             is embeddable as a host member (System) without emitting a second <h1>. -->
+-        <h2>Activity</h2>
+-        <div class="sub">
+-          What happened, who did it and how it ended — your actions, the
+-          assistant's, indexing and the engine's own work, in one list
+-          updated live. For raw diagnostic output, see Logs.
++      <div class="main" ?inert=${sheet} @keydown=${this.onKeydown}>
++        <div class="header">
++          <!-- Tempdoc 571 §11 / 578: shell topbar owns the page <h1>; <h2> here so this TRUST surface
++               is embeddable as a host member (System) without emitting a second <h1>. -->
++          <h2>Activity</h2>
++          <div class="sub">
++            What happened, who did it and how it ended — your actions, the
++            assistant's, indexing and the engine's own work, in one list
++            updated live. Choose a record for its details. For raw diagnostic output, see Logs.
++          </div>
++        </div>
++        <div class="body">
++          ${this.renderOwnReversals()}
++          ${this.renderAiActions()}
++          ${this.renderUndoPreview()}
++          <div class="utilities">
++            <jf-button size="sm" variant="ghost" label="Import journal archive" data-testid="activity-import-archive"
++              title="Paste a journal archive to keep it as a reusable macro"
++              .onActivate=${() => void this.importArchive()}>Import journal archive</jf-button>
++          </div>
++          <jf-run-activity api-base=${this.apiBase} data-testid="activity-run-activity"></jf-run-activity>
++          <!-- The one feed: ledger, committed operation history and this window's journal, joined. -->
++          <div class="section-label">Activity</div>
++          <jf-action-ledger
++            api-base=${this.apiBase}
++            data-testid="activity-surface-action-ledger"
++            .selectedKey=${this.selectedKey}
++            .currentRun=${run}
++            .runRecords=${run && ctrl.historySessionId === run ? ctrl.historyRecords : NO_RUN_RECORDS}
++            @feed-select=${(event: CustomEvent<{ key: string }>) => this.onSelect(event.detail.key)}
++            @feed-record=${(event: CustomEvent<{ key: string; record: SelectedRecord | null }>) => this.onRecord(event.detail.key, event.detail.record)}
++          ></jf-action-ledger>
+         </div>
+       </div>
+-      <div class="body">
+-        ${this.renderOwnReversals()}
+-        ${listJournalByOriginator('agent').some(e => e.pendingOutcome !== 'rejected') ? html`
+-          <div class="agent-actions">
+-            ${previewUndoAllByOriginator('agent').length ? html`<jf-button size="sm" label="Undo all AI actions" data-testid="activity-undo-all"
+-              .onActivate=${() => { this.undoPreview = previewUndoAllByOriginator('agent');
+-                if (!this.undoPreview.length) applyEffect({ kind: 'toast', message: 'Nothing to undo', severity: 'info' }); }}>Undo all AI actions</jf-button>` : nothing}
+-            <jf-button size="sm" label="Save as macro" data-testid="activity-save-macro"
+-              .onActivate=${() => void this.saveMacro()}>Save as macro</jf-button>
+-          </div>` : nothing}
+-        ${this.undoPreview.length ? html`<section class="undo-preview" aria-label="Confirm undo AI actions" data-testid="activity-undo-confirm">
+-          <p>Undo these ${this.undoPreview.length} AI actions?</p>
+-          <ul>${this.undoPreview.map(e => html`<li data-testid="activity-undo-row"><jf-effect-line .effect=${e.effect}></jf-effect-line></li>`)}</ul>
+-          ${listJournalByOriginator('agent').filter(e => e.pendingOutcome !== 'rejected'
+-            && !this.undoPreview.some(p => p.id === e.id)).length ? html`<p data-testid="activity-irreversible">${listJournalByOriginator('agent').filter(e => e.pendingOutcome !== 'rejected'
+-              && !this.undoPreview.some(p => p.id === e.id)).length} other actions can't be undone and will remain.</p>` : nothing}
+-          <jf-button size="sm" variant="danger" label="Undo all" data-testid="activity-undo-confirm-yes" .onActivate=${() => this.confirmUndo()}>Undo all</jf-button>
+-          <jf-button size="sm" label="Cancel" data-testid="activity-undo-confirm-cancel" .onActivate=${() => { this.undoPreview = []; }}>Cancel</jf-button>
+-        </section>` : nothing}
+-        <jf-run-activity api-base=${this.apiBase} data-testid="activity-run-activity"></jf-run-activity>
+-        <!-- The one feed: ledger, committed operation history and this window's journal, joined. -->
+-        <div class="section-label">Activity</div>
+-        <jf-action-ledger
+-          api-base=${this.apiBase}
+-          data-testid="activity-surface-action-ledger"
+-        ></jf-action-ledger>
+-
+-        <!-- §25.δ2 — the local effect journal with its per-entry actions, selection and archive. -->
+-        <div class="section-label">Effects recorded in this browser</div>
+-        <jf-effect-audit-log data-testid="activity-effect-journal"></jf-effect-audit-log>
+-      </div>
++      <div class="details" @keydown=${this.onKeydown}>${this.renderDetails()}</div>
+     `;
+   }
+ }

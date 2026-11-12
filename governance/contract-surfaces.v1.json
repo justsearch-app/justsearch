@@ -197,6 +197,7 @@
       "consumers": [
         "modules/ui-web/src/shell-v0/views/LibrarySurface.ts",
         "modules/ui-web/src/shell-v0/components/OperationOutcomeDetail.ts",
+        "modules/ui-web/src/shell-v0/operations/operationReceipt.ts",
         "modules/ui-web/src/shell-v0/state/frameStatus.ts",
         "modules/ui-web/src/shell-v0/controllers/frameStatusController.ts"
       ]

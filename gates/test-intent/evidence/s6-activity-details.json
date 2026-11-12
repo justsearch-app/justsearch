@@ -1,0 +1,487 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-11T23:28:26.509Z",
+  "revision": "d5d95eb7d62c72aa211688b02c4d5fcc56a89c2c",
+  "tree": "75da9fbb07d25396e5b274cf77d4f8995e1669a0",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-12246-1794439699357.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3123
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a click selects the record and opens the shared details pane; rows hold no controls of their own",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A17/A19 — the feed is a list box; a record opens its details in the shared pane a click selects the record and opens the shared details pane; rows hold no controls of their own",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#Enter and Space on a focused record select it; Escape closes the details and returns focus to that record",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A17/A19 — the feed is a list box; a record opens its details in the shared pane Enter and Space on a focused record select it; Escape closes the details and returns focus to that record",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#an operation shows its committed duration and its source, and which records it joins",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "14:10Z decision — every record says how long it took and where it came from an operation shows its committed duration and its source, and which records it joins",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#the history arrives first: a receipt still reading running is shown as behind, not as the outcome",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A7 / amendment 3 — a selected running operation converges without regressing the history arrives first: a receipt still reading running is shown as behind, not as the outcome",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a receipt that is unknown keeps the record and says what it means",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A8 — a missing or unreadable receipt is never a failed execution a receipt that is unknown keeps the record and says what it means",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a receipt that is expired keeps the record and says what it means",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A8 — a missing or unreadable receipt is never a failed execution a receipt that is expired keeps the record and says what it means",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a refused read says the receipt could not be read, and Try again reads it",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A8 — a missing or unreadable receipt is never a failed execution a refused read says the receipt could not be read, and Try again reads it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#Ask the engine to undo is a request until the Engine answers; a refusal is said as one, and a second click asks nothing",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A12 / A14 — the journal record's actions live in its details Ask the engine to undo is a request until the Engine answers; a refusal is said as one, and a second click asks nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#Restore to this point previews a fixed set, says what will remain, Cancel changes nothing, and confirming runs once",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A12 / A14 — the journal record's actions live in its details Restore to this point previews a fixed set, says what will remain, Cancel changes nothing, and confirming runs once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#Undo this AI turn and the causation trace are in the turn member's details",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A12 / A14 — the journal record's actions live in its details Undo this AI turn and the causation trace are in the turn member's details",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#records chosen in details save as a macro and export in journal order, whatever order they were chosen in",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A12 / A14 — the journal record's actions live in its details records chosen in details save as a macro and export in journal order, whatever order they were chosen in",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#Import journal archive stays an Activity utility and keeps a pasted archive as a macro",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A12 / A14 — the journal record's actions live in its details Import journal archive stays an Activity utility and keeps a pasted archive as a macro",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#Undo last AI action stays an Activity utility and names what it undid",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A12 / A14 — the journal record's actions live in its details Undo last AI action stays an Activity utility and names what it undid",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#an execution association recorded after the details opened brings its Undo there at once",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A12 / A14 — the journal record's actions live in its details an execution association recorded after the details opened brings its Undo there at once",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a backend copy of another window's effect has no proposal, undo, restore or choice",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "amendment 10 — local capabilities only where their source exists a backend copy of another window's effect has no proposal, undo, restore or choice",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#two Activities keep their own selections",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "amendment 10 — local capabilities only where their source exists two Activities keep their own selections",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#in a browser a resolved file is named, and Open file / Show in folder are said to be desktop-only",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "amendment 14 — related files only where the runtime can open them in a browser a resolved file is named, and Open file / Show in folder are said to be desktop-only",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#in the desktop app a resolved file offers Open file and Show in folder; an unresolved one offers neither until it resolves",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "amendment 14 — related files only where the runtime can open them in the desktop app a resolved file offers Open file and Show in folder; an unresolved one offers neither until it resolves",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a burst counts its failures and its details list every member",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A10 — a burst and a scan list their members in details a burst counts its failures and its details list every member",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a pointer to the journal resets the feed's filters to this window's records and puts the keyboard there",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A15 / amendment 13 — the journal arrival lands on this window's records, whatever filter was left a pointer to the journal resets the feed's filters to this window's records and puts the keyboard there",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#an Activity closing before it renders leaves the request to another, which reveals it",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A15 / amendment 13 — the journal arrival lands on this window's records, whatever filter was left an Activity closing before it renders leaves the request to another, which reveals it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#stays readable with its last-known content, says so, and offers no actions",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:317b63cc5528a68b297c8a1052e56d2352a8916cdf76c52dbcfa02e9393c4ebb",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "selection lifetime — a selected record no source holds any more stays readable with its last-known content, says so, and offers no actions",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d3a21166b77573a40a3b745893d5f255e5bf2cba",
+    "revision": "d3a21166b77573a40a3b745893d5f255e5bf2cba",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-12246-1794439703794.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2486,
+        "output": "JSON report written to /home/elias/.cache/am/4isn2edh/tmp/test-intent-vitest-12246-1794439703794.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a click selects the record and opens the shared details pane; rows hold no controls of their own",
+        "classification": "assertion",
+        "detail": "A17/A19 — the feed is a list box; a record opens its details in the shared pane a click selects the record and opens the shared details pane; rows hold no controls of their own:  AssertionError: expected 'list' to be 'listbox' // Object.is equality\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:235:91\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#Enter and Space on a focused record select it; Escape closes the details and returns focus to that record",
+        "classification": "assertion",
+        "detail": "A17/A19 — the feed is a list box; a record opens its details in the shared pane Enter and Space on a focused record select it; Escape closes the details and returns focus to that record:  AssertionError: expected null to be 'true' // Object.is equality\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:258:50\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-web/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#an operation shows its committed duration and its source, and which records it joins",
+        "classification": "assertion",
+        "detail": "14:10Z decision — every record says how long it took and where it came from an operation shows its committed duration and its source, and which records it joins:  AssertionError: expected '' to be '1m 30s' // Object.is equality\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:279:68\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-web/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#the history arrives first: a receipt still reading running is shown as behind, not as the outcome",
+        "classification": "assertion",
+        "detail": "A7 / amendment 3 — a selected running operation converges without regressing the history arrives first: a receipt still reading running is shown as behind, not as the outcome:  AssertionError: a receipt read for 019a0000-0000-7000-8000-000000000001 is waiting: expected 0 to be greater than 0\n    at receipt (/home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:128:63)\n    at /home/elias/.cache/am/4isn"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a receipt that is unknown keeps the record and says what it means",
+        "classification": "assertion",
+        "detail": "A8 — a missing or unreadable receipt is never a failed execution a receipt that is unknown keeps the record and says what it means:  AssertionError: a receipt read for 019a0000-0000-7000-8000-000000000001 is waiting: expected 0 to be greater than 0\n    at receipt (/home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:128:63)\n    at /home/elias/.cache/am/4isn"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a receipt that is expired keeps the record and says what it means",
+        "classification": "assertion",
+        "detail": "A8 — a missing or unreadable receipt is never a failed execution a receipt that is expired keeps the record and says what it means:  AssertionError: a receipt read for 019a0000-0000-7000-8000-000000000001 is waiting: expected 0 to be greater than 0\n    at receipt (/home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:128:63)\n    at /home/elias/.cache/am/4isn"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a refused read says the receipt could not be read, and Try again reads it",
+        "classification": "assertion",
+        "detail": "A8 — a missing or unreadable receipt is never a failed execution a refused read says the receipt could not be read, and Try again reads it:  AssertionError: a receipt read for 019a0000-0000-7000-8000-000000000001 is waiting: expected 0 to be greater than 0\n    at receipt (/home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:128:63)\n    at /home/elias/.cache/am/4isn"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#Ask the engine to undo is a request until the Engine answers; a refusal is said as one, and a second click asks nothing",
+        "classification": "assertion",
+        "detail": "A12 / A14 — the journal record's actions live in its details Ask the engine to undo is a request until the Engine answers; a refusal is said as one, and a second click asks nothing:  AssertionError: a receipt read for 019a0000-0000-7000-8000-000000000001 is waiting: expected 0 to be greater than 0\n    at receipt (/home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:128:63)\n    at undoableRecord (/home/elia"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#Restore to this point previews a fixed set, says what will remain, Cancel changes nothing, and confirming runs once",
+        "classification": "assertion",
+        "detail": "A12 / A14 — the journal record's actions live in its details Restore to this point previews a fixed set, says what will remain, Cancel changes nothing, and confirming runs once:  AssertionError: the control is there: expected null not to be null\n    at activate (/home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:220:46)\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-we"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#Undo this AI turn and the causation trace are in the turn member's details",
+        "classification": "assertion",
+        "detail": "A12 / A14 — the journal record's actions live in its details Undo this AI turn and the causation trace are in the turn member's details:  AssertionError: the step has details: expected null not to be null\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:459:53\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-we"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#records chosen in details save as a macro and export in journal order, whatever order they were chosen in",
+        "classification": "assertion",
+        "detail": "A12 / A14 — the journal record's actions live in its details records chosen in details save as a macro and export in journal order, whatever order they were chosen in:  AssertionError: the record's details offer to include it: expected null not to be null\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:480:68\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-d"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#Import journal archive stays an Activity utility and keeps a pasted archive as a macro",
+        "classification": "assertion",
+        "detail": "A12 / A14 — the journal record's actions live in its details Import journal archive stays an Activity utility and keeps a pasted archive as a macro:  AssertionError: the control is there: expected null not to be null\n    at activate (/home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:220:46)\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-we"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#Undo last AI action stays an Activity utility and names what it undid",
+        "classification": "assertion",
+        "detail": "A12 / A14 — the journal record's actions live in its details Undo last AI action stays an Activity utility and names what it undid:  AssertionError: the control is there: expected null not to be null\n    at activate (/home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:220:46)\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-we"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#an execution association recorded after the details opened brings its Undo there at once",
+        "classification": "assertion",
+        "detail": "A12 / A14 — the journal record's actions live in its details an execution association recorded after the details opened brings its Undo there at once:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:535:72\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-web/node_modules/@vitest"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a backend copy of another window's effect has no proposal, undo, restore or choice",
+        "classification": "assertion",
+        "detail": "amendment 10 — local capabilities only where their source exists a backend copy of another window's effect has no proposal, undo, restore or choice:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:548:60\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-web/node_modules/@vitest"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#two Activities keep their own selections",
+        "classification": "assertion",
+        "detail": "amendment 10 — local capabilities only where their source exists two Activities keep their own selections:  AssertionError: expected null to be 'true' // Object.is equality\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:560:72\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-web/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#in a browser a resolved file is named, and Open file / Show in folder are said to be desktop-only",
+        "classification": "assertion",
+        "detail": "amendment 14 — related files only where the runtime can open them in a browser a resolved file is named, and Open file / Show in folder are said to be desktop-only:  AssertionError: expected '' to be '/home/me/docs/report.pdf' // Object.is equality\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:580:64\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-detai"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#in the desktop app a resolved file offers Open file and Show in folder; an unresolved one offers neither until it resolves",
+        "classification": "assertion",
+        "detail": "amendment 14 — related files only where the runtime can open them in the desktop app a resolved file offers Open file and Show in folder; an unresolved one offers neither until it resolves:  AssertionError: expected '' to be 'Not resolved yet' // Object.is equality\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:598:66\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a burst counts its failures and its details list every member",
+        "classification": "assertion",
+        "detail": "A10 — a burst and a scan list their members in details a burst counts its failures and its details list every member:  AssertionError: the feed shows : expected undefined to be defined\n    at select (/home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:214:43)\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/s"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a pointer to the journal resets the feed's filters to this window's records and puts the keyboard there",
+        "classification": "assertion",
+        "detail": "A15 / amendment 13 — the journal arrival lands on this window's records, whatever filter was left a pointer to the journal resets the feed's filters to this window's records and puts the keyboard there:  AssertionError: expected undefined to be 'local' // Object.is equality\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:672:63\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modul"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#an Activity closing before it renders leaves the request to another, which reveals it",
+        "classification": "assertion",
+        "detail": "A15 / amendment 13 — the journal arrival lands on this window's records, whatever filter was left an Activity closing before it renders leaves the request to another, which reveals it:  AssertionError: expected undefined to be 'local' // Object.is equality\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:686:68\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#stays readable with its last-known content, says so, and offers no actions",
+        "classification": "assertion",
+        "detail": "selection lifetime — a selected record no source holds any more stays readable with its last-known content, says so, and offers no actions:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/4isn2edh/tmp/test-intent-before-gv0Agk/modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts:748:65\n    at file:///home/elias/dev/justsearch/.claude/worktrees/s6-activity-details/modules/ui-web/node_modules/@vitest"
+      }
+    ]
+  },
+  "digest": "sha256:a6c4f34b4167b0e9bc0b0d5b3484bc5a656e899b604ffce58ff9c3424d75c6fb"
+}

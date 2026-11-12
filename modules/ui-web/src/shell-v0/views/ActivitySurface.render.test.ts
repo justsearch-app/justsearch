@@ -114,21 +114,25 @@ describe('ActivitySurface (jf-activity-surface) — api-base forwarding (727 F-4
 });
 
 describe('Activity holds what the frame drawers held (DP3)', () => {
-  it('shows background runs, this run and the effect journal, with the journal’s undo controls', async () => {
+  const FEED_SCOPE = '[data-testid="feed-scope"] button';
+
+  it('shows background runs and the one feed; the journal and This run are scopes of the feed, not lists of their own', async () => {
     const el = document.createElement('jf-activity-surface') as ActivitySurface;
     document.body.append(el);
     await el.updateComplete;
     expect(el.shadowRoot!.querySelector('jf-run-activity')).not.toBeNull();
-    const journal = el.shadowRoot!.querySelector('jf-effect-audit-log') as HTMLElement & { updateComplete: Promise<unknown> };
-    await journal.updateComplete;
-    expect(journal.shadowRoot!.querySelector('[data-testid="effect-audit-journal"]')).not.toBeNull();
-    expect(journal.shadowRoot!.querySelector('dialog')).toBeNull();
+    expect(el.shadowRoot!.querySelector('jf-action-ledger')).not.toBeNull();
+    expect(el.shadowRoot!.querySelector('jf-effect-audit-log')).toBeNull();
+    const runs = el.shadowRoot!.querySelector('jf-run-activity') as HTMLElement & { updateComplete: Promise<unknown> };
+    await runs.updateComplete;
+    expect(runs.shadowRoot!.querySelector('[data-testid="activity-this-run"]')).toBeNull();
+    expect(el.shadowRoot!.querySelector('dialog')).toBeNull();
     el.remove();
   });
 
   it.each([
     ['background-runs', 'jf-run-activity', '[data-testid="activity-background-runs"]'],
-    ['effect-journal', 'jf-effect-audit-log', '[data-testid="effect-audit-journal"]'],
+    ['effect-journal', 'jf-action-ledger', FEED_SCOPE],
   ] as const)('a pointer to %s lands on that section, whether Activity is up yet or not', async (section, owner, selector) => {
     requestActivitySection(section);
     const el = document.createElement('jf-activity-surface') as ActivitySurface;
@@ -137,11 +141,14 @@ describe('Activity holds what the frame drawers held (DP3)', () => {
     const child = el.shadowRoot!.querySelector(owner) as HTMLElement & { updateComplete: Promise<unknown> };
     await child.updateComplete;
     await new Promise(resolve => setTimeout(resolve, 0));
+    await child.updateComplete;
+    expect(child.shadowRoot!.querySelector(selector), 'the section the pointer names is there').not.toBeNull();
     expect(child.shadowRoot!.activeElement).toBe(child.shadowRoot!.querySelector(selector));
     expect(takeActivitySection()).toBeNull();
     (child.shadowRoot!.activeElement as HTMLElement).blur();
     requestActivitySection(section);
     await new Promise(resolve => setTimeout(resolve, 0));
+    await child.updateComplete;
     expect(child.shadowRoot!.activeElement).toBe(child.shadowRoot!.querySelector(selector));
     el.remove();
   });
@@ -154,26 +161,27 @@ describe('Activity holds what the frame drawers held (DP3)', () => {
     await staying.updateComplete;
     requestActivitySection('effect-journal');
     leaving.remove();
-    const journal = staying.shadowRoot!.querySelector('jf-effect-audit-log') as HTMLElement & { updateComplete: Promise<unknown> };
-    await journal.updateComplete;
+    const feed = staying.shadowRoot!.querySelector('jf-action-ledger') as HTMLElement & { updateComplete: Promise<unknown> };
+    await feed.updateComplete;
     await new Promise(resolve => setTimeout(resolve, 0));
-    expect(journal.shadowRoot!.activeElement).toBe(journal.shadowRoot!.querySelector('[data-testid="effect-audit-journal"]'));
+    await feed.updateComplete;
+    expect(feed.shadowRoot!.querySelector(FEED_SCOPE), 'the feed is scoped to this window').not.toBeNull();
+    expect(feed.shadowRoot!.activeElement).toBe(feed.shadowRoot!.querySelector(FEED_SCOPE));
     expect(takeActivitySection()).toBeNull();
     staying.remove();
   });
 
-  it('arriving at the journal clears a journal filter that would hide what the pointer named', async () => {
+  it('arriving at the journal clears a filter that would hide what the pointer named', async () => {
     const el = document.createElement('jf-activity-surface') as ActivitySurface;
     document.body.append(el);
     await el.updateComplete;
-    const journal = el.shadowRoot!.querySelector('jf-effect-audit-log') as HTMLElement & { updateComplete: Promise<unknown>;
-      originator: string; outcome: string };
-    journal.originator = 'system';
-    journal.outcome = 'rejected';
+    const feed = el.shadowRoot!.querySelector('jf-action-ledger') as HTMLElement & { updateComplete: Promise<unknown>;
+      filter: Record<string, unknown> };
+    feed.filter = { ...feed.filter, quick: 'problems', originators: ['system'], proposals: ['rejected'], date: 'today' };
     requestActivitySection('effect-journal');
     await new Promise(resolve => setTimeout(resolve, 0));
-    await journal.updateComplete;
-    expect([journal.originator, journal.outcome]).toEqual(['all', 'all']);
+    await feed.updateComplete;
+    expect(feed.filter).toEqual({ quick: 'all', originators: [], outcomes: [], proposals: [], routine: 'auto', date: 'all', scope: 'local' });
     el.remove();
   });
 });

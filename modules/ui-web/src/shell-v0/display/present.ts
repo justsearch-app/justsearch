@@ -157,6 +157,11 @@ export function present(ref: EntityRef): Presented {
       if (eff.kind === 'navigate') {
         return { label: brand(`Navigate to ${surfaceLabel(routeToSurfaceId(eff.to)) || eff.to}`) };
       }
+      // Likewise an operation is named by its label (present's `operation` kind), not its catalog id.
+      if (eff.kind === 'invoke-operation' || eff.kind === 'undo-operation') {
+        const operation = present({ kind: 'operation', id: eff.operationId }).label;
+        return { label: brand(`${eff.kind === 'invoke-operation' ? 'Run' : 'Undo'} ${operation}`) };
+      }
       return { label: brand(describeEffect(eff)) };
     }
     case 'resource':

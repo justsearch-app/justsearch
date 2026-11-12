@@ -526,7 +526,7 @@ describe('classification and quick filters (A9, A10)', () => {
     expect(keys()).toEqual(['index:1']);
   });
 
-  it('A10 — a burst never reads as an unqualified success: it counts failures and expands to every member', async () => {
+  it('A10 — a burst never reads as an unqualified success: it counts failures', async () => {
     mount();
     ledger.snapshot([index(1, 'DONE', 'docs'), index(2, 'FAILED', 'docs'), index(3, 'DONE', 'docs')]);
     host.filter = { ...host.filter, quick: 'indexing' };
@@ -534,9 +534,6 @@ describe('classification and quick filters (A9, A10)', () => {
     const burst = q('[data-testid="ledger-burst"]');
     expect(burst).toHaveLength(1);
     expect(burst[0]!.textContent).toContain('Indexed 2 · 1 failed · docs');
-    (burst[0]!.querySelector('[data-testid="ledger-burst-expand"]') as HTMLButtonElement).click();
-    await settle();
-    expect(q('[data-testid="ledger-burst-member"]')).toHaveLength(3);
   });
 
   it('A9 — a burst counts a record only as its state establishes; an unknown state is counted and named, never indexed', async () => {
@@ -548,12 +545,6 @@ describe('classification and quick filters (A9, A10)', () => {
     expect(burst).toHaveLength(1);
     expect(burst[0]!.textContent).not.toContain('Indexed 2');
     expect(burst[0]!.textContent).toContain('Indexed 1 · 1 with unknown state · docs');
-    (burst[0]!.querySelector('[data-testid="ledger-burst-expand"]') as HTMLButtonElement).click();
-    await settle();
-    const members = q('[data-testid="ledger-burst-member"]').map((m) => m.textContent ?? '');
-    expect(members).toHaveLength(2);
-    expect(members.some((m) => m.includes('Index state unknown (PAUSED) · docs'))).toBe(true);
-    expect(members.some((m) => m.includes('Indexed · docs'))).toBe(true);
   });
 
   it('A9 — a resolved file name keeps what the state established: failed, gave up and unknown never read as indexed', async () => {

@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-11T22:27:06.422Z",
+  "revision": "809fa5e595546066e2d60331223fc17ae3b8270b",
+  "tree": "99c21709bacb8e6ecbbcef6678b6d030acdca4ed",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.group-details.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-472845-1794436017379.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3254
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#members that record neither: the burst says both are not recorded, as an ordinary record does",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0c24311b17eb37a0eae61ecee2b752a71f5789d25038b807ec93bde4554e0cb9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "14:10Z decision — a burst says how long it took and where it came from members that record neither: the burst says both are not recorded, as an ordinary record does",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#members that record both: from the first start to the last end, and the source they share",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0c24311b17eb37a0eae61ecee2b752a71f5789d25038b807ec93bde4554e0cb9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "14:10Z decision — a burst says how long it took and where it came from members that record both: from the first start to the last end, and the source they share",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#members from different sources, one with a duration not recorded: each source named as the members are listed, the duration not recorded",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0c24311b17eb37a0eae61ecee2b752a71f5789d25038b807ec93bde4554e0cb9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "14:10Z decision — a burst says how long it took and where it came from members from different sources, one with a duration not recorded: each source named as the members are listed, the duration not recorded",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "fedc486273",
+    "revision": "fedc486273a61e3269dff3fac90dfd56a4f87788",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.group-details.test.ts\" --reporter=json --outputFile=\"/tmp/test-intent-vitest-472845-1794436023718.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2366,
+        "output": "JSON report written to /tmp/test-intent-vitest-472845-1794436023718.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#members that record neither: the burst says both are not recorded, as an ordinary record does",
+        "classification": "assertion",
+        "detail": "14:10Z decision — a burst says how long it took and where it came from members that record neither: the burst says both are not recorded, as an ordinary record does:  AssertionError: expected '' to be 'Not recorded' // Object.is equality\n    at /tmp/test-intent-before-yG8EJ2/modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts:296:51\n    at file:///tmp/test-intent-before-yG8EJ2/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#members that record both: from the first start to the last end, and the source they share",
+        "classification": "assertion",
+        "detail": "14:10Z decision — a burst says how long it took and where it came from members that record both: from the first start to the last end, and the source they share:  AssertionError: expected '' to be '14s' // Object.is equality\n    at /tmp/test-intent-before-yG8EJ2/modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts:305:51\n    at file:///tmp/test-intent-before-yG8EJ2/modules/ui-web/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts#members from different sources, one with a duration not recorded: each source named as the members are listed, the duration not recorded",
+        "classification": "assertion",
+        "detail": "14:10Z decision — a burst says how long it took and where it came from members from different sources, one with a duration not recorded: each source named as the members are listed, the duration not recorded:  AssertionError: expected '' to be 'Not recorded' // Object.is equality\n    at /tmp/test-intent-before-yG8EJ2/modules/ui-web/src/shell-v0/views/ActivitySurface.group-details.test.ts:313:51\n    at file:///tmp/test-intent-before-yG8EJ2/modules/ui-web/node_modules/@vitest/runner/dist/chunk-art"
+      }
+    ]
+  },
+  "digest": "sha256:837d47f12c6c0ef2cadb7f9e00d53fa3b0ddb2f8d92a74d36519bff9e3639e4f"
+}
