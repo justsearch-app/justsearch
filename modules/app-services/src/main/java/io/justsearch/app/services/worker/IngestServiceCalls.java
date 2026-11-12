@@ -55,6 +55,20 @@ public interface IngestServiceCalls {
     throw new UnsupportedOperationException("Indexed source enumeration is unavailable");
   }
 
+  default long scanIndexedSourcesWithOrigin(java.util.function.Consumer<
+      io.justsearch.app.api.IndexingService.IndexedSourceOwner> consumer) {
+    throw new UnsupportedOperationException("Indexed origin enumeration unavailable");
+  }
+
+  default java.util.Optional<io.justsearch.app.api.indexing.SourceOrigin> findSourceOrigin(String id) {
+    throw new UnsupportedOperationException("Source origin lookup unavailable");
+  }
+
+  default io.justsearch.app.api.IndexingService.DeletionOutcome deleteExcludedImportMember(
+      String path, String expectedOriginId) {
+    throw new UnsupportedOperationException("Conditional exclusion deletion unavailable");
+  }
+
   default long scanIndexedSourcesWithCollection(
       java.util.function.Consumer<io.justsearch.app.api.IndexingService.IndexedSource> consumer) {
     throw new UnsupportedOperationException("Indexed collection enumeration is unavailable");

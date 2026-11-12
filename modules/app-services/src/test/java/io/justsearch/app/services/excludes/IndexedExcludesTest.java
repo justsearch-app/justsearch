@@ -27,8 +27,9 @@ final class IndexedExcludesTest {
       String selected = directory.resolve("missing.log").toString(), neighbour = directory.resolve("keep.txt").toString();
       AtomicBoolean reject = new AtomicBoolean();
       IndexingService indexing = mock(IndexingService.class, call -> {
-        if (call.getMethod().getName().equals("forEachIndexedSource")) {
-          java.util.function.Consumer<String> consumer = call.getArgument(0);
+        if ((call.getMethod().getName().equals("forEachIndexedSource")
+            || call.getMethod().getName().equals("forEachIndexedSourceWithOrigin"))) {
+          java.util.function.Consumer<String> consumer = indexedConsumer(call, null);
           List.of(selected, selected, neighbour).forEach(consumer);
           return 0L;
         }
@@ -59,9 +60,10 @@ final class IndexedExcludesTest {
       var context = TestEngineContexts.durableInternal();
       AtomicBoolean fail = new AtomicBoolean(true);
       IndexingService indexing = mock(IndexingService.class, call -> {
-        if (call.getMethod().getName().equals("forEachIndexedSource")) {
+        if ((call.getMethod().getName().equals("forEachIndexedSource")
+            || call.getMethod().getName().equals("forEachIndexedSourceWithOrigin"))) {
           if (fail.get()) throw new IllegalStateException("injected enumeration failure");
-          java.util.function.Consumer<String> consumer = call.getArgument(0);
+          java.util.function.Consumer<String> consumer = indexedConsumer(call, null);
           consumer.accept(directory.resolve("one.log").toString());
           consumer.accept(directory.resolve("two.log").toString());
           return 0L;
@@ -103,8 +105,9 @@ final class IndexedExcludesTest {
       IndexingService indexing = mock(IndexingService.class, call -> {
         if (call.getMethod().getName().equals("getWatchedRoots"))
           return List.of(new IndexingService.WatchedRoot("docs", watched));
-        if (call.getMethod().getName().equals("forEachIndexedSource")) {
-          java.util.function.Consumer<String> consumer = call.getArgument(0);
+        if ((call.getMethod().getName().equals("forEachIndexedSource")
+            || call.getMethod().getName().equals("forEachIndexedSourceWithOrigin"))) {
+          java.util.function.Consumer<String> consumer = indexedConsumer(call, null);
           List.of(watchedFile, adHocFile, neighbour).forEach(path -> consumer.accept(path.toString()));
           return 0L;
         }
@@ -127,8 +130,9 @@ final class IndexedExcludesTest {
     try {
       var context = TestEngineContexts.durableInternal();
       IndexingService indexing = mock(IndexingService.class, call -> {
-        if (call.getMethod().getName().equals("forEachIndexedSource")) {
-          java.util.function.Consumer<String> consumer = call.getArgument(0);
+        if ((call.getMethod().getName().equals("forEachIndexedSource")
+            || call.getMethod().getName().equals("forEachIndexedSourceWithOrigin"))) {
+          java.util.function.Consumer<String> consumer = indexedConsumer(call, null);
           consumer.accept(directory.resolve("known.log").toString()); return 1L;
         }
         return org.mockito.Answers.RETURNS_DEFAULTS.answer(call);
@@ -137,6 +141,67 @@ final class IndexedExcludesTest {
       assertEquals(1, preview.matchedFiles()); assertEquals(0, preview.confirmedRemovals());
       assertEquals(1, preview.uncheckedScopes().size());
       assertEquals("not_checked", preview.uncheckedScopes().getFirst().status());
+    } finally { TestResolvedConfigHelper.restoreGlobal(previous); }
+  }
+
+
+  private static java.util.function.Consumer<String> indexedConsumer(org.mockito.invocation.InvocationOnMock call,
+      String owner) {
+    java.util.function.Consumer<Object> consumer = call.getArgument(0);
+    return path -> {
+      try {
+        Object member = call.getMethod().getName().equals("forEachIndexedSource") ? path
+            : Class.forName(IndexingService.class.getName() + "$IndexedSourceOwner")
+                .getConstructor(String.class, String.class).newInstance(path, owner);
+        consumer.accept(member);
+      } catch (ReflectiveOperationException failure) { throw new IllegalStateException(failure); }
+    };
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void U5ImportRootRelativeExclusionsRemoveOnlyMatchingMembers(boolean changedOwner) throws Exception {
+    ConfigStore previous = ConfigStore.globalOrNull();
+    ConfigStore.setGlobal(new ConfigStore(ResolvedConfig.builder()
+        .putDefault("justsearch.ui.exclude_patterns", "[\"inner/**\"]").build()));
+    try {
+      Path root = directory.resolve("import");
+      String selected = root.resolve("inner/file.txt").toString(), neighbour = root.resolve("keep.txt").toString();
+      var approval = new io.justsearch.app.api.indexing.SourceOrigin.Approval(
+          new io.justsearch.app.api.operations.OperationAuthorizationBasis.StructuralAuto().encode(),
+          "SYSTEM_INTERNAL", "TRUSTED", "CLI", "core.ingest-files", "import-operation",
+          io.justsearch.app.api.indexing.SourceOrigin.ApprovalClass.DURABLE,
+          io.justsearch.app.api.indexing.SourceOrigin.EvidenceSource.GATE);
+      var origin = io.justsearch.app.api.indexing.SourceOrigin.accepted(
+          io.justsearch.app.api.indexing.SourceOrigin.Kind.IMPORT,
+          io.justsearch.app.api.indexing.SourceOrigin.watchedRoot(root, "docs"), approval, 1L);
+      var removed = new java.util.ArrayList<String>();
+      var enumerating = new AtomicBoolean();
+      IndexingService indexing = mock(IndexingService.class, call -> {
+        String name = call.getMethod().getName();
+        if (name.equals("forEachIndexedSource") || name.equals("forEachIndexedSourceWithOrigin")) {
+          enumerating.set(true);
+          try { List.of(selected, neighbour).forEach(indexedConsumer(call, origin.id())); return 0L; }
+          finally { enumerating.set(false); }
+        }
+        if (name.equals("findSourceOrigin")) {
+          assertFalse(enumerating.get(), "Origin lookup must run after the worker enumeration call exits");
+          return java.util.Optional.of(origin);
+        }
+        if (name.equals("deleteExcludedImportMember")) {
+          assertEquals(origin.id(), call.getArgument(1));
+          if (!changedOwner) removed.add(call.getArgument(0));
+          return new IndexingService.DeletionOutcome(!changedOwner, changedOwner ? "Changed owner" : "");
+        }
+        return org.mockito.Answers.RETURNS_DEFAULTS.answer(call);
+      });
+      var result = new ExcludesServiceImpl(() -> indexing).applyExcludes(false, TestEngineContexts.durableInternal());
+      assertEquals(1, result.matchedFiles()); assertEquals(changedOwner ? 0 : 1, result.confirmedRemovals());
+      assertEquals(changedOwner ? List.of() : List.of(selected), removed);
+      if (changedOwner) {
+        assertEquals(1, result.uncheckedScopes().size());
+        assertEquals("changed_owner", result.uncheckedScopes().getFirst().status());
+      } else assertTrue(result.uncheckedScopes().isEmpty());
     } finally { TestResolvedConfigHelper.restoreGlobal(previous); }
   }
 

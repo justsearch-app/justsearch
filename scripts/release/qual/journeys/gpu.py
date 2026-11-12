@@ -637,7 +637,13 @@ def first_run(run):
     buttons = run.wd.execute("return all(document,'button').map(e=>e.textContent.trim())")
     if 'Get started' in buttons:
         run.wd.click('button', 'Get started')
-    if run.wd.execute("return all(document,'jf-walkthrough-card').some(e=>!e.hidden)"):
+    # The legacy host remains mounted even when its card renders nothing.
+    if run.wd.execute("""
+return all(document,'jf-walkthrough-card').some(card => card.shadowRoot &&
+ all(card.shadowRoot,'button[aria-label="Dismiss"]').some(button => {
+  const r=button.getBoundingClientRect();return r.width>0 && r.height>0;
+ }));
+"""):
         run.wd.click('button[aria-label="Dismiss"]')
     run.native.shot('J1-gpu-first-run')
     return {'mountedDOM': True, 'window': run.native.app_window(run.binary, focused=False),
@@ -725,7 +731,7 @@ def chat_runtime_ready(status, runtime):
 def wait_chat_ready(run, label):
     proof = run.facts.get('chatStart', {})
     if proof.get('invoked') is not True or proof.get('acknowledged') is not True:
-        raise Infrastructure('Start AI action was not invoked and acknowledged; product chat failure cannot be established')
+        raise Infrastructure('Start answers action was not invoked and acknowledged; product chat failure cannot be established')
     samples = []
     def probe():
         status = run.api('/api/status')
@@ -746,15 +752,15 @@ def start_chat(run):
     # The CPU adapter has no chat action, so it cannot supply this GPU step.
     run.nav('AI Brain')
     run.facts['chatStart'] = {'invoked': False, 'acknowledged': False}
-    run.wd.click('button[aria-label="Start AI"]')
+    run.wd.click('button[aria-label="Start answers"]')
     run.facts['chatStart']['invoked'] = True
     def acknowledged():
         status = run.api('/api/status')
         run.facts['chatStart']['acknowledged'] = (status.get('inference') or {}).get('chatEnabledSpec') is True
-        run.evidence('J3-start-ai-action', {'control': 'Start AI', **run.facts['chatStart'],
+        run.evidence('J3-start-ai-action', {'control': 'Start answers', **run.facts['chatStart'],
                                           'inference': status.get('inference')})
         return run.facts['chatStart']['acknowledged']
-    wait_for(acknowledged, 'Start AI intent acknowledgment', seconds=30, error=Infrastructure)
+    wait_for(acknowledged, 'Start answers intent acknowledgment', seconds=30, error=Infrastructure)
     return wait_chat_ready(run, 'J3')
 
 
@@ -837,13 +843,10 @@ def restart(run):
 def author_state(run):
     run.require('ai')
     if run.args.resume and run.facts.get('authored'):
-        # A development recovery must preserve the already-authored record,
-        # rather than trying to press a bookmark control that is now a toggle.
+        # Recovery rechecks the saved rule, theme and model bytes without reauthoring.
         state = linux.assert_state(run)
-        if run.require('bookmark') not in linux.stored_bookmarks(run):
-            raise ProductFailure('Previously authored bookmark missing from Web Storage on recovery')
         run.evidence('J4-restored-authored-state', {'checkpoint': str(run.args.resume),
-                                                  'bookmark': run.facts['bookmark']})
+                                                  'state': state})
         return state
     state = linux.author_state(run)
     run.activation_checkpoint()

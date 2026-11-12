@@ -114,6 +114,22 @@ public interface IndexingService {
 
   record IndexedSource(String path, String collection) {}
 
+  record IndexedSourceOwner(String path, String originId) {}
+
+  default long forEachIndexedSourceWithOrigin(java.util.function.Consumer<IndexedSourceOwner> consumer,
+      EngineContext context) {
+    return forEachIndexedSource(path -> consumer.accept(new IndexedSourceOwner(path, null)), context);
+  }
+
+  default java.util.Optional<io.justsearch.app.api.indexing.SourceOrigin> findSourceOrigin(
+      String originId, EngineContext context) { return java.util.Optional.empty(); }
+
+  /** Conditional Apply Excludes; a changed owner or current rule keeps the new owner's rows. */
+  default DeletionOutcome deleteExcludedImportMember(String path, String expectedOriginId,
+      EngineContext context) {
+    return new DeletionOutcome(false, "Conditional exclusion deletion unavailable");
+  }
+
   /** Source identities and collection ownership; a nonzero result means unchecked rows or a
    * migration candidate not covered by this serving snapshot. */
   default long forEachIndexedSourceWithCollection(

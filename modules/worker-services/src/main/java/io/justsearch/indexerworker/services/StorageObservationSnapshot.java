@@ -109,8 +109,21 @@ public final class StorageObservationSnapshot {
     keys = refreshed.keys;
   }
 
+  /** One fresh observation per maintenance batch, including when topology cannot be read. */
+  public void refreshObservation() {
+    if (evidence == null) return;
+    var refreshed = linux(evidence);
+    mounts = refreshed.mounts;
+    keys = refreshed.keys;
+  }
+
   public SourceEnvelope envelope(Path source, String originId) {
     validateForPublication();
+    return observedEnvelope(source, originId);
+  }
+
+  /** Lookup in one captured observation. Maintenance refreshes once inside each batch fence. */
+  public SourceEnvelope observedEnvelope(Path source, String originId) {
     if (!observed) return new SourceEnvelope(originId, StorageStatus.NOT_OBSERVED, null, null);
     if (source == null) return new SourceEnvelope(originId, StorageStatus.UNKNOWN, null, null);
     var mount = LinuxRootIdentityLease.selectMount(mounts, source.toAbsolutePath().normalize());

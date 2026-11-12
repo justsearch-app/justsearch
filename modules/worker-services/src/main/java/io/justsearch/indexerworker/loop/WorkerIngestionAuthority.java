@@ -63,6 +63,44 @@ final class WorkerIngestionAuthority {
     return admit(job.path(), job.ingestionRoot(), job.collection());
   }
 
+  /** Upkeep never transfers ownership or reads replacement storage under an old declaration. */
+  boolean upkeepCurrent(io.justsearch.indexerworker.queue.JobQueue.IndexJob claim,
+      io.justsearch.indexerworker.queue.JobQueue queue,
+      io.justsearch.adapters.lucene.runtime.DocumentFieldOps fields) {
+    String owner = claim.upkeepOriginId();
+    if (owner == null) return true;
+    queue.allowsIngestionBoundary(io.justsearch.indexerworker.queue.JobQueue.IngestionBoundary.HASHING,
+        claim.scanId(), claim);
+    if (!queue.ownsClaimForPublication(claim)) return false;
+    var origin = queue.sourceOrigin(owner).orElse(null);
+    if (origin == null || origin.kind() != io.justsearch.app.api.indexing.SourceOrigin.Kind.IMPORT
+        || !origin.root().path().equals(claim.ingestionRoot())
+        || !claim.path().startsWith(origin.root().path())
+        || origin.root().singleFile() && !claim.path().equals(origin.root().path())
+        || origin.root().excludedSubtrees().stream().anyMatch(claim.path()::startsWith)
+        || io.justsearch.configuration.excludes.ExclusionPatterns.fromPatterns(origin.root().excludePatterns())
+            .isExcludedPath(origin.root().path(), claim.path())
+        || excludes(claim.path(), origin.root().path(), claim.collection())) return false;
+    String key = io.justsearch.indexerworker.util.PathNormalizer.normalizeKey(claim.path());
+    var wanted = new java.util.HashSet<>(io.justsearch.indexing.SourceEnvelope.FIELDS);
+    wanted.add(io.justsearch.indexing.SchemaFields.DOC_ID);
+    java.util.Map<String, String> row;
+    try {
+      row = fields.getDocumentFieldsBatchOrThrow(java.util.List.of(key), wanted).get(key);
+    } catch (IOException unavailable) { throw new java.io.UncheckedIOException(unavailable); }
+    // A post-retirement recreation has no parent. Exact queue ownership still fences re-imports
+    // and Apply Excludes, which cancel their displaced claims under the same mutation fence.
+    if (row == null) return true;
+    if (!owner.equals(row.get(io.justsearch.indexing.SchemaFields.ORIGIN_ID))) return false;
+    var recorded = io.justsearch.indexing.SourceEnvelope.decode(row).orElse(null);
+    if (recorded == null || recorded.storageStatus() != io.justsearch.indexing.SourceEnvelope.StorageStatus.KNOWN) return true;
+    var current = io.justsearch.indexerworker.services.StorageObservationSnapshot.capture()
+        .observedEnvelope(claim.path(), owner);
+    return current.storageStatus() == io.justsearch.indexing.SourceEnvelope.StorageStatus.KNOWN
+        && java.util.Objects.equals(recorded.storageMount(), current.storageMount())
+        && java.util.Objects.equals(recorded.storageKey(), current.storageKey());
+  }
+
   private volatile java.util.function.BiPredicate<Path, Path> userExclusions = (file, root) -> false;
 
   void useFileExclusions(java.util.function.BiPredicate<Path, Path> exclusions) {

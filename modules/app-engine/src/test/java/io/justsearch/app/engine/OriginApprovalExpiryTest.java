@@ -63,18 +63,36 @@ final class OriginApprovalExpiryTest {
       }
       assertEquals(1, queue.cleanupOldJobs(30)); queue.cleanupOldLedgerEvents(30);
     }
-    try (var queue = new SqliteJobQueue(queueDb)) {
+    try (var queue = new SqliteJobQueue(queueDb); var operations = new SqliteOperationStore(operationDb)) {
       queue.open();
+      var runner = new io.justsearch.app.observability.operations.OperationAttemptRunnerImpl(operations,
+          Clock.systemUTC(), java.util.Set.of(OperationKind.INGEST, OperationKind.REINDEX, OperationKind.ACCEPT_GAPS), null,
+          new io.justsearch.app.services.registry.executor.RecordedIngestPlanResolver());
+      var coordinator = new RecordedIngestionCoordinator(operations, runner, new EngineAdmissionController(2, 2, 1), authority);
+      try (var attachment = coordinator.attach(queue, () -> Optional.of("generation"), () -> true)) {
+      assertNotNull(attachment);
       var auto = queue.sourceOrigin(ids.get(0)).orElseThrow();
       var family = queue.sourceOrigin(ids.get(1)).orElseThrow();
       var session = queue.sourceOrigin(ids.get(2)).orElseThrow();
       assertTrue(authority.evaluateOriginApproval(auto));
+      assertArrayEquals(new boolean[] {true, true}, upkeepEligibility(queue, auto.id()));
       authority.grants().grantFamilyAllowAlways("file-operations", SourceTier.UNTRUSTED);
       assertTrue(authority.evaluateOriginApproval(family));
+      assertArrayEquals(new boolean[] {true, true}, upkeepEligibility(queue, family.id()));
       authority.grants().revokeFamily("file-operations", SourceTier.UNTRUSTED);
       authority.grants().grantAllowAlways("core.ingest-files", SourceTier.UNTRUSTED);
       assertFalse(authority.evaluateOriginApproval(family));
+      assertArrayEquals(new boolean[] {true, false}, upkeepEligibility(queue, family.id()));
       assertFalse(authority.evaluateOriginApproval(session));
+      assertArrayEquals(new boolean[] {true, false}, upkeepEligibility(queue, session.id()));
+      }
     }
+  }
+  private static boolean[] upkeepEligibility(SqliteJobQueue queue, String id) throws Exception {
+    try {
+      Object verdict = queue.getClass().getMethod("importUpkeepEligibility", String.class).invoke(queue, id);
+      return new boolean[] {(boolean) verdict.getClass().getMethod("inactive").invoke(verdict),
+          (boolean) verdict.getClass().getMethod("refreshAllowed").invoke(verdict)};
+    } catch (NoSuchMethodException before) { return new boolean[] {false, false}; }
   }
 }

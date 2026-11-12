@@ -379,12 +379,15 @@ public final class ExcludesServiceImpl implements ExcludesService {
       }
     }
 
-    List<String> indexedMatches = new ArrayList<>();
+    List<IndexingService.IndexedSourceOwner> indexedSources = new ArrayList<>();
+    List<IndexingService.IndexedSourceOwner> indexedMatches = new ArrayList<>();
+    var origins = new java.util.HashMap<String, java.util.Optional<io.justsearch.app.api.indexing.SourceOrigin>>();
     // Read one immutable ownership view before issuing any deletion from its matches.
     var indexedSeen = new java.util.HashSet<String>();
     boolean[] collecting = {true};
     try {
-      long unknown = indexing.forEachIndexedSource(id -> {
+      long unknown = indexing.forEachIndexedSourceWithOrigin(member -> {
+        String id = member.path();
         synchronized (indexedSeen) {
           if (!collecting[0]) return;
           if (visited.incrementAndGet() > maxWalkEntries) {
@@ -399,11 +402,7 @@ public final class ExcludesServiceImpl implements ExcludesService {
           if (watched.stream().filter(root -> root != null && root.path() != null)
               .anyMatch(root -> source.startsWith(root.path().toAbsolutePath().normalize()))) return;
           if (!indexedSeen.add(id)) return;
-          int idx = excludes.matchingPatternIndex(file, file);
-          if (idx < 0) return;
-          matchedFiles.incrementAndGet();
-          perPatternCount[idx]++;
-          indexedMatches.add(id);
+          indexedSources.add(member);
         }
       }, engineContext);
       if (unknown > 0) unchecked.add(new ExcludesResult.UncheckedScope(
@@ -415,13 +414,37 @@ public final class ExcludesServiceImpl implements ExcludesService {
       synchronized (indexedSeen) { collecting[0] = false; }
     }
 
-    if (!dryRun) for (String id : indexedMatches) {
+    // Root lookup is another Worker call. Finish enumeration before resolving any origin so
+    // concurrent Apply requests never nest work inside the bounded Worker executor.
+    try {
+      for (var member : indexedSources) {
+        Path file = Path.of(member.path()).normalize();
+        var origin = member.originId() == null ? null : origins.computeIfAbsent(member.originId(),
+            key -> indexing.findSourceOrigin(key, engineContext)).filter(saved ->
+                saved.kind() == io.justsearch.app.api.indexing.SourceOrigin.Kind.IMPORT
+                    && file.startsWith(saved.root().path())
+                    && (!saved.root().singleFile() || file.equals(saved.root().path())))
+            .orElse(null);
+        int idx = excludes.matchingPatternIndex(origin == null ? file : origin.root().path(), file);
+        if (idx < 0) continue;
+        matchedFiles.incrementAndGet();
+        perPatternCount[idx]++;
+        indexedMatches.add(new IndexingService.IndexedSourceOwner(member.path(), origin == null ? null : origin.id()));
+      }
+    } catch (RuntimeException failure) {
+      unchecked.add(new ExcludesResult.UncheckedScope("Indexed sources", "not_checked", failureReason(failure)));
+    }
+
+    if (!dryRun) for (var member : indexedMatches) {
+      String id = member.path();
       try {
-        var outcome = indexing.deleteDocByIdWithOutcome(id, engineContext);
+        var outcome = member.originId() == null ? indexing.deleteDocByIdWithOutcome(id, engineContext)
+            : indexing.deleteExcludedImportMember(id, member.originId(), engineContext);
         if (outcome != null && outcome.confirmed()) {
           deletedById.incrementAndGet();
           confirmedRemovals.incrementAndGet();
-        } else unchecked.add(scope(Path.of(id), "not_removed", outcome == null
+        } else unchecked.add(scope(Path.of(id), member.originId() != null && outcome != null
+            && "Changed owner".equals(outcome.error()) ? "changed_owner" : "not_removed", outcome == null
             ? "Worker deletion outcome unavailable" : outcome.error()));
       } catch (RuntimeException failure) {
         unchecked.add(scope(Path.of(id), "not_removed", failureReason(failure)));

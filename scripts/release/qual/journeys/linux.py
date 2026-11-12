@@ -123,7 +123,13 @@ def first_run(run):
     buttons = run.wd.execute("return all(document,'button').map(e=>e.textContent.trim());")
     if 'Get started' in buttons:
         run.wd.click('button', 'Get started')
-    if run.wd.execute("return all(document,'jf-walkthrough-card').some(e=>!e.hidden)"):
+    # The legacy host remains mounted even when its card renders nothing.
+    if run.wd.execute("""
+return all(document,'jf-walkthrough-card').some(card => card.shadowRoot &&
+ all(card.shadowRoot,'button[aria-label="Dismiss"]').some(button => {
+  const r=button.getBoundingClientRect();return r.width>0 && r.height>0;
+ }));
+"""):
         run.wd.click('button[aria-label="Dismiss"]')
     run.native.shot('J1-first-run')
     raise OwnerValidation('Desktop entry opened an owned, mapped installed app window and Engine is ready; validate first-run text in J1-desktop-first-run.png')
@@ -132,7 +138,8 @@ def first_run(run):
 def add_folder(run):
     run.require('ui')
     run.nav('Library')
-    run.wd.click('button[aria-label="Add Folder"]')
+    # v0.3.2 predecessor preparation still uses the capital-F label.
+    run.wd.click('button[aria-label="Add folder"],button[aria-label="Add Folder"]')
     try:
         # The actual GtkFileChooserNative is driven outside WebDriver.
         wait_for(lambda: run.native.picker_visible('J2-picker'),
@@ -224,7 +231,7 @@ def search_open(run):
     run.nav('Search')
     # Search input is distinct from the AI composer. The selector is scoped to
     # native input controls, including open shadow roots, and is probed below.
-    run.wd.click('button[aria-label="Mode: Search"]')
+    run.wd.click('button[data-testid="sv3-composer-tier"]')
     run.wd.click('button[data-tier="search"]')
     selector = 'textarea[data-testid="sv3-composer-input"]'
     run.wd.keys(selector, QUERY + '\ue007')
@@ -285,7 +292,7 @@ def install_ai(run):
     run.evidence('J3-production-manifest', manifest)
     resumed = run.facts.get('resumedSetup') is True
     if not resumed:
-        run.wd.click('button[aria-label="Install AI"]')
+        run.wd.click('button[aria-label^="Install AI"]')
         run.wd.click('button[aria-label="Accept and download"]')
     samples = []
     def settled():
@@ -430,7 +437,7 @@ def snapshot(run):
     # Observe owned authored/settings/model files; never modify saved state to
     # fabricate a persistence fixture. Exclude derived/live index and log bytes.
     files = run.target.json("""
-import hashlib,json,sqlite3,sys
+import hashlib,json,sys
 from pathlib import Path
 root=Path(json.loads(sys.argv[1])); rows={}
 for name in ('ui/settings.json',):
@@ -439,36 +446,33 @@ for name in ('ui/settings.json',):
 for p in root.rglob('*'):
  if p.is_file() and p.suffix in ('.onnx','.gguf','.safetensors'):
   rows[str(p.relative_to(root))]=hashlib.sha256(p.read_bytes()).hexdigest()
-authored=[]
-for db in (root/'localstorage').glob('*.localstorage'):
- with sqlite3.connect(db.as_uri()+'?mode=ro',uri=True) as conn:
-  for key,value in conn.execute('SELECT key,value FROM ItemTable'):
-   if key == 'justsearch.userState.v2':
-    if isinstance(value,bytes):value=value.decode('utf-16-le' if 0 in value[:8] else 'utf-8')
-    state=json.loads(value)
-    for profile in state.get('profiles',{}).values():authored.extend(profile.get('savedViews',[]))
-print(json.dumps({'files':rows,'savedViews':authored}))
+print(json.dumps({'files':rows}))
 """, run.data, timeout=180)
     return {'settings': settings, 'roots': roots, 'savedFiles': files,
             'search': search_api(run)}
 
 
+SKIP_RULE = 'justsearch-journey-skip-1.tmp'
+
+
 def author_state(run):
     run.require('ui')
     run.require('folder')
-    run.nav('Library')
-    run.wd.click('button[aria-label="Bookmark this view"]')
-    run.wd.click('button[aria-label="View bookmarks"]')
-    bookmark = wait_for(lambda: next((v for v in stored_bookmarks(run)
-                        if v.get('label') == 'Library' and v.get('surfaceId') == 'core.library-surface'), None),
-                        'UI-authored Library bookmark stored through Web Storage API', seconds=30)
-    run.facts['bookmark'] = bookmark
-    bookmark_entry(run, bookmark)
-    run.native.shot('J4-authored-bookmark')
-    run.native.key('escape')
+    # v0.3.2 has no row-based skip-rule editor. Dark is user-authored state
+    # both the predecessor and candidate expose, so J5 preserves that instead.
+    if run.args.phase != 'predecessor':
+        run.nav('Library')
+        run.wd.click('button[role="tab"][data-tab-id="folders"]')
+        run.wd.click('button[aria-label="Add a rule"]:not(:disabled)')
+        run.wd.keys('.skip-rule:last-of-type input[aria-label^="Skip rule "]', SKIP_RULE)
+        run.wd.click('button[aria-label="Save patterns"]:not(:disabled)')
+        wait_for(lambda: SKIP_RULE in run.api('/api/settings/v2').get('ui', {}).get('excludePatterns', []),
+                 'UI-authored skip rule persisted', seconds=20)
+        run.facts['skipRule'] = SKIP_RULE
+        skip_rule_entry(run, SKIP_RULE)
+        run.native.shot('J4-authored-skip-rule')
     run.nav('Settings')
     run.wd.click('button[data-settings-category="appearance"]')
-    # One user setting, authored through the real control.
     run.wd.click('button[role="radio"]', 'Dark')
     wait_for(lambda: run.api('/api/settings/v2').get('ui', {}).get('theme') == 'dark',
              'UI-authored theme persisted', seconds=20)
@@ -480,9 +484,12 @@ def author_state(run):
 def assert_state(run):
     before = run.require('beforeState')
     after = snapshot(run)
-    assert before['savedFiles'] == after['savedFiles'], 'Settings, authored records or model bytes changed'
-    assert after['savedFiles']['savedViews'], 'No persisted authored bookmark was observed'
-    assert before['settings'].get('ui') == after['settings'].get('ui'), 'Persisted UI settings changed'
+    assert before['savedFiles'] == after['savedFiles'], 'Settings or model bytes changed'
+    ui = after['settings'].get('ui', {})
+    assert before['settings'].get('ui') == ui, 'Persisted UI settings changed'
+    assert ui.get('theme') == 'dark', 'UI-authored Dark theme disappeared'
+    if run.args.phase != 'predecessor':
+        assert run.require('skipRule') in ui.get('excludePatterns', []), 'UI-authored skip rule disappeared'
     assert json.dumps(run.require('corpus')) in json.dumps(after['roots']), 'Watched folder disappeared'
     assert fixture_present(run, after['search']['results']), 'Indexed fixture disappeared'
     return after
@@ -490,20 +497,18 @@ def assert_state(run):
 
 def restart(run):
     run.require('beforeState')
-    bookmark = run.require('bookmark')
     run.start_ui()
     state = assert_state(run)
     run.evidence('J4-retained-state', state)
-    stored = stored_bookmarks(run)
-    assert bookmark in stored, 'Authored bookmark differs after restart through Web Storage API'
     run.close_settings()
-    interaction_observation(run, 'J4-bookmarks-click')
-    run.wd.click('button[aria-label="View bookmarks"]')
-    entry = bookmark_entry(run, bookmark)
-    run.evidence('J4-restarted-bookmark', {'domEntry': entry, 'storedBookmark': bookmark,
-                 'storageAPI': 'Web Storage localStorage.getItem in harness WebDriver session'})
-    run.native.shot('J4-restarted-bookmark')
-    run.native.key('escape')
+    if run.args.phase != 'predecessor':
+        interaction_observation(run, 'J4-skip-rule-navigation')
+        run.nav('Library')
+        run.wd.click('button[role="tab"][data-tab-id="folders"]')
+        entry = skip_rule_entry(run, run.require('skipRule'))
+        run.evidence('J4-restarted-skip-rule', {'domEntry': entry,
+                     'savedPatterns': state['settings']['ui']['excludePatterns']})
+        run.native.shot('J4-restarted-skip-rule')
     return state
 
 
@@ -522,45 +527,38 @@ def interaction_observation(run, name):
     return observed
 
 
-def stored_bookmarks(run):
-    """Read the app's durable saved views through the production Web Storage API."""
-    return run.wd.execute("""
-const state=JSON.parse(localStorage.getItem('justsearch.userState.v2') || 'null');
-return state?.profiles?.[state.activeProfileId]?.savedViews || [];
-""")
-
-
-def bookmark_entry(run, bookmark):
-    corroborated = bookmark in stored_bookmarks(run)
+def skip_rule_entry(run, rule):
+    corroborated = rule in run.api('/api/settings/v2').get('ui', {}).get('excludePatterns', [])
     return wait_for(lambda: run.wd.execute("""
-const popup=all(document,'jf-bookmarks-popover').find(e=>e.hasAttribute('open'));
-if (!popup?.shadowRoot) return null;
-const entry=all(popup.shadowRoot,'[role="listbox"] [role="option"]').find(e=>
- e.querySelector('.item-label')?.textContent.trim()===arguments[0].label &&
- e.getAttribute('title')===arguments[0].url && e.getBoundingClientRect().height>0);
-return entry ? {label:entry.querySelector('.item-label').textContent.trim(),url:entry.getAttribute('title')} : null;
-""", [bookmark]), 'Authored bookmark entry visible in DOM list', seconds=30,
-            error=AssertionError if corroborated else Infrastructure)
+const entry=all(document,'input[aria-label^="Skip rule "]').find(e=>{
+ const r=e.getBoundingClientRect();
+ return e.value===arguments[0] && !e.disabled && r.width>0 && r.height>0;
+});
+return entry ? {pattern:entry.value,label:entry.getAttribute('aria-label')} : null;
+""", [rule]), 'Authored skip rule visible in Library', seconds=30,
+            error=ProductFailure if corroborated else Infrastructure)
 
 
 def require_predecessor_state(run):
-    # A checkpoint can be useful for development after a failed J3. It does
-    # not certify the models/records which J5 promises to preserve.
-    missing = [key for key in ('ai', 'authored', 'bookmark', 'beforeState') if not run.facts.get(key)]
-    before = run.facts.get('beforeState', {}).get('savedFiles', {})
+    # J5 requires production downloads and UI-authored Dark theme. Bookmarks
+    # retired from the candidate UI; no new rule editor is assumed in v0.3.2.
+    missing = [key for key in ('ai', 'authored', 'beforeState') if not run.facts.get(key)]
+    prepared = run.facts.get('beforeState', {})
+    before = prepared.get('savedFiles', {})
     models = {p: checksum for p, checksum in before.get('files', {}).items()
               if Path(p).suffix in ('.onnx', '.gguf', '.safetensors')}
     if not models:
         missing.append('prepared model bytes')
-    if not before.get('savedViews') or run.facts.get('bookmark') not in before.get('savedViews', []):
-        missing.append('prepared authored bookmark')
+    if prepared.get('settings', {}).get('ui', {}).get('theme') != 'dark':
+        missing.append('prepared authored Dark theme')
     if missing:
         raise Unavailable('Predecessor preparation unavailable: ' + ', '.join(missing))
-    current = snapshot(run)['savedFiles']
-    run.evidence('J5-predecessor-state', {'prepared': before, 'observed': current})
+    observed = snapshot(run)
+    current = observed['savedFiles']
+    run.evidence('J5-predecessor-state', {'prepared': prepared, 'observed': observed})
     if (any(current.get('files', {}).get(p) != checksum for p, checksum in models.items())
-            or current.get('savedViews') != before['savedViews']):
-        raise Unavailable('Predecessor preparation unavailable: prepared models or authored records missing/changed; see J5-predecessor-state.json')
+            or observed.get('settings', {}).get('ui', {}).get('theme') != 'dark'):
+        raise Unavailable('Predecessor preparation unavailable: prepared models or authored theme missing/changed; see J5-predecessor-state.json')
     return current
 
 
@@ -895,8 +893,8 @@ def deep_links(run):
             raise ProductFailure('Warm OS deep link left an extra JustSearch process after the 3s forwarding grace period')
         destination = run.wd.execute("""
 const shell=all(document,'jf-shell').find(e=>e.activeId==='core.library-surface');
-const heading=all(document,'h1.surface-title').find(e=>e.textContent.trim()==='Library' && e.getBoundingClientRect().height>0);
-return shell && heading ? {route:shell.activeId,heading:heading.textContent.trim()} : null;
+const segment=all(document,'button.segment[data-surface-id="core.library-surface"][aria-current="page"]').find(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0});
+return shell && segment ? {route:shell.activeId,segment:segment.textContent.trim()} : null;
 """)
         if not destination:
             return None

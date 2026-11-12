@@ -345,7 +345,7 @@ class GpuTests(unittest.TestCase):
             {'inference': {'engineState': 'Healthy', 'chatEnabledSpec': True}},
             {'active': {'modelPath': '/private/models/chat.gguf', 'chatProfile': 'standard'}, 'activation': {'state': 'idle'}}]
         gpu.start_chat(run)
-        run.wd.click.assert_called_once_with('button[aria-label="Start AI"]')
+        run.wd.click.assert_called_once_with('button[aria-label="Start answers"]')
         self.assertEqual(run.api.call_args_list[0].args, ('/api/status',))
 
     def test_chat_failure_needs_invoked_and_acknowledged_start_ai(self):
@@ -416,18 +416,15 @@ class GpuTests(unittest.TestCase):
         run.activation_checkpoint.assert_called_once_with()
 
     def test_gpu_recovery_preserves_previously_authored_state(self):
-        bookmark = {'label': 'Library', 'surfaceId': 'core.library-surface'}
-        run = Mock(facts={'authored': True, 'bookmark': bookmark},
+        run = Mock(facts={'authored': True},
                    args=types.SimpleNamespace(resume=Path('/private/activated-checkpoint.json')))
-        run.require.side_effect = lambda key: run.facts.get(key)
         with patch.object(gpu.linux, 'author_state') as author, \
-                patch.object(gpu.linux, 'assert_state', return_value={'retained': True}) as preserved, \
-                patch.object(gpu.linux, 'stored_bookmarks', return_value=[bookmark]) as stored:
+                patch.object(gpu.linux, 'assert_state', return_value={'retained': True}) as preserved:
             self.assertEqual(gpu.author_state(run), {'retained': True})
             preserved.assert_called_once_with(run)
             author.assert_not_called()
-            stored.return_value = []
-            with self.assertRaisesRegex(runner.ProductFailure, 'Previously authored bookmark missing'):
+            preserved.side_effect = runner.ProductFailure('UI-authored skip rule disappeared')
+            with self.assertRaisesRegex(runner.ProductFailure, 'skip rule disappeared'):
                 gpu.author_state(run)
         run.wd.click.assert_not_called()
 

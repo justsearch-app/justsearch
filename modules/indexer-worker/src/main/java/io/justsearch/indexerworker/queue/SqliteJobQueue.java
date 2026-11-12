@@ -671,6 +671,70 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
     return accessRecordedWalk(() -> SqliteSourceOrigins.load(connection, id), false);
   }
 
+  private volatile java.util.function.Function<io.justsearch.app.api.indexing.SourceOrigin,
+      ImportUpkeepEligibility> importUpkeepAuthority = ignored -> ImportUpkeepEligibility.DENIED;
+
+  @Override public void useImportUpkeepAuthority(java.util.function.Function<
+      io.justsearch.app.api.indexing.SourceOrigin, ImportUpkeepEligibility> authority) {
+    importUpkeepAuthority = Objects.requireNonNull(authority);
+  }
+
+  @Override public ImportUpkeepEligibility importUpkeepEligibility(String originId) {
+    try {
+      var origin = sourceOrigin(originId).orElse(null);
+      if (origin == null || origin.kind() != io.justsearch.app.api.indexing.SourceOrigin.Kind.IMPORT) {
+        return ImportUpkeepEligibility.DENIED;
+      }
+      // Read only. In particular, never seal a producer to make it eligible for upkeep.
+      var open = accessRecordedWalk(() -> {
+        var keys = new ArrayList<String>();
+        try (var query = connection.prepareStatement(
+            "SELECT operation_key FROM ingestion_walk_progress WHERE sealed_at IS NULL");
+            var rows = query.executeQuery()) {
+          while (rows.next()) keys.add(rows.getString(1));
+        }
+        return keys;
+      }, false);
+      for (String key : open) {
+        if (Objects.equals(origin.approval().operationKey(), sourceOriginOperation.apply(key))) {
+          return ImportUpkeepEligibility.DENIED;
+        }
+      }
+      return Objects.requireNonNull(importUpkeepAuthority.apply(origin));
+    } catch (RuntimeException unavailable) {
+      return ImportUpkeepEligibility.DENIED;
+    }
+  }
+
+  @Override public boolean enqueueImportUpkeep(EnqueueEntry entry, String collection, String originId) {
+    if (!importUpkeepEligibility(originId).refreshAllowed()) return false;
+    var origin = sourceOrigin(originId).orElse(null);
+    if (origin == null || !Objects.equals(origin.root().path(), entry.ingestionRoot())) return false;
+    var declared = List.of(new IngestCollectionPolicy.RootBinding(origin.root().path(), collection));
+    String revision = "upkeep/" + UUID.fromString(originId) + "/" + UUID.randomUUID();
+    // Reuse ordinary maintenance's source witness and retry preservation for selected refreshes.
+    // Stable failures keep their budget; a genuinely edited source can acquire a fresh attempt.
+    var observed = observeAdmissionSource(entry, null, collection);
+    if (!importUpkeepEligibility(originId).refreshAllowed()) return false;
+    return accessRecordedWalk(() -> {
+      long now = System.currentTimeMillis();
+      try (var query = connection.prepareStatement("SELECT state,unit_revision FROM jobs WHERE path=?")) {
+        query.setString(1, normalizePath(entry.path()));
+        try (var row = query.executeQuery()) {
+          if (row.next() && !STATE_DONE.equals(row.getString(1))) {
+            // Existing producers and issued claims retain their admission and retry handling.
+            if (STATE_PROCESSING.equals(row.getString(1)) || activeClaims.containsKey(normalizePath(entry.path()))
+                || !originId.equals(JobQueue.upkeepOriginId(row.getString(2))) || observed == null
+                || (!needsExtractionPolicyRetry(entry, declared)
+                    && preservesMaintenanceWork(entry, collection, true, observed.sha256(), observed, now, false))) return false;
+          }
+        }
+      }
+      return enqueueEntriesInTransaction(List.of(entry), collection, null, now, true, revision, false,
+          declared, observed == null ? Map.of() : Map.of(entry, observed)).covered() == 1;
+    }, true);
+  }
+
   private void installRetentionFence(Set<String> retained) throws SQLException {
     org.sqlite.Function.create(connection, "import_child_retained", new org.sqlite.Function() {
       @Override protected void xFunc() throws SQLException {
@@ -694,6 +758,10 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
   }
 
   @Override public boolean allowsIngestionBoundary(IngestionBoundary boundary, String key, IndexJob claim) {
+    if (claim != null && claim.upkeepOriginId() != null
+        && !importUpkeepEligibility(claim.upkeepOriginId()).refreshAllowed()) {
+      throw new IngestionApprovalInterruptedException();
+    }
     if (!ingestionBoundaryAuthority.test(key, claim)) throw new IngestionApprovalInterruptedException();
     return true;
   }
@@ -725,6 +793,7 @@ public final class SqliteJobQueue implements SwitchBufferCapableQueue {
 
   @Override
   public java.util.Optional<String> sourceOriginId(IndexJob claim) {
+    if (claim.upkeepOriginId() != null) return java.util.Optional.of(claim.upkeepOriginId());
     // Never call the operation store or the declaration owner under the queue lock.
     String operation = claim.scanId() == null ? null : sourceOriginOperation.apply(claim.scanId());
     String activeBinding = operation == null ? null : importApprovalBinding.apply(operation);

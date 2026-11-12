@@ -579,4 +579,470 @@ final class IndexedSourceMaintenanceTest extends LuceneExecutorTestBase {
     }
   }
 
+  private static final class Mounts implements StorageObservationSnapshot.Evidence {
+    final java.util.concurrent.atomic.AtomicInteger reads = new java.util.concurrent.atomic.AtomicInteger();
+    List<String> lines = List.of("1 0 8:1 / / rw - ext4 /dev/root rw");
+    public List<String> mountInfo() { reads.incrementAndGet(); return lines; }
+    public Map<String, String> uuidDevices() { return Map.of("8:1", "aaaa-1111", "8:2", "bbbb-2222", "8:3", "cccc-3333"); }
+    public String sourceDevice(LinuxRootIdentityLease.Mount mount) { return mount.device(); }
+  }
+
+  private static void upkeepAuthority(SqliteJobQueue queue, boolean inactive, boolean refresh) throws Exception {
+    try {
+      var eligibility = Class.forName(JobQueue.class.getName() + "$ImportUpkeepEligibility");
+      Object verdict = eligibility.getConstructor(boolean.class, boolean.class).newInstance(inactive, refresh);
+      JobQueue.class.getMethod("useImportUpkeepAuthority", java.util.function.Function.class)
+          .invoke(queue, (java.util.function.Function<Object, Object>) ignored -> verdict);
+    } catch (ClassNotFoundException | NoSuchMethodException baseline) {
+      // The before-state has no upkeep bridge; maintenance behavior below is the oracle.
+    }
+  }
+
+  private io.justsearch.app.api.indexing.SourceOrigin origin(Path root, boolean singleFile) {
+    var approval = new io.justsearch.app.api.indexing.SourceOrigin.Approval(
+        new io.justsearch.app.api.operations.OperationAuthorizationBasis.StructuralAuto().encode(),
+        "SYSTEM_INTERNAL", "TRUSTED", "CLI", "core.ingest-files", "import-parent",
+        io.justsearch.app.api.indexing.SourceOrigin.ApprovalClass.DURABLE,
+        io.justsearch.app.api.indexing.SourceOrigin.EvidenceSource.GATE);
+    return new io.justsearch.app.api.indexing.SourceOrigin(java.util.UUID.randomUUID().toString(),
+        io.justsearch.app.api.indexing.SourceOrigin.Kind.IMPORT,
+        new io.justsearch.app.api.operations.RecordedRootPlan.Root(root, "docs", false, singleFile, List.of(), List.of()),
+        approval, 1L, new io.justsearch.app.api.indexing.SourceOrigin.RestartBinding(1,
+            java.util.UUID.randomUUID().toString(), "a".repeat(64), null));
+  }
+
+  private final class ImportFixture implements AutoCloseable {
+    final Path base = directory.resolve("base");
+    final Path root = Files.createDirectories(directory.resolve("import"));
+    final Path database = directory.resolve("imports.db");
+    final Mounts mounts = new Mounts();
+    final org.mockito.MockedStatic<RootIdentity> storage;
+    final SqliteJobQueue queue = new SqliteJobQueue(database);
+    final SqliteDocumentIdentityStore identities;
+    final RunningRuntime runtime;
+    final WorkerIngestService service;
+    final io.justsearch.app.api.indexing.SourceOrigin origin;
+    boolean failExtraction;
+
+    ImportFixture(boolean singleFile) throws Exception {
+      var layout = new IndexGenerationManager(base).initializeOrLoad();
+      runtime = IndexSchema.fromCatalog(new io.justsearch.configuration.JustSearchConfigurationLoader().loadFieldCatalog())
+          .atPath(layout.activeGenerationPath()).withExecutorRegistrations(testLuceneExecutors()).open();
+      runtime.commitOps().stopCommitTimer();
+      queue.open(); identities = new SqliteDocumentIdentityStore(database);
+      origin = origin(singleFile ? root.resolve("file.txt") : root, singleFile);
+      queue.recordSourceOrigins(List.of(origin)); upkeepAuthority(queue, true, true);
+      service = service(queue, runtime, base, identities);
+      storage = mockStatic(RootIdentity.class, CALLS_REAL_METHODS);
+      storage.when(RootIdentity::storageSnapshot).thenAnswer(call -> StorageObservationSnapshot.linux(mounts));
+    }
+
+    Path member(String relative) throws Exception {
+      Path file = root.resolve(relative); Files.createDirectories(file.getParent()); Files.writeString(file, "source");
+      ((RootWitness) service.rootCheck()).recordDeliberateAdd(file, true);
+      String uid = identities.resolve(DocumentIdentityStore.pathHash(PathNormalizer.normalizeKey(file)),
+          System.currentTimeMillis()).docUid();
+      String key = PathNormalizer.normalizeKey(file);
+      var parent = new java.util.HashMap<String, Object>(StorageObservationSnapshot.capture().envelope(file, origin.id()).fields());
+      parent.putAll(Map.of(SchemaFields.DOC_ID, key, SchemaFields.DOC_UID, uid, SchemaFields.PATH, key,
+          SchemaFields.CONTENT, "source", SchemaFields.COLLECTION, "docs"));
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(parent));
+      var child = new java.util.HashMap<>(parent);
+      child.remove(SchemaFields.CONTENT);
+      child.putAll(Map.of(SchemaFields.DOC_ID, key + "#child", SchemaFields.DOC_UID, uid + "#0",
+          SchemaFields.PARENT_DOC_ID, key, SchemaFields.IS_CHUNK, "true", SchemaFields.CHUNK_CONTENT, "source",
+          SchemaFields.CHUNK_START_CHAR, "0", SchemaFields.CHUNK_END_CHAR, "6",
+          SchemaFields.CHUNK_PARENT_CONTENT_SHA256, io.justsearch.indexing.chunking.ChunkParentRevision.sha256Hex("source")));
+      runtime.indexingCoordinator().indexSingle(new IndexDocument(child));
+      commit(); return file;
+    }
+
+    void commit() { runtime.commitOps().commitAndTrack(); runtime.commitOps().maybeRefreshBlocking(); }
+    int rows(Path file) throws java.io.IOException { return runtime.indexCountOps().countByIdAndChunksStrict(PathNormalizer.normalizeKey(file)); }
+    void reconcile() throws Exception { reconcile(false); }
+    void reconcile(boolean incomplete) throws Exception {
+      var result = IndexedSourceMaintenanceTest.this.reconcile(service);
+      if (incomplete) assertTrue(result.getError().startsWith("prune_incomplete:"), result.getError());
+      else assertTrue(result.getError().isEmpty(), result.getError());
+    }
+    @Override public void close() throws Exception { storage.close(); runtime.close(); identities.close(); queue.close(); }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void U2U3MissingImportAncestorsRetireTheWholeFamily(boolean wholeRoot) throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path first = f.member("inner/first.txt"), second = f.member("inner/second.txt");
+      Files.delete(first); Files.delete(second); Files.delete(first.getParent());
+      if (wholeRoot) Files.delete(f.root);
+      f.mounts.reads.set(0); f.reconcile();
+      assertEquals(0, f.rows(first)); assertEquals(0, f.rows(second));
+      assertEquals(2, f.mounts.reads.get(), "one observation per pass and one per retirement batch");
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"unplugged", "replaced", "overmounted", "between-enumeration-and-fence"})
+  void U9ChildMountChangesNeverAuthorizeRetirement(String topology) throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path child = Files.createDirectory(f.root.resolve("child"));
+      String disk = "2 1 8:2 / " + child + " rw - ext4 /dev/child rw";
+      f.mounts.lines = List.of(f.mounts.lines.getFirst(), disk);
+      Path file = f.member("child/file.txt"); Files.delete(file);
+      if (topology.equals("between-enumeration-and-fence")) {
+        var observed = spy(f.runtime); var fields = spy(f.runtime.documentFieldOps());
+        doReturn(fields).when(observed).documentFieldOps();
+        doAnswer(call -> {
+          f.mounts.lines = List.of(f.mounts.lines.getFirst());
+          return call.callRealMethod();
+        }).when(fields).getDocumentFieldsBatchOrThrow(anyList(), anySet());
+        var service = service(f.queue, observed, f.base, DocumentIdentityStore.UNAVAILABLE);
+        assertTrue(reconcile(service).getError().startsWith("prune_incomplete:"));
+      } else {
+        String replacement = "3 1 8:3 / " + child + " rw - ext4 /dev/replacement rw";
+        f.mounts.lines = switch (topology) {
+          case "unplugged" -> List.of(f.mounts.lines.getFirst());
+          case "overmounted" -> List.of(f.mounts.lines.getFirst(), disk, replacement);
+          default -> List.of(f.mounts.lines.getFirst(), replacement);
+        };
+        f.reconcile(true);
+      }
+      assertEquals(2, f.rows(file)); f.commit();
+    }
+  }
+
+  @Test void U10OpenImportProducerIsNeitherRetiredNorRefreshed() throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path missing = f.member("missing.txt"), changed = f.member("changed.txt");
+      f.queue.beginRecordedWalk("import-parent", "a".repeat(64), true);
+      Files.delete(missing); Files.writeString(changed, "changed source");
+      f.reconcile();
+      assertEquals(2, f.rows(missing)); assertEquals(0, f.queue.queueDepth());
+      assertNull(f.queue.recordedWalk("import-parent").orElseThrow().enumerationClosedAt());
+    }
+  }
+
+  @Test void U10InterruptedImportOwnerIsNeitherRetiredNorRefreshed() throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path missing = f.member("missing.txt"), changed = f.member("changed.txt");
+      upkeepAuthority(f.queue, false, false);
+      Files.delete(missing); Files.writeString(changed, "changed source"); f.reconcile();
+      assertEquals(2, f.rows(missing)); assertEquals(0, f.queue.queueDepth());
+    }
+  }
+
+  @Test void U4U11ChangedMembersQueueDurableOriginBearingRefreshWithoutDiscoveringNewFiles() throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path changed = f.member("changed.txt"); Files.writeString(changed, "new source text");
+      Files.writeString(f.root.resolve("new.txt"), "never discovered"); f.reconcile();
+      assertEquals(1, f.queue.queueDepth());
+      var claims = f.queue.pollPending(10); assertEquals(1, claims.size());
+      var claim = claims.getFirst(); assertEquals(changed, claim.path()); assertEquals("docs", claim.collection());
+      assertEquals(f.origin.root().path(), claim.ingestionRoot());
+      assertEquals(f.origin.id(), f.queue.sourceOriginId(claim).orElseThrow());
+      f.queue.returnUnfinishedClaims(claims);
+    }
+    try (var queue = new SqliteJobQueue(directory.resolve("imports.db"))) {
+      queue.open(); upkeepAuthority(queue, true, true); var claim = queue.pollPending(1).getFirst();
+      assertEquals("docs", claim.collection()); assertTrue(claim.unitRevision().startsWith("upkeep/"));
+      assertTrue(queue.sourceOriginId(claim).isPresent());
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"legacy", "revoked", "session", "excluded"})
+  void U6U7U8N5UnavailableApprovalOrExclusionNeverQueuesRefresh(String reason) throws Exception {
+    var previous = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    try (var f = new ImportFixture(false)) {
+      Path file = f.member("inner/changed.txt"); Files.writeString(file, "new source text");
+      if (reason.equals("legacy")) {
+        var fields = new java.util.HashMap<String, Object>(); fields.put(SchemaFields.ORIGIN_ID, null);
+        f.runtime.indexingCoordinator().updateDocument(file.toString(), fields); f.commit();
+      } else if (reason.equals("excluded")) {
+        io.justsearch.configuration.resolved.ConfigStore.setGlobal(new io.justsearch.configuration.resolved.ConfigStore(
+            io.justsearch.configuration.resolved.ResolvedConfig.builder()
+                .putDefault("justsearch.ui.exclude_patterns", "[\"inner/**\"]").build()));
+      } else upkeepAuthority(f.queue, true, false);
+      f.reconcile(); assertEquals(0, f.queue.queueDepth()); assertEquals(2, f.rows(file));
+    } finally { io.justsearch.configuration.resolved.TestResolvedConfigHelper.restoreGlobal(previous); }
+  }
+
+  private void processUpkeep(ImportFixture f, Runnable afterExtraction) throws Exception {
+    var parser = mock(io.justsearch.indexerworker.extract.TimeboxedContentExtractor.class);
+    var policy = io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults();
+    when(parser.extractionPolicy()).thenReturn(policy);
+    when(parser.extractArtifact(any())).thenAnswer(call -> {
+      if (f.failExtraction) throw new java.io.IOException("injected extraction failure");
+      return io.justsearch.indexerworker.extract.ExtractionArtifact.full(
+          new io.justsearch.indexerworker.extract.ContentExtractor.ExtractionResult(
+              Files.readString(call.getArgument(0)), null, "text/plain"), policy, "upkeep-test", false);
+    });
+    try (var identities = new SqliteDocumentIdentityStore(f.database);
+        var loop = new IndexingLoop(null, null, f.queue, f.runtime.indexingCoordinator(), f.runtime.commitOps(),
+            f.runtime.documentFieldOps(), f.runtime.indexCountOps(), () -> null,
+            mock(io.justsearch.indexerworker.coordination.WorkerSignalBus.class), IndexingPacing.unthrottled(),
+            null, null, null, null, parser, null,
+            new io.justsearch.indexerworker.loop.IndexingLoopOptions(false, null, identities, null, null, null))) {
+      loop.useRootCheck(f.service.rootCheck());
+      loop.useFileExclusions(f.service::isUserExcluded);
+      var running = IndexingLoop.class.getDeclaredField("running"); running.setAccessible(true);
+      ((java.util.concurrent.atomic.AtomicBoolean) running.get(loop)).set(true);
+      var extractorMethod = IndexingLoop.class.getDeclaredMethod("getExtractor"); extractorMethod.setAccessible(true);
+      var writerMethod = IndexingLoop.class.getDeclaredMethod("getWriter"); writerMethod.setAccessible(true);
+      var journalMethod = IndexingLoop.class.getDeclaredMethod("getJournal"); journalMethod.setAccessible(true);
+      var extractor = (io.justsearch.indexerworker.loop.JobBatchExtractor) extractorMethod.invoke(loop);
+      var writer = (io.justsearch.indexerworker.loop.JobBatchWriter) writerMethod.invoke(loop);
+      var journal = (io.justsearch.indexerworker.loop.IngestionOutcomeJournal) journalMethod.invoke(loop);
+      var claims = f.queue.pollPending(10);
+      var beginBatch = writer.getClass().getDeclaredMethod("beginBatch"); beginBatch.setAccessible(true);
+      beginBatch.invoke(writer); var jobs = extractor.extractAll(claims); afterExtraction.run();
+      for (var job : jobs) writer.write(job, null);
+      f.commit(); journal.drainPending(); journal.returnBatchClaims(claims);
+    }
+  }
+
+  @Test void U4U11TwoSuccessiveEditsPublishNewTextAndPreserveOwnershipAcrossQueueRestart() throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path file = f.member("file.txt");
+      assertTrue(((RootWitness) f.service.rootCheck()).recordAdded(f.root));
+      String uid = f.runtime.documentFieldOps().getDocumentField(file.toString(), SchemaFields.DOC_UID);
+      for (String text : List.of("first revision uniqueupkeepalpha", "second revision uniqueupkeepbeta with additional words")) {
+        Files.writeString(file, text); f.reconcile(); assertEquals(1, f.queue.queueDepth());
+        processUpkeep(f, () -> {});
+        assertEquals(text, f.runtime.documentFieldOps().getDocumentField(file.toString(), SchemaFields.CONTENT));
+        assertTrue(searchTerm(f, text.contains("alpha") ? "uniqueupkeepalpha" : "uniqueupkeepbeta") > 0);
+        if (text.contains("beta")) assertEquals(0, searchTerm(f, "uniqueupkeepalpha"));
+        assertEquals(f.origin.id(), f.runtime.documentFieldOps().getDocumentField(file.toString(), SchemaFields.ORIGIN_ID));
+        assertEquals("known", f.runtime.documentFieldOps().getDocumentField(file.toString(), SchemaFields.STORAGE_STATUS));
+        assertEquals("aaaa-1111:ext4:/", f.runtime.documentFieldOps().getDocumentField(file.toString(), SchemaFields.STORAGE_KEY));
+        assertEquals("docs", f.runtime.documentFieldOps().getDocumentField(file.toString(), SchemaFields.COLLECTION));
+        assertEquals(uid, f.runtime.documentFieldOps().getDocumentField(file.toString(), SchemaFields.DOC_UID));
+        assertEquals(0, f.queue.queueDepth());
+        f.queue.close(); f.queue.open(); upkeepAuthority(f.queue, true, true);
+      }
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"missing-before-extraction", "missing-after-extraction", "storage-before-extraction", "storage-after-extraction"})
+  void U11RefreshNeverDeletesRowsWhenTheSourceOrStorageDisappears(String when) throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path file = f.member("file.txt");
+      assertTrue(((RootWitness) f.service.rootCheck()).recordAdded(f.root));
+      Files.writeString(file, "edited source should not replace old rows"); f.reconcile();
+      if (f.queue.queueDepth() == 0) {
+        // Before-state fixture: isolate the extraction race from the then-missing upkeep producer.
+        assertEquals(1, f.queue.enqueueEntries(List.of(JobQueue.EnqueueEntry.stat(file).withinRoot(f.root)), "docs"));
+        try (var db = java.sql.DriverManager.getConnection("jdbc:sqlite:" + f.database);
+            var update = db.prepareStatement("UPDATE jobs SET unit_revision=? WHERE path=?")) {
+          update.setString(1, "upkeep/" + f.origin.id() + "/" + java.util.UUID.randomUUID());
+          update.setString(2, file.toString()); assertEquals(1, update.executeUpdate());
+        }
+      }
+      assertEquals(1, f.queue.queueDepth());
+      Runnable disappear = () -> {
+        try {
+          if (when.startsWith("missing")) Files.delete(file);
+          else f.mounts.lines = List.of("1 0 8:3 / / rw - ext4 /dev/replacement rw");
+        } catch (java.io.IOException failure) { throw new java.io.UncheckedIOException(failure); }
+      };
+      if (when.endsWith("before-extraction")) disappear.run();
+      processUpkeep(f, when.endsWith("after-extraction") ? disappear : () -> {});
+      assertEquals(2, f.rows(file));
+      assertEquals("source", f.runtime.documentFieldOps().getDocumentField(file.toString(), SchemaFields.CONTENT));
+    }
+  }
+
+  @Test void U12ExclusionRemovalSkipsChangedOwnerAndCancelsAnAlreadyQueuedRefresh() throws Exception {
+    var previous = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+    try (var f = new ImportFixture(false)) {
+      Path file = f.member("inner/file.txt");
+      Files.writeString(file, "changed content"); f.reconcile(); assertEquals(1, f.queue.queueDepth());
+      var next = origin(f.root, false); f.queue.recordSourceOrigins(List.of(next));
+      f.runtime.indexingCoordinator().updateDocument(file.toString(), Map.of(SchemaFields.ORIGIN_ID, next.id())); f.commit();
+      io.justsearch.configuration.resolved.ConfigStore.setGlobal(new io.justsearch.configuration.resolved.ConfigStore(
+          io.justsearch.configuration.resolved.ResolvedConfig.builder()
+              .putDefault("justsearch.ui.exclude_patterns", "[\"inner/**\"]").build()));
+      conditionalExclude(f.service, file, f.origin.id()); assertEquals(2, f.rows(file));
+      conditionalExclude(f.service, file, next.id()); assertEquals(0, f.rows(file));
+      assertEquals(0, f.queue.queueDepth()); processUpkeep(f, () -> {}); assertEquals(0, f.rows(file));
+    } finally { io.justsearch.configuration.resolved.TestResolvedConfigHelper.restoreGlobal(previous); }
+  }
+
+  private static void conditionalExclude(WorkerIngestService service, Path file, String origin) throws Exception {
+    try {
+      WorkerIngestService.class.getMethod("deleteExcludedImportMember", String.class, String.class, CallContext.class)
+          .invoke(service, file.toString(), origin, CallContext.none());
+    } catch (NoSuchMethodException before) {
+      service.deleteById(io.justsearch.ipc.DeleteByIdRequest.newBuilder().setDocId(file.toString()).build(), CallContext.none());
+    }
+  }
+
+  @Test void U14RecreatedMemberAfterRetirementCommitIsReadmittedUnderItsOrigin() throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path file = f.member("file.txt"); Files.delete(file);
+      var runtime = spy(f.runtime); var commits = spy(f.runtime.commitOps()); doReturn(commits).when(runtime).commitOps();
+      doAnswer(call -> { Object result = call.callRealMethod(); Files.writeString(file, "recreated content"); return result; })
+          .when(commits).commitAndTrack(io.justsearch.adapters.lucene.runtime.CommitReason.PRUNE);
+      var service = service(f.queue, runtime, f.base, DocumentIdentityStore.UNAVAILABLE);
+      var response = reconcile(service); assertTrue(response.getError().isEmpty(), response.getError());
+      assertEquals(1, f.queue.queueDepth()); assertEquals(0, f.rows(file));
+      assertEquals(f.origin.id(), f.queue.sourceOriginId(f.queue.pollPending(1).getFirst()).orElseThrow());
+    }
+  }
+
+  @Test void U13SingleFileImportRefreshesAndThenRetiresItsDeletedMember() throws Exception {
+    try (var f = new ImportFixture(true)) {
+      Path file = f.member("file.txt"); Files.writeString(file, "edited single import source"); f.reconcile();
+      assertEquals(1, f.queue.queueDepth()); processUpkeep(f, () -> {});
+      assertEquals("edited single import source", f.runtime.documentFieldOps().getDocumentField(file.toString(), SchemaFields.CONTENT));
+      Files.delete(file); f.reconcile(); assertEquals(0, f.rows(file));
+    }
+  }
+
+  @Test void U13ExternalRenameRetiresOnlyTheIndexedPathAndNeverDiscoversItsReplacement() throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path file = f.member("inner/file.txt"), destination = f.root.resolve("renamed.txt");
+      Files.move(file, destination); Files.delete(file.getParent()); f.reconcile();
+      assertEquals(0, f.rows(file)); assertEquals(0, f.rows(destination)); assertEquals(0, f.queue.queueDepth());
+    }
+  }
+
+  @Test void U13AppMediatedMoveRetainsTheOriginAndItsRefreshScope() throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path file = f.member("file.txt"), destination = f.root.resolve("moved.txt"); Files.move(file, destination);
+      var response = f.service.updateDocumentPaths(io.justsearch.ipc.UpdatePathsRequest.newBuilder()
+          .addMappings(io.justsearch.ipc.PathMapping.newBuilder().setOldPath(file.toString()).setNewPath(destination.toString()))
+          .build(), CallContext.none());
+      assertEquals(1, response.getUpdatedCount());
+      assertEquals(f.origin.id(), f.runtime.documentFieldOps().getDocumentField(destination.toString(), SchemaFields.ORIGIN_ID));
+      Files.writeString(destination, "changed after app move"); f.reconcile(); assertEquals(1, f.queue.queueDepth());
+      assertEquals(destination, f.queue.pollPending(1).getFirst().path());
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"revoked", "session"})
+  void U7U8MissingImportAncestorsRetireEvenWhenRefreshApprovalIsUnavailable(String approval) throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path file = f.member("inner/file.txt"); upkeepAuthority(f.queue, true, false);
+      Files.delete(file); Files.delete(file.getParent()); Files.delete(f.root); f.reconcile();
+      assertEquals(0, f.rows(file)); assertEquals(0, f.queue.queueDepth(), approval);
+    }
+  }
+
+  @Test void N2UnmountedImportStorageKeepsRowsUntilTheSameMountReturns() throws Exception {
+    try (var f = new ImportFixture(false)) {
+      String mounted = "2 1 8:2 / " + f.root + " rw - ext4 /dev/drive rw";
+      f.mounts.lines = List.of(f.mounts.lines.getFirst(), mounted);
+      Path file = f.member("file.txt"); Files.delete(file);
+      f.mounts.lines = List.of(f.mounts.lines.getFirst());
+      try (var ignored = NoVolumeIdentityExtension.withVolumeIdentity(false)) { f.reconcile(true); }
+      assertEquals(2, f.rows(file));
+      f.mounts.lines = List.of(f.mounts.lines.getFirst(), mounted);
+      assertTrue(reconcile(service(f.queue, f.runtime, f.base, DocumentIdentityStore.UNAVAILABLE)).getError().isEmpty());
+      assertEquals(0, f.rows(file));
+    }
+  }
+
+  @Test void N4UnknownStorageKeepsTheExistingParentWitnessRule() throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path file = f.member("inner/file.txt");
+      var unknown = new io.justsearch.indexing.SourceEnvelope(f.origin.id(),
+          io.justsearch.indexing.SourceEnvelope.StorageStatus.UNKNOWN, null, null).patch();
+      f.runtime.indexingCoordinator().updateDocument(file.toString(), unknown);
+      f.runtime.indexingCoordinator().updateDocument(file + "#child", unknown); f.commit();
+      Files.delete(file); Files.delete(file.getParent()); f.reconcile(true); assertEquals(2, f.rows(file));
+    }
+  }
+
+  @Test void U11ChunkFamilyGrowthAndShrinkReplaceEveryOldMember() throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path file = f.member("file.txt"); assertTrue(((RootWitness) f.service.rootCheck()).recordAdded(f.root));
+      String longText = "Long import content, with different words in each sentence.\n".repeat(800);
+      Files.writeString(file, longText); f.reconcile(); assertEquals(1, f.queue.queueDepth()); processUpkeep(f, () -> {});
+      int longFamily = f.rows(file); assertTrue(longFamily > 2);
+      Files.writeString(file, "short replacement content"); f.reconcile(); assertEquals(1, f.queue.queueDepth());
+      processUpkeep(f, () -> {}); assertTrue(f.rows(file) < longFamily);
+      assertEquals("short replacement content", f.runtime.documentFieldOps().getDocumentField(file.toString(), SchemaFields.CONTENT));
+      assertEquals(f.origin.id(), f.runtime.documentFieldOps().getDocumentField(file.toString(), SchemaFields.ORIGIN_ID));
+    }
+  }
+
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"extraction-failure", "unreadable", "placeholder"})
+  void U11FailedUnreadableOrPlaceholderRefreshPreservesTheExistingFamily(String failure) throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path file = f.member("file.txt"); assertTrue(((RootWitness) f.service.rootCheck()).recordAdded(f.root));
+      Files.writeString(file, "changed source awaiting extraction"); f.reconcile(); assertEquals(1, f.queue.queueDepth());
+      var permissions = Files.getPosixFilePermissions(file);
+      try (var cloud = mockStatic(io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.class, CALLS_REAL_METHODS)) {
+        if (failure.equals("placeholder")) cloud.when(() ->
+            io.justsearch.indexerworker.ingest.CloudPlaceholderDetector.isCloudPlaceholder(file)).thenReturn(true);
+        if (failure.equals("unreadable")) Files.setPosixFilePermissions(file, java.util.Set.of());
+        f.failExtraction = failure.equals("extraction-failure"); processUpkeep(f, () -> {});
+        assertEquals(2, f.rows(file));
+        assertEquals("source", f.runtime.documentFieldOps().getDocumentField(file.toString(), SchemaFields.CONTENT));
+      } finally { Files.setPosixFilePermissions(file, permissions); }
+    }
+  }
+
+  private static int searchTerm(ImportFixture fixture, String term) throws Exception {
+    try (var directory = org.apache.lucene.store.FSDirectory.open(fixture.runtime.openedIndexPath());
+        var reader = org.apache.lucene.index.DirectoryReader.open(directory)) {
+      var query = new org.apache.lucene.search.BooleanQuery.Builder();
+      for (String field : List.of(SchemaFields.CONTENT, SchemaFields.CHUNK_CONTENT)) {
+        query.add(new org.apache.lucene.search.TermQuery(new org.apache.lucene.index.Term(field, term)),
+            org.apache.lucene.search.BooleanClause.Occur.SHOULD);
+      }
+      return new org.apache.lucene.search.IndexSearcher(reader).count(query.build());
+    }
+  }
+
+  @org.junit.jupiter.params.ParameterizedTest
+  @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+  void U4FailedUpkeepRetainsItsRetryBudgetUntilTheMemberOrPolicyChanges(boolean policyChange) throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path file = f.member("file.txt"); assertTrue(((RootWitness) f.service.rootCheck()).recordAdded(f.root));
+      f.service.setExtractionPolicy(io.justsearch.indexerworker.extract.TikaExtractionPolicy.defaults());
+      Files.writeString(file, "failed source revision"); f.reconcile(); assertEquals(1, f.queue.queueDepth());
+      try (var db = java.sql.DriverManager.getConnection("jdbc:sqlite:" + f.database);
+          var failure = db.prepareStatement("UPDATE jobs SET state='FAILED',attempts=3,retry_after=NULL,last_outcome_class='PARSER_FAILED',last_retry_policy='NONE' WHERE path=?")) {
+        failure.setString(1, file.toString()); assertEquals(1, failure.executeUpdate());
+      }
+      f.reconcile(); assertEquals(0, f.queue.queueDepth(), "unchanged failure retains its exhausted budget");
+      if (policyChange) {
+        try (var db = java.sql.DriverManager.getConnection("jdbc:sqlite:" + f.database);
+            var policy = db.prepareStatement("UPDATE jobs SET extraction_policy_id='old-policy' WHERE path=?")) {
+          policy.setString(1, file.toString()); assertEquals(1, policy.executeUpdate());
+        }
+      } else Files.writeString(file, "fixed source revision with new text");
+      f.reconcile();
+      assertEquals(1, f.queue.queueDepth(), "changed bytes or extraction policy acquire fresh upkeep");
+      processUpkeep(f, () -> {});
+      assertEquals(policyChange ? "failed source revision" : "fixed source revision with new text",
+          f.runtime.documentFieldOps().getDocumentField(file.toString(), SchemaFields.CONTENT));
+    }
+  }
+
+  @Test void U7QueuedRefreshDefersWithoutOpeningOrSpendingAttemptsWhenApprovalIsLost() throws Exception {
+    try (var f = new ImportFixture(false)) {
+      Path file = f.member("file.txt"); Files.writeString(file, "edited while approved");
+      f.reconcile(); assertEquals(1, f.queue.queueDepth()); upkeepAuthority(f.queue, true, false);
+      try (var hashing = mockStatic(io.justsearch.indexerworker.loop.SourceContentHash.class, CALLS_REAL_METHODS)) {
+        processUpkeep(f, () -> {}); hashing.verifyNoInteractions();
+      }
+      assertEquals(2, f.rows(file));
+      try (var db = java.sql.DriverManager.getConnection("jdbc:sqlite:" + f.database);
+          var query = db.prepareStatement("SELECT attempts,last_updated,retry_after,last_retry_policy FROM jobs WHERE path=?")) {
+        query.setString(1, file.toString());
+        try (var row = query.executeQuery()) {
+          assertTrue(row.next()); assertEquals(0, row.getInt(1));
+          assertTrue(row.getLong(3) > row.getLong(2));
+          assertEquals("DEFER_WITHOUT_ATTEMPT", row.getString(4));
+        }
+      }
+    }
+  }
 }
