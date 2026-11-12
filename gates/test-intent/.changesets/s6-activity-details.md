@@ -811,3 +811,13 @@ Repair after the real-Engine recheck and verification of 2026-11-12 (design choi
   "digest": "sha256:ea1516a63f1c33d303d3c918c95bddd66d0da689c6fcce7d46c765a9c466e79b"
 }
 ```
+
+```json
+{
+  "kind": "tie-break",
+  "role": "verifier",
+  "session": "verifier-p9sium_c",
+  "verdict": "accept",
+  "digest": "sha256:ea1516a63f1c33d303d3c918c95bddd66d0da689c6fcce7d46c765a9c466e79b"
+}
+```
