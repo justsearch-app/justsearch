@@ -41,14 +41,18 @@ function reasonCode(loss: EngineLoss): string {
   return detail ? `${cause}:${detail}` : cause;
 }
 
-/** Exit codes and how often each occurred recently; integers only. */
+/**
+ * How often each exit occurred recently, exactly as the supervisor's record counts them
+ * (`recentExits.codes`, from its exit ledger). Keys are exit codes, or for a signal its name (a Linux
+ * SIGKILL has no exit code); nothing is inferred from the last exit. Integers and closed words only.
+ */
 function exitCodes(loss: EngineLoss): Record<string, number> {
   const codes: Record<string, number> = {};
   for (const [code, count] of Object.entries(loss.supervisor?.recentExits?.codes ?? {})) {
-    if (/^-?\d{1,10}$/.test(code) && Number.isInteger(count) && count >= 0) codes[String(Number(code))] = count;
+    if (!Number.isInteger(count) || count < 0) continue;
+    if (/^-?\d{1,10}$/.test(code)) codes[String(Number(code))] = count;
+    else if (/^(SIG[A-Z0-9]{2,10}|signal \d{1,3}|unknown)$/.test(code)) codes[code] = count;
   }
-  const last = loss.supervisor?.lastExit?.code;
-  if (Number.isInteger(last) && codes[String(last)] === undefined) codes[String(last)] = 1;
   return codes;
 }
 

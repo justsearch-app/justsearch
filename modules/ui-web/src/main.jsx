@@ -25,6 +25,10 @@ async function __maybeLockdown() {
 }
 
 import './styles/tokens.css'
+// Focus after the desktop window controls; ahead of every application listener, including the
+// start-up hand-off's input guard.
+import { installWindowControlFocus } from './boot/desktopWindow.ts'
+installWindowControlFocus()
 // Register local strategies immediately; catalog requests start after API discovery.
 // Lit chrome is the production chrome. During bootstrap, the shell-v0 barrel
 // registers the custom elements, including <jf-shell>, <jf-top-bar> and <jf-stage>.
