@@ -93,15 +93,31 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
       var before = preserved(runtime);
       replace(runtime, LONG, "explicit");
       assertAll(
-          () -> assertReplacement(runtime, LONG, 4000L),
+          () -> assertReplacement(runtime, LONG, 4000L, "en"),
           () -> assertEquals(before, preserved(runtime)),
           () -> assertReasonAbsent(runtime),
           () -> assertFalse(chunks(runtime).isEmpty()));
     }
     try (var runtime = open()) {
-      assertReplacement(runtime, LONG, 4000L);
+      assertReplacement(runtime, LONG, 4000L, "en");
       assertReasonAbsent(runtime);
       assertFalse(chunks(runtime).isEmpty());
+    }
+  }
+
+  @Test
+  void vc1bReplacementLabelsItsBodyNotItsOpeningAndKeepsTheOpeningAsPreview() throws Exception {
+    String english = "Changes to legislation: there are currently no known outstanding effects for this provision.\n";
+    String german = "Die öffentliche Bibliothek öffnet jeden Morgen und begrüßt Leser aus den umliegenden Dörfern.\n";
+    String replacement = english.repeat(50) + german.repeat(150);
+    try (var runtime = open()) {
+      seed(runtime, SHORT, 1L, PENDING);
+      replace(runtime, replacement, "explicit");
+      assertReplacement(runtime, replacement, replacement.length() / 3, "de");
+      assertTrue(field(runtime, SchemaFields.CONTENT_PREVIEW).startsWith(english));
+    }
+    try (var runtime = open()) {
+      assertReplacement(runtime, replacement, replacement.length() / 3, "de");
     }
   }
 
@@ -120,13 +136,13 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
       assertNumericQueryAndSort(4000L, 2000L, "control");
       replace(runtime, replacement, "explicit");
       assertAll(
-          () -> assertReplacement(runtime, replacement, expectedCount),
+          () -> assertReplacement(runtime, replacement, expectedCount, null),
           () -> assertTrue(java.util.Collections.disjoint(oldIds, chunks(runtime).keySet())),
           () -> assertEquals(size.equals("below-threshold"), chunks(runtime).isEmpty()),
           () -> assertNumericQueryAndSort(expectedCount, 4000L, DOC));
     }
     try (var runtime = open()) {
-      assertReplacement(runtime, replacement, expectedCount);
+      assertReplacement(runtime, replacement, expectedCount, null);
       assertNumericQueryAndSort(expectedCount, 4000L, DOC);
     }
   }
@@ -140,11 +156,11 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
       assertAll(
           () -> assertEquals("COMPLETED", field(runtime, SchemaFields.VDU_STATUS)),
           () -> assertNull(field(runtime, REASON)),
-          () -> assertReplacement(runtime, LONG, 4000L));
+          () -> assertReplacement(runtime, LONG, 4000L, "en"));
     }
     try (var runtime = open()) {
       assertEquals("COMPLETED", field(runtime, SchemaFields.VDU_STATUS));
-      assertReplacement(runtime, LONG, 4000L);
+      assertReplacement(runtime, LONG, 4000L, "en");
       assertReasonAbsent(runtime);
     }
   }
@@ -185,19 +201,19 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
     try (var runtime = open()) {
       seed(runtime, SHORT, null, null);
       replace(runtime, LONG, "explicit");
-      assertReplacement(runtime, LONG, 4000L);
+      assertReplacement(runtime, LONG, 4000L, "en");
       assertReasonAbsent(runtime);
       replace(runtime, SHORT, "legacy");
-      assertReplacement(runtime, SHORT, 21L);
+      assertReplacement(runtime, SHORT, 21L, null);
       assertTrue(chunks(runtime).isEmpty());
       runtime.indexingCoordinator().updateDocument(DOC, Map.of(COUNT, 9999L));
       refresh(runtime);
       replace(runtime, SHORT, "unspecified");
-      assertReplacement(runtime, SHORT, 21L);
+      assertReplacement(runtime, SHORT, 21L, null);
       assertReasonAbsent(runtime);
     }
     try (var runtime = open()) {
-      assertReplacement(runtime, SHORT, 21L);
+      assertReplacement(runtime, SHORT, 21L, null);
       assertReasonAbsent(runtime);
     }
   }
@@ -373,12 +389,12 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
       // JobQueue owns ingestion outcomes and journal transitions; VDU must not rewrite that history.
       verifyNoInteractions(queue);
       assertEquals(fingerprint, runtime.latestCommitUserDataBestEffort().get("index_fingerprint"));
-      assertReplacement(runtime, LONG, 4000L);
+      assertReplacement(runtime, LONG, 4000L, "en");
       assertReasonAbsent(runtime);
     }
     try (var runtime = open()) {
       assertEquals(fingerprint, runtime.latestCommitUserDataBestEffort().get("index_fingerprint"));
-      assertReplacement(runtime, LONG, 4000L);
+      assertReplacement(runtime, LONG, 4000L, "en");
     }
   }
 
@@ -443,7 +459,8 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
     return runtime.documentFieldOps().getDocumentFieldsBatch(ids, ALL_FIELDS);
   }
 
-  private static void assertReplacement(RunningRuntime runtime, String content, long expectedCount) {
+  private static void assertReplacement(
+      RunningRuntime runtime, String content, long expectedCount, String expectedLanguage) {
     assertEquals(content, runtime.documentFieldOps().getDocumentContent(DOC));
     assertAll(
         () -> assertEquals(Long.toString(expectedCount), field(runtime, COUNT)),
@@ -454,9 +471,10 @@ class VduResultWriterCoherenceTest extends LuceneExecutorTestBase {
         });
     assertEquals(Double.toString(TextQualityAnalyzer.computeQualityScore(content)), field(runtime, SchemaFields.EXTRACTION_QUALITY_SCORE));
     assertEquals(ChunkParentRevision.sha256Hex(content), field(runtime, SchemaFields.CONTENT_SHA256));
-    String preview = LanguageUtils.contentPreview(content, ChunkDocumentWriter.CONTENT_PREVIEW_MAX_CHARS);
-    assertEquals(preview, field(runtime, SchemaFields.CONTENT_PREVIEW));
-    assertEquals(LanguageUtils.resolveLanguage(preview), field(runtime, SchemaFields.LANGUAGE));
+    // The preview stays the opening of the stored text; the label follows its main text.
+    String stripped = content.strip();
+    assertEquals(stripped.substring(0, Math.min(4096, stripped.length())), field(runtime, SchemaFields.CONTENT_PREVIEW));
+    assertEquals(expectedLanguage, field(runtime, SchemaFields.LANGUAGE));
     assertEquals("VDU", field(runtime, SchemaFields.EXTRACTION_METHOD));
     assertEquals("PENDING", field(runtime, SchemaFields.EMBEDDING_STATUS));
     for (var chunk : chunks(runtime).entrySet()) {

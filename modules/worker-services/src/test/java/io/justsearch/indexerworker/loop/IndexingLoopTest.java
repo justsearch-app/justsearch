@@ -266,49 +266,49 @@ class IndexingLoopTest {
     @Test
     @DisplayName("null returns null")
     void nullReturnsNull() {
-      assertNull(io.justsearch.indexerworker.services.LanguageUtils.resolveLanguage(null));
+      assertNull(io.justsearch.indexerworker.services.LanguageUtils.contentLanguage(null, null, null));
     }
 
     @Test
     @DisplayName("empty string returns null")
     void emptyReturnsNull() {
-      assertNull(io.justsearch.indexerworker.services.LanguageUtils.resolveLanguage(""));
+      assertNull(io.justsearch.indexerworker.services.LanguageUtils.contentLanguage("", null, null));
     }
 
     @Test
     @DisplayName("Short Latin text has insufficient evidence")
     void latinReturnsNull() {
-      assertNull(io.justsearch.indexerworker.services.LanguageUtils.resolveLanguage("The quick brown fox jumps over the lazy dog."));
+      assertNull(io.justsearch.indexerworker.services.LanguageUtils.contentLanguage("The quick brown fox jumps over the lazy dog.", null, null));
     }
 
     @Test
     @DisplayName("Chinese text returns 'zh'")
     void chineseReturnsZh() {
-      assertEquals("zh", io.justsearch.indexerworker.services.LanguageUtils.resolveLanguage("这是一段中文文本用于测试。"));
+      assertEquals("zh", io.justsearch.indexerworker.services.LanguageUtils.contentLanguage("这是一段中文文本用于测试。", null, null));
     }
 
     @Test
     @DisplayName("Japanese hiragana returns 'ja'")
     void japaneseReturnsJa() {
-      assertEquals("ja", io.justsearch.indexerworker.services.LanguageUtils.resolveLanguage("これは日本語のテキストです。"));
+      assertEquals("ja", io.justsearch.indexerworker.services.LanguageUtils.contentLanguage("これは日本語のテキストです。", null, null));
     }
 
     @Test
     @DisplayName("Korean text returns 'ko'")
     void koreanReturnsKo() {
-      assertEquals("ko", io.justsearch.indexerworker.services.LanguageUtils.resolveLanguage("이것은 한국어 텍스트입니다."));
+      assertEquals("ko", io.justsearch.indexerworker.services.LanguageUtils.contentLanguage("이것은 한국어 텍스트입니다.", null, null));
     }
 
     @Test
     @DisplayName("Cyrillic (Russian) returns 'ru'")
     void russianReturnsRu() {
-      assertEquals("ru", io.justsearch.indexerworker.services.LanguageUtils.resolveLanguage("Это текст на русском языке."));
+      assertEquals("ru", io.justsearch.indexerworker.services.LanguageUtils.contentLanguage("Это текст на русском языке.", null, null));
     }
 
     @Test
     @DisplayName("Arabic text returns 'ar'")
     void arabicReturnsAr() {
-      assertEquals("ar", io.justsearch.indexerworker.services.LanguageUtils.resolveLanguage("هذا نص باللغة العربية."));
+      assertEquals("ar", io.justsearch.indexerworker.services.LanguageUtils.contentLanguage("هذا نص باللغة العربية.", null, null));
     }
   }
 
