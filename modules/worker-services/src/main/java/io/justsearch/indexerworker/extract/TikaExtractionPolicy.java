@@ -66,6 +66,7 @@ public record TikaExtractionPolicy(
   // v10: physical PDF text preserves word boundaries and rejoins lowercase line-end hyphens, including OCR.
   //      Language labels derive from content, including Latin prose, without a locale fallback.
   // v11: page orientation, EXIF image orientation and German-first default OCR.
+  //      Language labels come from up to eight windows across the text, not its opening.
   public static TikaExtractionPolicy defaults() {
     return new TikaExtractionPolicy(
         "tika-default-v11",
