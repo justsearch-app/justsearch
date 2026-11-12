@@ -10,8 +10,8 @@ author-session: cb931fec-4aa3-4c83-8112-969f6334cf08
 New checks in `KnowledgeServerRebuildHelpTest` for the bundled help documents after a user-started
 rebuild (a recorded candidate without an installer configuration). They run a real
 `KnowledgeServer` with a real index, queue and generation state; the recorded owner is a test
-double with an empty settings projection. Repaired checks fail by assertion at 07b719af28 (help is
-absent from the promoted generation); preservation checks pass there and on the candidate.
+double with an empty settings projection. Repaired checks fail by assertion on origin/main;
+preservation checks pass there and on the candidate.
 
 ```json
 {
@@ -21,7 +21,7 @@ absent from the promoted generation); preservation checks pass there and on the 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java"
       ],
       "class": "New",
-      "behaviour": "H1/H2/H4/N3/N4/N5 (repaired): after a user-started rebuild (user_requested_rebuild and user_requested_bulk_reindex) with zero watched roots completes, the promoted generation serves each top-level Markdown help file exactly once with collection justsearch-help, without a restart, a marker edit or a write to the help files; ignored .txt and nested Markdown stay absent; an excluded help file stays out, live and after restart; restarts keep the help documents without duplicates. A BUILDING generation recorded before help was admitted, a process stop before the pointer commitment and one after it each recover to a generation with the help documents exactly once. At 07b719af28 each fails by assertion: help is missing from the rebuilt generation.",
+      "behaviour": "H1/H2/H4/H5/N3/N4/N5 (repaired): after a user-started rebuild (user_requested_rebuild and user_requested_bulk_reindex) with zero watched roots completes, the promoted generation serves each top-level Markdown help file exactly once with collection justsearch-help, without a restart, a marker edit or a write to the help files; ignored .txt and nested Markdown stay absent; an excluded help file stays out, live and after restart; restarts keep the help documents without duplicates. A BUILDING generation recorded before help was admitted, and a process stop before or after the pointer commitment, each recover to a generation with the help documents exactly once. An unreadable help folder fails the rebuild and the serving generation stays. On origin/main each fails by assertion: help is missing from the rebuilt generation, or the rebuild with unreadable help promotes.",
       "sources": [
         {
           "kind": "owner-words",
@@ -32,8 +32,8 @@ absent from the promoted generation); preservation checks pass there and on the 
           "kind": "delegated-choice",
           "delegationQuote": "do that",
           "delegationLocation": "task t-20261112-help-after-rebuild request",
-          "delegationScope": "The repair the owner answered with \"do that\": a report that said \"Help documents after a rebuild: they disappear after a rebuild you start yourself. That was already broken before this fix.\" The scenarios and design are orchestrator choices under that delegation, not owner words or owner adoption.",
-          "choice": "Reuse the existing installer help-enumeration path for every recorded BUILDING generation, live and recovered; keep native migration handling, filtering, exclusions and promotion checks; no marker format change and no help-marker bump (v6 is unreleased and already re-submits help for installs from releases). Settled scenarios, verbatim: H1 \"After a user-started rebuild (core.rebuild-index via POST /api/indexing/migration/start, and core.bulk-reindex) completes with full coverage and the new generation serves, the eligible bundled help documents are in it: the expected help document identities (top-level .md files of the help folder), in the help collection, with current-policy labels, found by a help query (e.g. \"keyboard shortcuts\"). No restart needed. Also with zero watched roots.\" H2 \"After that rebuild, restarts keep them: no loss, no duplicate identities, not relabelled as user content (also when a watched folder is an ancestor of or coincides with the help folder).\" H4 \"Recovery: a crash (process kill) during a rebuild, (a) before help is admitted to the building generation, (b) after admission before processing, (c) around pointer commitment; each recovered successful rebuild contains help without duplicates. Cancellation before pointer commitment keeps the serving generation and its help.\" N3 \"Exclusions: excluding one help file, or the whole help folder, keeps it out after a rebuild, immediately and after restart.\" N4 (part) \"ignored .txt and nested Markdown in the help folder stay absent.\" N5 \"Help files are never written or moved.\"",
+          "delegationScope": "The repair the owner answered with \"do that\": a report that said \"Help documents after a rebuild: they disappear after a rebuild you start yourself. That was already broken before this fix.\" The scenarios and design below are orchestrator choices under that delegation, not owner words.",
+          "choice": "Every recorded BUILDING generation (user rebuild-index and bulk reindex, live and recovered after a restart, as well as installer activation) replays the bundled help folder through the existing installer help-enumeration path; native migration handling, filtering, exclusions and promotion checks are kept. No help-marker format change and no marker bump: v6 is unreleased and already re-submits help for installs from releases. Settled scenarios: H1 after a user-started rebuild completes and the new generation serves, the eligible bundled help documents (top-level .md files of the help folder) are in it, in the help collection, without a restart, also with zero watched roots; H2 restarts keep them, without loss or duplicate identities; H4 a stop before help is admitted, or around the pointer commitment, recovers to a rebuild that contains help without duplicates; H5 a help folder present but not fully enumerable keeps the serving generation (existing failure handling); N3 an excluded help file stays out after the rebuild and after a restart; N4 ignored .txt and nested Markdown in the help folder stay absent; N5 help files are never written.",
           "label": "agent choice"
         }
       ],
@@ -44,7 +44,8 @@ absent from the promoted generation); preservation checks pass there and on the 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#rebuiltHelpSurvivesRestartsWithoutDuplicates",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#excludedHelpStaysOutOfTheRebuild",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#resumedBuildingGenerationAdmitsHelpBeforePromotion",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#crashAroundPointerCommitmentKeepsHelp"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#crashAroundPointerCommitmentKeepsHelp",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#unreadableHelpKeepsTheServingGeneration"
       ]
     },
     {
@@ -52,14 +53,14 @@ absent from the promoted generation); preservation checks pass there and on the 
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java"
       ],
       "class": "New",
-      "behaviour": "H4/H5 (preservation): help rows already admitted to the BUILDING generation before a stop are served exactly once after the resumed rebuild; a cancellation at the pointer commitment keeps the serving generation and its help; a rebuild with the help folder absent or empty completes with an empty generation.",
+      "behaviour": "H2/H4/H5 (preservation): help rows already admitted to the BUILDING generation before a stop are served exactly once after the resumed rebuild; a cancellation at the pointer commitment keeps the serving generation and its help; a rebuild with the help folder absent or empty completes with an empty generation; a captured watched root that contains or is the help folder keeps owning those files, so the rebuild does not relabel them as help.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "do that",
           "delegationLocation": "task t-20261112-help-after-rebuild request",
-          "delegationScope": "The repair the owner answered with \"do that\": a report that said \"Help documents after a rebuild: they disappear after a rebuild you start yourself. That was already broken before this fix.\" The scenarios and design are orchestrator choices under that delegation, not owner words or owner adoption.",
-          "choice": "Settled scenarios, verbatim: H4 \"Recovery: a crash (process kill) during a rebuild, (a) before help is admitted to the building generation, (b) after admission before processing, (c) around pointer commitment; each recovered successful rebuild contains help without duplicates. Cancellation before pointer commitment keeps the serving generation and its help.\" H5 \"Help source edge cases: help folder absent or empty: the rebuild completes (no help required); help folder present but not fully enumerable: existing failure handling (serving generation kept, as native migration does today).\"",
+          "delegationScope": "The repair the owner answered with \"do that\": a report that said \"Help documents after a rebuild: they disappear after a rebuild you start yourself. That was already broken before this fix.\" The scenarios and design below are orchestrator choices under that delegation, not owner words.",
+          "choice": "Settled scenarios kept by the repair: H4 help rows already admitted to the building generation before a stop are served once after the resumed rebuild, and a cancellation before the pointer commitment keeps the serving generation and its help; H5 a rebuild with the help folder absent or empty completes (no help required); H2 overlap: when a watched folder contains or is the help folder, that folder keeps its existing binding (the watched root owns those files, as in live ingestion), so a rebuild does not relabel them as help.",
           "label": "agent choice"
         }
       ],
@@ -68,7 +69,8 @@ absent from the promoted generation); preservation checks pass there and on the 
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#resumedBuildingGenerationWithAdmittedHelpHasNoDuplicates",
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#refusedRebuildKeepsServingHelp",
-        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#rebuildWithoutHelpSourceStillCompletes"
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#rebuildWithoutHelpSourceStillCompletes",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#capturedWatchedRootKeepsItsHelpBinding"
       ]
     }
   ]

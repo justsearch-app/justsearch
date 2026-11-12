@@ -6,7 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import io.justsearch.app.api.operations.RecordedRootPlan;
 import io.justsearch.app.api.runtime.ManagedChildRegistry;
 import io.justsearch.configuration.EnvRegistry;
 import io.justsearch.configuration.resolved.ConfigStore;
@@ -98,6 +100,61 @@ final class KnowledgeServerRebuildHelpTest {
         "justsearch.ui.exclude_patterns", "[\"" + help.excluded.getFileName() + "\"]"))) {
       help.assertServedExactly(restarted.server);
     }
+  }
+
+  /** H5: a help folder that cannot be enumerated fails the rebuild; the serving generation stays. */
+  @Test
+  void unreadableHelpKeepsTheServingGeneration(@TempDir Path tempDir) throws Exception {
+    Help help = Help.write(tempDir);
+    assumeTrue(Files.getFileStore(help.root).supportsFileAttributeView("posix"));
+    var permissions = Files.getPosixFilePermissions(help.root);
+    try (Fixture fixture = new Fixture(tempDir)) {
+      String serving = fixture.manager.readStateBestEffort().active_generation();
+      Files.setPosixFilePermissions(help.root, java.util.Set.of());
+      try {
+        fixture.startRebuild(REBUILD);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+        while (!fixture.lifecycle.published && System.nanoTime() < deadline
+            && !"FAILED".equals(fixture.manager.readStateBestEffort().migration_state())) {
+          Thread.sleep(25);
+        }
+        assertFalse(fixture.lifecycle.published, "an incomplete help enumeration never promotes");
+        assertEquals("FAILED", fixture.manager.readStateBestEffort().migration_state());
+        fixture.lifecycle.cancelled = true; // the Engine records the refusal of the FAILED pointer
+        fixture.awaitMonitor();
+      } finally {
+        Files.setPosixFilePermissions(help.root, permissions);
+      }
+      assertFalse(fixture.lifecycle.published);
+      assertEquals(serving, fixture.manager.readStateBestEffort().active_generation());
+    }
+    help.assertUntouched();
+  }
+
+  /**
+   * H2 overlap: a captured watched root that contains or is the help folder owns those files, so
+   * the rebuild does not relabel them as help; the captured walk keeps their watched binding.
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"ancestor", "coincide"})
+  void capturedWatchedRootKeepsItsHelpBinding(String shape, @TempDir Path tempDir)
+      throws Exception {
+    Help help = Help.write(tempDir);
+    Path watched = "ancestor".equals(shape) ? help.root.getParent() : help.root;
+    try (Fixture fixture = new Fixture(tempDir)) {
+      fixture.lifecycle.capturedRoot = watched;
+      fixture.startRebuild(REBUILD);
+      fixture.awaitMonitor();
+      assertTrue(fixture.lifecycle.published);
+      try (var view = fixture.server.captureServingView()) {
+        for (Path file : help.expected) {
+          assertNull(view.searchRuntime().documentFieldOps().getDocumentField(
+              PathNormalizer.normalizeKey(file), SchemaFields.COLLECTION),
+              "the watched root's walk, not the help source, owns " + file);
+        }
+      }
+    }
+    help.assertUntouched();
   }
 
   @ParameterizedTest
@@ -404,8 +461,16 @@ final class KnowledgeServerRebuildHelpTest {
     private volatile Recorded recorded;
     private volatile boolean published;
     private volatile boolean cancelled;
+    private volatile Path capturedRoot;
 
     void resume(Recorded value) { recorded = value; }
+
+    @Override public Optional<RecordedRootPlan> recordedRootPlan(String key) {
+      Recorded current = recorded;
+      return capturedRoot == null || current == null ? Optional.empty()
+          : Optional.of(new RecordedRootPlan(current.building(), List.of(new RecordedRootPlan.Root(
+              capturedRoot, null, false, false, List.of(), List.of()))));
+    }
 
     @Override public IndexGenerationManager.BootOwnership bootOwnership(JobQueue queue) {
       Recorded current = recorded;

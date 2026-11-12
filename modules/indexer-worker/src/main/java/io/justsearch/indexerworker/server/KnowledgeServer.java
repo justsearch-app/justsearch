@@ -10931,10 +10931,19 @@ public final class KnowledgeServer implements Closeable {
     return rc != null && rc.rag() != null && rc.rag().chunkSpladeEnabled();
   }
 
-  private static List<ResolvedConfig.FileSource> bundledHelpRoots(ResolvedConfig configuration) {
+  /**
+   * The bundled help source a recorded candidate replays. A captured watched root that contains or
+   * is the help folder already owns those files, and its binding wins, as in live ingestion.
+   */
+  private static List<ResolvedConfig.FileSource> bundledHelpRoots(ResolvedConfig configuration,
+      List<RootBinding> capturedRoots) {
     var help = configuration.collections().bundledHelp();
-    return !EnvRegistry.EVAL_MODE.getBoolean(false) && help != null && Files.isDirectory(help.path())
-        ? List.of(help) : List.of();
+    if (EnvRegistry.EVAL_MODE.getBoolean(false) || help == null || !Files.isDirectory(help.path())) {
+      return List.of();
+    }
+    Path folder = help.path().toAbsolutePath().normalize();
+    return capturedRoots.stream().anyMatch(root -> root.path() != null
+        && folder.startsWith(root.path().toAbsolutePath().normalize())) ? List.of() : List.of(help);
   }
 
   private void startMigrationEnumeratorBestEffort(ResolvedConfig rc) {
@@ -10979,7 +10988,7 @@ public final class KnowledgeServer implements Closeable {
                 // and user rebuilds alike) must also replay the app-owned bundled help source,
                 // regardless of its startup version marker.
                 List<ResolvedConfig.FileSource> roots = enumerateFiles ? loadMigrationRoots(rc)
-                    : bundledHelpRoots(rc);
+                    : bundledHelpRoots(rc, frozenCollectionRoots);
                 if (enumerateFiles) {
                   requireMigrationRootsOnRecordedVolume(roots, rc.collections());
                 }
