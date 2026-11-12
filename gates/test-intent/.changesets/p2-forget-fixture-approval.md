@@ -24,3 +24,16 @@ author-session: p2-forget-fixture-approval-dlx1d4je
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-85_zu4rd-b250-20261112",
+  "verdict": "accept",
+  "digest": "sha256:60072e3d0199c052dbc0594190beae8dbd966fcde9bcff0c74505d2d68149d76",
+  "note": "The settled 2026-11-12 decision permits this reindex fixture. The single changed operation kind preserves every Q55 assertion; both candidate Q55 cases executed and passed. Import-walk forget remains outside these two checks."
+}
+```

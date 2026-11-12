@@ -943,3 +943,14 @@ I18 recovery repair (2026-11-12): the new restart regression also failed directl
   "note": "Reject entries 5,6,7,19,20: baseline non-assertion failures do not prove the behavior. Reject entries 18,19,23: unrelated context, confirmed-count and exhausted-attempt preservation assertions were removed outside the Obsolete warrant. Other entries have no objection. Independent candidate 186/186 and original baseline 112/112 passed without skips."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-85_zu4rd-b250-20261112",
+  "verdict": "accept",
+  "digest": "sha256:5827bdf6dde53d050fe86c7deebbe7524ccd609aef562350379363bccc5544b6",
+  "note": "Reviewed all 32 entries against the supplied scenarios, original tests, candidate diff and cited machine evidence. The 22 existing-case dispositions and preserved identity, context, confirmed-count, cancellation and attempt-ceiling checks are recorded in intent-review.md. No entry changes an unrelated established outcome. Candidate coordinator 86/86, restart 39/39 and origin, validator and wire checks executed without skips."
+}
+```
