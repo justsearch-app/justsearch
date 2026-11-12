@@ -73,7 +73,11 @@ _BATCH_TIMING_COLUMNS = {
 
 
 def snapshot_to_row(elapsed_s: float, snapshot: dict) -> dict:
-    """Extract a timeline row from a status snapshot."""
+    """Extract a timeline row from a status snapshot.
+
+    ``indexed`` is None (a blank TSV cell, the timeline's form for a value it does not have) when
+    the Engine reports the document count unknown; its 0 is then a placeholder, not an empty index.
+    """
     heap_bytes = snapshot.get("memoryUsedBytes", 0)
 
     # GPU metrics (335 §9: from GpuStatusView in /api/status)
@@ -83,7 +87,10 @@ def snapshot_to_row(elapsed_s: float, snapshot: dict) -> dict:
 
     row = {
         "elapsed_s": round(elapsed_s, 1),
-        "indexed": snapshot.get("indexedDocuments", 0),
+        "indexed": (
+            None if snapshot.get("indexedDocumentsUnknown") is True
+            else snapshot.get("indexedDocuments", 0)
+        ),
         "pending": (
             snapshot.get("pendingJobsCount", 0)
             + snapshot.get("processingJobsCount", 0)
@@ -162,19 +169,21 @@ def compute_pipeline_summary(rows: list[dict]) -> dict:
 
     # Primary indexing: time from first row with pending > 0 to first row
     # with pending == 0 AND indexed > initial (after indexing started).
-    initial_indexed = rows[0]["indexed"] if rows else 0
+    # Document counts come from the rows that have one (an unknown count is None).
+    counted = [row["indexed"] for row in rows if row["indexed"] is not None]
+    initial_indexed = counted[0] if counted else 0
     indexing_start = None
     indexing_end = None
     for row in rows:
         if indexing_start is None and row["pending"] > 0:
             indexing_start = row["elapsed_s"]
         if indexing_start is not None and indexing_end is None:
-            if row["pending"] == 0 and row["indexed"] > initial_indexed:
+            if row["pending"] == 0 and row["indexed"] is not None and row["indexed"] > initial_indexed:
                 indexing_end = row["elapsed_s"]
 
     if indexing_start is not None and indexing_end is not None:
         duration = indexing_end - indexing_start
-        docs = rows[-1]["indexed"] - initial_indexed
+        docs = counted[-1] - initial_indexed
         summary["primary_indexing"] = {
             "start_s": indexing_start,
             "end_s": indexing_end,
@@ -187,7 +196,7 @@ def compute_pipeline_summary(rows: list[dict]) -> dict:
     # min_docs: ignore rows where indexed < 90% of final count — filters out
     # vacuously-100% readings when 1 doc is enriched before bulk ingestion starts.
     summary["stages"] = {}
-    final_indexed = rows[-1]["indexed"] if rows else 0
+    final_indexed = counted[-1] if counted else 0
     doc_floor = int(final_indexed * 0.9) if final_indexed > 10 else 0
 
     embed_done = _first_at_threshold(rows, "embed_pct", 100.0, min_docs=doc_floor)
@@ -413,12 +422,13 @@ def _first_at_threshold(
 ) -> float | None:
     """Return elapsed_s of first row where field >= threshold, or None.
 
-    When min_docs > 0, ignores rows where indexed doc count is below the floor.
-    This filters out vacuously-100% readings when only 1 doc is enriched before
-    bulk ingestion starts.
+    When min_docs > 0, ignores rows where indexed doc count is below the floor
+    or unknown. This filters out vacuously-100% readings when only 1 doc is
+    enriched before bulk ingestion starts.
     """
     for row in rows:
-        if min_docs > 0 and row.get("indexed", 0) < min_docs:
+        indexed = row.get("indexed", 0)
+        if min_docs > 0 and (indexed is None or indexed < min_docs):
             continue
         if row.get(field, 0) >= threshold:
             return row["elapsed_s"]

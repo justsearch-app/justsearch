@@ -1134,7 +1134,9 @@ export class HealthSurface extends JfElement {
   }
 
   private renderStats(): TemplateResult {
-    const docs = this.status?.worker?.core?.indexedDocuments ?? 0;
+    // The person's own files (Help excluded), the count the Files value shows.
+    const own = this.aiState?.index.ownDocumentCount;
+    const docs = own?.known ? own.value : 0;
     // `size` now comes from projectFact('core.size'); only `docs` (tone) + `memUsed` (memRatio) numbers remain.
     const memUsed = this.status?.memoryUsedBytes ?? 0;
     const memMax = this.status?.memoryMaxBytes ?? 0;
@@ -1170,9 +1172,9 @@ export class HealthSurface extends JfElement {
     // lacked `indexSizeBytes` retains `null`, and Size falls back to '…' rather than a fake "0 B".
     const lastKnownSize = lastKnownIdx && settled!.indexSizeBytes != null;
     const currentCount = hasLiveDocumentCount(this.aiState);
-    const lastKnownFiles = lastKnownIdx && !currentCount;
+    const lastKnownFiles = lastKnownIdx && !currentCount && settled!.ownDocumentCount != null;
     const filesDisp = currentCount ? filesVal : lastKnownFiles
-      ? formatCount(settled!.documentCount)
+      ? formatCount(settled!.ownDocumentCount!)
       : wkr(filesVal);
     const sizeDisp = lastKnownSize ? formatBytes(settled!.indexSizeBytes!) : wkr(sizeVal);
     // 569 §15 — when CORE_DECLARED declares the Health stats region, project the metric cards through

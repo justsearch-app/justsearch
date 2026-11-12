@@ -39,8 +39,17 @@ def ingest_and_wait(
     """
     start = time.monotonic()
 
-    # Get initial doc count for floor calculation
+    # Get initial doc count for floor calculation. While the Engine cannot count its index
+    # (indexedDocumentsUnknown) there is no count to build a floor on: wait briefly for one.
     initial_count = _get_indexed_doc_count(config.base_url)
+    count_deadline = time.monotonic() + _WATCHER_SETTLE_MIN_SEC
+    while initial_count is None and time.monotonic() < count_deadline:
+        time.sleep(poll_interval_sec)
+        initial_count = _get_indexed_doc_count(config.base_url)
+    if initial_count is None:
+        raise RuntimeError(
+            "the Engine does not know its indexed document count, so the ingest floor cannot be set"
+        )
     if corpus_doc_count > 0:
         if _root_already_watched(config.base_url, docs_dir):
             # Tempdoc 751 sec Q sub-bug (a): the SAME root is being (re-)ingested
@@ -124,7 +133,8 @@ def ingest_and_wait(
 
     elapsed = time.monotonic() - start
     final_count = readiness.snapshot.get("indexedDocuments", 0)
-    docs_indexed = final_count - initial_count
+    # None: the last status did not know the count (readiness then failed on it).
+    docs_indexed = None if final_count is None else final_count - initial_count
 
     snapshot = readiness.snapshot
     summary: dict = {
@@ -134,7 +144,9 @@ def ingest_and_wait(
         "final_doc_count": final_count,
         "docs_indexed": docs_indexed,
         "elapsed_sec": round(elapsed, 2),
-        "docs_per_sec": round(docs_indexed / elapsed, 1) if elapsed > 0 else 0,
+        "docs_per_sec": (
+            None if docs_indexed is None else round(docs_indexed / elapsed, 1) if elapsed > 0 else 0
+        ),
         "index_size_bytes": snapshot.get("indexSizeBytes"),
     }
 
@@ -492,7 +504,8 @@ def _wait_for_watcher_activity(
             if data.get("indexState") != "IDLE":
                 log.debug("Watcher active: indexState=%s", data.get("indexState"))
                 return True
-            if data.get("indexedDocuments", 0) > initial_doc_count:
+            count = data.get("indexedDocuments", 0)
+            if count is not None and count > initial_doc_count:
                 log.debug("Watcher active: doc count grew")
                 return True
 
@@ -501,7 +514,8 @@ def _wait_for_watcher_activity(
     return False
 
 
-def _get_indexed_doc_count(base_url: str) -> int:
+def _get_indexed_doc_count(base_url: str) -> int | None:
+    """The serving index's document count; None while the Engine reports it unknown."""
     try:
         with httpx.Client(base_url=base_url, timeout=10) as client:
             resp = client.get("/api/status")

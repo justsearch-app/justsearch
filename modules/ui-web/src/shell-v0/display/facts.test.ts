@@ -113,7 +113,7 @@ describe('projectFact — status metric-facts (§17.2 migration off the bypass s
   const withState = (s: unknown): AiState => s as AiState;
   it('core.files formats the count, unknown when no index', () => {
     expect(
-      projectFact('core.files', withState({ index: { documentCount: known(605) } })),
+      projectFact('core.files', withState({ index: { ownDocumentCount: known(605) } })),
     ).toMatchObject({ name: 'Files', value: '605', presence: 'present' });
     expect(projectFact('core.files', withState({})).presence).toBe('unknown');
   });
@@ -127,7 +127,7 @@ describe('projectFact — status metric-facts (§17.2 migration off the bypass s
     expect(projectFact('core.memory', withState({ status: { memoryUsedBytes: 238_026_752 } })).value).toBe('227.0 MB');
   });
   it('metric-facts carry NO confidence/provenance (value-only — render plainly, §17.3)', () => {
-    const f = projectFact('core.files', withState({ index: { documentCount: known(1) } }));
+    const f = projectFact('core.files', withState({ index: { ownDocumentCount: known(1) } }));
     expect(f.confidence).toBeUndefined();
     expect(f.provenance).toBeUndefined();
   });

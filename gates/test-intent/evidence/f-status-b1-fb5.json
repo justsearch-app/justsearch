@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T16:39:33.548Z",
+  "revision": "c95be3048fcb581e2131f3e20d4d2b6b37175b90",
+  "tree": "86f9b0b1901dbecf2bb42b6c3917bf7ef88316e3",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/HealthSurface.own-files.test.ts\" \"src/shell-v0/state/uncountedIndex.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1ocgfpgu/tmp/test-intent-vitest-13136-1794501568565.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1727
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.own-files.test.ts#Files leaves the bundled Help out and agrees with the composer, Library and AI Brain",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.own-files.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:10374003ce3a5ad0fdd5a492048a6088adf0e641181d98d826c18b00d169f4a5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FB5 Health counts the person's own files Files leaves the bundled Help out and agrees with the composer, Library and AI Brain",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/HealthSurface.own-files.test.ts#Files says unknown when the Engine does not report the person's own count, never the whole index or 0",
+      "file": "modules/ui-web/src/shell-v0/views/HealthSurface.own-files.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:10374003ce3a5ad0fdd5a492048a6088adf0e641181d98d826c18b00d169f4a5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FB5 Health counts the person's own files Files says unknown when the Engine does not report the person's own count, never the whole index or 0",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts#distinguishes a failed filtered count from the fresh whole-index count",
+      "file": "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:41f428ae43a7fa2fc9ab6871fc45307b13f1e4281bb8609bea0c3b952631fcf9",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "count observation provenance distinguishes a failed filtered count from the fresh whole-index count",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "c95be3048f",
+    "revision": "c95be3048fcb581e2131f3e20d4d2b6b37175b90",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/HealthSurface.own-files.test.ts\" \"src/shell-v0/state/uncountedIndex.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1ocgfpgu/tmp/test-intent-vitest-13136-1794501571969.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1344,
+        "output": "JSON report written to /home/elias/.cache/am/1ocgfpgu/tmp/test-intent-vitest-13136-1794501571969.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.own-files.test.ts#Files leaves the bundled Help out and agrees with the composer, Library and AI Brain",
+        "classification": "assertion",
+        "detail": "FB5 Health counts the person's own files Files leaves the bundled Help out and agrees with the composer, Library and AI Brain:  AssertionError: expected '12' to match /^7\\b/\n    at /home/elias/.cache/am/1ocgfpgu/tmp/test-intent-before-PP96gN/modules/ui-web/src/shell-v0/views/HealthSurface.own-files.test.ts:53:29\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/elias/dev/justsearc"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/HealthSurface.own-files.test.ts#Files says unknown when the Engine does not report the person's own count, never the whole index or 0",
+        "classification": "assertion",
+        "detail": "FB5 Health counts the person's own files Files says unknown when the Engine does not report the person's own count, never the whole index or 0:  AssertionError: expected '12' to match /^Unknown\\b/\n    at /home/elias/.cache/am/1ocgfpgu/tmp/test-intent-before-PP96gN/modules/ui-web/src/shell-v0/views/HealthSurface.own-files.test.ts:61:29\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-status-b1/modules/ui-web/node_modules/@vitest/r"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts#distinguishes a failed filtered count from the fresh whole-index count",
+        "classification": "assertion",
+        "detail": "count observation provenance distinguishes a failed filtered count from the fresh whole-index count:  AssertionError: expected '12' to be 'Unknown' // Object.is equality\n    at /home/elias/.cache/am/1ocgfpgu/tmp/test-intent-before-PP96gN/modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts:96:59\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-status-b1/modules/ui-web/node_modules/@v"
+      }
+    ]
+  },
+  "digest": "sha256:3e38a629120cd58e06cec393a3a1ccf8cf2172f3c8b295c5ffd99f90611a4db0"
+}

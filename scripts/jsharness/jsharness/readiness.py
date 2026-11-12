@@ -251,7 +251,8 @@ def _check_pipeline_complete_conditions(
     if embedding_enabled:
         chunk_doc_count = snapshot.get("chunkDocCount", 0)
         if (chunk_doc_count > 0 and snapshot.get("chunkVectorCoveragePercent", 0) < 99.9) or (
-            chunk_doc_count == 0 and snapshot.get("indexedDocuments", 0) > 0
+            # An uncounted index (None) is already refused by the idle conditions above.
+            chunk_doc_count == 0 and (snapshot.get("indexedDocuments") or 0) > 0
             and snapshot.get("chunkingNotRequired") is False
         ):
             reasons.append("chunk_vectors_not_complete")
@@ -586,7 +587,7 @@ def _check_index_idle_conditions(s: dict, expected_doc_count_min: int) -> list[s
 
     if expected_doc_count_min >= 0:
         count = s.get("indexedDocuments", 0)
-        if count < expected_doc_count_min:
+        if count is not None and count < expected_doc_count_min:
             reasons.append(
                 f"indexed_doc_count_below_floor({count}/{expected_doc_count_min})"
             )
@@ -603,6 +604,10 @@ def _fetch_status(client: httpx.Client) -> dict:
     resp = client.get("/api/status")
     resp.raise_for_status()
     return flatten_status(resp.json())
+
+
+# The core counts ``indexedDocumentsUnknown`` qualifies (CoreIndexView; health-readiness contract).
+_UNCOUNTED_PLACEHOLDERS = ("indexedDocuments", "searchableDocuments")
 
 
 def flatten_status(data: dict) -> dict:
@@ -622,6 +627,11 @@ def flatten_status(data: dict) -> dict:
     A sibling-collision assertion converts a future wire-contract change that
     makes two sub-records claim the same top-level key from silent
     first-writer-wins data loss into a loud failure.
+
+    When ``worker.core.indexedDocumentsUnknown`` is true, the core's document
+    counts are placeholders the Engine keeps for older readers, not counts: the
+    flattened ``indexedDocuments`` and ``searchableDocuments`` are ``None``
+    (unknown), never 0. A counted 0 stays 0.
     """
     worker = data.get("worker")
     if not isinstance(worker, dict):
@@ -646,6 +656,8 @@ def flatten_status(data: dict) -> dict:
                     f"the wire contract (rename one) before flattening."
                 )
             if k not in data:
+                if sub_key == "core" and k in _UNCOUNTED_PLACEHOLDERS and sub.get("indexedDocumentsUnknown") is True:
+                    v = None
                 data[k] = v
                 contributed[k] = sub_key
     # enrichment.chunk is one level deeper

@@ -88,7 +88,7 @@ describe('HealthSurface — recommendedActions panel', () => {
   it('shows the serving document count and retry deadline while the queue waits', async () => {
     const retry = Date.now() + 3_600_000;
     feedReady({ worker: {
-      core: { indexedDocuments: 37, searchableDocuments: 37, pendingJobs: 8,
+      core: { indexedDocuments: 37, searchableDocuments: 37, ownSearchableDocuments: 37, pendingJobs: 8,
         indexState: 'WAITING', indexHealthy: true },
       migration: { pendingJobsCount: 8, pendingReadyJobsCount: 0, processingJobsCount: 0,
         activeIndexedDocuments: 37, buildingIndexedDocuments: 2 },
@@ -109,10 +109,10 @@ describe('HealthSurface — recommendedActions panel', () => {
   });
 
   it('uses the current serving count during migration instead of cached or building counts', async () => {
-    feedReady({ worker: { core: { indexedDocuments: 11, searchableDocuments: 11,
+    feedReady({ worker: { core: { indexedDocuments: 11, searchableDocuments: 11, ownSearchableDocuments: 11,
       indexState: 'IDLE', indexHealthy: true } } });
     feedReady({ worker: {
-      core: { indexedDocuments: 37, searchableDocuments: 37, pendingJobs: 3,
+      core: { indexedDocuments: 37, searchableDocuments: 37, ownSearchableDocuments: 37, pendingJobs: 3,
         indexState: 'INDEXING', indexHealthy: true },
       migration: { migrationState: 'MIGRATING', activeGenerationId: 'blue', buildingGenerationId: 'green',
         servingSearchGenerationId: 'blue', servingIngestGenerationId: 'green',
@@ -472,7 +472,7 @@ describe('HealthSurface — recommendedActions panel', () => {
     // 1) a settled poll stamps the retained value.
     __feedForTest({
       status: {
-        worker: { core: { indexedDocuments: 1234, indexSizeBytes: 4096, indexState: 'IDLE', indexHealthy: true } },
+        worker: { core: { indexedDocuments: 1234, ownSearchableDocuments: 1234, indexSizeBytes: 4096, indexState: 'IDLE', indexHealthy: true } },
         readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] } } },
       } as unknown as StatusSnapshot,
     });
@@ -506,7 +506,7 @@ describe('HealthSurface — recommendedActions panel', () => {
     // later provisional window Files shows the last-known count; Size must NOT assert a fake "0 B".
     __feedForTest({
       status: {
-        worker: { core: { indexedDocuments: 1234, indexState: 'IDLE', indexHealthy: true } },
+        worker: { core: { indexedDocuments: 1234, ownSearchableDocuments: 1234, indexState: 'IDLE', indexHealthy: true } },
         readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] } } },
       } as unknown as StatusSnapshot,
     });

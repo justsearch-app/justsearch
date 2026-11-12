@@ -52,12 +52,12 @@ describe('an index the backend could not count (t-20261013-ef3c41)', () => {
   });
 
   it('a counted index is unchanged: a known 0 is still empty, a known count is still shown', () => {
-    feed({ indexedDocuments: 0 });
+    feed({ indexedDocuments: 0, ownSearchableDocuments: 0 });
     expect(getAiState().index.documentCount).toEqual(known(0));
     expect(projectFact('core.files', getAiState()).value).toBe('0');
     expect(getAiState().capabilities.rag).toBe(false);
 
-    feed({ indexedDocuments: 12, indexedDocumentsUnknown: false });
+    feed({ indexedDocuments: 12, ownSearchableDocuments: 12, indexedDocumentsUnknown: false });
     expect(projectFact('core.files', getAiState()).value).toBe('12');
     expect(getAiState().capabilities.rag).toBe(true);
   });
@@ -70,8 +70,8 @@ describe('count observation provenance', () => {
 
   it('keeps fallback counts visibly last known with their original observation time', () => {
     const observedAtMs = 123456;
-    const status = { worker: { core: { indexState: 'IDLE', indexedDocuments: 12, searchableDocuments: 10 },
-      countObservations: { active: { state: 'stale', observedAtMs } },
+    const status = { worker: { core: { indexState: 'IDLE', indexedDocuments: 12, searchableDocuments: 12, ownSearchableDocuments: 12 },
+      countObservations: { active: { state: 'stale', observedAtMs }, searchable: { state: 'stale', observedAtMs } },
     } } as unknown as StatusSnapshot;
     for (let poll = 0; poll < 2; poll++) {
       __feedForTest({ status });
@@ -91,7 +91,9 @@ describe('count observation provenance', () => {
     expect(getAiState().index.documentCount).toEqual(known(12));
     expect(getAiState().index.searchableDocumentCount.known).toBe(false);
     expect(getAiState().lastSettledIndex).toBeNull();
-    expect(projectFact('core.files', getAiState()).value).toBe('12');
+    // Files counts the person's own files, a subset of the searchable population: that count failed,
+    // so Files says it is unknown rather than showing the whole-index 12 (which includes Help).
+    expect(projectFact('core.files', getAiState()).value).toBe('Unknown');
   });
   it('never treats a last-known zero as proof the current index is empty', () => {
     __feedForTest({
