@@ -422,3 +422,13 @@ fails before with the TypeError that ended the first-search probe on a None coun
 undefined; passes after).
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-wzd3wqir-round3",
+  "verdict": "accept",
+  "digest": "sha256:a055d66dcf7b8863f9a67e88e9d97f44a32f1c90af9e237bde4b3eb1f95b7826"
+}
+```
