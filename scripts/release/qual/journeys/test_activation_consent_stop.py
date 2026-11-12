@@ -28,6 +28,26 @@ class ConsentStopTests(unittest.TestCase):
         with self.assertRaises(runner.RunStopped):
             linux.activate_downloaded(run)
 
+    def disappearing(self):
+        seq = iter([{'typed': True, 'blocked': False, 'operationKeys': []}])
+        return lambda script: next(seq, {'typed': False, 'operationKeys': []})
+
+    def test_stop_while_typing_then_prompt_gone_propagates(self):
+        def keys(selector, text):
+            raise runner.RunStopped('GPU lane supervisor interrupted the session')
+        run = self.run_with(execute=self.disappearing(), keys=keys)
+        with self.assertRaises(runner.RunStopped):
+            linux.activate_downloaded(run)
+
+    def test_stop_while_approving_then_prompt_gone_propagates(self):
+        run = self.run_with(execute=self.disappearing())
+        def click(selector):
+            if 'Approve' in selector:
+                raise runner.RunStopped('GPU lane supervisor interrupted the session')
+        run.wd.click.side_effect = click
+        with self.assertRaises(runner.RunStopped):
+            linux.activate_downloaded(run)
+
 
 if __name__ == '__main__':
     unittest.main()
