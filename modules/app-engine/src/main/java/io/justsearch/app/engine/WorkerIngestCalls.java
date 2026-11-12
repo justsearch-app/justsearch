@@ -36,6 +36,23 @@ final class WorkerIngestCalls implements IngestServiceCalls {
   }
 
   @Override
+  public long scanIndexedSourcesWithOrigin(java.util.function.Consumer<
+      io.justsearch.app.api.IndexingService.IndexedSourceOwner> consumer) {
+    return service.scanIndexedSourcesWithOrigin(consumer, ctx);
+  }
+
+  @Override
+  public java.util.Optional<io.justsearch.app.api.indexing.SourceOrigin> findSourceOrigin(String id) {
+    return service.findSourceOrigin(id, ctx);
+  }
+
+  @Override
+  public io.justsearch.app.api.IndexingService.DeletionOutcome deleteExcludedImportMember(
+      String path, String expectedOriginId) {
+    return service.deleteExcludedImportMember(path, expectedOriginId, ctx);
+  }
+
+  @Override
   public long scanIndexedSourcesWithCollection(
       java.util.function.Consumer<io.justsearch.app.api.IndexingService.IndexedSource> consumer) {
     return service.scanIndexedSourcesWithCollection(consumer, ctx);

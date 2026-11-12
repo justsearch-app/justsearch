@@ -96,6 +96,9 @@ public final class JobBatchWriter {
   private final Supplier<RunningRuntime> activeLexicalSource;
   private final FileMutationFence fileMutationFence;
   private io.justsearch.indexerworker.services.StorageObservationSnapshot storageSnapshot;
+  private DocumentFieldOps sourceFields;
+
+  void useSourceFields(DocumentFieldOps fields) { sourceFields = Objects.requireNonNull(fields); }
   private final BatchServiceFailures writeFailures = new BatchServiceFailures();
 
 
@@ -200,7 +203,9 @@ public final class JobBatchWriter {
         batchStats.recordSkipped();
         return;
       }
-      if (ingestionAuthority.excludes(ex.filePath(), ex.claim().ingestionRoot(), ex.collection())) {
+      if (ex.claim().upkeepOriginId() != null && !ingestionAuthority.upkeepCurrent(
+          ex.claim(), jobQueue, sourceFields)
+          || ingestionAuthority.excludes(ex.filePath(), ex.claim().ingestionRoot(), ex.collection())) {
         journal.recordOutcomeSafely(ex.filePath(), "EXCLUDED_BEFORE_WRITE",
             () -> jobQueue.markClaimDone(ex.claim(),
                 journal.skipped(io.justsearch.indexerworker.ingest.IngestionSkipPolicy.isProtected(

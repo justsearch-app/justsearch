@@ -3119,6 +3119,65 @@ public final class WorkerIngestService {
     }
   }
 
+  public java.util.Optional<io.justsearch.app.api.indexing.SourceOrigin> findSourceOrigin(String id, CallContext ctx) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
+      return jobQueue.sourceOrigin(id);
+    }
+  }
+
+  public long scanIndexedSourcesWithOrigin(java.util.function.Consumer<
+      io.justsearch.app.api.IndexingService.IndexedSourceOwner> consumer, CallContext ctx) {
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
+      var source = searchLifecycle != null ? searchLifecycle : ingestLifecycle;
+      if (source == null) throw WorkerServiceException.unavailable("Index runtime not available");
+      source.commitOps().maybeRefreshBlocking();
+      return source.documentFieldOps().scanIndexedSources(256, batch -> {
+        try {
+          var fields = source.documentFieldOps().getDocumentFieldsBatchOrThrow(
+              batch.stream().map(io.justsearch.adapters.lucene.runtime.DocumentFieldOps.IndexedSource::docId).toList(),
+              Set.of(SchemaFields.ORIGIN_ID));
+          for (var row : batch) {
+            if (ctx.cancelled()) throw WorkerServiceException.unavailable("Indexed source enumeration cancelled");
+            String owner = fields.getOrDefault(row.docId(), Map.of()).get(SchemaFields.ORIGIN_ID);
+            consumer.accept(new io.justsearch.app.api.IndexingService.IndexedSourceOwner(row.path(), owner));
+          }
+        } catch (IOException unavailable) { throw new java.io.UncheckedIOException(unavailable); }
+      });
+    }
+  }
+
+  public io.justsearch.app.api.IndexingService.DeletionOutcome deleteExcludedImportMember(
+      String path, String expectedOriginId, CallContext ctx) {
+    if (expectedOriginId == null) {
+      var result = deleteById(DeleteByIdRequest.newBuilder().setDocId(path).setRequireSettled(true).build(), ctx);
+      return new io.justsearch.app.api.IndexingService.DeletionOutcome(result.getSuccess(), result.getError());
+    }
+    try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
+      return withFileMutationFence(() -> {
+        try {
+          if (switchBufferOps.buildingGenerationForFileAdmission() != null || hasDistinctWritableServingTarget()) {
+            return new io.justsearch.app.api.IndexingService.DeletionOutcome(false, "Import exclusion waits for migration activation");
+          }
+          if (ctx.cancelled()) return new io.justsearch.app.api.IndexingService.DeletionOutcome(false, "Cancelled");
+          String key = normalizeDocIdForMutation(path);
+          ingestLifecycle.commitOps().maybeRefreshBlocking();
+          String current = ingestLifecycle.documentFieldOps().getDocumentFieldOrThrow(key, SchemaFields.ORIGIN_ID);
+          var origin = importOrigin(expectedOriginId, Path.of(path));
+          if (!expectedOriginId.equals(current)) {
+            return new io.justsearch.app.api.IndexingService.DeletionOutcome(false, "Changed owner");
+          }
+          if (origin == null || !isUserExcluded(Path.of(path), origin.root().path())) {
+            return new io.justsearch.app.api.IndexingService.DeletionOutcome(false, "Exclusion rule changed");
+          }
+          deleteSourceUnderFence(key);
+          ingestLifecycle.commitOps().commitAndTrack(CommitReason.GRPC_DELETE_BY_ID);
+          ingestLifecycle.commitOps().maybeRefreshBlocking();
+          return new io.justsearch.app.api.IndexingService.DeletionOutcome(true, "");
+        } catch (IOException unavailable) { throw new java.io.UncheckedIOException(unavailable); }
+      });
+    }
+  }
+
   /** Upgrade enumeration never certifies a candidate it did not inspect. */
   public long scanIndexedSourcesWithCollection(
       java.util.function.Consumer<io.justsearch.app.api.IndexingService.IndexedSource> consumer,
@@ -3144,7 +3203,78 @@ public final class WorkerIngestService {
     }
   }
 
-  /** Periodic corpus backstop for completed ad-hoc sources, including with no watched roots. */
+  private static final Set<String> UPKEEP_FIELDS = java.util.stream.Stream.concat(
+      io.justsearch.indexing.SourceEnvelope.FIELDS.stream(),
+      java.util.stream.Stream.of(SchemaFields.DOC_UID, SchemaFields.DOC_ID, SchemaFields.PATH,
+          SchemaFields.COLLECTION, SchemaFields.PROJECTION_SOURCE_ID)).collect(java.util.stream.Collectors.toSet());
+
+  private io.justsearch.app.api.indexing.SourceOrigin importOrigin(String id, Path file) {
+    if (id == null) return null;
+    try {
+      var origin = jobQueue.sourceOrigin(id).orElse(null);
+      if (origin == null || origin.kind() != io.justsearch.app.api.indexing.SourceOrigin.Kind.IMPORT
+          || !file.startsWith(origin.root().path())
+          || origin.root().singleFile() && !file.equals(origin.root().path())
+          || origin.root().excludedSubtrees().stream().anyMatch(file::startsWith)) return null;
+      return origin;
+    } catch (RuntimeException unavailable) { return null; }
+  }
+
+  private boolean watchedOrigin(String id) {
+    try {
+      return jobQueue.sourceOrigin(id)
+          .filter(saved -> saved.kind() == io.justsearch.app.api.indexing.SourceOrigin.Kind.WATCHED).isPresent();
+    } catch (RuntimeException unavailable) { return false; }
+  }
+
+  private static boolean sameStorage(io.justsearch.indexing.SourceEnvelope recorded,
+      StorageObservationSnapshot observation, Path file) {
+    var current = observation.observedEnvelope(file, recorded.originId());
+    return current.storageStatus() == io.justsearch.indexing.SourceEnvelope.StorageStatus.KNOWN
+        && Objects.equals(recorded.storageMount(), current.storageMount())
+        && Objects.equals(recorded.storageKey(), current.storageKey());
+  }
+
+  /** Missing import ancestors may vouch only on the member's recorded, still effective storage. */
+  private boolean importAbsenceRoot(Path file, io.justsearch.indexing.SourceEnvelope envelope,
+      StorageObservationSnapshot observation) {
+    if (!sameStorage(envelope, observation, file)) return false;
+    Path mount = Path.of(envelope.storageMount());
+    for (Path folder = file.getParent(); folder != null && folder.startsWith(mount); folder = folder.getParent()) {
+      var presence = io.justsearch.adapters.lucene.runtime.PathPresence.probe(folder);
+      if (presence == io.justsearch.adapters.lucene.runtime.PathPresence.ABSENT) continue;
+      return presence == io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT
+          && io.justsearch.adapters.lucene.runtime.PathPresence.isReadableDirectory(folder)
+          && folder.equals(realDirectory(folder)) && sameStorage(envelope, observation, folder);
+    }
+    return false;
+  }
+
+  private static Path realDirectory(Path folder) {
+    try { return folder.toRealPath(); }
+    catch (IOException | SecurityException unavailable) { return null; }
+  }
+
+  private void refreshImportMember(Path file, String collection,
+      io.justsearch.app.api.indexing.SourceOrigin origin, boolean retired,
+      java.nio.file.attribute.BasicFileAttributes attrs) throws IOException {
+    if (!jobQueue.importUpkeepEligibility(origin.id()).refreshAllowed()
+        || admissionExcluded(file, origin.root().path(), collection)
+        || io.justsearch.configuration.excludes.ExclusionPatterns.fromPatterns(origin.root().excludePatterns())
+            .isExcludedPath(origin.root().path(), file)) return;
+    // Indexed-source enumeration is the only inventory. Never walk the disk for new members.
+    if (!attrs.isRegularFile()) return;
+    String key = PathNormalizer.normalizeKey(file);
+    var fields = ingestLifecycle.documentFieldOps();
+    if (!retired && Objects.equals(normalizeRootCollection(collection), normalizeRootCollection(
+        fields.getDocumentFieldOrThrow(key, SchemaFields.COLLECTION)))
+        && fields.isUnmodified(key, attrs.lastModifiedTime().toMillis(), attrs.size(), null, extractionPolicyId)
+        && !jobQueue.extractionPolicyRetryPaths(List.of(key), extractionPolicyId).contains(key)) return;
+    jobQueue.enqueueImportUpkeep(new JobQueue.EnqueueEntry(file, attrs.size()).withinRoot(origin.root().path()),
+        collection, origin.id());
+  }
+
+  /** Periodic corpus backstop: only indexed members, never discovery of new import files. */
   public PruneResponse reconcileIndexedSources(CallContext ctx) {
     try (var ignored = openRequestMdc(ctx); var ignoredMutation = mutationLease()) {
       if (ingestLifecycle == null) return pruneErrorResponse("Index runtime not available");
@@ -3152,11 +3282,13 @@ public final class WorkerIngestService {
         return pruneErrorResponse("Indexed source reconciliation waits for migration activation");
       }
       var roots = declaredCollectionRoots().stream().map(binding -> binding.path()).toList();
+      var observation = StorageObservationSnapshot.capture();
       int[] removed = {0}, unknown = {0};
-      var marker = confirmedDeletionMarker;
+      var retired = new java.util.LinkedHashMap<Path, Map.Entry<String, io.justsearch.app.api.indexing.SourceOrigin>>();
       var checkedPaths = new java.util.HashSet<String>();
       ingestLifecycle.commitOps().maybeRefreshBlocking();
       long skipped = ingestLifecycle.documentFieldOps().scanIndexedSources(256, batch -> {
+        var candidates = new ArrayList<io.justsearch.adapters.lucene.runtime.DocumentFieldOps.IndexedSource>();
         for (var identity : batch) {
           if (ctx.cancelled()) return;
           if (!checkedPaths.add(identity.path())) continue;
@@ -3164,38 +3296,105 @@ public final class WorkerIngestService {
           try { file = Path.of(identity.path()); }
           catch (InvalidPathException invalid) { continue; }
           if (!file.isAbsolute() || roots.stream().anyMatch(file::startsWith)) continue;
-          if (io.justsearch.indexerworker.loop.SourcePresence.classify(file, null, rootWitness)
-              == io.justsearch.indexerworker.loop.SourcePresence.Verdict.PRESENT) continue;
-          withFileMutationFence(() -> {
-            try {
-              var fields = ingestLifecycle.documentFieldOps();
-              String projection = fields.getDocumentFieldOrThrow(identity.docId(), SchemaFields.PROJECTION_SOURCE_ID);
-              String uid = fields.getDocumentFieldOrThrow(identity.docId(), SchemaFields.DOC_UID);
-              String backing = fields.getDocumentFieldOrThrow(identity.docId(), SchemaFields.PATH);
+          candidates.add(identity);
+        }
+        if (candidates.isEmpty()) return;
+        withFileMutationFence(() -> {
+          try {
+            var fields = ingestLifecycle.documentFieldOps();
+            var rows = fields.getDocumentFieldsBatchOrThrow(candidates.stream().map(
+                io.justsearch.adapters.lucene.runtime.DocumentFieldOps.IndexedSource::docId).toList(), UPKEEP_FIELDS);
+            boolean refreshedStorage = false;
+            for (var identity : candidates) {
+              if (ctx.cancelled()) break;
+              Path file = Path.of(identity.path());
+              var row = rows.get(identity.docId());
+              if (row == null) continue;
+              String projection = row.get(SchemaFields.PROJECTION_SOURCE_ID);
+              String backing = row.get(SchemaFields.PATH);
               if (projection != null && !projection.isBlank()
-                  || !Objects.equals(identity.docUid(), uid)
-                  || fields.getDocumentFieldOrThrow(identity.docId(), SchemaFields.DOC_ID) == null
-                  || backing != null && !backing.isBlank() && !backing.equals(identity.path())) return false;
-              var verdict = io.justsearch.indexerworker.loop.SourcePresence.classify(file, null, rootWitness);
+                  || !Objects.equals(identity.docUid(), row.get(SchemaFields.DOC_UID))
+                  || row.get(SchemaFields.DOC_ID) == null
+                  || backing != null && !backing.isBlank() && !backing.equals(identity.path())) continue;
+              // Storage evidence remains conservative even when optional origin attribution is malformed.
+              var storageFields = new HashMap<String, Object>(row);
+              storageFields.remove(SchemaFields.ORIGIN_ID);
+              var envelope = io.justsearch.indexing.SourceEnvelope.decode(storageFields).orElse(null);
+              var origin = importOrigin(row.get(SchemaFields.ORIGIN_ID), file);
+              // A watched owner is never treated as a legacy ad-hoc source.
+              if (origin == null && row.get(SchemaFields.ORIGIN_ID) != null
+                  && watchedOrigin(row.get(SchemaFields.ORIGIN_ID))) continue;
+              if (origin != null && !jobQueue.importUpkeepEligibility(origin.id()).inactive()) continue;
+              java.nio.file.attribute.BasicFileAttributes attrs = null;
+              io.justsearch.adapters.lucene.runtime.PathPresence first;
+              try {
+                attrs = Files.readAttributes(file, java.nio.file.attribute.BasicFileAttributes.class,
+                    java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                first = io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT;
+              } catch (java.nio.file.NoSuchFileException absent) {
+                first = io.justsearch.adapters.lucene.runtime.PathPresence.ABSENT;
+              } catch (IOException | SecurityException unavailable) {
+                first = io.justsearch.adapters.lucene.runtime.PathPresence.UNKNOWN;
+              }
+              if (first == io.justsearch.adapters.lucene.runtime.PathPresence.PRESENT) {
+                if (origin != null) refreshImportMember(file, row.get(SchemaFields.COLLECTION), origin, false, attrs);
+                continue;
+              }
+              if (!refreshedStorage) {
+                observation.refreshObservation();
+                refreshedStorage = true;
+              }
+              boolean known = envelope != null && envelope.storageStatus()
+                  == io.justsearch.indexing.SourceEnvelope.StorageStatus.KNOWN;
+              if (known && !sameStorage(envelope, observation, file)) { unknown[0]++; continue; }
+              boolean importStorage = origin != null && known;
+              var guard = new io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard() {
+                @Override public boolean rootCurrent() {
+                  return (!known || sameStorage(envelope, observation, file))
+                      && (importStorage ? importAbsenceRoot(file, envelope, observation)
+                          : rootWitness.vouchesForFile(file.getParent()));
+                }
+              };
+              var verdict = io.justsearch.indexerworker.loop.SourcePresence.classify(file, null,
+                  importStorage ? new io.justsearch.indexerworker.loop.SourcePresence.RootCheck() {
+                    public boolean vouches(Path folder) { return guard.rootCurrent(); }
+                    public boolean admits(Path folder) { return false; }
+                  } : rootWitness);
               if (verdict == io.justsearch.indexerworker.loop.SourcePresence.Verdict.ABSENT) {
-                var guard = new io.justsearch.adapters.lucene.runtime.PruneOps.PresenceGuard() {
-                  @Override public boolean rootCurrent() { return rootWitness.vouchesForFile(file.getParent()); }
-                };
                 int pruned = ingestLifecycle.pruneOps().pruneFile(identity.path(), file.getParent(),
                     guard, io.justsearch.adapters.lucene.runtime.PruneOps.WriterFence.NONE);
-                if (pruned > 0) marker.markIfAbsent(file);
+                if (pruned > 0) {
+                  confirmedDeletionMarker.markIfAbsent(file);
+                  if (origin != null) retired.put(file, new java.util.AbstractMap.SimpleImmutableEntry<>(
+                      row.get(SchemaFields.COLLECTION), origin));
+                }
                 removed[0] += pruned;
               } else if (verdict != io.justsearch.indexerworker.loop.SourcePresence.Verdict.PRESENT) unknown[0]++;
-              return true;
-            } catch (IOException unreadable) {
-              throw new java.io.UncheckedIOException(unreadable);
             }
-          });
-        }
+            return true;
+          } catch (IOException unreadable) { throw new java.io.UncheckedIOException(unreadable); }
+        });
       });
       if (removed[0] > 0) {
         ingestLifecycle.commitOps().commitAndTrack(CommitReason.PRUNE);
         ingestLifecycle.commitOps().maybeRefreshBlocking();
+        for (var entry : retired.entrySet()) {
+          withFileMutationFence(() -> {
+              try {
+                var attrs = Files.readAttributes(entry.getKey(), java.nio.file.attribute.BasicFileAttributes.class,
+                    java.nio.file.LinkOption.NOFOLLOW_LINKS);
+                // A re-import that published while commit was in progress owns its new rows.
+                String current = ingestLifecycle.documentFieldOps().getDocumentFieldOrThrow(
+                    PathNormalizer.normalizeKey(entry.getKey()), SchemaFields.ORIGIN_ID);
+                if (current == null || current.equals(entry.getValue().getValue().id())) {
+                  refreshImportMember(entry.getKey(), entry.getValue().getKey(), entry.getValue().getValue(), true, attrs);
+                }
+                return true;
+              } catch (java.nio.file.NoSuchFileException absent) {
+                return false;
+              } catch (IOException unavailable) { throw new java.io.UncheckedIOException(unavailable); }
+            });
+        }
       }
       if (ctx.cancelled()) return pruneResultResponse(removed[0], true);
       if (unknown[0] > 0 || skipped > 0) return pruneIncompleteResponse(removed[0], unknown[0]);
