@@ -452,3 +452,13 @@ undefined; passes after).
   "digest": "sha256:a055d66dcf7b8863f9a67e88e9d97f44a32f1c90af9e237bde4b3eb1f95b7826"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-wgfr4x74-lockdown",
+  "verdict": "accept",
+  "digest": "sha256:a7965e6b1b3f0de0e6b21d00a9efb6fece8f03f4e07707001361c49690d23cc2"
+}
+```
