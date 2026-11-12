@@ -12,6 +12,14 @@ in another language. Repaired checks fail on 5358c3952a (origin/main at the star
 failures and pass on the candidate; preserved checks pass on both (the before-state run of the
 preserved checks is not part of the evidence file; the verifier repeats it).
 
+Release v0.3.3 shipped extraction policy tika-default-v11 and help marker v5 without this change,
+so the generated default and configured policy identities advance from v11 to v12 and the help
+marker from v5 to v6: installs that already run v0.3.3 re-extract their files and bundled help once.
+The identity entries follow the #1229 precedent (`New`, expected outcomes change; older identities
+used as "old" fixtures keep their values; every non-policy expectation is unchanged). Their
+repaired checks fail on origin/main by assertion (v11 or v5 where v12 or v6 is expected, or no
+re-ingest for a v5 marker) and pass on the candidate (evidence lang-body-sample-bump.json).
+
 ```json
 {
   "entries": [
@@ -205,6 +213,397 @@ preserved checks is not part of the evidence file; the verifier repeats it).
       "evidence": "gates/test-intent/evidence/lang-body-sample-preserved.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/services/VduResultWriterCoherenceTest.java"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PolicyTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Advance generated null/blank fallback, default, null-worker and configured policy identity expectations from v11 to v12. Preserve all limits and explicit caller-owned identity assertions.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yes you should fix that.",
+          "location": "task t-20261110-langdetect agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes you should fix that.",
+          "delegationLocation": "task t-20261110-langdetect agreement",
+          "delegationScope": "The answer to the question \"should I fix the app so it judges a file's language from the main text rather than its opening menus?\": how the label is estimated and on which write paths, within the round-2 scenarios settled 2026-11-12 (language label only; stored preview, search and matching unchanged).",
+          "label": "agent choice",
+          "choice": "v0.3.3 shipped v11 without this change; bump to v12 and help marker v6 so released installs re-extract once"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/lang-body-sample-bump.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PolicyTest.java#blankOrNullIdentityUsesCurrentGeneration",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8PolicyTest.java#defaultAndConfiguredIdentitiesUseCurrentGeneration"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaExtractionPolicyWorkerLimitsTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Advance generated default/configured identity expectations and current-generation comments from v11 to v12. Keep deterministic default-equivalent and nonpositive fallback identities, distinct configured chars/bytes, numeric limits, office cap, clamp and factory independence assertions.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yes you should fix that.",
+          "location": "task t-20261110-langdetect agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes you should fix that.",
+          "delegationLocation": "task t-20261110-langdetect agreement",
+          "delegationScope": "The answer to the question \"should I fix the app so it judges a file's language from the main text rather than its opening menus?\": how the label is estimated and on which write paths, within the round-2 scenarios settled 2026-11-12 (language label only; stored preview, search and matching unchanged).",
+          "label": "agent choice",
+          "choice": "v0.3.3 shipped v11 without this change; bump to v12 and help marker v6 so released installs re-extract once"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/lang-body-sample-bump.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaExtractionPolicyWorkerLimitsTest.java#defaultEquivalentLimitsKeepDefaultIdentity",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaExtractionPolicyWorkerLimitsTest.java#differingLimitsGetADistinctIdentity",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaExtractionPolicyWorkerLimitsTest.java#nonPositiveLimitsFallBack",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TikaExtractionPolicyWorkerLimitsTest.java#defaultsRemainStable"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Advance only generated default, null/blank fallback and configured policy identity expectations from v11 to v12. Preserve all UTF-16 text, metadata, status and truncation expectations.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yes you should fix that.",
+          "location": "task t-20261110-langdetect agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes you should fix that.",
+          "delegationLocation": "task t-20261110-langdetect agreement",
+          "delegationScope": "The answer to the question \"should I fix the app so it judges a file's language from the main text rather than its opening menus?\": how the label is estimated and on which write paths, within the round-2 scenarios settled 2026-11-12 (language label only; stored preview, search and matching unchanged).",
+          "label": "agent choice",
+          "choice": "v0.3.3 shipped v11 without this change; bump to v12 and help marker v6 so released installs re-extract once"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/lang-body-sample-bump.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#defaultPolicyIdentityIsCurrentGeneration",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#blankOrNullPolicyIdentityFallsBackToCurrentGeneration",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf16WithoutBomExtractionTest.java#configuredPolicyIdentityIsCurrentGeneration"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WithoutBomExtractionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Advance only expected default/configured artifact identities from v11 to v12 across real child reuse/replacement and Hebrew formats/lengths. Preserve exact text, status, child PID, spawn/restart and all non-policy expectations.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yes you should fix that.",
+          "location": "task t-20261110-langdetect agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes you should fix that.",
+          "delegationLocation": "task t-20261110-langdetect agreement",
+          "delegationScope": "The answer to the question \"should I fix the app so it judges a file's language from the main text rather than its opening menus?\": how the label is estimated and on which write paths, within the round-2 scenarios settled 2026-11-12 (language label only; stored preview, search and matching unchanged).",
+          "label": "agent choice",
+          "choice": "v0.3.3 shipped v11 without this change; bump to v12 and help marker v6 so released installs re-extract once"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/lang-body-sample-bump.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WithoutBomExtractionTest.java#childReuseAndReplacementKeepUtf8TextAndPolicyIdentity",
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/Utf8WithoutBomExtractionTest.java#childExtractsAllHebrewFormatsAndLengths"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8ExtractionTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Advance only the expected child artifact identity from tika-default-v11 to tika-default-v12. Preserve every encoding attribution, exact structured/flat/policy/child text, SUCCESS_FULL and child spawn/restart expectation.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yes you should fix that.",
+          "location": "task t-20261110-langdetect agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes you should fix that.",
+          "delegationLocation": "task t-20261110-langdetect agreement",
+          "delegationScope": "The answer to the question \"should I fix the app so it judges a file's language from the main text rather than its opening menus?\": how the label is estimated and on which write paths, within the round-2 scenarios settled 2026-11-12 (language label only; stored preview, search and matching unchanged).",
+          "label": "agent choice",
+          "choice": "v0.3.3 shipped v11 without this change; bump to v12 and help marker v6 so released installs re-extract once"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/lang-body-sample-bump.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/AsciiFirstUtf8ExtractionTest.java#asciiFirstTextAcrossFormatsAndRoutes"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionRoutingTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Advance only the in-process current policy expectation from tika-default-v11 to tika-default-v12. Preserve empty-child-command acceptance solely for IN_PROCESS and rejection for PROCESS/AUTO, with all routing expectations.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yes you should fix that.",
+          "location": "task t-20261110-langdetect agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes you should fix that.",
+          "delegationLocation": "task t-20261110-langdetect agreement",
+          "delegationScope": "The answer to the question \"should I fix the app so it judges a file's language from the main text rather than its opening menus?\": how the label is estimated and on which write paths, within the round-2 scenarios settled 2026-11-12 (language label only; stored preview, search and matching unchanged).",
+          "label": "agent choice",
+          "choice": "v0.3.3 shipped v11 without this change; bump to v12 and help marker v6 so released installs re-extract once"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/lang-body-sample-bump.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/ExtractionRoutingTest.java#modeSwitchSelectsTheSandbox"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Advance only the real extraction-child artifact identity expectation from tika-default-v11 to tika-default-v12. Preserve the child content assertion and every protocol, security, lifecycle and request-budget expectation.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yes you should fix that.",
+          "location": "task t-20261110-langdetect agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes you should fix that.",
+          "delegationLocation": "task t-20261110-langdetect agreement",
+          "delegationScope": "The answer to the question \"should I fix the app so it judges a file's language from the main text rather than its opening menus?\": how the label is estimated and on which write paths, within the round-2 scenarios settled 2026-11-12 (language label only; stored preview, search and matching unchanged).",
+          "label": "agent choice",
+          "choice": "v0.3.3 shipped v11 without this change; bump to v12 and help marker v6 so released installs re-extract once"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/lang-body-sample-bump.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PersistentExtractionSandboxTest.java#realChildExtractsFileContent"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Advance only current fresh/indexed/artifact/successful-ledger identities and the current-policy unchanged-family seed from v11 to v12. Historical v5 documents and ledger events keep v5. Preserve text, metadata, source hash, stable UID, chunk revisions, family reuse and restart expectations.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yes you should fix that.",
+          "location": "task t-20261110-langdetect agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes you should fix that.",
+          "delegationLocation": "task t-20261110-langdetect agreement",
+          "delegationScope": "The answer to the question \"should I fix the app so it judges a file's language from the main text rather than its opening menus?\": how the label is estimated and on which write paths, within the round-2 scenarios settled 2026-11-12 (language label only; stored preview, search and matching unchanged).",
+          "label": "agent choice",
+          "choice": "v0.3.3 shipped v11 without this change; bump to v12 and help marker v6 so released installs re-extract once"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/lang-body-sample-bump.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java#ordinaryQueuedWorkRepairsOlderPolicyAndSurvivesAnotherRestart",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java#forcedReindexRepairsHebrewAndSurvivesAnotherRestart",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/AsciiFirstUtf8QueuedRestartTest.java#newlyIndexedAsciiFirstUtf8SurvivesRestart"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/Utf8QueuedRestartTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Advance only the expected newly extracted parent identity from tika-default-v11 to tika-default-v12. Preserve older source/provenance, literal text, source/content revisions, preview, chunk replacement, forced/ordinary work and reopen expectations.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yes you should fix that.",
+          "location": "task t-20261110-langdetect agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes you should fix that.",
+          "delegationLocation": "task t-20261110-langdetect agreement",
+          "delegationScope": "The answer to the question \"should I fix the app so it judges a file's language from the main text rather than its opening menus?\": how the label is estimated and on which write paths, within the round-2 scenarios settled 2026-11-12 (language label only; stored preview, search and matching unchanged).",
+          "label": "agent choice",
+          "choice": "v0.3.3 shipped v11 without this change; bump to v12 and help marker v6 so released installs re-extract once"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/lang-body-sample-bump.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/Utf8QueuedRestartTest.java#forcedReindexRepairsHebrewAndSurvivesAnotherRestart",
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/Utf8QueuedRestartTest.java#ordinaryQueuedWorkRepairsOlderPolicyAndSurvivesAnotherRestart"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/testFixtures/java/io/justsearch/indexerworker/fixtures/FormatCapabilityExpectedState.java"
+      ],
+      "class": "New",
+      "behaviour": "Advance only the typed format-capability oracle policyId from tika-default-v11 to tika-default-v12. Preserve every recipe hash, literal annotated text, required/absent marker, MIME/parser identity, embedded/structure count and known-gap classification. Real production extraction must return v12; Java/JSON projections must still agree.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yes you should fix that.",
+          "location": "task t-20261110-langdetect agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes you should fix that.",
+          "delegationLocation": "task t-20261110-langdetect agreement",
+          "delegationScope": "The answer to the question \"should I fix the app so it judges a file's language from the main text rather than its opening menus?\": how the label is estimated and on which write paths, within the round-2 scenarios settled 2026-11-12 (language label only; stored preview, search and matching unchanged).",
+          "label": "agent choice",
+          "choice": "v0.3.3 shipped v11 without this change; bump to v12 and help marker v6 so released installs re-extract once"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/lang-body-sample-bump.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PolicyDrivenFormatCapabilityTest.java#productionExtractorMatchesVersionedCapabilityOracle"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/resources/fixtures/format-capability/expected-state.v1.json"
+      ],
+      "class": "New",
+      "behaviour": "Advance only format-capability JSON policyId expectations from tika-default-v11 to tika-default-v12. Preserve every recipe hash, literal annotated text, required/absent marker, MIME/parser identity, embedded/structure count and known-gap classification. Real production extraction must return v12; Java/JSON projections must still agree.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yes you should fix that.",
+          "location": "task t-20261110-langdetect agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes you should fix that.",
+          "delegationLocation": "task t-20261110-langdetect agreement",
+          "delegationScope": "The answer to the question \"should I fix the app so it judges a file's language from the main text rather than its opening menus?\": how the label is estimated and on which write paths, within the round-2 scenarios settled 2026-11-12 (language label only; stored preview, search and matching unchanged).",
+          "label": "agent choice",
+          "choice": "v0.3.3 shipped v11 without this change; bump to v12 and help marker v6 so released installs re-extract once"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/lang-body-sample-bump.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PolicyDrivenFormatCapabilityTest.java#productionExtractorMatchesVersionedCapabilityOracle"
+      ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CaseDistinctPageEdgesQueuedRestartTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Advance only current default/configured maintenance target policy expectations from v11 to v12. Historical v8 policies remain v8. Preserve case-distinct PDF edges, repeated-edge removal, source identity, successful-history provenance, queued repair, complete-family reuse and reopen assertions.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yes you should fix that.",
+          "location": "task t-20261110-langdetect agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes you should fix that.",
+          "delegationLocation": "task t-20261110-langdetect agreement",
+          "delegationScope": "The answer to the question \"should I fix the app so it judges a file's language from the main text rather than its opening menus?\": how the label is estimated and on which write paths, within the round-2 scenarios settled 2026-11-12 (language label only; stored preview, search and matching unchanged).",
+          "label": "agent choice",
+          "choice": "v0.3.3 shipped v11 without this change; bump to v12 and help marker v6 so released installs re-extract once"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/lang-body-sample-bump.json",
+      "newChecks": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/loop/CaseDistinctPageEdgesQueuedRestartTest.java#maintenanceRepairsSuccessfulOldPolicyAndReusesCompleteFamilyAfterReopen"
+      ]
+    },
+    {
+      "items": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredExtractionIntegrationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "Advance only expected default/configured child artifact identities from v11 to v12. Preserve six physical PDF pages, exact case-distinct headers/footers, removal of exact repeated edges, direct/child text equality, structured parser identity, SUCCESS_FULL, no truncation and actual child reuse without restart.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yes you should fix that.",
+          "location": "task t-20261110-langdetect agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes you should fix that.",
+          "delegationLocation": "task t-20261110-langdetect agreement",
+          "delegationScope": "The answer to the question \"should I fix the app so it judges a file's language from the main text rather than its opening menus?\": how the label is estimated and on which write paths, within the round-2 scenarios settled 2026-11-12 (language label only; stored preview, search and matching unchanged).",
+          "label": "agent choice",
+          "choice": "v0.3.3 shipped v11 without this change; bump to v12 and help marker v6 so released installs re-extract once"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/lang-body-sample-bump.json",
+      "newChecks": [
+        "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/StructuredExtractionIntegrationTest.java#caseDistinctPdfEdgesSurviveRealStructuredParserAndReusedChild"
+      ]
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/HelpIngestMarkerRecoveryTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The v5 help marker released in v0.3.3 names built-in help stored under extraction policy v11, whose language labels came from the text's opening; the help folder is no watched root, so only the marker re-reads it. The new v5MarkerReingestsOnceAndWritesV6 check requires a v5 marker to trigger exactly one forced help re-ingest, advance the marker to v6, and suppress another re-ingest on the next start. The historical v2, v3 and v4 checks now expect the v6 marker and are renamed from ...WritesV5 to ...WritesV6; their once-only oracle (one re-ingest, then none) is retained. The stale, unreadable and current-marker checks are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "yes you should fix that.",
+          "location": "task t-20261110-langdetect agreement"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "yes you should fix that.",
+          "delegationLocation": "task t-20261110-langdetect agreement",
+          "delegationScope": "The answer to the question \"should I fix the app so it judges a file's language from the main text rather than its opening menus?\": how the label is estimated and on which write paths, within the round-2 scenarios settled 2026-11-12 (language label only; stored preview, search and matching unchanged).",
+          "label": "agent choice",
+          "choice": "v0.3.3 shipped v11 without this change; bump to v12 and help marker v6 so released installs re-extract once"
+        }
+      ],
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/lang-body-sample-bump.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/HelpIngestMarkerRecoveryTest.java#v5MarkerReingestsOnceAndWritesV6",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/HelpIngestMarkerRecoveryTest.java#v2MarkerReingestsOnceAndWritesV6",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/HelpIngestMarkerRecoveryTest.java#v3MarkerReingestsOnceAndWritesV6",
+        "modules/app-services/src/test/java/io/justsearch/app/services/worker/HelpIngestMarkerRecoveryTest.java#v4MarkerReingestsOnceAndWritesV6"
       ]
     }
   ]

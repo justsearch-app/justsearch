@@ -72,7 +72,7 @@ final class CaseDistinctPageEdgesQueuedRestartTest extends LuceneExecutorTestBas
     var policy = configured ? TikaExtractionPolicy.fromWorkerLimits(new ResolvedConfig.Worker(100_000, 1_000_000))
         : TikaExtractionPolicy.defaults();
     String oldPolicy = configured ? "tika-config-v8-100000-1000000" : "tika-default-v8";
-    String currentPolicy = configured ? "tika-config-v11-100000-1000000" : "tika-default-v11";
+    String currentPolicy = configured ? "tika-config-v12-100000-1000000" : "tika-default-v12";
     DocumentIdentityStore.Identity originalIdentity;
     List<JobQueue.IngestionEventView> historical;
     Map<String, Map<String, String>> original;

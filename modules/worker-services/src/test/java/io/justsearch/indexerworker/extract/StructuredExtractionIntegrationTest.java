@@ -72,7 +72,7 @@ class StructuredExtractionIntegrationTest {
       long pid = -1;
       for (int request = 0; request < 2; request++) {
         var artifact = sandbox.extract(pdf);
-        assertEquals(configured ? "tika-config-v11-100000-1000000" : "tika-default-v11", artifact.policyId());
+        assertEquals(configured ? "tika-config-v12-100000-1000000" : "tika-default-v12", artifact.policyId());
         assertEquals("tika-policy-structured", artifact.parserId());
         assertEquals(ExtractionStatus.SUCCESS_FULL, artifact.status());
         assertFalse(artifact.truncated());

@@ -95,7 +95,7 @@ class Utf16WithoutBomExtractionTest {
 
   @Test
   void defaultPolicyIdentityIsCurrentGeneration() throws Exception {
-    assertEquals("tika-default-v11", TikaExtractionPolicy.defaults().policyId());
+    assertEquals("tika-default-v12", TikaExtractionPolicy.defaults().policyId());
   }
 
   @Test
@@ -103,13 +103,13 @@ class Utf16WithoutBomExtractionTest {
     for (String id : Arrays.asList(null, "", " ")) {
       var policy = new TikaExtractionPolicy(id, 48, 1024, 1024, 128, 128, 4096,
           0, 0, 100.0d, true, Set.of(), Set.of());
-      assertEquals("tika-default-v11", policy.policyId());
+      assertEquals("tika-default-v12", policy.policyId());
     }
   }
 
   @Test
   void configuredPolicyIdentityIsCurrentGeneration() throws Exception {
-    assertEquals("tika-config-v11-48-1024", TikaExtractionPolicy.fromWorkerLimits(
+    assertEquals("tika-config-v12-48-1024", TikaExtractionPolicy.fromWorkerLimits(
         new ResolvedConfig.Worker(48, 1024)).policyId());
   }
 
