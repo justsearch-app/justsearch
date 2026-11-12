@@ -760,3 +760,13 @@ Repair after the real-Engine recheck and verification of 2026-11-12 (design choi
   "digest": "sha256:0f17040da6f33bebfb313ab0abfb8a7f6f19494f53fbf6c98197203fefa8994f"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1cd22-daac-7862-9b76-773b0d9d7640",
+  "verdict": "accept",
+  "digest": "sha256:2da81cf4a9b8489de27de7a3f79b843914e58279ab4927dbdcd4b8035923f8d1"
+}
+```
