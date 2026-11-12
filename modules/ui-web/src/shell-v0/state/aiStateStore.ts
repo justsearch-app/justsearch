@@ -277,6 +277,11 @@ export interface AiState {
   /** Indexing observation is within its freshness window, independently of inference/SSE contact. */
   indexingStatusLive: boolean;
   /**
+   * The latest completed status read failed (refused, aborted, an error answer): the held body is a
+   * past measurement from then on. A later answered read clears it; a read that never completes does not set it.
+   */
+  statusReadFailed: boolean;
+  /**
    * Spec A step 9 — the AI readiness reason when the Engine unloaded the chat model for another GPU
    * user (`inference.unloaded_gpu_pressure` / `inference.unloaded_game_mode`), else null. Chat is
    * then not offline: a person's chat request loads it again, and the chat window offers "Load
@@ -385,6 +390,7 @@ const inferenceSig = signal<InferenceSnapshot | null>(null);
 const statusSig = signal<StatusSnapshot | null>(null);
 const lastInferenceSuccessSig = signal<number | null>(null);
 const lastStatusSuccessSig = signal<number | null>(null);
+const statusReadFailedSig = signal(false);
 const activitySig = signal<AiActivity>(INITIAL_ACTIVITY);
 const installStateSig = signal<Maybe<{ installed: boolean; installing: boolean }>>(UNKNOWN);
 // 663 Stage 3 — raw install/runtime/pack snapshots from the shared `aiInstallPoll`.
@@ -675,6 +681,15 @@ function verdictOwnsStatus(verdict: SystemHealthVerdict): boolean {
     verdict.kind === 'transitioning' ||
     verdict.kind === 'degraded'
   );
+}
+
+/**
+ * What `statusLabel`'s words are about, by the same precedence `computeStatusLabel` uses: an answer in
+ * progress and the AI-engine arm speak of the AI models; the verdict arm speaks of the system.
+ */
+export function statusLabelSubject(state: Pick<AiState, 'activity' | 'verdict'>): 'system' | 'ai' {
+  if (['thinking', 'streaming', 'extracting'].includes(state.activity?.state ?? '')) return 'ai';
+  return !state.verdict || verdictOwnsStatus(state.verdict) ? 'system' : 'ai';
 }
 
 /**
@@ -993,6 +1008,7 @@ function buildSnapshot(): AiState {
     snapshotLive,
     status,
     indexingStatusLive: computeIndexingStatusLive(snapshotLive),
+    statusReadFailed: statusReadFailedSig.get(),
     inference: inferenceSig.get(),
     lastSettledIndex: lastSettledIndexSig.get(),
     episodeMaxPendingJobs: episodeMaxPendingJobsSig.get(),
@@ -1100,6 +1116,8 @@ function onStatusUpdate(snap: StatusSnapshot | null, invalidated = false): void 
     statusSig.set(null);
     ingestInferenceSnapshot(null);
   }
+  // An invalidation is the producer's own announcement, not a failed read.
+  statusReadFailedSig.set(!snap && !invalidated);
   if (snap) {
     statusSig.set(snap);
     lastStatusSuccessSig.set(Date.now());
@@ -1255,6 +1273,7 @@ export function stopAiStateStore(): void {
   started = false;
   // The stopped poller has discarded its epoch and replay state.
   statusSig.set(null);
+  statusReadFailedSig.set(false);
 }
 
 export function subscribeAiState(listener: (s: AiState) => void): () => void {
@@ -1321,6 +1340,7 @@ export function __feedForTest(opts: {
     statusSig.set(opts.status);
     if (opts.status) {
       lastStatusSuccessSig.set(Date.now());
+      statusReadFailedSig.set(false);
       stampSettledIndex(opts.status); // E2 — mirror the production poll-callback stamp.
       stampEpisodeMaxPendingJobs(opts.status); // 813 §19 W2 — same mirror, same reason.
       stampEnrichSettleSamples(opts.status); // 813 §20 — same mirror, same reason.
@@ -1355,6 +1375,7 @@ export function __resetAiStateForTest(): void {
   statusSig.set(null);
   lastInferenceSuccessSig.set(null);
   lastStatusSuccessSig.set(null);
+  statusReadFailedSig.set(false);
   activitySig.set(INITIAL_ACTIVITY);
   installStateSig.set(UNKNOWN);
   installObservationSig.set(undefined);

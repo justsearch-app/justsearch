@@ -368,10 +368,13 @@ export class LogSurface extends JfElement {
     .error {
       color: var(--text-danger);
     }
+    /* The time, level and logger keep their column widths; the message takes the rest of the line.
+       When the rest is narrower than a readable message (a small window, large text), the message
+       wraps onto its own full-width line, and so does the logger when even the columns do not fit. */
     .row {
-      display: grid;
-      grid-template-columns: 9rem 4rem 9rem 1fr;
-      gap: 0.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0 0.5rem;
       padding: 0.125rem 0;
       border-bottom: 1px solid var(--border-subtle);
       font-family: ui-monospace, monospace;
@@ -379,10 +382,12 @@ export class LogSurface extends JfElement {
       align-items: baseline;
     }
     .row .ts {
+      flex: 0 0 9rem;
       color: var(--text-tertiary);
       white-space: nowrap;
     }
     .row .level {
+      flex: 0 0 4rem;
       font-weight: 600;
     }
     .row .level.DEBUG {
@@ -398,12 +403,15 @@ export class LogSurface extends JfElement {
       color: var(--text-danger);
     }
     .row .logger {
+      flex: 0 0 9rem;
       color: var(--text-tertiary);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .row .msg {
+      flex: 1 1 20rem;
+      min-width: 0;
       word-break: break-word;
     }
     /* 574 B2 — the status pills are the jf-status-badge atom now; the per-surface .badge fork
