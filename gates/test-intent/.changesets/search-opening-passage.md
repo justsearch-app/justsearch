@@ -110,3 +110,14 @@ GPL is a preservation check: it passes before and after, and its entry claims no
   "note": "Transcribed by the orchestrator from the acceptor's answer (its sandbox could not spawn git)."
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "01a1cd23-6678-72d0-a761-c76366347933",
+  "verdict": "accept",
+  "digest": "sha256:a5da8e00edab9486849a3319125a1939a56fcce1c98546c34be2bbf148b8bf04",
+  "note": "Transcribed by the orchestrator from the auditor's answer (its sandbox could not spawn git)."
+}
+```
