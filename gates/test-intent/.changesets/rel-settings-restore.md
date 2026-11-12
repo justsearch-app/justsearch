@@ -70,3 +70,14 @@ opened beneath the frame out of the top layer.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-settings-1794483268",
+  "verdict": "reject",
+  "digest": "sha256:d828bbdd90556709088a7d9e0f814babc6d5ef7a32d50746284d81f8c3e127c3",
+  "note": "Reject: every source (and defectSource.stronger) is kind owner-words citing docs/explanation/10-ui-ux-design.md, whose cited lines came from agent co-authored PRs (#527, #1134, #1194); only the user's own words are owner-words, and no listed safeguard fits. Behaviour, evidence and fail-before hold (R1 fails on a003b507f4 by assertion; :modal alone also fails there). Clear by re-sourcing: a delegated-choice quoting the owner's release request verbatim with its task location and the choice 'restored Settings stays modal after hand-off; X and Escape close it', or an owner-adopted-scenario R1, used both as sources and as defectSource.stronger."
+}
+```
