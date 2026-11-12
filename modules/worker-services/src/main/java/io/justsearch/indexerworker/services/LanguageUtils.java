@@ -23,10 +23,12 @@ import org.commonmark.renderer.text.TextContentRenderer;
 public final class LanguageUtils {
 
   private static final int MIN_LATIN_LETTERS = 50;
-  /** Characters per language-sample window; four windows fill the detector's text limit. */
-  private static final int SAMPLE_WINDOW_CHARS = LatinLanguageDetector.MAX_TEXT_CHARS / 4;
-  /** How far a window boundary may move to reach a line break. */
-  private static final int SAMPLE_BOUNDARY_SLACK = 256;
+  /** Characters per language window. */
+  private static final int WINDOW_CHARS = 4096;
+  /** At most this many windows vote on a document's label. */
+  private static final int MAX_WINDOWS = 8;
+  /** How far a window edge may move to reach a line break. */
+  private static final int WINDOW_EDGE_SLACK = 256;
   private static final char BOM = '\uFEFF';
   private static final Set<String> STRUCTURED_DATA_MIMES = Set.of(
       "text/csv", "text/tab-separated-values", "application/json", "application/x-ndjson",
@@ -45,11 +47,13 @@ public final class LanguageUtils {
    *
    * <p>Source code and structured data, as the app classifies them by file kind and MIME type,
    * have no natural language and get no label. Otherwise the content is prepared as for the
-   * preview (Markdown converted to plain text) and the label is estimated from a bounded sample
-   * of it: four windows of 4,096 characters at the start, at the two thirds points and at the end,
-   * so an opening block in another language (site menus, a cover page) does not decide the label.
-   * The existing non-Latin script rules and bundled statistical models for Latin prose apply to the
-   * combined sample. Insufficient evidence has no label; the machine locale is never consulted.
+   * preview (Markdown converted to plain text). A text shorter than 4,096 characters is one window;
+   * a longer one is read as up to eight windows of 4,096 characters, evenly spaced from its start to
+   * its end. Each window gets the existing rule on its own (non-Latin script rules, then bundled
+   * statistical models for Latin prose), and the document's label is the language most windows
+   * name, when it leads every other language. So an opening block in another language (site menus,
+   * a cover page) does not decide the label. A tie or no window label means no label; the machine
+   * locale is never consulted.
    *
    * @param content the document's full content, as stored
    * @param fileKind the stored file kind ({@code code}, {@code text}, {@code markdown}, ...)
@@ -60,7 +64,7 @@ public final class LanguageUtils {
     if (content == null || isCodeOrData(fileKind, mimeBase)) {
       return null;
     }
-    return detectLanguage(languageSample(preparedText(content, "markdown".equals(fileKind))));
+    return votedLanguage(preparedText(content, "markdown".equals(fileKind)));
   }
 
   private static boolean isCodeOrData(String fileKind, String mimeBase) {
@@ -72,53 +76,46 @@ public final class LanguageUtils {
   }
 
   /**
-   * The bounded, deterministic language sample of a prepared text: windows of 4,096 characters at
-   * the start, centred on the two thirds points, and ending at the end. Windows that overlap
-   * merge. An inner window boundary moves inward to the nearest line break within 256 characters,
-   * and never splits a surrogate pair. Windows are joined with a newline; the sample has at most
-   * 16,384 characters.
+   * The plurality label of a prepared text's windows: {@code min(8, ceil(length / 4096))} windows
+   * of 4,096 characters, the first starting at the start and the last ending at the end, evenly
+   * spaced between. An inner window edge moves inward to the nearest line break within 256
+   * characters, and never splits a surrogate pair.
    */
-  private static String languageSample(String text) {
+  private static String votedLanguage(String text) {
     int length = text.length();
-    if (length <= SAMPLE_WINDOW_CHARS) {
-      return text;
+    if (length <= WINDOW_CHARS) {
+      return detectLanguage(text);
     }
-    int half = SAMPLE_WINDOW_CHARS / 2;
-    int[][] windows = {
-        {0, SAMPLE_WINDOW_CHARS},
-        {length / 3 - half, length / 3 + half},
-        {2 * (length / 3) - half, 2 * (length / 3) + half},
-        {length - SAMPLE_WINDOW_CHARS, length}};
-    StringBuilder sample = new StringBuilder(LatinLanguageDetector.MAX_TEXT_CHARS + windows.length);
-    int start = -1;
-    int end = -1;
-    for (int[] window : windows) {
-      int from = window[0] <= 0 ? 0 : lineStartAtOrAfter(text, window[0]);
-      int to = window[1] >= length ? length : lineEndAtOrBefore(text, window[1]);
-      if (start >= 0 && from <= end) {
-        end = Math.max(end, to);
-        continue;
+    int windows = Math.min(MAX_WINDOWS, (length + WINDOW_CHARS - 1) / WINDOW_CHARS);
+    java.util.Map<String, Integer> votes = new java.util.HashMap<>();
+    for (int i = 0; i < windows; i++) {
+      int start = (int) ((long) i * (length - WINDOW_CHARS) / (windows - 1));
+      int end = start + WINDOW_CHARS;
+      String label = detectLanguage(text.substring(
+          start == 0 ? 0 : lineStartAtOrAfter(text, start),
+          end == length ? length : lineEndAtOrBefore(text, end)));
+      if (label != null) {
+        votes.merge(label, 1, Integer::sum);
       }
-      if (start >= 0) {
-        appendWindow(sample, text, start, end);
+    }
+    String leader = null;
+    int most = 0;
+    boolean tied = false;
+    for (var vote : votes.entrySet()) {
+      if (vote.getValue() > most) {
+        leader = vote.getKey();
+        most = vote.getValue();
+        tied = false;
+      } else if (vote.getValue() == most) {
+        tied = true;
       }
-      start = from;
-      end = to;
     }
-    appendWindow(sample, text, start, end);
-    return truncate(sample.toString(), LatinLanguageDetector.MAX_TEXT_CHARS);
-  }
-
-  private static void appendWindow(StringBuilder sample, String text, int from, int to) {
-    if (!sample.isEmpty()) {
-      sample.append('\n');
-    }
-    sample.append(text, from, to);
+    return tied ? null : leader;
   }
 
   /** A window start: just after the nearest line break at most the slack ahead, else unsplit. */
   private static int lineStartAtOrAfter(String text, int position) {
-    int limit = Math.min(text.length(), position + SAMPLE_BOUNDARY_SLACK);
+    int limit = Math.min(text.length(), position + WINDOW_EDGE_SLACK);
     for (int i = position - 1; i < limit; i++) {
       if (text.charAt(i) == '\n') {
         return i + 1;
@@ -129,7 +126,7 @@ public final class LanguageUtils {
 
   /** A window end: at the nearest line break at most the slack behind, else unsplit. */
   private static int lineEndAtOrBefore(String text, int position) {
-    int limit = Math.max(0, position - SAMPLE_BOUNDARY_SLACK);
+    int limit = Math.max(0, position - WINDOW_EDGE_SLACK);
     for (int i = position; i >= limit; i--) {
       if (text.charAt(i) == '\n') {
         return i;
@@ -158,7 +155,7 @@ public final class LanguageUtils {
     return truncate(preparedText(content, isMarkdown), maxChars);
   }
 
-  /** The full text the preview and the language sample are taken from. */
+  /** The full text the preview and the language windows are taken from. */
   private static String preparedText(String content, boolean isMarkdown) {
     if (content == null || content.isBlank()) {
       return "";
@@ -567,8 +564,8 @@ public final class LanguageUtils {
     return null;
   }
 
-  private static String detectLanguage(String sample) {
-    if (sample.isEmpty()) {
+  private static String detectLanguage(String window) {
+    if (window.isEmpty()) {
       return null;
     }
     int latin = 0;
@@ -580,8 +577,8 @@ public final class LanguageUtils {
     int devanagari = 0;
     int greek = 0;
     int examined = 0;
-    for (int i = 0; i < sample.length(); i++) {
-      char ch = sample.charAt(i);
+    for (int i = 0; i < window.length(); i++) {
+      char ch = window.charAt(i);
       if (!Character.isLetter(ch)) {
         continue;
       }
@@ -634,7 +631,7 @@ public final class LanguageUtils {
       return "el";
     }
     if (latin >= MIN_LATIN_LETTERS && latin >= examined * 0.8) {
-      return LatinLanguageDetector.detect(sample);
+      return LatinLanguageDetector.detect(window);
     }
     return null;
   }
