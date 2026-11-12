@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 export const repo = path.resolve(import.meta.dirname, '../..');
-export const root = () => fs.mkdtempSync(path.join(os.tmpdir(), 'owner-check-'));
+export const root = () => fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'owner-check-')));
 export const pid = 990051;
 export const caller = { harness: 'codex', owner: { key: 'override-check-caller', pid: null }, sessionId: 'check-caller' };
 export const emptyOps = { byCriticality: { mustComplete: [], unsafeToInterrupt: [], interruptibleWithLoss: [] }, entries: [] };
