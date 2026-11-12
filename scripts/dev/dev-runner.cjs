@@ -844,10 +844,10 @@ function ownerVerdictFor({ active, callerIdentity, selfCheck, supervisorAlive, l
  * no kill is ever based on a failed lookup. The run's own processes are real ones, so the agent
  * process-table fixture (which models harness processes) is not consulted here.
  */
-function isPidAlive(pid) {
+function isPidAlive(pid, { kill = process.kill } = {}) {
   const n = Number(pid);
   if (!Number.isFinite(n) || n <= 0) return false;
-  return ownerPresence.ownerPidPresence({ pid: n }, { env: {} }) !== 'absent';
+  return ownerPresence.ownerPidPresence({ pid: n }, { env: {}, kill }) !== 'absent';
 }
 
 // Tempdoc 730 B1, re-homed by lane F stage A item A16.
