@@ -340,7 +340,7 @@ def require_gpu_install(status):
 
 def require_gpu_encoders(runtime):
     features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
-    for name in ('embed', 'splade'):
+    for name in ('embed',):
         feature = features.get(name, {})
         if (feature.get('modelActive') is not True or feature.get('executionProvider') != 'cuda'
                 or feature.get('gpuFallback') is not False):
@@ -355,7 +355,7 @@ class SoakGpu:
 
     def observe(self, sample):
         features = {f['id']: f for f in sample['runtime'].get('onnxFeatures', [])}
-        cpu = {name for name in ('embed', 'splade')
+        cpu = {name for name in ('embed',)
                if features.get(name, {}).get('executionProvider') == 'cpu'}
         try:
             require_gpu_encoders(sample['runtime'])

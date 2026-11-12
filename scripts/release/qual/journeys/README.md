@@ -421,7 +421,7 @@ are activated through the existing UI activation consent. Preview must select GP
 readiness must agree and must not install the Windows native runtime. The separate
 **Start answers** control then sets chat intent; the observed runtime must become
 healthy with a realized model before a chat request. Embedding
-and SPLADE must report **observed** CUDA execution without GPU fallback.
+must report **observed** CUDA execution without GPU fallback. SPLADE is downloaded but runs only when enabled (off by default since #1162), so it is not required.
 The production RAG chat request goes through the shell's own authenticated
 origin; a completed answer must name the fixture's turquoise telescope and cite
 the inspection message. The selected llama-server must be the installed cuda12
@@ -619,7 +619,7 @@ qualification. Explicit `--journeys` subsets likewise never qualify a release.
   determine which file was opened.
 - J3: default production downloads, then **Activate downloaded models** and the
   UI's typed authorization when requested (immediate operation acceptance is
-  also observed). All four reported retrieval models must be active
+  also observed). The embedding, reranker and citation-scorer models must be active (SPLADE is off by default since #1162 and not required)
   and installation fully complete. A semantic vector query must return the
   fixture with a dense-only execution trace and an executed cross-encoder, without
   keyword fallback. Fresh downloads also require the session acquisition capability;
@@ -881,8 +881,8 @@ Cleanly stopped failed stages retain their checkpoint as well as their
 failed summary, so a diagnostic rerun can reuse production downloads without
 certifying the failed stage. Refreshing an application snapshot's guest controls
 keeps its original phase and checkpoint. Cached J3 also recognizes complete
-acquisition through the production install-status API; activation, all four
-runtime components and semantic retrieval still have to pass. Windows J3 retains
+acquisition through the production install-status API; activation, the three
+required runtime components and semantic retrieval still have to pass. Windows J3 retains
 the actual activation click events and disabled control state through its own
 WebDriver session in `J3-activation-input.json`.
 
@@ -979,7 +979,7 @@ when chat and CUDA are hardware-skipped. That status is accepted only with
 completed activation, no repair needed, retrieval-core acquisition ready, all
 five downloadable model packages installed without errors, and exactly those
 two hardware skips. The semantic query, executed retrieval stages, chat
-unavailability and all four active runtime components remain required. Linux's
+unavailability and the three required active runtime components remain required. Linux's
 existing completion checks are unchanged.
 
 J5 uses the production HTTPS URL, descriptor v2, generated test trust pins and a

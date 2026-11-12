@@ -55,7 +55,7 @@ class Repair2Tests(unittest.TestCase):
         self.assertEqual(classify(failure.exception), 'failed-product')
         reason = str(failure.exception)
         for expected in ('reranker.modelActive=false', 'embed.modelActive=true',
-                         'splade.modelActive=true', 'citation_scorer.modelActive=true', 'cross-encoder'):
+                         'citation_scorer.modelActive=true', 'cross-encoder'):
             self.assertIn(expected, reason)
         run.wd.click.assert_not_called()  # No repeated download.
         self.assertNotIn('ai', run.facts)

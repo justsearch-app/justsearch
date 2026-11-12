@@ -311,8 +311,8 @@ def install_ai(run):
             # installedFully can briefly be true before reboot initialization
             # publishes activation_required. Only activation/runtime evidence
             # settles a cached setup; an ambiguous idle state must keep waiting.
-            return status if status.get('phase') == 'activation_required' or all(
-                features.get(name, {}).get('modelActive') is True for name in ('embed', 'splade')) else None
+            return status if (status.get('phase') == 'activation_required'
+                              or features.get('embed', {}).get('modelActive') is True) else None
         return status if (status.get('state') in ('completed', 'installed', 'succeeded')
                           or status.get('installedFully') is True) else None
     status = wait_for(settled, 'Default CPU AI install', seconds=900 if resumed else 1800, interval=5,
@@ -354,8 +354,8 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
             if operation.get('state') in ('failed', 'cancelled'):
                 raise ProductFailure('Model activation failed: ' + json.dumps(operation))
         features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
-        return {'install': install, 'runtime': runtime} if cpu_install_ready(run, install) and all(
-            features.get(name, {}).get('modelActive') is True for name in ('embed', 'splade')) else None
+        return {'install': install, 'runtime': runtime} if (cpu_install_ready(run, install)
+            and features.get('embed', {}).get('modelActive') is True) else None
     active = wait_for(activated, 'Downloaded default CPU search encoders activated', seconds=900, interval=5)
     status = active['install']
     # Acquisition stages belong to this download session, not rebooted caches.
@@ -375,20 +375,21 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
     assert (chat.get('unavailableReason') or 'Chat is not supported here.') in text, 'CPU chat unavailable explanation is not shown'
     run.native.shot('J3-cpu-search-without-chat')
     # RerankerConfig documents lazy initialization on a retrieval query. Check
-    # all reported default models after exercising retrieval, not before it.
+    # required retrieval models after exercising retrieval, not before it.
+    # SPLADE is downloaded by default but runs only when enabled.
     def models_active():
         observed = run.api('/api/ai/runtime/status')
         run.evidence('J3-runtime', observed)
         features = {f['id']: f for f in observed.get('onnxFeatures', [])}
         return observed if all(features.get(name, {}).get('modelActive') is True
-                               for name in ('embed', 'splade', 'reranker', 'citation_scorer')) else None
+                               for name in ('embed', 'reranker', 'citation_scorer')) else None
     try:
         runtime = wait_for(models_active, 'All default retrieval models active after vector query', seconds=120, interval=3)
     except AssertionError as exc:
         observed = run.api('/api/ai/runtime/status')
         features = {f['id']: f for f in observed.get('onnxFeatures', [])}
         flags = {name + '.modelActive': features.get(name, {}).get('modelActive')
-                 for name in ('embed', 'splade', 'reranker', 'citation_scorer')}
+                 for name in ('embed', 'reranker', 'citation_scorer')}
         diagnostic = {'flags': flags, 'retrievalTrace': retrieval.get('searchTrace', {}), 'runtime': observed}
         run.evidence('J3-model-activity-failure', diagnostic)
         raise AssertionError(str(exc) + '; ' + ', '.join(
