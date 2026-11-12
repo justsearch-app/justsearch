@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T14:58:56.417Z",
+  "revision": "18780a75a81a8cad673c7f6469c6666b5433adb0",
+  "tree": "1fc3ad0cfc8c25b80e4ef3763677a15f8f0ed491",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/tmp/test-intent-vitest-3933986-1794495380918.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 83144
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC8 at 1280×720, 160 records draw and scroll without an uncaught ResizeObserver loop error",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bf75a377006abf5c7cf6e0b9971a664a800369f085221e777e24e26f94c5598c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC8 at 1280×720, 160 records draw and scroll without an uncaught ResizeObserver loop error",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC8 at 1280×720 in forced colours, 160 records draw and scroll without an uncaught ResizeObserver loop error",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bf75a377006abf5c7cf6e0b9971a664a800369f085221e777e24e26f94c5598c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC8 at 1280×720 in forced colours, 160 records draw and scroll without an uncaught ResizeObserver loop error",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "d8f6c9d13f",
+    "revision": "d8f6c9d13ff0e8fb6af13a248855d3f7508c0d9d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/tmp/test-intent-vitest-3933986-1794495466657.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 69415,
+        "output": "JSON report written to /tmp/test-intent-vitest-3933986-1794495466657.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC8 at 1280×720, 160 records draw and scroll without an uncaught ResizeObserver loop error",
+        "classification": "assertion",
+        "detail": "FC8 at 1280×720, 160 records draw and scroll without an uncaught ResizeObserver loop error:  AssertionError: no loop error while the feed first draws: expected [ Array(1) ] to deeply equal []\n    at /tmp/test-intent-before-u9WIoE/modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts:207:82\n    at file:///tmp/test-intent-before-u9WIoE/modules/ui-web/node_modules/@vitest"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC8 at 1280×720 in forced colours, 160 records draw and scroll without an uncaught ResizeObserver loop error",
+        "classification": "assertion",
+        "detail": "FC8 at 1280×720 in forced colours, 160 records draw and scroll without an uncaught ResizeObserver loop error:  AssertionError: no loop error while the feed first draws: expected [ Array(1) ] to deeply equal []\n    at /tmp/test-intent-before-u9WIoE/modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts:207:82\n    at file:///tmp/test-intent-before-u9WIoE/modules/ui-web/node_modules/@vitest"
+      }
+    ]
+  },
+  "digest": "sha256:f26b1c37446c5688a2ffaf74557d00e6be9438c9ea25f4bc295a7f5e673155ee"
+}

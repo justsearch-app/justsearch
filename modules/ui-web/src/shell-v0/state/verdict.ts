@@ -563,21 +563,15 @@ export interface VerdictPresentation {
   readonly tone: ReturnType<typeof verdictTone>;
   readonly headline: string;
   readonly body: string;
-  /**
-   * The screen-reader announcement of a verdict CHANGE (595 §15.1 / E1). `text` is
-   * the concise headline (WCAG 4.1.3 — brief); `politeness` maps to the ONE
-   * live-region authority (`<jf-system-notice live>`): `alert` (assertive) only for
-   * an error verdict, else `status` (polite).
-   */
-  readonly announce: { readonly text: string; readonly politeness: 'status' | 'alert' };
 }
 
 /**
  * The ONE verdict-presentation projection (595 §15.1). Every surface CONSUMES this —
  * the Health badge (tone + headline), the footer (headline + body), the status bar
- * (headline for the provisional kinds, via computeStatusLabel), and the a11y
- * announcer (announce). It mirrors 557's `present()` display projector, extended
- * from the verdict's VALUE to its PRESENTATION, so the wording lives in one place.
+ * (headline for the provisional kinds, via computeStatusLabel). The status pill's
+ * live region speaks the pill's own words instead (frameStatus `spokenStatus`, FC10a).
+ * It mirrors 557's `present()` display projector, extended from the verdict's VALUE
+ * to its PRESENTATION, so the wording lives in one place.
  */
 export function presentVerdict(v: SystemHealthVerdict): VerdictPresentation {
   const headline = verdictHeadline(v);
@@ -585,6 +579,5 @@ export function presentVerdict(v: SystemHealthVerdict): VerdictPresentation {
     tone: verdictTone(v.severity),
     headline,
     body: verdictBody(v),
-    announce: { text: headline, politeness: v.severity === 'error' ? 'alert' : 'status' },
   };
 }

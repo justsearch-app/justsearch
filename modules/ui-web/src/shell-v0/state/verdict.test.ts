@@ -841,18 +841,4 @@ describe('presentVerdict (595 §15.1) — the ONE verdict-presentation projectio
     expect(p.headline).toBe('Reduced capability');
     expect(p.body).toContain('search still works');
   });
-
-  it('announces politely for non-error verdicts, assertively for an error verdict', () => {
-    expect(presentVerdict({ kind: 'operational', severity: 'ok', reasons: [] }).announce).toEqual({
-      text: 'Search available',
-      politeness: 'status',
-    });
-    expect(presentVerdict({ kind: 'unreachable', severity: 'error', reasons: [] }).announce.politeness).toBe('alert');
-  });
-
-  it('the announce text is the concise headline (WCAG 4.1.3 brevity)', () => {
-    const p = presentVerdict({ kind: 'transitioning', severity: 'busy', reasons: ['rebuilding'] });
-    expect(p.announce.text).toBe('Rebuilding…');
-    expect(p.announce.text).toBe(p.headline);
-  });
 });

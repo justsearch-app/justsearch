@@ -452,7 +452,7 @@ export class StatusPanel extends JfElement {
       ${model && Object.values(model.sections).every(rows => !rows.length)
         ? html`<p class="empty">${model.pill.kind === 'calm' ? 'Search is up to date. Nothing needs you.' : model.pill.label}</p>` : nothing}
       ${this.renderPlugins()}
-      <div class="footer"><button type="button" @click=${() => this.action({ kind: 'navigate', target: 'core.activity-surface', label: 'All activity' })}>All activity</button>
+      <div class="footer"><button type="button" @click=${() => this.action({ kind: 'all-activity', target: 'core.activity-surface', label: 'All activity' })}>All activity</button>
         <button type="button" @click=${() => this.action({ kind: 'navigate', target: 'core.health-surface', label: 'Health' })}>Health</button></div>
     </div>`;
   }

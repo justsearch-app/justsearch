@@ -236,7 +236,8 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
     const outcome = host.shadowRoot!.querySelector('[data-testid="ledger-outcome"]');
     expect(outcome).not.toBeNull();
     expect(outcome!.getAttribute('data-tone')).toBe('success');
-    expect(outcome!.textContent).toContain('SUCCESS');
+    // FC9 — the outcome in words, as the details pane says it.
+    expect(outcome!.textContent).toContain('Succeeded');
     // the label no longer carries the " — SUCCESS" suffix (the outcome moved to its own cell).
     const label = host.shadowRoot!.querySelector('[data-testid="ledger-row"] .label');
     expect(label!.textContent).not.toContain('SUCCESS');
@@ -260,7 +261,7 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
     expect(outcome).not.toBeNull();
     expect(outcome!.getAttribute('data-tone')).toBe('error');
     expect(outcome!.textContent).toContain('✕'); // the failure glyph (statusGlyph → glyphChar)
-    expect(outcome!.textContent).toContain('FAILURE');
+    expect(outcome!.textContent).toContain('Failed');
   });
 
   it('shows an empty state when the snapshot has no activity', async () => {
@@ -371,7 +372,7 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
     await host.updateComplete;
     const rows = host.shadowRoot!.querySelectorAll('[data-testid="ledger-row"]');
     expect(rows.length).toBe(1);
-    expect(rows[0]!.querySelector('.who')?.textContent).toContain('agent');
+    expect(rows[0]!.querySelector('.who')?.textContent).toContain('The assistant');
   });
 
   // tempdoc 612 §3/§L — the routine de-flood widened beyond navigation to witnessed local-ack /

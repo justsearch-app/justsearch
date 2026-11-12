@@ -497,6 +497,15 @@
       "note": "Tempdoc 558 \u00a7S1 \u2014 the ONE ledger-row projection over a UnifiedActionEntry (renderEventRow), single-sourced so the Activity surface and the workspace retrospective render identical rows (they previously forked)."
     },
     {
+      "id": "fe-activity-words",
+      "kind": "projection",
+      "lang": "ts",
+      "path": "modules/ui-web/src/shell-v0/operations/activityWords.ts",
+      "guard": "gate:operation-surface",
+      "consumesProjection": "fe-action-ledger-client",
+      "note": "S6 follow-up C2 (FC9): the one wording module for Activity rows and the details pane (operation outcomes, approval and permission dispositions, sources) over ActionLedgerClient's entries. Words only; keeps no record of its own."
+    },
+    {
       "id": "operation-record-type",
       "kind": "source",
       "lang": "java",
