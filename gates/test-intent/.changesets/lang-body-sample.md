@@ -212,3 +212,14 @@ preserved checks is not part of the evidence file; the verifier repeats it).
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "cb931fec-4aa3-4c83-8112-969f6334cf08:verifier-5",
+  "verdict": "accept",
+  "digest": "sha256:32abfead46d0e306cd6232666b7004f9bd41609d057571c3e4093e719493d737",
+  "note": "Verified on 421a1dd9ec against base 5358c3952a. Before-state run of the candidate's three language test classes overlaid on 5358c3952a: every repaired check fails by assertion for the reason under test (opening language en, or the opening's language, instead of the body's: de/fr/nl/zh/ru/en/nl/cy; parent and passages en instead of de/nl); every preserved check passes on 5358c3952a (ContentLanguageBodySampleTest 40 preserved cases; VduResultWriterCoherenceTest 21 of 22, only vc1b fails) and all pass on the candidate. Adaptation entries keep inputs and expected labels; every input is under 4,096 characters, where contentLanguage applies the old single-window rule. The exempt ContentLanguageBodyWritePathsTest changes no global state, is read by no other test (full module suites pass), and its four checks fail by assertion before. Non-blocking: n2ShortMixedScriptFilesKeepTheirLabels pins two known short-text mislabels (Japanese kanji text as zh); its warrant is the delegated 'shorter than 4,096 characters keeps today's rule', not N2, which does not require keeping mistakes. The choice text says Markdown is prepared once and shared with the preview; the indexing writer still prepares it twice, as on main (measured: no added allocation)."
+}
+```
