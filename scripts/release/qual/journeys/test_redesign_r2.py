@@ -183,11 +183,14 @@ class ClassificationTests(unittest.TestCase):
              self.assertRaises(AssertionError):
             runner.Run.start_ui(run)
 
-    def test_activation_neither_consent_nor_operation_is_infrastructure(self):
+    def test_activation_neither_consent_nor_operation_is_evidence_only(self):
         run = Mock(); run.wd.execute.return_value = None
         run.api.return_value = {'state': 'completed', 'phase': 'activation_required'}
-        with patch.object(linux,'wait_for',immediate), self.assertRaises(runner.Infrastructure):
+        with patch.object(linux,'wait_for',immediate):
             linux.activate_downloaded(run)
+        evidence = [c.args[1] for c in run.evidence.call_args_list
+                    if c.args[0] == 'J3-activation-consent'][-1]
+        self.assertEqual(evidence['path'], 'noneObserved')
 
     def test_generic_product_timeout_is_not_download_transport(self):
         for message in ('model activation timeout', 'worker readiness timed out', 'model verification timeout'):

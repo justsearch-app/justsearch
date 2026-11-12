@@ -101,7 +101,7 @@ class RepairTests(unittest.TestCase):
             downloaded = {'state': 'completed', 'phase': 'activation_required', 'installedFully': False,
                           'readyCapabilities': ['retrieval-core']}
             active = dict(downloaded, phase='completed', installedFully=True)
-            statuses = iter([downloaded, downloaded, active])
+            statuses = iter([downloaded, active])
             retrieval = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',
                          'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'skipped', 'reason': 'PIPELINE_NOT_ELIGIBLE'}]}}
             queried = False

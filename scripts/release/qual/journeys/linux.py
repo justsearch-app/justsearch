@@ -386,110 +386,79 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
 
 
 def activate_downloaded(run):
-    # The installed version/policy may accept this UI action immediately or
-    # request typed authorization. The page may also approve the same pending
-    # request while the broadcast bridge briefly shows a duplicate typed prompt.
+    # Consent observations are evidence only. The caller must wait for the
+    # installed/active end state even if no prompt or operation is observed.
     last = {'typed': False, 'operationKeys': []}
-    baseline = None
+    observations = []
+    seen_prompt = False
     last_failure = None
-    interaction_error = None
+
+    def evidence(path=None):
+        observed = dict(last, observations=list(observations))
+        if path:
+            observed['path'] = path
+        run.evidence('J3-activation-consent', observed)
+
     def observe():
         nonlocal last
         last = run.wd.execute("""
 const inputs=all(document,'input[data-testid="authorization-typed-input"]').filter(e=>{
- const r=e.getBoundingClientRect();return r.width>0 && r.height>0;
+ const r=e.getBoundingClientRect();
+ const style=getComputedStyle(e);
+ return r.width>0 && r.height>0 && style.visibility!=='hidden' && style.display!=='none';
 });
 const typed=inputs.length>0;
 const blocked=typed && !inputs.some(e=>!e.disabled && !e.readOnly);
 const operationKeys=all(document,'jf-operation-outcome-detail').map(e=>e.operationKey).filter(Boolean);
 return {typed,blocked,operationKeys};
 """) or {'typed': False, 'operationKeys': []}
-        if interaction_error:
-            last['interactionError'] = interaction_error
-        if baseline is not None:
-            last['baseline'] = baseline
-        run.evidence('J3-activation-consent', last)
+        observations.append(dict(last))
+        evidence()
         return last
 
-    def poll(fn, description, seconds):
-        def probe():
-            nonlocal last_failure
-            try:
-                return fn()
-            except Exception as exc:
-                last_failure = exc
-                raise
+    def consent():
+        nonlocal seen_prompt, last_failure
         try:
-            return wait_for(probe, description, seconds=seconds, error=Infrastructure)
-        except (ProductFailure, RunStopped):
+            observe()
+            last_failure = None
+            if last['typed']:
+                seen_prompt = True
+                if last.get('blocked'):
+                    return None
+                try:
+                    run.wd.keys('input[data-testid="authorization-typed-input"]', 'core.activate-installed-models')
+                    run.wd.click('button[aria-label="Approve"]')
+                except Infrastructure as exc:
+                    observations.append({'interactionError': str(exc)})
+                    # keys/click may exhaust their own timeout as the prompt
+                    # disappears. Recheck even if the polling deadline elapsed.
+                    if not observe()['typed']:
+                        return 'withdrawn'
+                    raise
+                return 'typedApproved'
+            if seen_prompt:
+                return 'withdrawn'
+        except RunStopped:
             raise
-        except (Infrastructure, AssertionError) as exc:
-            # wait_for classifies exhausted TransientAPI retries as AssertionError
-            # even with error=Infrastructure. Consent is an infrastructure check.
-            raise Infrastructure(description + ' did not settle; last observation: '
-                                 + json.dumps(last) + '; last failure cause: '
-                                 + (str(last_failure) if last_failure else 'none observed')) from exc
+        except (OSError, KeyError, ValueError, Infrastructure) as exc:
+            last_failure = exc
+            observations.append({'failureCause': str(exc)})
+            evidence()
+            raise
+        return None
 
-    baseline = dict(observe(), install=run.api('/api/ai/install/status'))
-    run.evidence('J3-activation-consent-baseline', baseline)
     run.wd.click('button[aria-label="Activate downloaded models"]')
-
-    def initial():
-        observed = observe()
-        return observed if observed['typed'] or observed['operationKeys'] else None
-
-    consent = poll(initial, 'Activation authorization or accepted operation visible', seconds=30)
-    if not consent['typed']:
-        run.evidence('J3-activation-consent', dict(consent, path='immediate'))
-        return
-
-    def settle():
-        nonlocal interaction_error, last_failure
-        observed = observe()
-        if observed['typed']:
-            if observed.get('blocked'):
-                return None
-            try:
-                run.wd.keys('input[data-testid="authorization-typed-input"]', 'core.activate-installed-models')
-                run.wd.click('button[aria-label="Approve"]')
-            except RunStopped:
-                raise
-            except Infrastructure as exc:
-                # Withdrawal may race even this second observation. Recheck the
-                # real UI/status instead of requiring a now-stale input.
-                interaction_error = str(exc)
-                last_failure = exc
-                observed['interactionError'] = interaction_error
-                run.evidence('J3-activation-consent', observed)
-                return None
-            observed['path'] = 'typedApproved'
-        else:
-            new_keys = set(observed['operationKeys']) - set(baseline['operationKeys'])
-            activation_keys = []
-            if new_keys:
-                # The snapshot carries operationId + operationKey; the single-key
-                # receipt endpoint carries progress but no operation identity.
-                history = run.api('/api/operation-history')
-                observed['history'] = history
-                activation_keys = [entry['operationKey'] for entry in history.get('entries', [])
-                                   if entry.get('operationKey') in new_keys
-                                   and entry.get('operationId') == 'core.activate-installed-models']
-            install = run.api('/api/ai/install/status')
-            observed['install'] = install
-            run.evidence('J3-activation-consent', observed)
-            if activation_keys:
-                progress = {'operationKeys': activation_keys}
-            elif (baseline['install'].get('phase') == 'activation_required'
-                  and install.get('phase') in ('activating', 'done')
-                  and install.get('state') not in ('failed', 'error')):
-                progress = {'install': install}
-            else:
-                return None
-            observed.update(path='withdrawnAfterPageApproval', progress=progress)
-        run.evidence('J3-activation-consent', observed)
-        return observed
-
-    poll(settle, 'Activation typed approval or page-approved progress', seconds=60)
+    try:
+        path = wait_for(consent, 'Activation typed authorization', seconds=30, error=Infrastructure)
+    except (Infrastructure, AssertionError) as exc:
+        if last_failure:
+            raise Infrastructure('Activation typed authorization did not settle; last observation: '
+                                 + json.dumps(last) + '; last failure cause: '
+                                 + str(last_failure)) from exc
+        # No usable prompt is allowed: this says nothing about activation.
+        path = 'immediate' if not seen_prompt and any(
+            observation.get('operationKeys') for observation in observations) else 'noneObserved'
+    evidence(path)
 
 
 def semantic_search(run, *, reranking=False):
