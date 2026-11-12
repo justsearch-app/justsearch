@@ -89,7 +89,7 @@ as skipped by decision. The Wayland VM exercises the system picker.
 Wayland runs J1–J4 and J7–J8 on a fresh **candidate** overlay. The wrapper stops
 that guest and starts a second fresh overlay, installing the **predecessor from
 scratch**. J1–J4 prepare that predecessor's folder, default AI installation,
-bookmark, setting and restart; J5 then updates it to the candidate and J6 checks
+Dark theme and restart; J5 then updates it to the candidate and J6 checks
 install-over and retained data. No candidate data is moved aside or reused by
 the predecessor. Each overlay retains its own summary; the wrapper combines the
 candidate observations and predecessor update/retention observations into one
@@ -326,7 +326,7 @@ The candidate's AI registry and URLs are used **unchanged**. `--source` must be
 the source that produced that candidate. For the round-nine development continuation, add `--journeys J1 J3 J9`;
 J3 adds the small corpus through the production API as a prerequisite, without
 a J2 result. Installation still uses fresh private downloads, production
-activation and the acknowledged Start AI control.
+activation and the acknowledged Start answers control.
 For a development isolation check without AI installation or GPU work, use
 `--journeys J1 J2 --write-budget-bytes 20000000000`; the summary marks this
 subset as development evidence.
@@ -419,7 +419,7 @@ completion is observed through `/api/ai/install/status`. This lane does not driv
 the Install AI consent dialog; the CPU VMs qualify that UI flow. Downloaded models
 are activated through the existing UI activation consent. Preview must select GPU_FULL and include chat and `cuda-runtime-linux`; installed
 readiness must agree and must not install the Windows native runtime. The separate
-**Start AI** control then sets chat intent; the observed runtime must become
+**Start answers** control then sets chat intent; the observed runtime must become
 healthy with a realized model before a chat request. Embedding
 and SPLADE must report **observed** CUDA execution without GPU fallback.
 The production RAG chat request goes through the shell's own authenticated
@@ -430,8 +430,8 @@ the live, run-owned Engine and llama-server must both contain CUDA libraries;
 every CUDA/cuDNN library's canonical path must be inside this candidate's
 installed pack. OS `libcuda`/`libnvidia` driver libraries are the explicit
 exception. Host `/etc/ld.so.conf.d/000-ort-cuda12.conf` paths, symlink escapes and
-deleted mappings fail. J4 reuses the shared UI-authored bookmark/theme, Web
-Storage, folder/index and model-hash persistence checks, then repeats GPU chat
+deleted mappings fail. J4 reuses the shared UI-authored skip-rule/theme, Engine
+settings, folder/index and model-hash persistence checks, then repeats GPU chat
 and library ownership after restart. J5–J8 are inapplicable here.
 
 J9 observes the real Engine for **at least 3600 seconds**, with a mixed long
@@ -553,11 +553,11 @@ saved state, and labels the result `development-rerun`, never fresh release
 qualification. The original failed report remains unchanged. Recovery is a new
 invocation: its write backstop starts a fresh baseline. Completed UI-authored
 facts are checkpointed and verified against their saved-state snapshot on
-recovery; the already-bookmarked view is not authored a second time. The empty
+recovery; the saved skip rule and theme are not authored a second time. The empty
 sandbox-home mount placeholders are rebuilt for the new evidence path. Exited
 zombie processes are excluded before environment reads and final live-process
 checks; unreadable known live processes still fail as infrastructure. Remove any retained
-root after the development repair sequence ends. Start AI
+root after the development repair sequence ends. Start answers
 must be invoked and its chat intent acknowledged before chat startup failures
 can be classified as product failures.
 
@@ -626,14 +626,16 @@ qualification. Explicit `--journeys` subsets likewise never qualify a release.
   cached reboots prove readiness through active runtime encoders and that query.
   Activation polls record `/proc/meminfo` samples about every five seconds. The CPU
   plan and chat-unavailable explanation are also checked. Downloads are not seeded.
-- J4: a UI-authored bookmark and theme, restart, retained settings,
-  watched folder, indexed fixture, authored records and model file hashes.
-  Bookmark rendering after restart is checked in the harness's own newly launched
-  WebDriver session: the open list must contain the authored Library entry with
-  its exact label and URL. The persisted record (including ID) must also match
-  through the Web Storage API (`localStorage.getItem`) in that session. Bookmarks
-  are app-local browser state; the Engine exposes no bookmark endpoint. Existing
-  read-only saved-file checks also retain the record and model hashes.
+- J4: a UI-authored **Skip these files** rule (`**/justsearch-journey-skip-*.tmp`)
+  and Dark theme, restart, retained settings, watched folder, indexed fixture and
+  model file hashes. The rule is added in Library's Folders tab with **Add a rule**
+  and **Save patterns**. It cannot match the corpus fixtures. After restart, the
+  harness's own WebDriver session must show the exact rule in a visible, enabled
+  input; the Engine's `ui.excludePatterns` must also retain it. J6 checks the same
+  settings and model hashes across install-over and uninstall/reinstall.
+  Predecessor J4 authors only the Dark theme: v0.3.2 lacks the row-based rule
+  editor, while both versions expose that setting. J5 requires and rechecks Dark
+  and the prepared model bytes before updating, then checks their retention.
 - J5 (VM): parent-state preparation, signed HTTPS update offer, cancelled
   PolicyKit prompt with old Engine recovery and re-offer, the **real 300-second
   dpkg lock timeout**, then accepted elevation and automatic candidate relaunch.
@@ -912,7 +914,7 @@ WebDriver uses the normal installed app's `LOCALAPPDATA/io.justsearch.shell`
 profile through `tauri:options.webviewOptions.userDataFolder`. Owned WebView2
 process arguments must confirm that profile (`webdriver-profile.json`).
 [EdgeDriver otherwise creates a temporary profile](https://learn.microsoft.com/en-us/microsoft-edge/webdriver/capabilities-edge-options),
-which cannot prove saved bookmarks survive a restart. The shared client's
+which cannot prove app-local UI state survives a restart. The shared client's
 default Linux session request is unchanged. Each child run also gets a distinct
 guest evidence directory, since stopped checkpoints retain previous evidence.
 
@@ -965,8 +967,8 @@ patterns, then requires the returned path in the app DOM and watched-folder API.
 Open-file evidence requires the OS default viewer's exact image, a new PID and
 creation time, the exact fixture argument, and its UIA window. Titles and OCR
 cannot pass any check. J3 and J4 reuse the Linux DOM/API AI and authored-state
-contracts; Windows bookmarks are read through Web Storage, never guessed from a
-WebView database. J6 hashes actual downloaded models/settings across reinstall
+contracts; Windows checks the saved skip rule through Engine settings and the
+Library DOM, using the same controls as Linux. J6 hashes actual downloaded models/settings across reinstall
 and uninstall/reinstall. It uses the preservation method of
 `update-preserves-models-test.ps1`; that script's Actions-only guard is preserved.
 J8 uses the release bridge and pinned MCP Inspector over stdio on Windows too.
@@ -1055,3 +1057,26 @@ python3 -m unittest discover -s scripts/release/qual/journeys -p 'test_*.py'
 # Inside Windows: adapter fixtures and owned short-lived processes; no host VM modules.
 python -m unittest discover -s scripts/release/qual/journeys -p test_windows.py
 ```
+
+
+### Current UI selector audit (H1–H6)
+
+Checked against `origin/main` at `d8f6c9d13f` (the source in this checkout).
+`test_current_ui.py` covers the reported controls and predecessor exception;
+`SkipRuleTests` in `test_redesign.py` also rejects missing, hidden, disabled or
+changed rule inputs after restart. Older round notes above describe historical
+observations.
+
+| Journey controls | Current UI source under `modules/ui-web/src/shell-v0/` | Audit result |
+| --- | --- | --- |
+| J1 shell and first launch | `chrome/Shell.ts`, `components/WalkthroughCard.ts`, `components/GettingStarted.ts` | The empty legacy walkthrough host is still mounted. Dismiss only when its actual button is visible; the current Getting started card needs no dismissal. Legacy Get started remains optional for predecessors. |
+| Navigation and Settings close | `chrome/TopBar.ts`, `chrome/SettingsWindow.ts` | `button[data-surface-id]`, `jf-shell.activeId` and Close Settings remain valid; update the runner's obsolete rail comment only. |
+| J2 system picker | `views/LibrarySurface.ts`, `controllers/FolderAddFlow.ts` | Add folder is lowercase; retain Add Folder for v0.3.2. Folder path and Add are unchanged. |
+| J2 search and open | `views/search-v3/Sv3Composer.ts`, `components/searchResults/ResultsCard.ts`, `commands/searchResultActions.ts` | Use the mode trigger's stable `sv3-composer-tier` test ID regardless of current mode. Search tier, composer input, results-card snapshot, result-row identity, row Actions and Open file remain valid. |
+| J3 install, consent, activation, GPU chat | `views/BrainSurface.ts`, `components/AuthorizationHost.ts`, `components/OperationOutcomeDetail.ts` | Match Install AI by label prefix; Start answers replaces Start AI. Accept and download, Activate downloaded models, typed authorization, Approve and operationKey remain valid. |
+| J4 authored state | `views/LibrarySurface.ts`, `components/SurfaceTabs.ts`, `views/settingsRegister.ts`, `components/SettingsNav.ts`, `renderers/controls/OptionButtonGroupRenderer.ts` | Folders tab, Add a rule, last skip-rule input and Save patterns; Appearance and Dark are unchanged. Retire bookmark UI and savedViews checks. J5 predecessor state is Dark plus downloaded models. |
+| J5 update offer and install | `components/StatusPill.ts`, `components/StatusPanel.ts`, `state/frameStatus.ts`, `views/SettingsSurface.ts`, `views/settingsControlLabels.ts` | Status trigger, app-update row, Review and install, General and Install update remain valid. |
+| J7 warm link and shortcut | `chrome/TopBar.ts`, `views/SettingsSurface.ts`, `views/search-v3/Sv3Composer.ts` | Replace the removed Library heading with its visible current top-bar segment; keep shell activeId. General, settings-search-shortcut and the focused composer input remain valid. |
+
+The two additional H6 fixes are the empty walkthrough host and selected-mode
+assumption. No other selector mismatches were found. No product files changed.

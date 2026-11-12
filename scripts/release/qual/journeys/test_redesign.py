@@ -23,7 +23,7 @@ BINARY = '/usr/bin/JustSearch'
 SHELL = {'pid': 77, 'ticks': '123', 'exe': BINARY}
 WINDOW = {'pid': 77, 'title': 'JustSearch', 'focused': True,
           'rect': {'x': 0, 'y': 0, 'width': 800, 'height': 600}}
-DESTINATION = {'route': 'core.library-surface', 'heading': 'Library'}
+DESTINATION = {'route': 'core.library-surface', 'segment': 'Library'}
 
 
 def app_window(native, focused=True):
@@ -231,72 +231,66 @@ console.log(JSON.stringify([true,JSON.stringify(eval(process.argv[1]))]));
                                 next(i for i,c in enumerate(run.mock_calls) if c[0]=='desktop_spawn'))
 
 
-class BookmarkTests(unittest.TestCase):
-    bookmark={'id':'saved-library','label':'Library','url':'justsearch://surface/core.library-surface',
-              'surfaceId':'core.library-surface','savedAt':123}
+class SkipRuleTests(unittest.TestCase):
+    rule = '**/justsearch-journey-skip-*.tmp'
 
-    def restart_run(self,stored=True,visible=True):
-        run=Mock(binary=BINARY,work='/tmp/isolated',facts={})
-        geometry={'button':{'x':10,'y':20},'popup':{}}
-        run.require.side_effect=lambda key: self.bookmark if key=='bookmark' else geometry if key=='bookmarkGeometry' else True
-        run.native.app_window.return_value=WINDOW
-        def dom(script,args=None):
-            if 'localStorage' in script:return [self.bookmark] if stored else []
-            if 'const popup=' in script:return {'label':'Library','url':self.bookmark['url']} if visible else None
-            return True
-        run.wd.execute.side_effect=dom
+    def restart_run(self, stored=True, visible=True):
+        before = {'savedFiles': {'files': {'models/embed.onnx': 'sha'}},
+                  'settings': {'ui': {'theme': 'dark', 'excludePatterns': [self.rule]}},
+                  'roots': ['/corpus'], 'search': {'results': [linux.OPEN_FILE]}}
+        current = dict(before, settings={'ui': {'theme': 'dark', 'excludePatterns': [self.rule] if stored else []}})
+        run = Mock(binary=BINARY, work='/tmp/isolated', args=NS(phase='candidate'),
+                   facts={'beforeState': before, 'skipRule': self.rule, 'corpus': '/corpus'})
+        run.require.side_effect = lambda key: run.facts[key]
+        run.current_state = current
+        run.api.return_value = current['settings']
+        run.wd.execute.return_value = {'pattern': self.rule, 'label': 'Skip rule 2'} if visible else None
         return run
 
-    def restart(self,run):
-        with patch.object(linux,'assert_state',return_value={'retained':True}), \
-             patch.object(linux,'interaction_observation'),patch.object(linux,'wait_for',immediate), \
-             patch.object(linux.time,'sleep'):
+    def restart(self, run):
+        with patch.object(linux, 'snapshot', return_value=run.current_state), \
+             patch.object(linux, 'interaction_observation'), patch.object(linux, 'wait_for', immediate):
             return linux.restart(run)
 
-    def test_restart_uses_own_webdriver_dom_and_storage_api(self):
-        run=self.restart_run()
-        self.assertEqual(self.restart(run),{'retained':True})
+    def test_restart_uses_own_webdriver_dom_and_engine_settings(self):
+        run = self.restart_run()
+        self.assertEqual(self.restart(run), run.current_state)
         run.start_ui.assert_called_once()
         run.native.screen_text.assert_not_called()
-        run.wd.click.assert_any_call('button[aria-label="View bookmarks"]')
-        self.assertTrue(any('localStorage.getItem' in c.args[0] for c in run.wd.execute.call_args_list))
+        run.nav.assert_called_once_with('Library')
+        run.wd.click.assert_called_once_with('button[role="tab"][data-tab-id="folders"]')
+        self.assertIn('input[aria-label^="Skip rule "]', run.wd.execute.call_args.args[0])
 
-    def test_library_pixels_cannot_hide_missing_stored_bookmark(self):
-        with self.assertRaisesRegex(AssertionError,'Web Storage API'):
+    def test_library_pixels_cannot_hide_missing_saved_rule(self):
+        with self.assertRaisesRegex(AssertionError, 'Persisted UI settings changed'):
             self.restart(self.restart_run(stored=False))
 
-    def test_library_pixels_cannot_hide_missing_dom_entry_with_stored_bookmark(self):
-        with self.assertRaisesRegex(AssertionError,'entry visible in DOM list'):
+    def test_library_pixels_cannot_hide_missing_dom_entry_with_saved_rule(self):
+        with self.assertRaisesRegex(AssertionError, 'skip rule visible in Library'):
             self.restart(self.restart_run(visible=False))
 
-    def test_bookmark_dom_requires_exact_visible_list_entry_label_and_url(self):
-        run=Mock()
-        for label,url,height in (('Library',self.bookmark['url'],20),('Other',self.bookmark['url'],20),
-                                 ('Library','justsearch://other',20),('Library',self.bookmark['url'],0)):
-            def execute(script,args=None):
-                if 'localStorage' in script:return [self.bookmark]
-                js='''const data=JSON.parse(process.argv[1]);
-const row={querySelector:()=>({textContent:data.label}),getAttribute:()=>data.url,getBoundingClientRect:()=>({height:data.height})};
-const popup={hasAttribute:()=>true,shadowRoot:{}};
-const all=(root,selector)=>selector==='jf-bookmarks-popover'?[popup]:(root===popup.shadowRoot?[row]:[]);
+    def test_rule_dom_requires_exact_visible_enabled_input(self):
+        run = Mock()
+        run.api.return_value = {'ui': {'excludePatterns': [self.rule]}}
+        for pattern, width, height, disabled in ((self.rule, 100, 20, False), ('other', 100, 20, False),
+                                                (self.rule, 0, 20, False), (self.rule, 100, 0, False),
+                                                (self.rule, 100, 20, True)):
+            def execute(script, args=None):
+                js = """const data=JSON.parse(process.argv[1]);
+const row={value:data.pattern,disabled:data.disabled,getAttribute:()=> 'Skip rule 2',getBoundingClientRect:()=>data};
+const all=(root,selector)=>selector==='input[aria-label^="Skip rule "]'?[row]:[];
 const value=new Function('all','document','args','return (function(){'+process.argv[2]+'}).apply(null,args)')(all,{},JSON.parse(process.argv[3]));
-console.log(JSON.stringify(value));'''
-                return json.loads(subprocess.check_output(['node','-e',js,json.dumps({'label':label,'url':url,'height':height}),script,json.dumps(args or [])],text=True))
-            run.wd.execute.side_effect=execute
-            with self.subTest(label=label,url=url,height=height),patch.object(linux,'wait_for',immediate):
-                if label=='Library' and url==self.bookmark['url'] and height:
-                    self.assertEqual(linux.bookmark_entry(run,self.bookmark),{'label':label,'url':url})
+console.log(JSON.stringify(value));"""
+                return json.loads(subprocess.check_output(['node', '-e', js,
+                    json.dumps(dict(pattern=pattern, width=width, height=height, disabled=disabled)),
+                    script, json.dumps(args or [])], text=True))
+            run.wd.execute.side_effect = execute
+            with self.subTest(pattern=pattern, width=width, height=height, disabled=disabled), patch.object(linux, 'wait_for', immediate):
+                if pattern == self.rule and width and height and not disabled:
+                    self.assertEqual(linux.skip_rule_entry(run, self.rule), {'pattern': pattern, 'label': 'Skip rule 2'})
                 else:
-                    with self.assertRaises(AssertionError):linux.bookmark_entry(run,self.bookmark)
-
-    def test_storage_api_reads_active_profile_persisted_record(self):
-        run=Mock()
-        state={'version':2,'activeProfileId':'b','profiles':{'a':{'savedViews':[{'id':'wrong'}]},'b':{'savedViews':[self.bookmark]}}}
-        def execute(script,args=None):
-            js='''const state=process.argv[1];global.localStorage={getItem:()=>state};console.log(JSON.stringify(new Function(process.argv[2])()));'''
-            return json.loads(subprocess.check_output(['node','-e',js,json.dumps(state),script],text=True))
-        run.wd.execute.side_effect=execute
-        self.assertEqual(linux.stored_bookmarks(run),[self.bookmark])
+                    with self.assertRaises(AssertionError):
+                        linux.skip_rule_entry(run, self.rule)
 
 
 class PollingTests(unittest.TestCase):
