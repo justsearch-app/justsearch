@@ -252,6 +252,7 @@ export class LibrarySurface extends JfElement {
     enrichmentStages: { state: true },
     enrichmentPending: { state: true },
     enrichmentBlocked: { state: true },
+    ownDocuments: { state: true },
     otherSources: { state: true },
     bulkOutcome: { state: true },
     gapDecision: { state: true },
@@ -361,6 +362,8 @@ export class LibrarySurface extends JfElement {
   declare indexingActivity: ReturnType<typeof selectIndexingProgress>['activity'];
   declare retryWaiting: boolean;
   declare enrichmentStages: EnrichmentApplicability | null;
+  /** The person's own searchable files (the bundled Help aside), as the header counts them (FA4). */
+  declare ownDocuments: Maybe<number>;
   /**
    * 809 finding 1 — the enrichment backfill still owes work, so a drained folder is keyword-searchable
    * but not yet semantically searchable. Projected from the one `enrichmentProgress` derivation and
@@ -398,9 +401,10 @@ export class LibrarySurface extends JfElement {
 
   private aiUnsub: (() => void) | null = null;
   /**
-   * Tempdoc 811 C-2a — the default-scope document count, used to size the collection facet scan so
-   * it cannot truncate (truncation OMITS collections; see `otherSources.ts`). Not reactive state:
-   * it only feeds the next probe's request, never the render.
+   * Tempdoc 811 C-2a — the default-scope document count (Help included), used to size the collection
+   * facet scan so it cannot truncate (truncation OMITS collections; see `otherSources.ts`). Not
+   * reactive state: it only feeds the next probe's request and, on an Engine that does not report
+   * the own count, the headline's "has anything been indexed" question.
    */
   private defaultScopeDocuments: Maybe<number> = UNKNOWN;
   /**
@@ -459,6 +463,7 @@ export class LibrarySurface extends JfElement {
     this.enrichmentStages = null;
     this.enrichmentPending = false;
     this.enrichmentBlocked = false;
+    this.ownDocuments = UNKNOWN;
     this.otherSources = EMPTY_OTHER_SOURCES;
     this.gapDecision = null;
     this.gapDecisionBusy = false;
@@ -845,6 +850,7 @@ export class LibrarySurface extends JfElement {
       this.defaultScopeDocuments = s.index.searchableDocumentCount.known
         ? s.index.searchableDocumentCount
         : s.index.documentCount;
+      this.ownDocuments = s.index.ownDocumentCount;
       // Only once a first probe has run (i.e. after the roots are loaded, so root-owned collections
       // can be subtracted): a poll revealing a LARGER corpus than the last scan covered must
       // re-probe — a capped scan omits collections rather than undercounting them.
@@ -2130,16 +2136,20 @@ export class LibrarySurface extends JfElement {
 
   private renderHeader(): TemplateResult {
     const count = this.attentionItems().length;
+    // The person's own files; an Engine that does not report them leaves only the Help-inclusive count.
+    const documents = this.ownDocuments.known ? this.ownDocuments : this.defaultScopeDocuments;
     const headline = this.loading ? 'Loading your Library…'
       : !this.indexProgress.live || this.contactUnconfirmed ? 'Indexing status unconfirmed'
         : count ? `${count} ${count === 1 ? 'thing needs' : 'things need'} your attention`
           : this.provisional ? this.provisionalHeadline
             : !this.indexingActivity.confirmed ? this.indexingActivity.summary
               : !this.roots.length ? 'Add a folder to start searching'
-                : !this.defaultScopeDocuments.known ? 'Checking your folders'
-                  : this.defaultScopeDocuments.value === 0 ? 'Indexing your files' : 'Your files are searchable';
+                : !documents.known ? 'Checking your folders'
+                  : documents.value === 0 ? 'Indexing your files' : 'Your files are searchable';
     return html`<div class="header"><div class="header-left"><h2>${headline}</h2>
-      <p class="subtitle">${this.defaultScopeDocuments.known ? `${this.defaultScopeDocuments.value.toLocaleString()} searchable documents` : 'Searchable document count unconfirmed'}
+      <p class="subtitle">${!this.ownDocuments.known ? 'Searchable document count not known'
+        : this.ownDocuments.value === 0 ? 'None of your files are searchable yet'
+          : `${this.ownDocuments.value.toLocaleString()} searchable ${this.ownDocuments.value === 1 ? 'document' : 'documents'}`}
         · ${this.roots.length} ${this.roots.length === 1 ? 'folder' : 'folders'}${this.activitySentence ? ` · ${this.activitySentence}` : ''}</p>
     </div></div>`;
   }

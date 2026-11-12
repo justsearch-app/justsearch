@@ -86,16 +86,17 @@ export type Sv3Corpus =
 export const SV3_CORPUS_UNKNOWN: Sv3Corpus = { kind: 'unknown' };
 
 /**
- * 811 C-4 — `searchableDocumentCount` is the default-search-scope population and is the number the
- * reader's next question will actually run against; `documentCount` is the fallback for a backend
- * that does not report it. A reported `0` is real and gets the remedy.
+ * The person's own files (`ownDocumentCount`): the bundled Help is searched too, but it is not what
+ * "Searching N files" tells the reader about. A backend that does not report the own count leaves it
+ * unknown rather than falling back to a count that includes Help. A reported `0` is real and gets the
+ * remedy.
  */
 export function projectSv3Corpus(snapshot: AiState | null): Sv3Corpus {
   const observation = snapshot?.status?.worker?.countObservations?.searchable;
   if (observation?.state === 'unknown' || observation?.state === 'stale') return SV3_CORPUS_UNKNOWN;
   const index = snapshot?.lastSettledIndex;
   if (index == null) return SV3_CORPUS_UNKNOWN;
-  const count = index.searchableDocumentCount ?? index.documentCount;
+  const count = index.ownDocumentCount;
   if (typeof count !== 'number') return SV3_CORPUS_UNKNOWN;
   return count > 0 ? { kind: 'documents', count } : { kind: 'empty' };
 }

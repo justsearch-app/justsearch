@@ -3,6 +3,7 @@ import { html, css, nothing, type PropertyValues } from 'lit';
 import { keyed } from 'lit/directives/keyed.js';
 import { JfElement } from '../primitives/JfElement.js';
 import { TransientController } from '../primitives/transientController.js';
+import { cssLength, shiftIntoWindow } from '../chrome/menuPlacement.js';
 import { FrameStatusController } from '../controllers/frameStatusController.js';
 import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
 import { cancelTask } from '../substrates/tasks/index.js';
@@ -190,12 +191,12 @@ export class StatusPill extends JfElement {
         void panel?.updateComplete.then(() => {
           // R4 — under the pill, kept a margin away from both window edges; the arrow points at the
           // pill's centre and stays on the straight part of the panel's top edge.
-          const margin = this.cssPx('--jf-space-2');
+          const margin = cssLength(this, '--jf-space-2');
           const width = panel.getBoundingClientRect().width;
-          const right = Math.max(margin, Math.min(window.innerWidth - rect.right, window.innerWidth - margin - width));
+          const right = window.innerWidth - rect.right - shiftIntoWindow({ left: rect.right - width, right: rect.right }, margin);
           this.style.setProperty('--frame-status-panel-right', `${right}px`);
           const placed = panel.getBoundingClientRect();
-          const inset = this.cssPx('--frame-panel-radius') + margin / 2;
+          const inset = cssLength(this, '--frame-panel-radius') + margin / 2;
           const fromRight = Math.min(Math.max(inset, placed.right - (rect.left + rect.width / 2)), Math.max(inset, placed.width - inset));
           this.style.setProperty('--frame-status-arrow-right', `calc(${fromRight}px - var(--jf-space-2) / 2)`);
           // The panel's answers just appeared where the pointer may already be: they arm from now (C12).
@@ -221,12 +222,6 @@ export class StatusPill extends JfElement {
     this.setAttribute('notice-under', '');
   };
   /** A length token in px (rem resolves against the root font size); 0 when the token is not defined. */
-  private cssPx(name: string): number {
-    const value = getComputedStyle(this).getPropertyValue(name).trim();
-    const n = parseFloat(value);
-    if (!Number.isFinite(n)) return 0;
-    return value.endsWith('rem') ? n * (parseFloat(getComputedStyle(document.documentElement).fontSize) || 16) : n;
-  }
   toggle(): void { if (this.open) this.close(); else if (!modalOwnsFocus()) this.open = true; }
   close(restoreFocus = true): void {
     if (!this.open) return;

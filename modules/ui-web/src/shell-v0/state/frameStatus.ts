@@ -470,10 +470,18 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     ...((input.tasks ?? []).some(task => task.id.startsWith('idxjob:')) ? [{ id: 'file-window', section: 'running' as const,
       title: 'File details are a live window, showing up to 8 tasks; queue totals include files outside it.' }] : []),
   ];
+  // AI is optional (ref-01): semantic work that waits only for AI models nobody has asked for yet,
+  // or that are still being installed or started, needs nothing from the person and is no Needs-you
+  // row. Any other blocked producer, a failed or interrupted install, or installed models that cannot
+  // run still are.
+  const enrichment = ai?.status?.worker?.enrichment;
+  const waitsForOptionalAi = progress.phase === 'blocked' && enrichment?.embeddingEnabled === false
+    && progress.blockedPending === Math.max(0, enrichment.embeddingPendingCount ?? 0) + Math.max(0, enrichment.chunk?.chunkEmbeddingPendingCount ?? 0)
+    && ['not_installed', 'connecting', 'installing', 'starting'].includes(ai!.aiEngine.kind);
   if (progress.pause) add({ id: 'indexing-hold', section: 'needs', indexing: true,
     title: progress.activity.summary, detail: progress.activity.detail ?? progress.pause.reason,
     stale: !progress.activity.confirmed });
-  else if (progress.phase !== 'ready' && progress.phase !== 'unknown') add({ id: 'indexing',
+  else if (progress.phase !== 'ready' && progress.phase !== 'unknown' && !waitsForOptionalAi) add({ id: 'indexing',
     section: progress.phase === 'error' ? 'problems' : progress.phase === 'blocked' ? 'needs' : 'running', indexing: true,
     title: progress.activity.summary,
     detail: progress.activity.confirmed ? [progress.phase === 'indexing' ? indexingCountsLine(progress)
@@ -581,6 +589,8 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   } else if (!stale && input.finished && now - input.finished.at < FINISHED_DWELL_MS) pill = { kind: 'finished', label: input.finished.title, stale: false };
   else if (input.gettingStarted?.visible && input.gettingStarted.known) pill = { kind: 'calm', label: `Getting started · ${input.gettingStarted.currentStep} of 3`, stale: false };
   else if (!stale && ai?.verdict.kind === 'operational' && progress.phase === 'ready') pill = { kind: 'calm', label: 'Up to date', stale: false };
+  // Not "Up to date": that is a coverage claim, and semantic coverage is what is missing.
+  else if (!stale && ai?.verdict.kind === 'operational' && waitsForOptionalAi) pill = { kind: 'calm', label: 'Keyword search ready', stale: false };
   else pill = { kind: 'unknown', label: 'Checking search status', stale: true };
   if (pill.stale) {
     const age = ai?.connection.lastSuccessMs == null ? null : Math.max(0, Math.floor((now - ai.connection.lastSuccessMs) / 60_000));

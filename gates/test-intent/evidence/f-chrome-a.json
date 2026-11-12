@@ -1,0 +1,700 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T02:42:06.492Z",
+  "revision": "83b6a6a577dcf52ab0e9ff0ed2649be00ac55357",
+  "tree": "213ac8ca47dc36a7d810b47404cec0a64ac9d809",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/TopBar.placement-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/cwoa4f1k/tmp/test-intent-vitest-32108-1794451291211.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 14526
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/SettingsSurface.internalReferences.test.ts\" \"src/shell-v0/state/frameStatus.optionalAi.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts\" \"src/shell-v0/views/LibrarySurface.ownCount.test.ts\" \"src/shell-v0/state/aiStateStore.ownCount.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cwoa4f1k/tmp/test-intent-vitest-32108-1794451305737.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1823
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#More opens entirely inside the window, its words not cut (forced colours: false)",
+      "file": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5357ae37f8de0703eb2e993d57803257ec4facb9ac5b52204640c2b445375339",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA1 the top bar at 600x400 with 200% text and the window controls More opens entirely inside the window, its words not cut (forced colours: false)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#More opens entirely inside the window, its words not cut (forced colours: true)",
+      "file": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5357ae37f8de0703eb2e993d57803257ec4facb9ac5b52204640c2b445375339",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA1 the top bar at 600x400 with 200% text and the window controls More opens entirely inside the window, its words not cut (forced colours: true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#the area switcher and its menu fit inside the window (forced colours: false)",
+      "file": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5357ae37f8de0703eb2e993d57803257ec4facb9ac5b52204640c2b445375339",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA1 the top bar at 600x400 with 200% text and the window controls the area switcher and its menu fit inside the window (forced colours: false)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#the area switcher and its menu fit inside the window (forced colours: true)",
+      "file": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5357ae37f8de0703eb2e993d57803257ec4facb9ac5b52204640c2b445375339",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA1 the top bar at 600x400 with 200% text and the window controls the area switcher and its menu fit inside the window (forced colours: true)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#a menu opened in a small window follows the window when it grows and shrinks",
+      "file": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5357ae37f8de0703eb2e993d57803257ec4facb9ac5b52204640c2b445375339",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA1 the top bar at 600x400 with 200% text and the window controls a menu opened in a small window follows the window when it grows and shrinks",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#the status panel opens inside the window",
+      "file": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5357ae37f8de0703eb2e993d57803257ec4facb9ac5b52204640c2b445375339",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA1 the top bar at 600x400 with 200% text and the window controls the status panel opens inside the window",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#1280x720: More hangs under its button, its end edge on the button's",
+      "file": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5357ae37f8de0703eb2e993d57803257ec4facb9ac5b52204640c2b445375339",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA1 the larger windows keep their menus where they were 1280x720: More hangs under its button, its end edge on the button's",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#900x800: More hangs under its button, its end edge on the button's",
+      "file": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5357ae37f8de0703eb2e993d57803257ec4facb9ac5b52204640c2b445375339",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA1 the larger windows keep their menus where they were 900x800: More hangs under its button, its end edge on the button's",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#600x400 at normal text: the area menu hangs under its button, its start edge on the button's",
+      "file": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5357ae37f8de0703eb2e993d57803257ec4facb9ac5b52204640c2b445375339",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA1 the larger windows keep their menus where they were 600x400 at normal text: the area menu hangs under its button, its start edge on the button's",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.internalReferences.test.ts#FA2 no section shows internal design references to the OPERATOR audience",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.internalReferences.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0e6fb47674905128731da88a21d54be30331b809345260e7925e46e255f0ae31",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA2 no section shows internal design references to the OPERATOR audience",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.internalReferences.test.ts#FA2 no section shows internal design references to the DEVELOPER audience",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.internalReferences.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0e6fb47674905128731da88a21d54be30331b809345260e7925e46e255f0ae31",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA2 no section shows internal design references to the DEVELOPER audience",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.internalReferences.test.ts#FA2 no section shows internal design references to the USER audience",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.internalReferences.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0e6fb47674905128731da88a21d54be30331b809345260e7925e46e255f0ae31",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA2 no section shows internal design references to the USER audience",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#fresh install, no AI models, nothing asked of AI: the pill shows first-use progress, nothing needs the person",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:beb95726b6f17452cd95ae46f75a0d8a9359763500514742392f01ada8b94d22",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3 optional AI and the status pill fresh install, no AI models, nothing asked of AI: the pill shows first-use progress, nothing needs the person",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#after first use, keyword search reads as ready, never \"Up to date\" over missing semantic coverage",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:beb95726b6f17452cd95ae46f75a0d8a9359763500514742392f01ada8b94d22",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3 optional AI and the status pill after first use, keyword search reads as ready, never \"Up to date\" over missing semantic coverage",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#an AI install the person started shows its progress, not \"Needs you\", while it runs",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:beb95726b6f17452cd95ae46f75a0d8a9359763500514742392f01ada8b94d22",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3 optional AI and the status pill an AI install the person started shows its progress, not \"Needs you\", while it runs",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#an AI install they started that failed shows as needing them",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:beb95726b6f17452cd95ae46f75a0d8a9359763500514742392f01ada8b94d22",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3 what still needs the person an AI install they started that failed shows as needing them",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#an interrupted install left waiting shows as needing them",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:beb95726b6f17452cd95ae46f75a0d8a9359763500514742392f01ada8b94d22",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3 what still needs the person an interrupted install left waiting shows as needing them",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#installed AI models that are not running shows as needing them",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:beb95726b6f17452cd95ae46f75a0d8a9359763500514742392f01ada8b94d22",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3 what still needs the person installed AI models that are not running shows as needing them",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#semantic search turned on that cannot run shows as needing them",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:beb95726b6f17452cd95ae46f75a0d8a9359763500514742392f01ada8b94d22",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3 what still needs the person semantic search turned on that cannot run shows as needing them",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#another enabled producer that cannot run shows as needing them",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:beb95726b6f17452cd95ae46f75a0d8a9359763500514742392f01ada8b94d22",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3 what still needs the person another enabled producer that cannot run shows as needing them",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts#states the own count, not the count that includes Help",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f21809ea8fe78af8824e55be1c55c029e70cd978c46045747fdf53d2d224d178",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4 the composer counts the person's own files states the own count, not the count that includes Help",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts#one own file reads in the singular",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f21809ea8fe78af8824e55be1c55c029e70cd978c46045747fdf53d2d224d178",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4 the composer counts the person's own files one own file reads in the singular",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts#with no own files it says so in words and offers the way to add some, whatever Help holds",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f21809ea8fe78af8824e55be1c55c029e70cd978c46045747fdf53d2d224d178",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4 the composer counts the person's own files with no own files it says so in words and offers the way to add some, whatever Help holds",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts#an Engine that does not report the own count: the count is said to be unknown, never a number",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f21809ea8fe78af8824e55be1c55c029e70cd978c46045747fdf53d2d224d178",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4 the composer counts the person's own files an Engine that does not report the own count: the count is said to be unknown, never a number",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts#before any status: unknown in words, never 0",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f21809ea8fe78af8824e55be1c55c029e70cd978c46045747fdf53d2d224d178",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4 the composer counts the person's own files before any status: unknown in words, never 0",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts#an own count reported late replaces the unknown one",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f21809ea8fe78af8824e55be1c55c029e70cd978c46045747fdf53d2d224d178",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4 the composer counts the person's own files an own count reported late replaces the unknown one",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts#FA4 counts the person's own files, not the bundled Help",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:45895e85dc4140b5401a2d03a4909ff892cf70fc4dbdd35c544390feb83dbe26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4 counts the person's own files, not the bundled Help",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts#FA4 one own file reads in the singular",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:45895e85dc4140b5401a2d03a4909ff892cf70fc4dbdd35c544390feb83dbe26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4 one own file reads in the singular",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts#FA4 with no own files it says so in words, whatever Help holds",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:45895e85dc4140b5401a2d03a4909ff892cf70fc4dbdd35c544390feb83dbe26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4 with no own files it says so in words, whatever Help holds",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts#FA4 an Engine that does not report the own count: unknown in words, never a number",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:45895e85dc4140b5401a2d03a4909ff892cf70fc4dbdd35c544390feb83dbe26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4 an Engine that does not report the own count: unknown in words, never a number",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts#FA4 the own count reported late replaces the unknown one",
+      "file": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:45895e85dc4140b5401a2d03a4909ff892cf70fc4dbdd35c544390feb83dbe26",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4 the own count reported late replaces the unknown one",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/aiStateStore.ownCount.test.ts#FA4 the status store projects and retains the own count; a reported 0 stays 0, an unreported one stays unknown",
+      "file": "modules/ui-web/src/shell-v0/state/aiStateStore.ownCount.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:db49052210f72def46e5ff291191e96b7661269f5a4221a05a406caa13828c53",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA4 the status store projects and retains the own count; a reported 0 stays 0, an unreported one stays unknown",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "origin/main",
+    "revision": "83b6a6a577dcf52ab0e9ff0ed2649be00ac55357",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/TopBar.placement-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/cwoa4f1k/tmp/test-intent-vitest-32108-1794451309056.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 15427,
+        "output": "JSON report written to /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-vitest-32108-1794451309056.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/SettingsSurface.internalReferences.test.ts\" \"src/shell-v0/state/frameStatus.optionalAi.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts\" \"src/shell-v0/views/LibrarySurface.ownCount.test.ts\" \"src/shell-v0/state/aiStateStore.ownCount.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cwoa4f1k/tmp/test-intent-vitest-32108-1794451324483.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1774,
+        "output": "JSON report written to /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-vitest-32108-1794451324483.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#More opens entirely inside the window, its words not cut (forced colours: false)",
+        "classification": "assertion",
+        "detail": "FA1 the top bar at 600x400 with 200% text and the window controls More opens entirely inside the window, its words not cut (forced colours: false):  AssertionError: {\"window\":600,\"menu\":{\"left\":-112,\"right\":464,\"top\":107.5,\"bottom\":363.5},\"trigger\":{\"left\":392,\"right\":464,\"top\":19.5,\"bottom\":91.5},\"clipped\":[\"System\\n      Health, Activity, Logs\",\"Help & shortcuts\\n      \\n      F1\",\"About JustSearch\",\"Notes Window\"]}: expected -112 to be greate"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#More opens entirely inside the window, its words not cut (forced colours: true)",
+        "classification": "assertion",
+        "detail": "FA1 the top bar at 600x400 with 200% text and the window controls More opens entirely inside the window, its words not cut (forced colours: true):  AssertionError: {\"window\":600,\"menu\":{\"left\":-112,\"right\":464,\"top\":107.5,\"bottom\":363.5},\"trigger\":{\"left\":392,\"right\":464,\"top\":19.5,\"bottom\":91.5},\"clipped\":[\"System\\n      Health, Activity, Logs\",\"Help & shortcuts\\n      \\n      F1\",\"About JustSearch\",\"Notes Window\"]}: expected -112 to be greate"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#the area switcher and its menu fit inside the window (forced colours: false)",
+        "classification": "assertion",
+        "detail": "FA1 the top bar at 600x400 with 200% text and the window controls the area switcher and its menu fit inside the window (forced colours: false):  AssertionError: {\"window\":600,\"menu\":{\"left\":58,\"right\":634,\"top\":95.5,\"bottom\":345.5},\"trigger\":{\"left\":58,\"right\":136,\"top\":31.5,\"bottom\":79.5},\"clipped\":[]}: expected 634 to be less than or equal to 600\n    at inside (/home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#the area switcher and its menu fit inside the window (forced colours: true)",
+        "classification": "assertion",
+        "detail": "FA1 the top bar at 600x400 with 200% text and the window controls the area switcher and its menu fit inside the window (forced colours: true):  AssertionError: {\"window\":600,\"menu\":{\"left\":58,\"right\":634,\"top\":95.5,\"bottom\":345.5},\"trigger\":{\"left\":58,\"right\":136,\"top\":31.5,\"bottom\":79.5},\"clipped\":[]}: expected 634 to be less than or equal to 600\n    at inside (/home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#a menu opened in a small window follows the window when it grows and shrinks",
+        "classification": "assertion",
+        "detail": "FA1 the top bar at 600x400 with 200% text and the window controls a menu opened in a small window follows the window when it grows and shrinks:  AssertionError: {\"window\":600,\"menu\":{\"left\":-112,\"right\":464,\"top\":107.5,\"bottom\":363.5},\"trigger\":{\"left\":392,\"right\":464,\"top\":19.5,\"bottom\":91.5},\"clipped\":[\"System\\n      Health, Activity, Logs\",\"Help & shortcuts\\n      \\n      F1\",\"About JustSearch\",\"Notes Window\"]}: expected -112 to be greate"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#the status panel opens inside the window",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#1280x720: More hangs under its button, its end edge on the button's",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#900x800: More hangs under its button, its end edge on the button's",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts#600x400 at normal text: the area menu hangs under its button, its start edge on the button's",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.internalReferences.test.ts#FA2 no section shows internal design references to the OPERATOR audience",
+        "classification": "assertion",
+        "detail": "FA2 no section shows internal design references to the OPERATOR audience:  AssertionError: expected [ Array(1) ] to deeply equal []\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/views/SettingsSurface.internalReferences.test.ts:59:31\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/node_mo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.internalReferences.test.ts#FA2 no section shows internal design references to the DEVELOPER audience",
+        "classification": "assertion",
+        "detail": "FA2 no section shows internal design references to the DEVELOPER audience:  AssertionError: expected [ …(2) ] to deeply equal []\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/views/SettingsSurface.internalReferences.test.ts:59:31\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/node_module"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.internalReferences.test.ts#FA2 no section shows internal design references to the USER audience",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#fresh install, no AI models, nothing asked of AI: the pill shows first-use progress, nothing needs the person",
+        "classification": "assertion",
+        "detail": "FA3 optional AI and the status pill fresh install, no AI models, nothing asked of AI: the pill shows first-use progress, nothing needs the person:  AssertionError: not_installed: expected '1 needs you' to be 'Getting started · 1 of 3' // Object.is equality\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts:31:40\n    at file:///home/elias/dev/justsearch/.claude/wor"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#after first use, keyword search reads as ready, never \"Up to date\" over missing semantic coverage",
+        "classification": "assertion",
+        "detail": "FA3 optional AI and the status pill after first use, keyword search reads as ready, never \"Up to date\" over missing semantic coverage:  AssertionError: expected { kind: 'needs', …(3) } to deeply equal { kind: 'calm', …(2) }\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts:38:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/mod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#an AI install the person started shows its progress, not \"Needs you\", while it runs",
+        "classification": "assertion",
+        "detail": "FA3 optional AI and the status pill an AI install the person started shows its progress, not \"Needs you\", while it runs:  AssertionError: expected 'needs' to be 'working' // Object.is equality\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts:43:29\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/node_"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#an AI install they started that failed shows as needing them",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#an interrupted install left waiting shows as needing them",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#installed AI models that are not running shows as needing them",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#semantic search turned on that cannot run shows as needing them",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts#another enabled producer that cannot run shows as needing them",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts#states the own count, not the count that includes Help",
+        "classification": "assertion",
+        "detail": "FA4 the composer counts the person's own files states the own count, not the count that includes Help:  AssertionError: expected { kind: 'documents', …(2) } to deeply equal { kind: 'documents', …(2) }\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts:56:32\n    at processTicksAndRejections (node:internal/process"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts#one own file reads in the singular",
+        "classification": "assertion",
+        "detail": "FA4 the composer counts the person's own files one own file reads in the singular:  AssertionError: expected 'Searching 251 files' to be 'Searching 1 file' // Object.is equality\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts:61:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts#with no own files it says so in words and offers the way to add some, whatever Help holds",
+        "classification": "assertion",
+        "detail": "FA4 the composer counts the person's own files with no own files it says so in words and offers the way to add some, whatever Help holds:  AssertionError: expected 'documents' to be 'empty' // Object.is equality\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts:67:23\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts#an Engine that does not report the own count: the count is said to be unknown, never a number",
+        "classification": "assertion",
+        "detail": "FA4 the composer counts the person's own files an Engine that does not report the own count: the count is said to be unknown, never a number:  AssertionError: expected { kind: 'documents', …(2) } to deeply equal { kind: 'unknown', …(2) }\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts:75:32\n    at file:///home/elias/dev/justsearch/.claude/worktree"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts#before any status: unknown in words, never 0",
+        "classification": "assertion",
+        "detail": "FA4 the composer counts the person's own files before any status: unknown in words, never 0:  AssertionError: expected { kind: null, text: '', remedy: false } to deeply equal { kind: 'unknown', …(2) }\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts:79:32\n    at file:///home/elias/dev/justsearch/.cla"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts#an own count reported late replaces the unknown one",
+        "classification": "assertion",
+        "detail": "FA4 the composer counts the person's own files an own count reported late replaces the unknown one:  AssertionError: expected 'documents' to be 'unknown' // Object.is equality\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts:84:39\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts#FA4 counts the person's own files, not the bundled Help",
+        "classification": "assertion",
+        "detail": "FA4 counts the person's own files, not the bundled Help:  AssertionError: expected { …(2) } to deeply equal { …(2) }\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts:41:26\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/elias/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts#FA4 one own file reads in the singular",
+        "classification": "assertion",
+        "detail": "FA4 one own file reads in the singular:  AssertionError: expected '251 searchable documents' to be '1 searchable document' // Object.is equality\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts:46:34\n    at file:///home/elias/dev/justsearch/.claude/worktre"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts#FA4 with no own files it says so in words, whatever Help holds",
+        "classification": "assertion",
+        "detail": "FA4 with no own files it says so in words, whatever Help holds:  AssertionError: expected { …(2) } to deeply equal { …(2) }\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts:51:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/node_modules/@vi"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts#FA4 an Engine that does not report the own count: unknown in words, never a number",
+        "classification": "assertion",
+        "detail": "FA4 an Engine that does not report the own count: unknown in words, never a number:  AssertionError: expected '250 searchable documents' to be 'Searchable document count not known' // Object.is equality\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts:57:17\n    at file:///home/elias/dev/justsearch/."
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts#FA4 the own count reported late replaces the unknown one",
+        "classification": "assertion",
+        "detail": "FA4 the own count reported late replaces the unknown one:  AssertionError: expected '250 searchable documents' to be 'Searchable document count not known' // Object.is equality\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/views/LibrarySurface.ownCount.test.ts:62:34\n    at runNextTicks (node:internal/process"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/aiStateStore.ownCount.test.ts#FA4 the status store projects and retains the own count; a reported 0 stays 0, an unreported one stays unknown",
+        "classification": "assertion",
+        "detail": "FA4 the status store projects and retains the own count; a reported 0 stays 0, an unreported one stays unknown:  AssertionError: expected undefined to deeply equal { known: false }\n    at /home/elias/.cache/am/cwoa4f1k/tmp/test-intent-before-QJOaAC/modules/ui-web/src/shell-v0/state/aiStateStore.ownCount.test.ts:17:47\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-chrome-a/modules/ui-web/node_modu"
+      }
+    ]
+  },
+  "digest": "sha256:f3c67a76e89e0d3979c12b3024fd70a0902b583fb620c9ed5706c4d4bc689511"
+}

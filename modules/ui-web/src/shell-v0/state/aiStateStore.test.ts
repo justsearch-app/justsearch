@@ -544,13 +544,13 @@ describe('aiStateStore — system-health verdict (595)', () => {
 
   it('E2: a settled poll stamps lastSettledIndex; a provisional poll keeps it', () => {
     feed(statusWith('READY', [], { docs: 1234, sizeBytes: 4096 }));
-    expect(getAiState().lastSettledIndex).toEqual({ documentCount: 1234, searchableDocumentCount: null, indexSizeBytes: 4096 });
+    expect(getAiState().lastSettledIndex).toEqual({ documentCount: 1234, ownDocumentCount: null, indexSizeBytes: 4096 });
     // index component recoveries: a *successful* poll returns the fallback (0 docs / UNAVAILABLE). The
     // retained settled value must NOT be overwritten by that transient zero.
     feed(statusWith('UNKNOWN', [], { indexState: 'UNAVAILABLE', docs: 0, sizeBytes: 0 }));
     const s = getAiState();
     expect(s.stability.kind).toBe('provisional');
-    expect(s.lastSettledIndex).toEqual({ documentCount: 1234, searchableDocumentCount: null, indexSizeBytes: 4096 });
+    expect(s.lastSettledIndex).toEqual({ documentCount: 1234, ownDocumentCount: null, indexSizeBytes: 4096 });
   });
 
   it('E2: a later settled poll refreshes lastSettledIndex', () => {
@@ -558,7 +558,7 @@ describe('aiStateStore — system-health verdict (595)', () => {
     feed(statusWith('READY', [], { docs: 20, sizeBytes: 200 }));
     expect(getAiState().lastSettledIndex).toEqual({
       documentCount: 20,
-      searchableDocumentCount: null,
+      ownDocumentCount: null,
       indexSizeBytes: 200,
     });
   });
@@ -574,7 +574,7 @@ describe('aiStateStore — system-health verdict (595)', () => {
     } as unknown as StatusSnapshot);
     expect(getAiState().lastSettledIndex).toEqual({
       documentCount: 77,
-      searchableDocumentCount: null,
+      ownDocumentCount: null,
       indexSizeBytes: null,
     });
   });
@@ -593,17 +593,6 @@ describe('aiStateStore — system-health verdict (595)', () => {
     // A default scope that excludes EVERY indexed document reports 0 — a known value, not absence.
     feed(statusWith('READY', [], { docs: 40, searchable: 0 }));
     expect(getAiState().index.searchableDocumentCount).toEqual(known(0));
-  });
-
-  it('C-4: a settled poll retains searchableDocumentCount; 0 is retained as 0, not as null', () => {
-    feed(statusWith('READY', [], { docs: 40, sizeBytes: 4096, searchable: 31 }));
-    expect(getAiState().lastSettledIndex).toEqual({
-      documentCount: 40,
-      searchableDocumentCount: 31,
-      indexSizeBytes: 4096,
-    });
-    feed(statusWith('READY', [], { docs: 40, sizeBytes: 4096, searchable: 0 }));
-    expect(getAiState().lastSettledIndex?.searchableDocumentCount).toBe(0);
   });
 
   // 813 §19 (W2) — the drain episode's high-water backlog. Mirrors the E2 cases above: an

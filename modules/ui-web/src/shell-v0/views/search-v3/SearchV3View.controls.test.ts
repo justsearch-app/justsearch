@@ -133,7 +133,7 @@ function aiOnline(): void {
 function aiOnlineWithoutDocuments(): void {
   __feedForTest({
     inference: { mode: 'online', available: true } as never,
-    status: { worker: { core: { indexedDocuments: 0 } } } as unknown as StatusSnapshot,
+    status: { worker: { core: { indexedDocuments: 0, ownSearchableDocuments: 0 } } } as unknown as StatusSnapshot,
   });
   __feedContactForTest();
 }
