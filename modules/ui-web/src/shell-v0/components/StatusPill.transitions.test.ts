@@ -57,8 +57,20 @@ describe('verdict and AI-engine announcers (595 §15.1 E1, moved from the status
     expect(notice('verdict-announcer')!.getAttribute('live')).toBe('status');
     expect(notice('verdict-announcer')!.textContent).toBe('Search available');
     expect(pill.shadowRoot!.textContent).not.toContain('All systems operational');
-    await observe(verdict('unreachable', 'error'));
-    expect(notice('verdict-announcer')!.getAttribute('live')).toBe('alert');
+    // FC10 — spoken as the pill shows it: checking while contact is lost within the grace, then
+    // assertively that the engine cannot be reached.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const lost = { connection: { reachable: false, lastSuccessMs: Date.now(), lastContactMs: Date.now(), consecutiveFailures: 1 } } as Partial<AiState>;
+      await observe({ ...verdict('unreachable', 'error'), ...lost });
+      expect(notice('verdict-announcer')!.getAttribute('live')).toBe('status');
+      expect(notice('verdict-announcer')!.textContent).toBe('Checking search status');
+      vi.setSystemTime(Date.now() + 11_000);
+      await observe({ ...verdict('unreachable', 'error'), ...lost });
+      expect(pill.status.model.pill.kind).toBe('unreachable');
+      expect(notice('verdict-announcer')!.getAttribute('live')).toBe('alert');
+      expect(notice('verdict-announcer')!.textContent).toBe("Can't reach the engine");
+    } finally { vi.useRealTimers(); }
   });
   it('announces the AI engine through its sibling region', async () => {
     await observe(engine('online'));

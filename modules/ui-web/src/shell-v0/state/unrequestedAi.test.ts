@@ -135,7 +135,10 @@ describe('FA3c an AI install the person started that was interrupted or failed n
   });
 
   it('the rows say what happened in the AI verdict\'s own words', () => {
-    expect(derive(observe(FAILED)).sections.needs.map(row => row.detail)).toEqual(['Could not write to the models folder']);
+    // FC11 — the failed install in the verdict's words; the Engine's own message is detail for support.
+    expect(derive(observe(FAILED)).sections.needs.map(row => row.detail)).toEqual([
+      'The folder for AI models could not be created or written to. Check the free space on the disk and that the folder can be written to, then install again.']);
+    expect(derive(observe(FAILED)).sections.needs[0]!.details?.map(row => row.title)).toEqual(['Detail for support: Could not write to the models folder']);
     expect(derive(observe(INTERRUPTED)).sections.needs.map(row => row.detail))
       .toEqual([expect.stringContaining('already downloaded is kept on disk')]);
   });

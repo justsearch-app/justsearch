@@ -131,7 +131,7 @@ export class EffectLine extends JfElement {
       </div>
       ${rows.length > 0
         ? html`<details class="detail">
-            <summary data-testid="effect-detail-toggle">details</summary>
+            <summary data-testid="effect-detail-toggle">Recorded fields (for support)</summary>
             <dl>
               ${rows.map(
                 ([k, v]) =>

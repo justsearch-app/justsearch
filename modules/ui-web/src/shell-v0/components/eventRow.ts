@@ -3,7 +3,7 @@
  * The ONE ledger-row projection (tempdoc 558 §S1) — the convergence the D3 timing change surfaced.
  *
  * The Activity surface (`<jf-action-ledger>`) and the agent retrospective's History tab both render a
- * {@link UnifiedActionEntry} as `who · label · outcome · source · when`. Before this they FORKED: the
+ * {@link UnifiedActionEntry} as `who · label · outcome · when`. Before this they FORKED: the
  * Activity row showed absolute clock time + the outcome baked into the label; History re-derived a
  * separate `HistoryEntry` and showed relative time + an accent-fill-as-text colour. That is 548 §1's
  * "two authorities for one concept, neither subordinate" at the row level. This module is the single
@@ -21,6 +21,7 @@ import { html, css, type CSSResult, type TemplateResult } from 'lit';
 import type { UnifiedActionEntry } from '../operations/ActionLedgerClient.js';
 import { formatRelativeIso } from '../../utils/relativeTime.js';
 import { statusToTone, statusGlyph, glyphChar, toneText } from '../utils/statusTone.js';
+import { rowOutcomeWords, whoWords } from '../operations/activityWords.js';
 
 /** Human absolute time for the `<time>` title/hover (machine ISO in `datetime`, relative form visible). */
 function absoluteTime(iso: string): string {
@@ -45,11 +46,11 @@ export function renderEventWhen(iso: string): TemplateResult {
 }
 
 /**
- * The outcome cell — a semantic glyph + the outcome word, tinted via the ONE status-tone authority at
- * TEXT grade (`toneText` → `var(--text-*)`, surface-legible — never the accent fill, which would be
- * accent-as-text). Rows with no outcome (navigation/effect) render nothing.
+ * The outcome cell — a semantic glyph + the outcome in words (Activity's words, FC9), tinted via the
+ * ONE status-tone authority at TEXT grade (`toneText` → `var(--text-*)`, surface-legible — never the
+ * accent fill, which would be accent-as-text). Rows with no outcome (navigation/effect) render nothing.
  */
-function renderEventOutcome(outcome: string | undefined): TemplateResult {
+function renderEventOutcome(kind: string, outcome: string | undefined): TemplateResult {
   if (!outcome) return html`${''}`;
   const tone = statusToTone(outcome);
   const glyph = glyphChar(statusGlyph(outcome));
@@ -58,7 +59,7 @@ function renderEventOutcome(outcome: string | undefined): TemplateResult {
     data-testid="ledger-outcome"
     data-tone=${tone}
     style=${`color: ${toneText(tone)}`}
-    >${glyph ? html`<span aria-hidden="true">${glyph}</span> ` : ''}${outcome}</span
+    >${glyph ? html`<span aria-hidden="true">${glyph}</span> ` : ''}${rowOutcomeWords(kind, outcome)}</span
   >`;
 }
 
@@ -78,13 +79,12 @@ export function renderEventRow(entry: UnifiedActionEntry, opts: EventRowOptions 
     ${opts.isNew
       ? html`<span class="new-dot" data-testid="ledger-new-dot" role="img" aria-label="new since you looked"></span>`
       : ''}
-    <span class="who" data-originator=${entry.originator}>${entry.originator}</span>
+    <span class="who" data-originator=${entry.originator}>${whoWords(entry.originator)}</span>
     <span class="label">${entry.label}
       ${entry.operationOutcomeKey ? html`<jf-operation-outcome-detail
         operation-key=${entry.operationOutcomeKey} api-base=${opts.apiBase ?? ''}></jf-operation-outcome-detail>` : ''}
     </span>
-    ${renderEventOutcome(entry.outcome)}
-    <span class="src">${entry.source === 'backend' ? 'backend' : 'local'}</span>
+    ${renderEventOutcome(entry.kind, entry.outcome)}
     ${renderEventWhen(entry.occurredAt)}
   </div>`;
 }
@@ -136,11 +136,6 @@ export const eventRowStyles: CSSResult = css`
   }
   .label {
     flex: 1 1 auto;
-  }
-  .src {
-    flex: 0 0 auto;
-    color: var(--text-secondary);
-    font-size: var(--font-size-xs);
   }
   /* The "timing" the surface subtitle promises, projected from occurredAt. Tabular figures keep the
      column aligned; muted so it reads as metadata. */

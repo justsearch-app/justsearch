@@ -2,7 +2,7 @@
 import { setFirstUseRoots, getFirstUse, subscribeFirstUse } from '../state/firstUse.js';
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
-import { deriveFrameStatus, completedLongWork, transientPlacement, FINISHED_DWELL_MS, type FrameStatus, type StatusFact, type DurableStatusOperation } from '../state/frameStatus.js';
+import { deriveFrameStatus, spokenStatus, completedLongWork, transientPlacement, FINISHED_DWELL_MS, type FrameStatus, type StatusFact, type DurableStatusOperation } from '../state/frameStatus.js';
 import { subscribeTasks, listTasks, completeTask } from '../substrates/tasks/index.js';
 import { subscribePending, listPending } from '../substrates/pending-effects/index.js';
 import { subscribeConsent, listPendingConsentRequests } from '../substrates/consent/index.js';
@@ -25,9 +25,9 @@ import type { PluginErrorEventDetail } from '../state/pluginLoadEvents.js';
 import { presentationForSeverity } from '../state/messageClasses.js';
 import { isWindowFocused } from '../../utils/windowFocus.js';
 import { onWindowFocusChange } from '../../utils/windowFocusChange.js';
-import { presentVerdict, type VerdictPresentation } from '../state/verdict.js';
+import type { VerdictPresentation } from '../state/verdict.js';
 import { presentAiEngineVerdict, type AiEngineVerdictPresentation } from '../state/aiVerdict.js';
-import { awaitsUnrequestedAi, isIndexingObservation } from '../state/readinessNotice.js';
+import { isIndexingObservation } from '../state/readinessNotice.js';
 import { getSeenCursor, subscribeSeenCursor } from '../substrates/recall/recallCursor.js';
 import { getIndexedRoots, readIndexedRoots, subscribeIndexedRoots } from '../state/indexedRoots.js';
 import { subscribeProfileSwitch } from '../state/UserStateDocument.js';
@@ -465,7 +465,9 @@ export class FrameStatusController implements ReactiveController {
     // 595 §15.1 — one verdict announcer and its AI-engine sibling, moved from the retired status
     // bar into this always-mounted owner. Indexing transitions speak through the indexing announcer.
     // A gap that only AI nobody asked for would fill is no warning here either (FA3b): the pill says it.
-    const verdict = this.ai && !awaitsUnrequestedAi(this.ai.verdict, this.ai.aiEngine) ? presentVerdict(this.ai.verdict).announce : null;
+    // FC10 — spoken by the rule that decides the visible pill (frameStatus), never a second one.
+    const spoken = spokenStatus(next, this.ai);
+    const verdict = spoken.verdict;
     this.indexingTransition = this.ai?.verdict.kind === 'transitioning' && this.ai.verdict.reasons.some(isIndexingObservation);
     this.verdictAnnouncement = verdict && !this.indexingTransition ? verdict : null;
     if (this.ai?.aiEngine.kind !== this.unsaidEngineKind) this.unsaidEngineKind = null;
@@ -473,7 +475,12 @@ export class FrameStatusController implements ReactiveController {
       ? presentAiEngineVerdict(this.ai.aiEngine).announce : null;
     const activityAnnouncement = [this.indexingTransition && p.activity.confirmed
       ? verdict?.text ?? p.activity.summary : p.activity.summary, p.activity.detail].filter(Boolean).join(' — ');
-    if (p.activity.confirmed) {
+    if (!spoken.indexing) {
+      // Indexing work left out of the panel because it only waits for AI: nothing about it is said.
+      this.indexingAnnouncement = '';
+      this.indexingAnnouncementKey = null;
+      this.indexingWasPaused = false;
+    } else if (p.activity.confirmed) {
       const resumedKey = `resumed:${activityAnnouncement}`;
       if (p.pause) {
         if (this.indexingAnnouncementKey !== p.pause.state) this.indexingAnnouncement = activityAnnouncement;

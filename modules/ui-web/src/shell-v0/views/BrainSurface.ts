@@ -2647,10 +2647,11 @@ export class BrainSurface extends JfElement {
       // Tempdoc 663 §E — install failure was previously unrepresented as a lifecycle state (folded
       // silently into a generic 'offline'/'not_installed' render, with only a separate dismissable
       // `runtimeError` banner hinting at it). Now a real, named state.
+      // FC11 — in the AI verdict's words; the install service's own message is the alert below, once.
       install_failed: {
         dot: 'offline',
         label: 'Install Failed',
-        sub: this.installStatus?.lastError || this.installStatus?.message || 'Installation failed — try again.',
+        sub: aiEngineBody(aiVerdict),
       },
       offline: {
         dot: 'offline',
@@ -2931,7 +2932,8 @@ export class BrainSurface extends JfElement {
           : nothing}
         ${this.renderAlerts()}
         ${this.renderCompatibilityCallouts()}
-        ${known && aiState === 'install_failed' ? html`<jf-error-alert tone="error">Install failed: ${this.deriveAiEngineVerdict().installFailure ?? this.installStatus?.lastError ?? this.installStatus?.message}</jf-error-alert>` : nothing}
+        ${known && aiState === 'install_failed' && this.deriveAiEngineVerdict().installFailure ? html`<jf-error-alert tone="error"
+          data-testid="brain-install-failure-detail">Detail for support: ${this.deriveAiEngineVerdict().installFailure}</jf-error-alert>` : nothing}
         ${known ? this.renderRepairAlert() : nothing}
         ${this.renderFeaturePath()}
         ${this.renderGraphicsCard()}

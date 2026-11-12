@@ -73,8 +73,14 @@ export type AiEngineKind =
 export interface AiEngineVerdict {
   readonly kind: AiEngineKind;
   readonly stability: AiStability;
-  /** Set only when `kind === 'install_failed'` - the install service's own error text. */
+  /**
+   * Set only when `kind === 'install_failed'` - the install service's own error text. It is detail for
+   * support, shown once and labelled as such; what went wrong and what to do are said in words by
+   * {@link aiEngineBody}, from {@link installFailureCode} (FC11).
+   */
   readonly installFailure: string | null;
+  /** Set only when `kind === 'install_failed'` and the install service named its error code. */
+  readonly installFailureCode?: string;
   /**
    * Set only when `kind === 'indexing'`: true when the engine is parked specifically because
    * `chatEnabledSpec === false` (the user hasn't activated chat yet - "install is not enable"),
@@ -214,6 +220,7 @@ function computeLifecycle(input: AiEngineObservedInput): AiEngineVerdict {
       kind: 'install_failed',
       stability: { kind: 'settled' },
       installFailure: installStatus.lastError || installStatus.message || null,
+      ...(installStatus.errorCode ? { installFailureCode: installStatus.errorCode } : {}),
     };
   }
 
@@ -526,7 +533,7 @@ export function aiEngineBody(v: AiEngineVerdict): string {
     case 'installing':
       return 'Downloading models.';
     case 'install_failed':
-      return v.installFailure || 'Installation failed — try again.';
+      return installFailureWords(v.installFailureCode);
     case 'offline':
       return 'Start AI to enable chat and summaries.';
     case 'starting':
@@ -540,6 +547,30 @@ export function aiEngineBody(v: AiEngineVerdict): string {
       return 'AI engine is finishing document understanding — chat is off.';
     case 'indexing':
       return 'Indexing embeddings…';
+  }
+}
+
+/**
+ * FC11 — a failed AI install in words: what went wrong and what to do, by the install service's error
+ * code (AiInstallService). The service's own message (a path, an exception) is not words for the
+ * person; surfaces show it once, labelled as detail for support (`installFailure`).
+ */
+function installFailureWords(code: string | undefined): string {
+  switch (code) {
+    case 'ALL_DOWNLOADS_FAILED':
+    case 'REQUIRED_DOWNLOADS_FAILED':
+      return 'The AI model files could not be downloaded or saved. Check the internet connection and the free space on the disk, then install again.';
+    case 'INSTALL_IO_ERROR':
+    case 'IO_ERROR':
+      return 'The folder for AI models could not be created or written to. Check the free space on the disk and that the folder can be written to, then install again.';
+    case 'MANIFEST_UNAVAILABLE':
+      return 'The list of AI models to install could not be read. Install again later.';
+    case 'DOWNLOADS_DISABLED':
+      return 'Downloads are turned off by your administrator, so AI models cannot be installed on this computer.';
+    case 'SMOKE_TEST_FAILED':
+      return 'The AI models were installed but did not start correctly. Install again to repair them.';
+    default:
+      return 'The AI install stopped before it finished. Install again to continue.';
   }
 }
 

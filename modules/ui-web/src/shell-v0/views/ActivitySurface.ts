@@ -34,7 +34,9 @@ import '../components/ActionLedgerView.js';
 import type { ActionLedgerView } from '../components/ActionLedgerView.js';
 import '../components/RunActivity.js';
 import type { RunActivity } from '../components/RunActivity.js';
-import { recordTitle, type ActivityDetails } from '../components/ActivityDetails.js';
+import '../components/ActivityDetails.js';
+import type { ActivityDetails } from '../components/ActivityDetails.js';
+import { recordTitle } from '../operations/activityWords.js';
 import '../components/detailsPane/DetailsPane.js';
 import type { DetailsPane } from '../components/detailsPane/DetailsPane.js';
 import {
@@ -169,16 +171,17 @@ export class ActivitySurface extends JfElement {
 
   /**
    * A pointer from elsewhere (the status panel, Ctrl+K) lands on the section it named. The request
-   * is taken only by an Activity that is still on screen once rendered, so a second Activity (another
-   * pane) or one closing meanwhile cannot consume it without revealing it. The journal's arrival
-   * shows the feed scoped to what this window recorded, with every other filter cleared, so a filter
-   * left from earlier cannot hide what the pointer named.
+   * is for the Activity in the window its navigation lands on (FC6), and is taken by it only while
+   * it is still connected once rendered, so another Activity (a dismissed preview, the other window
+   * of a split) or one closing meanwhile cannot consume it without revealing it. The journal's
+   * arrival shows the feed scoped to what this window recorded, with every other filter cleared, so a
+   * filter left from earlier cannot hide what the pointer named.
    */
   private arriveAtSection(): void {
-    if (!this.isConnected || peekActivitySection() === null) return;
+    if (!this.isConnected || peekActivitySection(this) === null) return;
     void this.updateComplete.then(async () => {
       if (!this.isConnected) return;
-      const section = takeActivitySection();
+      const section = takeActivitySection(this);
       if (section === null) return;
       if (section === 'background-runs') {
         const runs = this.renderRoot.querySelector<RunActivity>('jf-run-activity');

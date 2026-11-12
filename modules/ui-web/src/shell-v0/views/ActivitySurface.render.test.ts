@@ -10,7 +10,10 @@
  */
 
 import { describe, expect, it, afterEach, beforeAll, vi } from 'vitest';
-import { requestActivitySection, takeActivitySection } from '../state/activitySection.js';
+import { addressActivitySection, requestActivitySection, takeActivitySection } from '../state/activitySection.js';
+
+/** A pointer's navigation, applied: it lands on the page these Activities are on. */
+const landOnPage = (): void => addressActivitySection(() => document.body);
 import {
   __resetForTest as resetResourceCatalog,
   __seedForTest as seedResourceCatalog,
@@ -135,6 +138,7 @@ describe('Activity holds what the frame drawers held (DP3)', () => {
     ['effect-journal', 'jf-action-ledger', FEED_SCOPE],
   ] as const)('a pointer to %s lands on that section, whether Activity is up yet or not', async (section, owner, selector) => {
     requestActivitySection(section);
+    landOnPage();
     const el = document.createElement('jf-activity-surface') as ActivitySurface;
     document.body.append(el);
     await el.updateComplete;
@@ -144,9 +148,10 @@ describe('Activity holds what the frame drawers held (DP3)', () => {
     await child.updateComplete;
     expect(child.shadowRoot!.querySelector(selector), 'the section the pointer names is there').not.toBeNull();
     expect(child.shadowRoot!.activeElement).toBe(child.shadowRoot!.querySelector(selector));
-    expect(takeActivitySection()).toBeNull();
+    expect(takeActivitySection(el)).toBeNull();
     (child.shadowRoot!.activeElement as HTMLElement).blur();
     requestActivitySection(section);
+    landOnPage();
     await new Promise(resolve => setTimeout(resolve, 0));
     await child.updateComplete;
     expect(child.shadowRoot!.activeElement).toBe(child.shadowRoot!.querySelector(selector));
@@ -160,6 +165,7 @@ describe('Activity holds what the frame drawers held (DP3)', () => {
     await leaving.updateComplete;
     await staying.updateComplete;
     requestActivitySection('effect-journal');
+    landOnPage();
     leaving.remove();
     const feed = staying.shadowRoot!.querySelector('jf-action-ledger') as HTMLElement & { updateComplete: Promise<unknown> };
     await feed.updateComplete;
@@ -167,7 +173,7 @@ describe('Activity holds what the frame drawers held (DP3)', () => {
     await feed.updateComplete;
     expect(feed.shadowRoot!.querySelector(FEED_SCOPE), 'the feed is scoped to this window').not.toBeNull();
     expect(feed.shadowRoot!.activeElement).toBe(feed.shadowRoot!.querySelector(FEED_SCOPE));
-    expect(takeActivitySection()).toBeNull();
+    expect(takeActivitySection(staying)).toBeNull();
     staying.remove();
   });
 
@@ -179,6 +185,7 @@ describe('Activity holds what the frame drawers held (DP3)', () => {
       filter: Record<string, unknown> };
     feed.filter = { ...feed.filter, quick: 'problems', originators: ['system'], proposals: ['rejected'], date: 'today' };
     requestActivitySection('effect-journal');
+    landOnPage();
     await new Promise(resolve => setTimeout(resolve, 0));
     await feed.updateComplete;
     expect(feed.filter).toEqual({ quick: 'all', originators: [], outcomes: [], proposals: [], routine: 'auto', date: 'all', scope: 'local' });

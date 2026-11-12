@@ -22,7 +22,7 @@ import { __resetElicitForTest, listPendingElicits, resolveElicit } from '../subs
 import { __resetMacrosForTest, listMacros } from '../substrates/macros/index.js';
 import { __resetRecallCursor } from '../substrates/recall/recallCursor.js';
 import { __resetAgentSessionStore, getAgentSessionController } from '../state/agentSessionStore.js';
-import { requestActivitySection, takeActivitySection } from '../state/activitySection.js';
+import { addressActivitySection, requestActivitySection, takeActivitySection } from '../state/activitySection.js';
 import {
   __resetForTest as resetResourceCatalog,
   __seedForTest as seedResourceCatalog,
@@ -667,11 +667,13 @@ describe('A15 / amendment 13 — the journal arrival lands on this window\'s rec
     feedRoot(el).querySelector<HTMLElement>('[data-quick="problems"]')!.click();
     await settle(el);
     requestActivitySection('effect-journal');
+    // The pointer's navigation, applied: it lands on the page this Activity is on.
+    addressActivitySection(() => document.body);
     await settle(el);
-    expect(takeActivitySection()).toBeNull();
+    expect(takeActivitySection(el)).toBeNull();
     expect(testid(feedRoot(el), 'feed-scope')?.dataset.scope).toBe('local');
     expect(entries(el)).toHaveLength(1);
-    expect(entries(el)[0]!.textContent).toContain('open-pane');
+    expect(entries(el)[0]!.textContent).toContain('Open pane "here"');
     expect(feedRoot(el).activeElement).toBe(entries(el)[0]);
   });
 
@@ -680,9 +682,10 @@ describe('A15 / amendment 13 — the journal arrival lands on this window\'s rec
     const leaving = await mount();
     const staying = await mount();
     requestActivitySection('effect-journal');
+    addressActivitySection(() => document.body);
     leaving.remove();
     await settle(staying);
-    expect(takeActivitySection()).toBeNull();
+    expect(takeActivitySection(staying)).toBeNull();
     expect(testid(feedRoot(staying), 'feed-scope')?.dataset.scope).toBe('local');
   });
 });

@@ -578,9 +578,10 @@ describe('presentAiEngineVerdict (Design pass 3 — the presentation projection)
     expect(p.body).toBe('An earlier download is paused — resuming continues from where it stopped.');
   });
 
-  it('install_failed surfaces the install service error text in the body', () => {
+  it('install_failed says in words what went wrong and what to do; the service\'s own text is not the body (FC11)', () => {
     const p = presentAiEngineVerdict(verdictFor('install_failed', 'disk full'));
-    expect(p.body).toBe('disk full');
+    expect(p.body).toBe('The AI install stopped before it finished. Install again to continue.');
+    expect(p.body).not.toContain('disk full');
   });
 
   it('install_failed announces with assertive politeness (the one error-toned kind)', () => {

@@ -1,0 +1,172 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T09:12:01.591Z",
+  "revision": "d8f6c9d13ff0e8fb6af13a248855d3f7508c0d9d",
+  "tree": "d387ab78b0c31d3107e037015de2f76fe41ce776",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts\" \"src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/9p2yna62/tmp/test-intent-vitest-63084-1794474662546.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 56050
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts\" \"src/shell-v0/state/pillAnnouncements.test.ts\" \"src/shell-v0/views/ActivitySurface.details.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/9p2yna62/tmp/test-intent-vitest-63084-1794474718596.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2994
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts#FC6 at 1280×720, Activity reached from More takes the arrival",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a516d3d154e9025ebd97f66749b73fe20e38f86b65d9688afd52541b1219c4c0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC6 at 1280×720, Activity reached from More takes the arrival",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts#FC6 at 600×400 with 200% text, Activity reached from More takes the arrival",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a516d3d154e9025ebd97f66749b73fe20e38f86b65d9688afd52541b1219c4c0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC6 at 600×400 with 200% text, Activity reached from More takes the arrival",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts#the page's own Engine is one Engine, whether it is named by its address or left unnamed",
+      "file": "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ad7aab01821436596b3701174a23a14a2d149618b6f166acff7dc792df547f70",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC7 the resolver remembers each Engine's own answer the page's own Engine is one Engine, whether it is named by its address or left unnamed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC8 at 1280×720, 160 records draw and scroll without an uncaught ResizeObserver loop error",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:07d902ab17ad63c6cb3ff4c17ff308587328841b06f63230c0914fae175fd1e5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC8 at 1280×720, 160 records draw and scroll without an uncaught ResizeObserver loop error",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC8 at 1280×720 in forced colours, 160 records draw and scroll without an uncaught ResizeObserver loop error",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:07d902ab17ad63c6cb3ff4c17ff308587328841b06f63230c0914fae175fd1e5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC8 at 1280×720 in forced colours, 160 records draw and scroll without an uncaught ResizeObserver loop error",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/pillAnnouncements.test.ts#the pill says keyword search is ready (semantic queue empty), and nothing spoken says Needs you or waiting for AI",
+      "file": "modules/ui-web/src/shell-v0/state/pillAnnouncements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e4239f0490911d6287f882a76dead1beaa764699c6339f47292b4691b659040f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC10 a fresh install where nobody asked for AI says nothing of AI it did not ask for the pill says keyword search is ready (semantic queue empty), and nothing spoken says Needs you or waiting for AI",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/pillAnnouncements.test.ts#an AI install the person started that failed still needs them, shown and spoken alike",
+      "file": "modules/ui-web/src/shell-v0/state/pillAnnouncements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e4239f0490911d6287f882a76dead1beaa764699c6339f47292b4691b659040f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC10 a fresh install where nobody asked for AI says nothing of AI it did not ask for an AI install the person started that failed still needs them, shown and spoken alike",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/pillAnnouncements.test.ts#an AI install the person started that was interrupted still needs them, shown and spoken alike",
+      "file": "modules/ui-web/src/shell-v0/state/pillAnnouncements.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e4239f0490911d6287f882a76dead1beaa764699c6339f47292b4691b659040f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC10 a fresh install where nobody asked for AI says nothing of AI it did not ask for an AI install the person started that was interrupted still needs them, shown and spoken alike",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts#a pointer to the journal resets the feed's filters to this window's records and puts the keyboard there",
+      "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.details.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:93230696b5603c10e9562c2f2f5ef58c26e8e5b983d175b5c562e7050c85eb43",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "A15 / amendment 13 — the journal arrival lands on this window's records, whatever filter was left a pointer to the journal resets the feed's filters to this window's records and puts the keyboard there",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:24038712ee892240772b86bc4dbff6f7d259e93f50285e478fb32ddd04503e44"
+}

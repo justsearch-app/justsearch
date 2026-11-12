@@ -7,7 +7,7 @@ import { aiEngineBody } from './aiVerdict.js';
 import { formatBytes, formatCount } from '../display/format.js';
 import { indexingCountsLine, indexingCountsLabel, enrichingCountsLine, enrichingCountsLabel } from './statusProgress.js';
 import { indexingTaskStatus } from './indexingProgress.js';
-import { verdictHeadline } from './verdict.js';
+import { presentVerdict, verdictHeadline, type VerdictPresentation } from './verdict.js';
 import type { AdvisoryRecord } from '../components/advisory/AdvisoryStore.js';
 import { advisoryClassChrome, healthAdvisoryReasonBody } from '../components/advisory/AdvisoryClassChrome.js';
 import { interpolateMessage } from '../../i18n/resourceCatalog.js';
@@ -323,6 +323,32 @@ function foldDecisions(activity: readonly UnifiedActionEntry[]): { folded: Set<s
   return { folded, state };
 }
 
+const CHECKING = 'Checking search status';
+const UNREACHABLE = "Can't reach the engine";
+
+/**
+ * FC10 — what the status pill's hidden live regions say, by the rule that decides the visible pill.
+ * While the pill says it is checking the search status, or that the engine cannot be reached, the
+ * search status is spoken as that: never a verdict the pill does not show ("Catching up…" beside
+ * "Checking search status"). Otherwise the search verdict is spoken, except a gap only AI nobody asked
+ * for would fill (the AI verdict says who asked), where the pill is calm. Indexing work the panel
+ * leaves out because it only waits for AI (semantic work waiting for AI nobody asked for, or for the
+ * AI install row that speaks for it) is not spoken either: `indexing` is false then.
+ */
+export function spokenStatus(model: FrameStatus, ai: AiState | null): {
+  readonly verdict: VerdictPresentation['announce'] | null;
+  readonly indexing: boolean;
+} {
+  const pill = model.pill;
+  const listed = [...model.sections.needs, ...model.sections.problems, ...model.sections.running]
+    .some(row => row.id === 'indexing' || row.id === 'indexing-hold');
+  const indexing = listed || ['ready', 'unknown'].includes(model.progress.phase);
+  if (pill.kind === 'unreachable') return { verdict: { text: UNREACHABLE, politeness: 'alert' }, indexing };
+  if (pill.kind === 'unknown') return { verdict: { text: CHECKING, politeness: 'status' }, indexing };
+  if (!ai || awaitsUnrequestedAi(ai.verdict, ai.aiEngine)) return { verdict: null, indexing };
+  return { verdict: presentVerdict(ai.verdict).announce, indexing };
+}
+
 export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   const { ai, now } = input;
   const progress = selectIndexingProgress(ai?.status, ai?.indexingStatusLive ?? false,
@@ -518,8 +544,12 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   const limited = ai?.verdict.reasons.some(code => isSearchUnavailableCause(code) || isReindexCause(code)) ?? false;
   if (limited && ai) add({ id: 'search-limited', section: 'problems', title: 'Search limited',
     detail: verdictHeadline(ai.verdict), stale: ai.phase !== 'connected', actions: [go('Health', 'core.health-surface')] });
+  // FC11 — what went wrong and what to do in the AI verdict's words; the install service's own message
+  // only once, under Details, labelled for support.
   if (ai && engine && aiInstallNeedsYou) add({ id: engine.kind === 'install_failed' ? 'ai-install-failed' : 'ai-install-paused',
     section: 'needs', title: engine.kind === 'install_failed' ? 'AI install failed' : 'AI download paused', detail: aiEngineBody(engine),
+    ...(engine.kind === 'install_failed' && engine.installFailure ? { details: [{ id: 'ai-install-support', section: 'needs' as const,
+      title: `Detail for support: ${engine.installFailure}` }] } : {}),
     stale: !ai.installObservationLive, actions: [go('Open AI Brain', 'core.brain-surface')] });
   // A known reduced search is said, never "Checking" (search limits, `limited`, speak for themselves).
   // Lacking only what AI provides, it is AI nobody asked for (calm), AI on its way, or AI waiting on the
@@ -596,7 +626,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   const searchServesFully = ai?.verdict.kind === 'operational' || ai?.verdict.kind === 'degraded' && ai.verdict.severity === 'info';
   let pill: StatusPillState;
   const pastGrace = input.contactLostAt !== null && now - input.contactLostAt >= RECONNECT_GRACE_MS;
-  if (ai && !ai.connection.reachable && pastGrace) pill = { kind: 'unreachable', label: "Can't reach the engine", stale: false };
+  if (ai && !ai.connection.reachable && pastGrace) pill = { kind: 'unreachable', label: UNREACHABLE, stale: false };
   else if (limited) pill = { kind: 'limited', label: 'Search limited', stale };
   else if (sections.needs.length) pill = { kind: 'needs', label: `${sections.needs.length} ${sections.needs.length === 1 ? 'needs' : 'need'} you`, count: sections.needs.length, stale: sections.needs.every(row => row.stale === true) };
   else if (sections.problems.length) pill = { kind: 'problems', label: `Problems right now (${sections.problems.length})`, count: sections.problems.length, stale };
@@ -610,7 +640,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   // Not "Up to date": that is a coverage claim, and semantic coverage is what is missing.
   else if (!stale && engine?.notRequested && (searchServesFully || awaitsUnrequestedAi(ai!.verdict, engine))
     && (progress.phase === 'ready' || waitsForOptionalAi)) pill = { kind: 'calm', label: 'Keyword search ready', stale: false };
-  else pill = { kind: 'unknown', label: 'Checking search status', stale: true };
+  else pill = { kind: 'unknown', label: CHECKING, stale: true };
   if (pill.stale) {
     const age = ai?.connection.lastSuccessMs == null ? null : Math.max(0, Math.floor((now - ai.connection.lastSuccessMs) / 60_000));
     // No retained calm claim while an observation is stale. The contact signal determines ONLY
