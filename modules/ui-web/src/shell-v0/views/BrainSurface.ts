@@ -1544,9 +1544,31 @@ export class BrainSurface extends JfElement {
   }
 
   private hasInstalledAi(): boolean {
-    return this.installStatus?.installedFully === true || this.installStatus?.repairNeeded === true
+    return this.installStatus?.installedFully === true || (this.installStatus?.repairNeeded === true && this.installBegan())
       || ['online', 'background', 'indexing', 'starting', 'offline'].includes(this._unifiedAiState?.aiEngine?.kind ?? '')
       || (this._unifiedAiState?.runtime?.installed?.known === true && this._unifiedAiState.runtime.installed.value);
+  }
+
+  /**
+   * Whether AI was ever installed here or an install began. `repairNeeded` only says a required
+   * file is missing, which is equally true on a machine that never installed AI; what tells the two
+   * apart is evidence the status and plan already carry: a completed install, a run this session,
+   * bytes an interrupted run left staged, or any part already on disk (ADR-0024: a fresh machine
+   * installs through Install AI, not Repair).
+   */
+  private installBegan(): boolean {
+    const status = this.installStatus;
+    return status?.installedFully === true || (status?.packages?.length ?? 0) > 0 || (status?.startedAtEpochMs ?? 0) > 0
+      || (status?.resumableBytes ?? 0) > 0 || (status?.state != null && status.state !== 'idle')
+      || this.modelPresence?.packages?.some(p => p.complete || (p.presentVariantFiles?.length ?? 0) > 0) === true
+      || this.planPreview?.components?.some(c => c.state === 'installed') === true
+      || this.downloadedFiles?.parts?.some(p => p.state === 'downloaded' || p.state === 'incomplete') === true;
+  }
+
+  /** The remedy this page owes: a missing file on a machine that never installed AI is Install AI's job. */
+  private repairRemedy(): RepairRemedy {
+    const remedy = deriveRepairRemedy(this.installStatus);
+    return remedy.kind === 'manual' || this.installBegan() ? remedy : { kind: 'none' };
   }
 
   private packagePresent(id: string): boolean {
@@ -1609,7 +1631,7 @@ export class BrainSurface extends JfElement {
         : !present ? 'Not downloaded'
         : active === null ? 'Unknown — last observed files are downloaded'
         : id === 'chat' && installed && this.settingsRead && !selected ? 'Off — background work can continue'
-        : id === 'chat' && selected && active === false ? this.installStatus?.repairNeeded ? 'Unavailable — repair needed; answers are enabled' : 'Unavailable — answers are enabled'
+        : id === 'chat' && selected && active === false ? this.installStatus?.repairNeeded && this.installBegan() ? 'Unavailable — repair needed; answers are enabled' : 'Unavailable — answers are enabled'
         : id === 'reranker' && installed && active === true && this.rerankerSettings?.rerankerEnabled === false && this.rerankerApplied === null ? 'On — the saved Off choice is not applied'
         : id === 'reranker' && installed && active === false ? selected ? 'Unavailable — Best match first is enabled' : 'Off — files kept'
         : active ? 'On' : 'Off';
@@ -1692,7 +1714,7 @@ export class BrainSurface extends JfElement {
   }
 
   private renderRepairAlert(): TemplateResult | typeof nothing {
-    const remedy = deriveRepairRemedy(this.installStatus);
+    const remedy = this.repairRemedy();
     if (remedy.kind === 'none') return nothing;
     if (remedy.kind === 'manual') return html`<div role="alert" data-testid="install-manual-fallback">
       Automatic repair could not download these files. Download each one and save it to the path shown, then restart AI.
@@ -2611,7 +2633,7 @@ export class BrainSurface extends JfElement {
     const indexingActivity = this.indexingProgress().activity;
     const downloadsDisabled = this.policy?.downloadsEnabled === false;
     const onlineDisabled = this.policy?.onlineAiEnabled === false;
-    const repairRemedy = deriveRepairRemedy(this.installStatus);
+    const repairRemedy = this.repairRemedy();
     const chatComponent = this.planPreview?.components?.find(c => c.id === 'chat');
     const chatUnavailableReason = chatComponent?.state === 'unavailable'
       ? chatComponent.unavailableReason || 'Chat is not supported here.' : null;
