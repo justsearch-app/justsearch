@@ -225,8 +225,7 @@ export async function buildOwnershipProjection({ mainRepoRoot, callerRepoRoot, c
   }
   const leaseExpired = active.lease?.expiresAt ? new Date(active.lease.expiresAt) < new Date() : true;
   // An unreadable run record behind an unexpired lease is an unknown supervisor: alive, not dead.
-  const supervisorAlive = ownerPresence.supervisorAliveFrom({ runJson, leaseExpired, pidAlive: _pidAlive,
-    readTable: evidence === 'full' ? agentIdentity.readTableSync : () => null });
+  const supervisorAlive = ownerPresence.supervisorAliveFrom({ runJson, leaseExpired, pidAlive: _pidAlive });
   const opLeases = await readOwnershipOpLeases(mainRepoRoot);
   // Tempdoc 606 Piece 2: provenance mismatch — the running stack was built from a
   // different checkout than where this caller is working (the dominant stale-jar case).

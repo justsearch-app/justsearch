@@ -27,7 +27,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { normalizeCreationTime, coerceProcessTable, DEFAULT_MAX_TABLE_AGE_MS, linuxIdentity, readLinuxProcess } = require('./process-identity.cjs');
-const { isSafeKey, readFixtureTable, readTableSync } = require('./agent-identity.cjs');
+const { isSafeKey, readFixtureTable } = require('./agent-identity.cjs');
 
 const OWNERS_DIRNAME = 'owners';
 const TOUCH_SCHEMA = 'owner-touch.v1';
@@ -447,33 +447,24 @@ function readActiveRunRecord(active, { mainRepoRoot, runsRoot, readFile = (p) =>
  * Supervisor liveness for the verdict. The run record names the supervisor pid. A record that
  * cannot be read, or has no usable pid, leaves the supervisor unknown. An unknown supervisor behind an unexpired lease
  * (the lease is renewed by the running supervisor) counts as alive - never as dead, so it can never
- * yield RECLAIM_DEAD. With the lease expired as well there is no evidence of life left. A present
- * pid is dead only if its recorded birth differs; unavailable birth evidence falls back to presence.
+ * yield RECLAIM_DEAD. With the lease expired as well there is no evidence of life left.
+ * On Linux a present pid is dead only if its recorded birth differs; unavailable birth evidence
+ * and non-Linux identities fall back to presence. Identity confirmation never reads a process table.
  */
 function supervisorAliveFrom({ runJson, leaseExpired,
   pidAlive = (pid) => ownerPidPresence({ pid }, { env: {} }) !== 'absent',
-  readProcess = readLinuxProcess, readTable = readTableSync, now = Date.now(),
-  maxTableAgeMs = DEFAULT_MAX_TABLE_AGE_MS }) {
+  readProcess = readLinuxProcess }) {
   const pid = Number(runJson?.pids?.runnerPid);
   if (!Number.isSafeInteger(pid) || pid <= 0) return !leaseExpired;
   if (!pidAlive(pid)) return false;
   const recorded = runJson?.identities?.runner;
   if (!recorded || recorded.pid !== pid) return true;
   const birth = linuxIdentity(recorded);
-  let table;
-  if (birth) {
-    const seen = readProcess(pid);
-    const actual = linuxIdentity(seen);
-    if (!seen?.present || !actual || actual.pid !== pid) return true;
-    table = { ok: true, readAt: now, table: [{ ProcessId: pid, processIdentity: seen.processIdentity }] };
-  } else {
-    if (!normalizeCreationTime(recorded.creationFileTimeUtc)) return true;
-    const evidence = coerceProcessTable(readTable(), { now, maxTableAgeMs });
-    if (!evidence.ok || !evidence.table.some((row) => Number(row.ProcessId) === pid)) return true;
-    table = { ok: true, readAt: now, table: evidence.table };
-  }
-  return ownerLiveness({ key: 'runner', pid, processIdentity: recorded.processIdentity,
-    creationTime: recorded.creationFileTimeUtc }, { table, now, maxTableAgeMs }).state !== 'ended';
+  if (!birth) return true;
+  const seen = readProcess(pid);
+  const actual = linuxIdentity(seen);
+  if (!seen?.present || !actual || actual.pid !== pid) return true;
+  return actual.bootId === birth.bootId && actual.startTicks === birth.startTicks;
 }
 
 /** "Your stack was taken over" notice for a caller whose recorded ownedEpoch is behind. */
