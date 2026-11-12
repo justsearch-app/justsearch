@@ -25,8 +25,7 @@
       "jobId": "app-ui-ui",
       "jobName": "Unit tests (app-ui-ui)",
       "commands": [
-        "npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4",
-        "npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4"
+        "npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4"
       ],
       "classifierLane": "ui"
     },
@@ -51,6 +50,9 @@
       },
       "jobId": "app-ui-ui-2",
       "jobName": "Unit tests (app-ui-ui-2)",
+      "commands": [
+        "npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4"
+      ],
       "classifierLane": "ui"
     },
     {

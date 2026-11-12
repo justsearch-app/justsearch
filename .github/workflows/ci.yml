@@ -1294,8 +1294,8 @@ jobs:
     if: needs.changes.outputs.ui != 'false'
     name: Unit tests (app-ui-ui)
     runs-on: ubuntu-latest
-    # Frontend unit and lockdown runs plus a cold Java compile of ui and its dependencies exceed
-    # 25 minutes whenever the test task cannot come from the build cache (a PR touching app-api).
+    # Raised from 25 minutes in #1228, when this job also ran the frontend lockdown tests
+    # (now in app-ui-ui-2) and was cancelled at that limit.
     timeout-minutes: 40
     steps:
       - name: Checkout
@@ -1332,14 +1332,6 @@ jobs:
 
       - name: Frontend unit tests
         run: npm run test:unit:run --prefix modules/ui-web -- --maxWorkers=4
-
-      # boot-lockdown.test.ts loads the production bundle under SES in headless Chromium.
-      - name: Install headless Chromium for lockdown tests
-        working-directory: modules/ui-web
-        run: npx --no-install playwright-core install --with-deps chromium
-
-      - name: Frontend lockdown tests
-        run: npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4
 
       - name: Stage Linux process-lifetime helper
         shell: bash
@@ -1415,6 +1407,14 @@ jobs:
         run: |
           npm ci --audit=false
           npm ci --prefix modules/ui-web --audit=false
+
+      # boot-lockdown.test.ts loads the production bundle under SES in headless Chromium.
+      - name: Install headless Chromium for lockdown tests
+        working-directory: modules/ui-web
+        run: npx --no-install playwright-core install --with-deps chromium
+
+      - name: Frontend lockdown tests
+        run: npm run test:unit:lockdown --prefix modules/ui-web -- --maxWorkers=4
 
       - name: Stage Linux process-lifetime helper
         shell: bash

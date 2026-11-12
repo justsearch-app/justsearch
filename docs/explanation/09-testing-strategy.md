@@ -258,6 +258,10 @@ runner label, Gradle tasks, local reproduction command, owner, platform classifi
 warn-only budget settings. The verifier fails when that policy drifts from the `ci.yml` unit-test
 matrix or the workflow-signal required checks.
 
+The UI jobs split frontend work: `app-ui-ui` runs frontend unit tests and
+`:modules:ui:ciUnitTest1`; `app-ui-ui-2` installs headless Chromium and runs frontend lockdown
+tests before `:modules:ui:ciUnitTest2`.
+
 The public `Unit tests` lanes also publish unit-test attribution and advisory budget reports from
 existing Gradle/JUnit XML. Attribution shows module totals, slow suites, skips, failures, errors,
 lane identity, and hosted runner image identity. Budget reports are diagnostic and warn-only; Gradle
