@@ -290,10 +290,11 @@ def install_ai(run):
     run.evidence('J3-default-plan', preview)
     manifest = run.api('/api/ai/install/manifest')
     run.evidence('J3-production-manifest', manifest)
-    resumed = run.facts.get('resumedSetup') is True
-    if not resumed:
-        run.wd.click('button[aria-label^="Install AI"]')
-        run.wd.click('button[aria-label="Accept and download"]')
+    if run.facts.get('resumedSetup') is True:
+        run.evidence('J3-resume-runtime', run.api('/api/ai/runtime/status'))
+        raise Unavailable('cached setup: activation cannot be re-observed; run J3 on a fresh install')
+    run.wd.click('button[aria-label^="Install AI"]')
+    run.wd.click('button[aria-label="Accept and download"]')
     samples = []
     def settled():
         status = run.api('/api/ai/install/status')
@@ -304,19 +305,10 @@ def install_ai(run):
             if any(x in raw.lower() for x in ('connection reset', 'connection timed out', 'connect timeout', 'read timed out', 'read timeout', 'download timed out', 'download timeout', 'curl exit 28', 'curl: (28)', 'resolve host', 'http 503', 'http 502', 'http 429')):
                 raise RuntimeError('Production AI download failed; see J3-install-observations.json')
             raise ProductFailure('Install AI failed: ' + raw)
-        if resumed:
-            runtime = run.api('/api/ai/runtime/status')
-            run.evidence('J3-resume-runtime', runtime)
-            features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
-            # installedFully can briefly be true before reboot initialization
-            # publishes activation_required. Only activation/runtime evidence
-            # settles a cached setup; an ambiguous idle state must keep waiting.
-            return status if status.get('phase') == 'activation_required' or all(
-                features.get(name, {}).get('modelActive') is True for name in ('embed', 'splade')) else None
         return status if (status.get('state') in ('completed', 'installed', 'succeeded')
                           or status.get('installedFully') is True) else None
-    status = wait_for(settled, 'Default CPU AI install', seconds=900 if resumed else 1800, interval=5,
-                      error=Infrastructure if resumed else AssertionError)
+    status = wait_for(settled, 'Default CPU AI install', seconds=1800, interval=5,
+                      error=AssertionError)
     assert preview.get('downloadProfile') == 'CPU', 'Default plan did not select CPU'
     run.evidence('J3-downloaded', status)
     memory_samples = []
@@ -333,11 +325,7 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
         memory_samples.append(sample)
         run.evidence('J3-activation-memory', memory_samples)
     sample_memory()
-    if not resumed or status.get('phase') == 'activation_required':
-        activate_downloaded(run)
-    else:
-        run.evidence('J3-activation-consent', {'restoredActivatedSetup': True,
-            'reason': 'Development rerun; original UI action belongs to the snapshot source report'})
+    activate_downloaded(run)
     activation_samples = []
     def activated():
         sample_memory()
@@ -354,13 +342,12 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
             if operation.get('state') in ('failed', 'cancelled'):
                 raise ProductFailure('Model activation failed: ' + json.dumps(operation))
         features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
-        return {'install': install, 'runtime': runtime} if cpu_install_ready(run, install) and all(
-            features.get(name, {}).get('modelActive') is True for name in ('embed', 'splade')) else None
+        return {'install': install, 'runtime': runtime} if (cpu_install_ready(run, install)
+            and install.get('phase') != 'activation_required'
+            and features.get('embed', {}).get('modelActive') is True) else None
     active = wait_for(activated, 'Downloaded default CPU search encoders activated', seconds=900, interval=5)
     status = active['install']
-    # Acquisition stages belong to this download session, not rebooted caches.
-    if not resumed:
-        assert 'retrieval-core' in status.get('readyCapabilities', []), 'Installed CPU search capability is not ready'
+    assert 'retrieval-core' in status.get('readyCapabilities', []), 'Installed CPU search capability is not ready'
     runtime = run.api('/api/ai/runtime/status')
     run.evidence('J3-runtime', runtime)
     components = preview.get('components', [])
@@ -374,21 +361,21 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
     text = run.wd.text()
     assert (chat.get('unavailableReason') or 'Chat is not supported here.') in text, 'CPU chat unavailable explanation is not shown'
     run.native.shot('J3-cpu-search-without-chat')
-    # RerankerConfig documents lazy initialization on a retrieval query. Check
-    # all reported default models after exercising retrieval, not before it.
+    # Check required retrieval models after exercising retrieval. SPLADE and
+    # CPU reranking are off by default, even with their files downloaded.
     def models_active():
         observed = run.api('/api/ai/runtime/status')
         run.evidence('J3-runtime', observed)
         features = {f['id']: f for f in observed.get('onnxFeatures', [])}
         return observed if all(features.get(name, {}).get('modelActive') is True
-                               for name in ('embed', 'splade', 'reranker', 'citation_scorer')) else None
+                               for name in ('embed', 'citation_scorer')) else None
     try:
         runtime = wait_for(models_active, 'All default retrieval models active after vector query', seconds=120, interval=3)
     except AssertionError as exc:
         observed = run.api('/api/ai/runtime/status')
         features = {f['id']: f for f in observed.get('onnxFeatures', [])}
         flags = {name + '.modelActive': features.get(name, {}).get('modelActive')
-                 for name in ('embed', 'splade', 'reranker', 'citation_scorer')}
+                 for name in ('embed', 'reranker', 'citation_scorer')}
         diagnostic = {'flags': flags, 'retrievalTrace': retrieval.get('searchTrace', {}), 'runtime': observed}
         run.evidence('J3-model-activity-failure', diagnostic)
         raise AssertionError(str(exc) + '; ' + ', '.join(
@@ -415,16 +402,19 @@ return typed || operationKeys.length ? {typed,operationKeys} : null;
         run.wd.click('button[aria-label="Approve"]')
 
 
-def semantic_search(run):
+def semantic_search(run, *, reranking=False):
     def probe():
         result = run.api('/api/knowledge/search', {'query': 'flower coastal navigation tower', 'mode': 'vector', 'limit': 20})
         run.evidence('J3-vector-query', result)
         trace = result.get('searchTrace', {})
         degradation = trace.get('degradation', {})
         stages = trace.get('stages', [])
+        cross_encoder = [s for s in stages if s.get('id') == 'cross-encoder']
+        expected = 'executed' if reranking else 'skipped'
         return result if fixture_present(run, result.get('results', [])) and trace.get('effectiveMode') == 'VECTOR' and not degradation.get('hybridFallback') and not degradation.get('vectorBlocked') and any(
-            s.get('id') == 'dense-retrieval' and s.get('status') == 'executed' for s in stages) and any(
-            s.get('id') == 'cross-encoder' and s.get('status') == 'executed' for s in stages) and not any(
+            s.get('id') == 'dense-retrieval' and s.get('status') == 'executed' for s in stages) and cross_encoder and all(
+            s.get('status') == expected and (reranking or s.get('reason') == 'PIPELINE_NOT_ELIGIBLE')
+            for s in cross_encoder) and not any(
             s.get('id') == 'sparse-retrieval' and s.get('status') == 'executed' for s in stages) else None
     return wait_for(probe, 'Semantic fixture retrieval without keyword fallback', seconds=240, interval=3)
 

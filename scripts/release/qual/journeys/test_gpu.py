@@ -338,6 +338,32 @@ class GpuTests(unittest.TestCase):
         with self.assertRaises(runner.ProductFailure):
             gpu.require_gpu_encoders(runtime)
 
+    def test_disabled_splade_allows_gpu_readiness_and_soak(self):
+        tracker = gpu.SoakGpu()
+        for seconds in (0, 30):
+            sample = self.gpu_soak_sample(seconds)
+            sample['runtime']['onnxFeatures'][1] = {
+                'id': 'splade', 'status': 'unknown', 'reason': 'worker_not_answered',
+                'modelActive': False}
+            gpu.require_gpu_encoders(sample['runtime'])
+            tracker.observe(sample)
+        self.assertEqual(tracker.confirmed_checks, 2)
+        self.assertEqual(tracker.observations, [])
+
+    def test_inactive_embed_does_not_satisfy_gpu_readiness(self):
+        sample = self.gpu_soak_sample(0)
+        sample['runtime']['onnxFeatures'][0]['modelActive'] = False
+        with self.assertRaisesRegex(runner.ProductFailure, 'Encoder is not executing on CUDA: embed'):
+            gpu.require_gpu_encoders(sample['runtime'])
+
+    def test_splade_cpu_status_does_not_trigger_persistent_fallback(self):
+        tracker = gpu.SoakGpu()
+        for seconds in (0, 30):
+            sample = self.gpu_soak_sample(seconds, memory=0, libraries=())
+            sample['runtime']['onnxFeatures'][1].update(executionProvider='cpu', gpuFallback=True)
+            tracker.observe(sample)
+        self.assertEqual(len(tracker.observations), 2)
+
     def test_start_ai_is_a_separate_real_control_after_model_activation(self):
         run = Mock(facts={})
         run.api.side_effect = [
