@@ -372,6 +372,26 @@ and needs no entry.
         "input re-encoding"
       ],
       "whatMoved": "The four stand-in Engine statuses of 'SC4 Open Health' and 'SC4 each Health fact carries the time it was itself observed' gain ownSearchableDocuments 1234 beside searchableDocuments 1234, so Health's 'Searchable files' fact, which now reads only the person's own count (FB5a: never the Help-inclusive searchable count), has its input. Expected 'Searchable files 1,234 · last seen …', the 'Files waiting 7' and 'Index Serving' wording, every age assertion and every other input are unchanged."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/display/date-call-sites-lockdown.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The Files fact's provenance now reads the searchable count's observation (countObservations.searchable) instead of the active one, because Files shows the person's own searchable files (FB5). The fixture's stale observation moves from countObservations.active to countObservations.searchable; the observed time, the 'Last known · observed <date>' expectation and every other input and assertion are unchanged.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (top bar, Settings, status pill, counts): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "FB5 (2026-11-12): Health's Files count reads the person's own searchable files; its provenance follows that count's observation.",
+          "label": "agent choice"
+        }
+      ]
     }
   ]
 }

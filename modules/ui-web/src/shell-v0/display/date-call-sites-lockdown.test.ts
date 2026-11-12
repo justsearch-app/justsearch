@@ -74,7 +74,7 @@ read('effect tooltip', show(effect.render()).querySelector('time')?.title, [full
 
 const { projectFact } = await import('/src/shell-v0/display/facts.ts');
 const { __feedForTest, getAiState } = await import('/src/shell-v0/state/aiStateStore.ts');
-__feedForTest({ status: { worker: { core: { indexedDocuments: 12 }, countObservations: { active: { state: 'stale', observedAtMs: stamp } } } } });
+__feedForTest({ status: { worker: { core: { indexedDocuments: 12 }, countObservations: { searchable: { state: 'stale', observedAtMs: stamp } } } } });
 read('observation provenance', projectFact('core.files', getAiState()).provenance, ['Last known · observed ' + full]);
 const { HealthLitView } = await import('/src/shell-v0/views/HealthLitView.ts');
 read('health event time', text(show(new HealthLitView().renderOccurrence({ timestamp: iso, severity: 'INFO', id: 'test', body: {} })).querySelector('.occurrence-time')), [clock.format(date)]);
