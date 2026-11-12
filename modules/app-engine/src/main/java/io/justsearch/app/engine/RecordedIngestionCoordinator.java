@@ -932,6 +932,10 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
       interrupt(row, "RECOVERY_BINDING_INVALID");
       return new Reconciliation.Wait();
     }
+    var state = importState(row);
+    if (state != null && state.interruptionReason() != null) {
+      checkpointInterruptedImport(row, plan, physical);
+    }
     // Durable receipts prove completion independently of permission to read another source file.
     var completed = completedParent(row, plan, physical);
     if (completed.isPresent()) return completed.orElseThrow();
@@ -939,6 +943,7 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     if (decision instanceof RecordedIngestRecoveryDecision.Refused refused) {
       if (!"cancelled".equals(refused.receipt().code())) {
         interrupt(row, refused.receipt().code());
+        if (state == null || state.interruptionReason() == null) checkpointInterruptedImport(row, plan, physical);
         return new Reconciliation.Wait();
       }
     } else if (row.attempts() >= OperationAttemptRunner.MAX_DURABLE_ATTEMPTS) {
@@ -963,6 +968,52 @@ final class RecordedIngestionCoordinator implements RecordedIngestionService, Re
     } catch (io.justsearch.app.api.operations.OperationStoreException unavailable) {
       interrupt(row, WRITE_UNAVAILABLE);
       return new Reconciliation.Wait();
+    }
+  }
+
+  /** Confirmed queue work survives a lost live checkpoint without granting source authority. */
+  private void checkpointInterruptedImport(OperationRecord row, RecordedRootPlan plan, Attached physical) {
+    if (row.state().terminal()) return;
+    try {
+      long completed = 0;
+      long failed = 0;
+      for (int index = 0; index < plan.roots().size(); index++) {
+        var childPlan = oneRoot(plan, index);
+        var found = findChild(row.key(), childPlan);
+        if (found.isEmpty()) continue;
+        var child = found.orElseThrow();
+        long childCompleted = child.unitsCompleted();
+        long childFailed = child.unitsFailed();
+        if (!child.state().terminal()) {
+          var observed = physical.queue.recordedWalk(child.key());
+          if (observed.isPresent()) {
+            var progress = observed.orElseThrow();
+            if (!planHash(childPlan).equals(progress.planHash()) || progress.completedUnits() < childCompleted
+                || progress.failedUnits() < childFailed) {
+              throw new JobQueue.RecordedWalkGapException("Interrupted progress contradicted its operation");
+            }
+            childCompleted = progress.completedUnits();
+            childFailed = progress.failedUnits();
+            if (progress.sealedAt() == null) checkpointConfirmedCounts(child, childCompleted, childFailed);
+          } else if (child.checkpointCursor() != null || childCompleted != 0 || childFailed != 0) {
+            throw new JobQueue.RecordedWalkGapException("Interrupted recorded progress disappeared");
+          }
+        }
+        completed = Math.addExact(completed, childCompleted);
+        failed = Math.addExact(failed, childFailed);
+      }
+      checkpointConfirmedCounts(operations.find(row.key()).orElseThrow(), completed, failed);
+    } catch (JobQueue.RecordedWalkGapException unavailable) {
+      interrupt(row, RecordedIngestionSettlement.UNAVAILABLE);
+    }
+  }
+
+  private void checkpointConfirmedCounts(OperationRecord row, long completed, long failed) {
+    if (!row.state().terminal() && completed >= row.unitsCompleted() && failed >= row.unitsFailed()
+        && (completed != row.unitsCompleted() || failed != row.unitsFailed())
+        && !operations.checkpoint(row.id(), row.checkpointCursor(), completed, failed)) {
+      throw new io.justsearch.app.api.operations.OperationStoreException(
+          io.justsearch.app.api.operations.OperationStoreException.Code.STORAGE_FAILED, null);
     }
   }
 

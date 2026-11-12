@@ -11,6 +11,8 @@ Owner agreement, 2026-11-02: "i agree with your recommendations." Only the adopt
 
 Execution evidence is written by run-evidence.mjs. The original repaired checks use gates/test-intent/compat/p2-interrupted-imports-before.patch against their original before revision 982069c83b34cd56e01332283e95ae3d10c08ae3 (origin/main in the isolated evidence clone). I18 uses gates/test-intent/compat/p2-i18-confirmed-counts-before.patch against HEAD, removing only commit 9273dbb240's coordinator change while retaining the current test source. The existing acceptance records are retained for independent re-review.
 
+I18 recovery repair (2026-11-12): the new restart regression also failed directly on unchanged 317831ee434b4b45bf37e782904128086916b6ab with expected 1 / actual 0 after its no-enumeration and no-claims assertions passed. Its durable fail-before evidence uses the existing I18 compatibility patch against that revision. Evidence refreshes use a scratch copy of run-evidence.mjs adapted only to route Gradle through `js-gradle-slot -w 3600`, create shared before clones instead of registered worktrees, and resolve the original repository/import paths; its actual script digest is recorded. The source repository's Git metadata is read-only. No acceptance record is written by this builder.
+
 ```json
 {
   "entries": [
@@ -902,6 +904,28 @@ Execution evidence is written by run-evidence.mjs. The original repaired checks 
       "newChecks": [
         "modules/app-services/src/test/java/io/justsearch/app/services/registry/emitter/UIOperationViewConformanceTest.java#coreOperationWireMatchesGolden"
       ]
+    },
+    {
+      "items": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java"
+      ],
+      "class": "New",
+      "behaviour": "I18: after confirmed queue work outlives a failed operation count write and a crash, boot and later maintenance repair interrupted child and parent totals exactly once; cursor and state stay unchanged, with no enumeration, claims or new approval.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "Import interrupted by a crash: resume automatically for exactly the folders originally approved; if that approval was session-only, show it as interrupted with a resume action; never silently drop.",
+          "delegationLocation": "task t-20261102-redesign request",
+          "delegationScope": "Orchestrator-settled I18 count repair after operation-checkpoint failure; the detailed count assertions are delegated intent.",
+          "choice": "Recover durable confirmed totals after operation count-write failure and restart, preserving interruption and prohibiting source work.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/p2-i18-recovery-counts.json",
+      "newChecks": [
+        "modules/app-engine/src/test/java/io/justsearch/app/engine/RecordedIngestionCoordinatorTest.java#interruptedConfirmedWorkCatchesUpAfterCountWriteFailureAndRestart"
+      ],
+      "repaired": true
     }
   ]
 }
