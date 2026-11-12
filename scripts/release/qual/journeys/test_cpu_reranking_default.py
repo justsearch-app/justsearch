@@ -78,6 +78,7 @@ class CPURerankingDefaultTests(unittest.TestCase):
 
     def test_gpu_journey_requests_reranking(self):
         run = Mock(facts={})
+        run.api.return_value = {'onnxFeatures': [{'id': 'reranker', 'modelActive': True}]}
         with patch.object(gpu, 'start_chat'), patch.object(gpu, 'require_gpu_encoders'), \
              patch.object(gpu, 'chat'), patch.object(linux, 'semantic_search') as semantic:
             gpu.gpu_installed_checks(run)

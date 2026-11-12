@@ -621,10 +621,11 @@ qualification. Explicit `--journeys` subsets likewise never qualify a release.
   UI's typed authorization when requested (immediate operation acceptance is
   also observed). The embedding and citation-scorer models must be active;
   SPLADE and CPU reranking are off by default (#1162, #1182), so their models
-  need not be active on CPU.
-  and installation fully complete. A semantic vector query must return the
+  need not be active on CPU. Installation must meet the completion checks below.
+  A semantic vector query must return the
   fixture with a dense-only execution trace, without keyword fallback or blocked
-  vector retrieval. CPU requires an explicitly skipped cross-encoder stage;
+  vector retrieval. CPU requires a cross-encoder stage explicitly skipped for
+  `PIPELINE_NOT_ELIGIBLE`;
   GPU still requires an executed cross-encoder. Fresh downloads also require the session acquisition capability;
   cached reboots prove readiness through active runtime encoders and that query.
   Activation polls record `/proc/meminfo` samples about every five seconds. The CPU
@@ -884,8 +885,9 @@ Cleanly stopped failed stages retain their checkpoint as well as their
 failed summary, so a diagnostic rerun can reuse production downloads without
 certifying the failed stage. Refreshing an application snapshot's guest controls
 keeps its original phase and checkpoint. Cached J3 also recognizes complete
-acquisition through the production install-status API; activation, the three
-required runtime components and semantic retrieval still have to pass. Windows J3 retains
+acquisition through the production install-status API; activation, the two
+required CPU runtime components (embedding and citation scorer) and semantic retrieval
+still have to pass. Windows J3 retains
 the actual activation click events and disabled control state through its own
 WebDriver session in `J3-activation-input.json`.
 
@@ -982,7 +984,8 @@ when chat and CUDA are hardware-skipped. That status is accepted only with
 completed activation, no repair needed, retrieval-core acquisition ready, all
 five downloadable model packages installed without errors, and exactly those
 two hardware skips. The semantic query, executed retrieval stages, chat
-unavailability and the three required active runtime components remain required. Linux's
+unavailability and the two required active CPU runtime components (embedding and
+citation scorer) remain required. Linux's
 existing completion checks are unchanged.
 
 J5 uses the production HTTPS URL, descriptor v2, generated test trust pins and a

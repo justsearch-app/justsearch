@@ -716,6 +716,9 @@ def gpu_installed_checks(run, preview=None):
     runtime = run.api('/api/ai/runtime/status')
     run.evidence('J3-gpu-runtime', runtime)
     require_gpu_encoders(runtime)
+    features = {f['id']: f for f in runtime.get('onnxFeatures', [])}
+    if features.get('reranker', {}).get('modelActive') is not True:
+        raise ProductFailure('GPU reranker model is not active: ' + json.dumps(features.get('reranker', {})))
     answer = chat(run, 'J3')
     run.facts['ai'] = installed
     return {'installed': installed, 'preview': preview, 'runtime': runtime, 'retrieval': retrieval, 'chat': answer}

@@ -149,7 +149,7 @@ class RepairTests(unittest.TestCase):
         run.facts = {'resumedSetup': True}
         run.wd.text.return_value = 'Chat is not supported here.'
         run.wd.execute.return_value = []
-        installed = {'state': 'completed', 'phase': 'completed', 'installedFully': True,
+        installed = {'state': 'completed', 'phase': 'done', 'installedFully': True,
                      'readyCapabilities': ['retrieval-core']}
         retrieval = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',
                      'stages': [{'id': 'dense-retrieval', 'status': 'executed'}, {'id': 'cross-encoder', 'status': 'skipped', 'reason': 'PIPELINE_NOT_ELIGIBLE'}]}}
