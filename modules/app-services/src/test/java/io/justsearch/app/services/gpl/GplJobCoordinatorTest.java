@@ -791,6 +791,9 @@ class GplJobCoordinatorTest {
     ObjectMapper mapper = new ObjectMapper();
     List<String> lines = Files.readAllLines(tripleStore.storeFile(), StandardCharsets.UTF_8);
     assertEquals(2, lines.size(), "1 positive + 1 negative expected");
+    assertTrue(lines.stream().noneMatch(line ->
+        line.contains("parent_opening") || line.contains("private-opening")),
+        "the GPL export must project training features without rerank-only input");
 
     JsonNode positive = mapper.readTree(lines.get(0));
     assertEquals(9.0f, positive.get("whole_sparse").floatValue(), 0.001f);
@@ -1243,6 +1246,7 @@ class GplJobCoordinatorTest {
   private static SearchResult detailResult(String id, Map<String, Float> detail) {
     return SearchResult.newBuilder()
         .setId(id)
+        .putFields("parent_opening", "private-opening")
         .addTrace(HitStage.newBuilder().setId("fusion").putAllDetail(detail).build())
         .build();
   }

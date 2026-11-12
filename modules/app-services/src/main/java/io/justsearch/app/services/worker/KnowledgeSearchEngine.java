@@ -83,6 +83,20 @@ final class KnowledgeSearchEngine {
   /** Target length for query-focused snippets passed to the reranker (~512 tokens). */
   private static final int RERANK_SNIPPET_LENGTH = 1500;
 
+  /**
+   * Wire-only field the Worker adds to a chunk hit: the head of its document's opening
+   * ({@code SearchResponseBuilder.PARENT_OPENING_FIELD}). Removed before hits leave the API.
+   */
+  static final String PARENT_OPENING_FIELD = "parent_opening";
+
+  /**
+   * How many leading window candidates are also judged by their document's opening. The first
+   * few positions carry nearly all of the gain (offline on real-use: +0.0134 nDCG@10 for 3 vs
+   * +0.0159 for all 20) at about two extra pairs instead of fourteen, which keeps the rerank
+   * inside its 200 ms budget.
+   */
+  private static final int OPENING_PASSAGE_CANDIDATES = 3;
+
   private enum ExpansionOwnership { PENDING, CUTOFF, COLLECTING, CLOSED }
 
   /** Max tokens the LLM may generate for query expansion. */
@@ -279,6 +293,59 @@ final class KnowledgeSearchEngine {
     String snippet =
         SearchResultMapper.extractQueryFocusedSnippet(preview, spans, RERANK_SNIPPET_LENGTH);
     return title + " " + snippet;
+  }
+
+  /**
+   * The candidate's second cross-encoder passage: its title followed by the opening of its
+   * document (title page, subject line). A chunk hit's opening comes from the Worker's {@link
+   * #PARENT_OPENING_FIELD}; a whole-document hit's {@code content_preview} already starts at the
+   * document's start. Null when no opening is known or the passage would repeat {@link
+   * #buildCrossEncoderDocText} exactly, so no pair is scored twice.
+   */
+  static String buildCrossEncoderOpeningText(SearchResult sr) {
+    Map<String, String> fields = sr.getFieldsMap();
+    String opening =
+        fields.containsKey("chunk_index")
+            ? fields.get(PARENT_OPENING_FIELD)
+            : fields.get("content_preview");
+    if (opening == null || opening.isBlank()) return null;
+    String text =
+        fields.getOrDefault("title", "")
+            + " "
+            + SearchResultMapper.snippetAround(opening, 0, RERANK_SNIPPET_LENGTH);
+    return text.equals(buildCrossEncoderDocText(sr)) ? null : text;
+  }
+
+  /**
+   * Folds the opening passages' scores into their candidates: each candidate keeps the better of
+   * its match passage (position {@code i}) and its opening passage (position {@code
+   * openingAt[i]}, or -1), and the sorted order is recomputed over the {@code topK} candidates
+   * (ties keep window order). An incomplete response cannot judge every requested passage, so
+   * discard its scores and order together and keep the pre-rerank order.
+   */
+  static RerankResponse keepBetterPassage(RerankResponse reranked, int[] openingAt, int topK) {
+    if (reranked == null || reranked.getSkipped()) {
+      return reranked;
+    }
+    int expectedScores = topK;
+    for (int o : openingAt) expectedScores = Math.max(expectedScores, o + 1);
+    if (reranked.getScoresCount() < expectedScores) {
+      return reranked.toBuilder().clearScores().clearSortedIndices()
+          .setSkipped(true).setSkipReason("INFERENCE_FAILED").build();
+    }
+    float[] best = new float[topK];
+    for (int i = 0; i < topK; i++) {
+      best[i] = reranked.getScores(i);
+      int o = openingAt[i];
+      if (o >= 0 && o < reranked.getScoresCount()) best[i] = Math.max(best[i], reranked.getScores(o));
+    }
+    Integer[] order = new Integer[topK];
+    for (int i = 0; i < topK; i++) order[i] = i;
+    Arrays.sort(order, (a, b) -> Float.compare(best[b], best[a]));
+    RerankResponse.Builder out = reranked.toBuilder().clearScores().clearSortedIndices();
+    for (float s : best) out.addScores(s);
+    for (int i : order) out.addSortedIndices(i);
+    return out.build();
   }
 
   @SuppressWarnings("unused") // Called from KnowledgeHttpApiAdapterHarmfulCombinationsTest
@@ -1227,14 +1294,24 @@ final class KnowledgeSearchEngine {
         for (int i = 0; i < topK; i++) {
           docTexts.add(buildCrossEncoderDocText(results.get(i)));
         }
+        // The leading candidates are also judged by their document's opening; each keeps the
+        // better score.
+        int[] openingAt = new int[topK];
+        Arrays.fill(openingAt, -1);
+        for (int i = 0; i < Math.min(topK, OPENING_PASSAGE_CANDIDATES); i++) {
+          String opening = buildCrossEncoderOpeningText(results.get(i));
+          openingAt[i] = opening == null ? -1 : docTexts.size();
+          if (opening != null) docTexts.add(opening);
+        }
 
         Span ceSpan =
             tracer.spanBuilder("search/cross_encoder").setParent(Context.current()).startSpan();
         try (Scope ceScope = ceSpan.makeCurrent()) { // NOPMD - scope used for auto-close
           // The RPC's budget is min(its category budget, rerank deadline - now) (§1.2), so a
           // rerank whose native run stalls releases the search at the rerank deadline.
-          reranked = withinHead(rerankBy, () -> client.rerankSearch(
-              req.query(), docTexts, rerankConfig.deadlineBudgetMs(), engineContext));
+          reranked = keepBetterPassage(withinHead(rerankBy, () -> client.rerankSearch(
+              req.query(), docTexts, rerankConfig.deadlineBudgetMs(), engineContext)),
+              openingAt, topK);
           // Tempdoc 553 Phase D (head): OpenInference RERANKER projection of the CE-scored
           // output — the reranked docs (id + CE score + content), in the cross-encoder's chosen
           // order.
