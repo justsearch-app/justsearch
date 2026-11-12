@@ -188,7 +188,7 @@ describe('WP3.7 shared pause surfaces', () => {
   it('S37.7 the status announcer changes once per pause/resume edge, staying silent on repeated polls', async () => {
     feed('RUNNING');
     const el = await mount('jf-status-pill');
-    const announcer = el.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
+    const announcer = el.shadowRoot!.querySelector('[data-testid="verdict-announcer"]')!;
     const changes: string[] = [];
     const observer = new MutationObserver(() => changes.push(announcer.textContent!.trim()));
     observer.observe(announcer, { subtree: true, childList: true, characterData: true });
@@ -205,7 +205,7 @@ describe('WP3.7 shared pause surfaces', () => {
   it('S37.7 announces confirmed pause and resume once across details and unconfirmed blips', async () => {
     feed('RUNNING', 0);
     const el = await mount('jf-status-pill');
-    const announcer = el.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
+    const announcer = el.shadowRoot!.querySelector('[data-testid="verdict-announcer"]')!;
     const changes: string[] = [];
     const observer = new MutationObserver(() => changes.push(announcer.textContent!.trim()));
     observer.observe(announcer, { subtree: true, childList: true, characterData: true });
@@ -238,7 +238,7 @@ describe('WP3.7 shared pause surfaces', () => {
     };
     error(1);
     const el = await mount('jf-status-pill');
-    const announcer = el.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
+    const announcer = el.shadowRoot!.querySelector('[data-testid="verdict-announcer"]')!;
     expect(announcer.textContent).toContain('1 file could not be indexed');
     const changes: string[] = [];
     const observer = new MutationObserver(() => changes.push(announcer.textContent!.trim()));
@@ -247,7 +247,8 @@ describe('WP3.7 shared pause surfaces', () => {
       error(1, true); await settle(el);
       error(1); await settle(el);
       error(1); await settle(el);
-      expect(announcer.textContent).toBe('Indexing resumed.');
+      // FC10a — one announcement: the pill's words, then what only indexing knows.
+      expect(announcer.textContent).toBe('Problems right now (1). Indexing resumed.');
       error(2); await settle(el);
       expect(announcer.textContent).toContain('Indexing error');
       expect(announcer.textContent).toContain('2 files could not be indexed');
@@ -460,7 +461,7 @@ describe('WP3.7 verifier layout and focus repairs', () => {
     const task = await mount('jf-status-pill');
     const control = await controls(task);
     const resume = button(control); resume.focus();
-    const announcer = deck.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
+    const announcer = deck.shadowRoot!.querySelector('[data-testid="verdict-announcer"]')!;
     const announcements: string[] = [];
     const observer = new MutationObserver(() => announcements.push(announcer.textContent!.trim()));
     observer.observe(announcer, { childList: true, subtree: true, characterData: true });

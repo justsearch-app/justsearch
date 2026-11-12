@@ -129,12 +129,13 @@ describe('WP3.3 independent inventory regressions', () => {
   it('S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims', async () => {
     const pill = new StatusPill(); pill.status.ai = observe('chat', 4, true); pill.status.refresh();
     const output = dom(pill.render()); document.body.append(output); await Promise.resolve();
-    expect(output.querySelectorAll('[data-testid="indexing-announcer"]')).toHaveLength(1);
+    expect(output.querySelectorAll('[data-testid="verdict-announcer"]')).toHaveLength(1);
     const notices = () => [...output.querySelectorAll('jf-system-notice')].filter(n => n.textContent?.includes('Rebuilding'));
     expect(notices().length).toBe(1);
     pill.status.ai = observe('indexing stale', 4, true); pill.status.refresh(); render(pill.render(), output);
     await Promise.resolve();
-    expect(output.querySelector('[data-testid="indexing-announcer"]')?.textContent).toContain(UNKNOWN);
+    // FC10a — unconfirmed indexing is the pill's own checking, which says nothing of unconfirmed work.
+    expect(output.querySelector('[data-testid="verdict-announcer"]')?.textContent?.trim()).toBe('');
     expect(notices().length).toBe(0);
     expect(pill.status.model.sections.running.find(r => r.id === 'rebuilding')!.stale).toBe(true);
   });

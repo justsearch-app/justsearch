@@ -696,7 +696,8 @@ describe('C6 live regions follow the same rule as notifications', () => {
     await observe(engine('install_failed'));
     await observe(engine('offline'));
     const shown = pill.status.model.pill;
-    expect(pill.status.verdictAnnouncement?.text, 'the pill\'s state, in its words').toBe(shown.words ?? shown.label);
+    expect(pill.shadowRoot!.querySelector('[data-testid="verdict-announcer"]')?.textContent?.trim(), 'the pill\'s state, in its words')
+      .toBe(shown.words ?? shown.label);
     for (const text of spoken()) expect(text).not.toMatch(/^(Offline|Install Failed|Not Installed)$/);
   });
   it('an end observed live is still announced', async () => {

@@ -3,7 +3,7 @@
 // FC8a: at 600×400 with 200% text, moving through Activity's windowed feed with the keyboard
 // (Ctrl+End to the oldest loaded record, Ctrl+Home back to the newest) after a filter change, a
 // reload and a return from Health logs no uncaught "ResizeObserver loop completed with undelivered
-// notifications" error. The real Shell opens System › Activity; its ledger arrives over the shared
+// notifications" error, counted as the browser reports it with its own ResizeObserver. The real Shell opens System › Activity; its ledger arrives over the shared
 // shell-events stream the way an Engine sends it: operations, approvals, permissions, index records,
 // scans, copies and routine navigation, rows of mixed heights.
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
@@ -14,6 +14,12 @@ import os from 'node:os';
 import path from 'node:path';
 
 const ROWS = 180;
+// The browser reports an undelivered notification only in some frames (timing decides which
+// observers fire together; on the before-state, at a quarter speed, about every second window), so
+// the path runs in several fresh windows, the keys three times in each.
+const WINDOWS = 6;
+const ROUNDS = 3;
+const CPU_SLOWDOWN = 4;
 
 const HARNESS = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <link rel="stylesheet" href="/src/styles/tokens.css"></head><body><script type="module">
@@ -131,8 +137,6 @@ declare global {
     __uncaught: string[];
     /** The element `tag` anywhere in the page, across shadow roots. */
     __deep(tag: string): Element | null;
-    /** What the windowed list changed of itself while the browser was delivering ResizeObserver notifications. */
-    __duringDelivery: string[];
   }
 }
 
@@ -141,50 +145,15 @@ interface Opened { readonly page: Page; readonly pageErrors: string[] }
 async function open(width: number, height: number, text: string, forcedColors: boolean): Promise<Opened> {
   context = await browser.newContext({ viewport: { width, height }, forcedColors: forcedColors ? 'active' : 'none' });
   const page = await context.newPage();
+  // A slower computer (a quarter of this one's speed): the frames the keys cross take longer, as on a laptop on battery.
+  await (await context.newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: CPU_SLOWDOWN });
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
-  // Counted from before the page's own scripts run: the window's error event is how the browser
-  // reports an undelivered ResizeObserver notification.
+  // Counted from before the page's own scripts run, with the browser's own ResizeObserver: the
+  // window's error event is how the browser reports an undelivered ResizeObserver notification.
   await page.addInitScript(() => {
     window.__uncaught = [];
     window.addEventListener('error', (event) => { window.__uncaught.push(String(event.message ?? event.error ?? 'error')); });
-    // The cause the browser reports: the list resizing itself or drawing rows while ResizeObserver
-    // notifications are being delivered (their callbacks and the microtasks after them). Rows drawn
-    // then at the depth just delivered cannot be delivered in that frame; whether the browser then
-    // reports it depends on which observers fired together, so the cause is counted as well. A
-    // delivery ends with its frame: by the next task or the next frame's animation callbacks,
-    // whichever runs first (the one asked for here, at the delivery's first callback, runs before any
-    // its callbacks ask for).
-    window.__duringDelivery = [];
-    let delivering = false;
-    const ended = new MessageChannel();
-    const end = (): void => { delivering = false; };
-    ended.port1.onmessage = end;
-    const Native = window.ResizeObserver;
-    window.ResizeObserver = class extends Native {
-      constructor(callback: ResizeObserverCallback) {
-        super((entries, observer) => {
-          if (!delivering) { delivering = true; ended.port2.postMessage(0); requestAnimationFrame(end); }
-          callback(entries, observer);
-        });
-      }
-    };
-    const watch = (root: Node): void => new MutationObserver((records) => {
-      if (!delivering) return;
-      for (const record of records) {
-        const list = record.target as HTMLElement;
-        if (list.localName !== 'lit-virtualizer') continue;
-        if (record.type === 'childList' && record.addedNodes.length) window.__duringDelivery.push(`drew ${record.addedNodes.length} row(s)`);
-        if (record.type === 'attributes' && record.oldValue !== list.getAttribute('style')) window.__duringDelivery.push(`resized to ${list.style.minHeight}`);
-      }
-    }).observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['style'], attributeOldValue: true });
-    watch(document);
-    const attachShadow = Element.prototype.attachShadow;
-    Element.prototype.attachShadow = function (init) {
-      const root = attachShadow.call(this, init);
-      watch(root);
-      return root;
-    };
   });
   await page.goto(`${url}${text ? `?text=${text}` : ''}#justsearch://surface/core.activity-surface`, { timeout: 45_000 });
   await loaded(page);
@@ -216,10 +185,10 @@ async function settle(page: Page, ms = 400): Promise<void> {
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
-/** The uncaught ResizeObserver-loop errors so far, from the window's error event and the page's own report. */
-async function loopErrors({ page, pageErrors }: Opened): Promise<string[]> {
+/** The uncaught ResizeObserver errors so far, from the window's error event and the page's own report. */
+async function observerErrors({ page, pageErrors }: Opened): Promise<string[]> {
   const reported = await page.evaluate(() => window.__uncaught);
-  return [...reported, ...pageErrors].filter((message) => /ResizeObserver loop/i.test(message));
+  return [...reported, ...pageErrors].filter((message) => /ResizeObserver/i.test(message));
 }
 
 /** The feed entry with the keyboard, by its index; null when the keyboard is elsewhere. */
@@ -230,33 +199,42 @@ function focusedIndex(page: Page): Promise<number | null> {
   });
 }
 
-it('FC8a at 600×400 with 200% text, Ctrl+End and Ctrl+Home through the feed log no uncaught ResizeObserver loop error', async () => {
+/** FC8a's path in a fresh window, then the keys through rows not yet measured; the uncaught ResizeObserver errors it logged. */
+async function traverse(): Promise<string[]> {
   const opened = await open(600, 400, '200%', false);
   const { page } = opened;
-  // FC8a's path: a filter change, a reload and a return from Health; then the keys, through rows not yet measured.
-  const quick = page.locator('jf-action-ledger [data-testid="feed-quick"]');
-  await quick.evaluate((group) => group.scrollIntoView({ block: 'start', behavior: 'instant' }));
-  await quick.locator('[data-quick="agents"]').click();
-  await quick.locator('[data-quick="all"]').click();
-  await page.reload({ timeout: 45_000 });
-  await loaded(page);
-  await page.getByRole('tab', { name: 'Health' }).click();
-  await page.getByRole('tab', { name: /^Activity/ }).click();
-  await loaded(page);
-  await settle(page, 600);
+  try {
+    // A filter change, a reload and a return from Health.
+    const quick = page.locator('jf-action-ledger [data-testid="feed-quick"]');
+    await quick.evaluate((group) => group.scrollIntoView({ block: 'start', behavior: 'instant' }));
+    await quick.locator('[data-quick="agents"]').click();
+    await quick.locator('[data-quick="all"]').click();
+    await page.reload({ timeout: 45_000 });
+    await loaded(page);
+    await page.getByRole('tab', { name: 'Health' }).click();
+    await page.getByRole('tab', { name: /^Activity/ }).click();
+    await loaded(page);
+    await settle(page, 600);
 
-  const count = await page.evaluate(() => (window.__deep('jf-action-ledger')!.shadowRoot!.querySelector('lit-virtualizer') as
-    unknown as { items: unknown[] }).items.length);
-  await page.evaluate(() => window.__deep('jf-action-ledger')!.shadowRoot!.querySelector<HTMLElement>('.entry[data-index="0"]')!.focus());
-  for (let round = 0; round < 3; round += 1) {
-    await page.keyboard.press('Control+End');
-    await expect.poll(() => focusedIndex(page), { message: 'Ctrl+End reaches the oldest loaded record', timeout: 8_000 }).toBe(count - 1);
-    await settle(page, 600);
-    await page.keyboard.press('Control+Home');
-    await expect.poll(() => focusedIndex(page), { message: 'Ctrl+Home reaches the newest record', timeout: 8_000 }).toBe(0);
-    await settle(page, 600);
-  }
-  expect(await loopErrors(opened), 'no uncaught ResizeObserver loop error while the keys move through the feed').toEqual([]);
-  expect(await page.evaluate(() => window.__duringDelivery),
-    'from the reload on, the list neither resized itself nor drew rows while ResizeObserver notifications were delivered').toEqual([]);
-}, 120_000);
+    const count = await page.evaluate(() => (window.__deep('jf-action-ledger')!.shadowRoot!.querySelector('lit-virtualizer') as
+      unknown as { items: unknown[] }).items.length);
+    await expect.poll(() => page.evaluate(() => !!window.__deep('jf-action-ledger')!.shadowRoot!.querySelector('.entry[data-index="0"]')),
+      { message: 'the newest record is drawn', timeout: 8_000 }).toBe(true);
+    await page.evaluate(() => window.__deep('jf-action-ledger')!.shadowRoot!.querySelector<HTMLElement>('.entry[data-index="0"]')!.focus());
+    for (let round = 0; round < ROUNDS; round += 1) {
+      await page.keyboard.press('Control+End');
+      await expect.poll(() => focusedIndex(page), { message: 'Ctrl+End reaches the oldest loaded record', timeout: 8_000 }).toBe(count - 1);
+      await settle(page, 600);
+      await page.keyboard.press('Control+Home');
+      await expect.poll(() => focusedIndex(page), { message: 'Ctrl+Home reaches the newest record', timeout: 8_000 }).toBe(0);
+      await settle(page, 600);
+    }
+    return await observerErrors(opened);
+  } finally { await context?.close(); context = undefined; }
+}
+
+it('FC8a at 600×400 with 200% text, Ctrl+End and Ctrl+Home through the feed log no uncaught ResizeObserver loop error', async () => {
+  const errors: string[] = [];
+  for (let attempt = 1; attempt <= WINDOWS; attempt += 1) errors.push(...(await traverse()).map((message) => `window ${attempt}: ${message}`));
+  expect(errors, 'no uncaught ResizeObserver error while the keys move through the feed').toEqual([]);
+}, 600_000);

@@ -208,7 +208,7 @@ describe('WP3.3 shared status surfaces', () => {
     feed(status());
     await mountAll();
     const deck = surfaces[0]!;
-    const announcer = deck.shadowRoot?.querySelector('[data-testid="indexing-announcer"]');
+    const announcer = deck.shadowRoot?.querySelector('[data-testid="verdict-announcer"]');
     expect(announcer).not.toBeNull();
     expect(announcer?.textContent).toContain('Meaning search is waiting while the computer saves energy. Some meaning processing can continue between files.');
     const mutations: MutationRecord[] = [];
@@ -225,7 +225,7 @@ describe('WP3.3 shared status surfaces', () => {
       feed(status(4, ['game_mode']));
       await flush();
       expect(mutations).toHaveLength(1);
-      expect(surfaces.slice(1).flatMap((el) => [...el.shadowRoot!.querySelectorAll('[data-testid="indexing-announcer"]')])).toHaveLength(0);
+      expect(surfaces.slice(1).flatMap((el) => [...el.shadowRoot!.querySelectorAll('[data-testid="verdict-announcer"]')])).toHaveLength(0);
     } finally { observer.disconnect(); }
   });
 });

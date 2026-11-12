@@ -26,7 +26,10 @@ What each Obsolete entry replaces:
 - `verdict.test.ts` (Obsolete, FC10a): 'announces politely for non-error verdicts, assertively for an error verdict' and 'the announce text is the concise headline (WCAG 4.1.3 brevity)' pinned presentVerdict's `announce`, the verdict headline the pill's live region spoke ('Search available', 'Catching up…'); it is retired with its only consumer, the pill speaking its own words. Replaced by: modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#Needs you during an Engine outage: spoken as Needs you, then as the engine that cannot be reached, modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#mirrors the verdict politely and an error verdict assertively, never as "All systems operational".
 - `aiVerdict.test.ts` (Obsolete, FC10a, FC11a): 'kind install_failed → headline Install Failed, tone error' is replaced by the status panel's and AI Brain's one sentence 'AI install failed'; 'install_failed announces with assertive politeness (the one error-toned kind)' and 'every other kind announces with polite status politeness' pinned presentAiEngineVerdict's `announce`, retired with the AI-engine live region. Replaced by: modules/ui-web/src/shell-v0/state/aiVerdict.test.ts#kind install_failed → headline AI install failed, tone error, modules/ui-web/src/shell-v0/views/BrainSurface.installCause.test.ts#INSTALL_IO_ERROR: says it failed, what went wrong and what to do, as the status panel does, modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#an AI install failed: nothing spoken that the pill never shows.
 
+- `IndexingPause.test.ts` (Obsolete, FC10a): 'R5-1 announces changed error counts after Resume…' expected the resume said alone ('Indexing resumed.') in the indexing announcer, beside the pill's own announcement; FC10a says each change once, in one announcement. Replaced by: modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#R5-1 announces changed error counts after Resume without an intervening indexing sample, modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#each change of status is heard once, through calm, indexing, needs you and an outage.
+- `indexingMissedSurfaces.test.ts` (Obsolete, FC10a): 'S33.4 S33.6 migration announcements…' expected 'Indexing status unconfirmed' spoken once a rebuild's state is unconfirmed, a status the pill already says as its own checking. Replaced by: modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims, modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#each change of status is heard once, through calm, indexing, needs you and an outage.
 The Adaptation entries: the arrival request is now addressed to the window its navigation lands on (FC6), so the checks that simulate an arrival without a Shell address it to the page, as the navigation would, and read it back for their own Activity.
+After the second verification: the pill says each change of status once, from one live announcement (FC10a; the indexing announcer is retired and what only indexing knows is said after the pill's words), so the checks that listened to the indexing announcer listen to that announcement (Adaptation, instrumentation); FC8a's check observes only the uncaught error with the browser's own ResizeObserver, repeated in fresh windows at a quarter CPU speed, and no longer how the list avoids it. `f-activity-c2-amend.json` and `f-activity-c2.json` were produced again with their original before-states (2cc52382dc, d8f6c9d13f) after these test files changed.
 Independent acceptance is pending.
 
 ```json
@@ -770,7 +773,7 @@ Independent acceptance is pending.
         "modules/ui-web/src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "FC8a repaired: at 600x400 with 200% text, after a filter change, a reload and a return from Health, Ctrl+End to the oldest loaded record and Ctrl+Home back (three times, through rows not yet measured) log no uncaught 'ResizeObserver loop' error in real Chromium, and the windowed list neither resizes itself nor draws rows while ResizeObserver notifications are delivered (the cause the browser reports; whether it reports it depends on which observers fired together, so the cause is counted as well as the error).",
+      "behaviour": "FC8a repaired: at 600x400 with 200% text, after a filter change, a reload and a return from Health, Ctrl+End to the oldest loaded record and Ctrl+Home back (three times, through rows not yet measured) log no uncaught ResizeObserver error, as real Chromium reports it with its own ResizeObserver (the window's error event and the page's errors), in each of six fresh windows on a computer at a quarter speed (Chromium CPU throttling). Only the error is observed, not how the list avoids it. The before-state (2cc52382dc) reports 'ResizeObserver loop completed with undelivered notifications' in some windows: the browser reports it only in some frames, so the check repeats the path; at a quarter speed about every second window.",
       "sources": [
         {
           "kind": "owner-words",
@@ -1033,6 +1036,136 @@ Independent acceptance is pending.
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none (docs/decisions/* searched for AI engine headline, Install Failed, announcer, announce, presentAiEngineVerdict)"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "FC10a repaired: each change of status is heard once, from one place, the pill's one live announcement. With every live region of the pill observed, the first calm observation is heard once ('Up to date', never also 'Indexing queue empty' or 'Ready — fully searchable'), indexing once, calm again once, a failed install's Needs you once, an Engine outage begins with nothing new heard while the pill still says '1 needs you' (never 'Indexing status unconfirmed'), and the engine that cannot be reached once, assertively. What only indexing knows is said in the same announcement, after the pill's words: after Resume beside an indexing error, 'Problems right now (1). Indexing resumed.'; and once a rebuild's state is unconfirmed, its claim is withdrawn and nothing about unconfirmed indexing is said.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell request"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (Activity, file names, the status pill and panel, AI Brain's install line): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "FC10a The pill's spoken text agrees with what it shows in every state, including Needs you during an Engine outage (no 'Catching up…'/'Reconnecting…' when the pill does not say so), and adds no wording the pill never shows ('Service degraded', title-case 'Not Installed', 'Install Failed').",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-activity-c2-amend.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#each change of status is heard once, through calm, indexing, needs you and an outage",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#R5-1 announces changed error counts after Resume without an intervening indexing sample",
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.test.ts",
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+        "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingStatusSurfaces.test.ts",
+        "modules/ui-web/src/shell-v0/components/indexingSurfaceSweep.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "The checks that listened to the indexing announcer (data-testid 'indexing-announcer') listen to the pill's one live announcement (data-testid 'verdict-announcer'), which now says indexing too (FC10a): Shell 'S2 full Shell announces each indexing transition once…', IndexingPause 'S37.7 …' (both), 'R5-1 …' and 'F2 …', StatusPill.transitions 'announces retry waiting with its backlog and deadline', indexingMissedSurfaces 'S33.4 S33.6 …' (one region), indexingStatusSurfaces 'S33.6 announces one semantic change once across identical polls' and indexingSurfaceSweep 'S33.6 the frame has one indexing announcement…'. Inputs, preconditions, the words looked for and the counts of announcements are unchanged, except the two expectations the Obsolete entries name.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell request"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (Activity, file names, the status pill and panel, AI Brain's install line): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "FC10a The pill's spoken text agrees with what it shows in every state, including Needs you during an Engine outage (no 'Catching up…'/'Reconnecting…' when the pill does not say so), and adds no wording the pill never shows ('Service degraded', title-case 'Not Installed', 'Install Failed').",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation"
+      ],
+      "whatMoved": "'after the unsaid end, the spoken status moves on with what the pill shows…' reads the words from the pill's one live announcement as rendered (data-testid 'verdict-announcer'), instead of the controller's `verdictAnnouncement` field it replaced (FC10a). Inputs, preconditions and the expected words are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell request"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (Activity, file names, the status pill and panel, AI Brain's install line): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "FC10a The pill's spoken text agrees with what it shows in every state, including Needs you during an Engine outage (no 'Catching up…'/'Reconnecting…' when the pill does not say so), and adds no wording the pill never shows ('Service degraded', title-case 'Not Installed', 'Install Failed').",
+          "label": "agent choice"
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell request"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (Activity, file names, the status pill and panel, AI Brain's install line): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "FC10a The pill's spoken text agrees with what it shows in every state, including Needs you during an Engine outage (no 'Catching up…'/'Reconnecting…' when the pill does not say so), and adds no wording the pill never shows ('Service degraded', title-case 'Not Installed', 'Install Failed').",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none (docs/decisions/* searched for live region, aria-live, announcer, indexing announcement, screen reader)"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell request"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (Activity, file names, the status pill and panel, AI Brain's install line): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "FC10a The pill's spoken text agrees with what it shows in every state, including Needs you during an Engine outage (no 'Catching up…'/'Reconnecting…' when the pill does not say so), and adds no wording the pill never shows ('Service degraded', title-case 'Not Installed', 'Install Failed').",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none (docs/decisions/* searched for live region, aria-live, announcer, indexing announcement, screen reader)"
     }
   ]
 }

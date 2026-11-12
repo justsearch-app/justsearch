@@ -334,36 +334,37 @@ const UNREACHABLE = "Can't reach the engine";
 export interface Spoken { readonly text: string; readonly politeness: 'status' | 'alert' }
 
 /**
- * FC10, FC10a — what the status pill's hidden live regions say, by the rule that decides the visible
+ * FC10, FC10a — what the status pill's live announcement says, by the rule that decides the visible
  * pill: its search status is the pill's own words, in every state, and no others. While the pill is
  * checking the search status (or a calm claim can no longer be confirmed) that is "Checking search
  * status"; once the engine cannot be reached, assertively, that it cannot; otherwise what the pill
  * shows ("Up to date", "Keyword search ready", "1 needs you", "Search limited"), without the age a
  * stale pill adds, so a verdict the pill does not show ("Catching up…", "Service degraded") is never
- * spoken. While work runs, indexing is said by the indexing announcer; the first other work that runs
- * now is said by its row's title ("Rebuilding search", "Installing AI models") — by the indexing
- * announcer while it is an indexing transition — and nothing for work whose state is unconfirmed. A
- * passing completion is said by its own notice, not twice. Indexing work the panel leaves
- * out because it only waits for AI (semantic work waiting for AI nobody asked for, or for the AI
- * install row that speaks for it) is not spoken either: `indexing` is false then.
+ * spoken. While work runs, indexing is said in its own words; the first other work that runs now is
+ * said by its row's title ("Rebuilding search", "Installing AI models"), and nothing for work whose
+ * state is unconfirmed. A passing completion is said by its own notice, not twice. `listed`: indexing
+ * is a row of the panel now (a hold, an error, files waiting), whose words the pill's do not say.
+ * Indexing work the panel leaves out because it only waits for AI (semantic work waiting for AI
+ * nobody asked for, or for the AI install row that speaks for it) is not spoken: `indexing` is false.
  */
 export function spokenStatus(model: FrameStatus, ai: AiState | null): {
   readonly verdict: Spoken | null;
   readonly indexing: boolean;
+  readonly listed: boolean;
 } {
   const pill = model.pill;
   const listed = [...model.sections.needs, ...model.sections.problems, ...model.sections.running]
     .some(row => row.id === 'indexing' || row.id === 'indexing-hold');
   const indexing = listed || ['ready', 'unknown'].includes(model.progress.phase);
-  if (pill.kind === 'finished') return { verdict: null, indexing };
+  if (pill.kind === 'finished') return { verdict: null, indexing, listed };
   if (pill.kind === 'working') {
     const work = model.sections.running.find(row => !row.stale && row.id !== 'indexing' && row.id !== FILE_ACTIVITY_ID
       && row.id !== 'file-window' && !row.id.startsWith('folder-work:'));
-    return { verdict: work ? { text: work.title, politeness: 'status' } : null, indexing };
+    return { verdict: work ? { text: work.title, politeness: 'status' } : null, indexing, listed };
   }
   const text = pill.kind === 'unknown' || (pill.stale && pill.kind === 'calm') ? CHECKING : pill.words ?? pill.label;
   const urgent = pill.kind === 'unreachable' || (pill.kind === 'limited' && ai?.verdict.severity === 'error');
-  return { verdict: { text, politeness: urgent ? 'alert' : 'status' }, indexing };
+  return { verdict: { text, politeness: urgent ? 'alert' : 'status' }, indexing, listed };
 }
 
 export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-12T12:02:01.903Z",
-  "revision": "2cc52382dc285162539580fe4e17a5b4673f6d8f",
-  "tree": "294fc48c9dd67e30ce656828d0cbcd87e51161a6",
+  "createdAt": "2026-11-12T13:34:04.075Z",
+  "revision": "8b9d9551905ec3d3e32e2fee657a9ec9883be791",
+  "tree": "e30c36c52047eddc11cab29e39673b68deea34f2",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/kplvoidg/tmp/test-intent-vitest-67273-1794484883663.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/qh83gazj/tmp/test-intent-vitest-24073-1794490251793.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 15500
+      "durationMs": 91457
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.approvalWords.test.ts\" \"src/shell-v0/components/StatusPanel.allActivity.test.ts\" \"src/shell-v0/views/BrainSurface.installCause.test.ts\" \"src/shell-v0/state/aiVerdict.test.ts\" \"src/shell-v0/components/StatusPill.spokenWords.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/state/unrequestedAi.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/kplvoidg/tmp/test-intent-vitest-67273-1794484899164.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.approvalWords.test.ts\" \"src/shell-v0/components/StatusPanel.allActivity.test.ts\" \"src/shell-v0/views/BrainSurface.installCause.test.ts\" \"src/shell-v0/state/aiVerdict.test.ts\" \"src/shell-v0/components/StatusPill.spokenWords.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/state/unrequestedAi.test.ts\" \"src/shell-v0/components/IndexingPause.test.ts\" \"src/shell-v0/components/indexingMissedSurfaces.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/qh83gazj/tmp/test-intent-vitest-24073-1794490343251.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2002
+      "durationMs": 3868
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts#FC8a at 600×400 with 200% text, Ctrl+End and Ctrl+Home through the feed log no uncaught ResizeObserver loop error",
       "file": "modules/ui-web/src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b88379ec1697dd7ef3b1c8f120ac3fdaf42a3310a5c87492d1cdcb84aa321c1e",
+      "contentDigest": "sha256:ff301c05300d177c66c4b7e968b425425a31109edd63016c97465727813a0b36",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -140,7 +140,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#Needs you during an Engine outage: spoken as Needs you, then as the engine that cannot be reached",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:8020923f1f4aa2022dc48c25a9bcbb64d3561d8e7a0e831a6992a6a361026aba",
+      "contentDigest": "sha256:e1239783c1870bb636e6a67687bbb63695729279a86af37d00730a0f695658ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -155,7 +155,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#AI not installed, nobody asked: nothing spoken that the pill never shows",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:8020923f1f4aa2022dc48c25a9bcbb64d3561d8e7a0e831a6992a6a361026aba",
+      "contentDigest": "sha256:e1239783c1870bb636e6a67687bbb63695729279a86af37d00730a0f695658ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -170,7 +170,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#an AI install failed: nothing spoken that the pill never shows",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:8020923f1f4aa2022dc48c25a9bcbb64d3561d8e7a0e831a6992a6a361026aba",
+      "contentDigest": "sha256:e1239783c1870bb636e6a67687bbb63695729279a86af37d00730a0f695658ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -185,7 +185,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#search degraded: nothing spoken that the pill never shows",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:8020923f1f4aa2022dc48c25a9bcbb64d3561d8e7a0e831a6992a6a361026aba",
+      "contentDigest": "sha256:e1239783c1870bb636e6a67687bbb63695729279a86af37d00730a0f695658ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -200,7 +200,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#AI online: nothing spoken that the pill never shows",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:8020923f1f4aa2022dc48c25a9bcbb64d3561d8e7a0e831a6992a6a361026aba",
+      "contentDigest": "sha256:e1239783c1870bb636e6a67687bbb63695729279a86af37d00730a0f695658ca",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -215,7 +215,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#speaks no AI-engine headline the pill never shows (FC10a)",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:661c29bc26f904dd02127b7e80087380b3a8d9c374b224eec7b194625ed67214",
+      "contentDigest": "sha256:dd166f277b091e42476d731d295a513a6aa92cf0f8169cf78f9b113a683c0d92",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -230,7 +230,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#after the unsaid end, the spoken status moves on with what the pill shows, never the engine's own headline (FC10a)",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ad8d592bf0748e50facf57e7f6e378f34ea3c613764a2a885ace06c0640fd21f",
+      "contentDigest": "sha256:e60d81c405b65b0c59f51878030edc7e47dfba3ca5f816b1c4d2e0743d8b3773",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -245,7 +245,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#an end observed live is still announced",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:ad8d592bf0748e50facf57e7f6e378f34ea3c613764a2a885ace06c0640fd21f",
+      "contentDigest": "sha256:e60d81c405b65b0c59f51878030edc7e47dfba3ca5f816b1c4d2e0743d8b3773",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -285,6 +285,51 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#each change of status is heard once, through calm, indexing, needs you and an outage",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e1239783c1870bb636e6a67687bbb63695729279a86af37d00730a0f695658ca",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FC10a the pill's spoken text agrees with what it shows each change of status is heard once, through calm, indexing, needs you and an outage",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#R5-1 announces changed error counts after Resume without an intervening indexing sample",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fd0a82a15b43b8e303fbac0f0db1c4bfead6ec79bf4715f5d56c7d31cb93e789",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.7 shared pause surfaces R5-1 announces changed error counts after Resume without an intervening indexing sample",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims",
+      "file": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6a03ca930715691d023ea7b22877701120bbc3695752b7b4f9fc02d03eea7342",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "WP3.3 independent inventory regressions S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": {
@@ -294,90 +339,90 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/kplvoidg/tmp/test-intent-vitest-67273-1794484903468.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/qh83gazj/tmp/test-intent-vitest-24073-1794490348535.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 15972,
-        "output": "JSON report written to /home/elias/.cache/am/kplvoidg/tmp/test-intent-vitest-67273-1794484903468.json\n\n"
+        "durationMs": 91038,
+        "output": "JSON report written to /home/elias/.cache/am/qh83gazj/tmp/test-intent-vitest-24073-1794490348535.json\n\n"
       },
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.approvalWords.test.ts\" \"src/shell-v0/components/StatusPanel.allActivity.test.ts\" \"src/shell-v0/views/BrainSurface.installCause.test.ts\" \"src/shell-v0/state/aiVerdict.test.ts\" \"src/shell-v0/components/StatusPill.spokenWords.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/state/unrequestedAi.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/kplvoidg/tmp/test-intent-vitest-67273-1794484919441.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/ActionLedgerView.approvalWords.test.ts\" \"src/shell-v0/components/StatusPanel.allActivity.test.ts\" \"src/shell-v0/views/BrainSurface.installCause.test.ts\" \"src/shell-v0/state/aiVerdict.test.ts\" \"src/shell-v0/components/StatusPill.spokenWords.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" \"src/shell-v0/components/StatusPill.notices.test.ts\" \"src/shell-v0/state/unrequestedAi.test.ts\" \"src/shell-v0/components/IndexingPause.test.ts\" \"src/shell-v0/components/indexingMissedSurfaces.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/qh83gazj/tmp/test-intent-vitest-24073-1794490439574.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2244,
-        "output": "JSON report written to /home/elias/.cache/am/kplvoidg/tmp/test-intent-vitest-67273-1794484919441.json\n\n"
+        "durationMs": 4210,
+        "output": "JSON report written to /home/elias/.cache/am/qh83gazj/tmp/test-intent-vitest-24073-1794490439574.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts#FC8a at 600×400 with 200% text, Ctrl+End and Ctrl+Home through the feed log no uncaught ResizeObserver loop error",
         "classification": "assertion",
-        "detail": "FC8a at 600×400 with 200% text, Ctrl+End and Ctrl+Home through the feed log no uncaught ResizeObserver loop error:  AssertionError: from the reload on, the list neither resized itself nor drew rows while ResizeObserver notifications were delivered: expected [ 'drew 1 row(s)', …(2) ] to deeply equal []\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/views/ActivitySur"
+        "detail": "FC8a at 600×400 with 200% text, Ctrl+End and Ctrl+Home through the feed log no uncaught ResizeObserver loop error:  AssertionError: no uncaught ResizeObserver error while the keys move through the feed: expected [ …(3) ] to deeply equal []\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/views/ActivitySurface.keyboard-lockdown.test.ts:239:91\n    at file:///home/elias"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.approvalWords.test.ts#say the decision once, in the details pane's words, with no code beside it",
         "classification": "assertion",
-        "detail": "FC9a approval and permission rows read in words say the decision once, in the details pane's words, with no code beside it:  AssertionError: row: The assistant Asked for approval: Ingest Files Not described (code GATED) 2026-11-01: expected 'The assistant Asked for approval: Ing…' not to match /Not described|\\(code|\\b(GATED|APPROVE…/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/sh"
+        "detail": "FC9a approval and permission rows read in words say the decision once, in the details pane's words, with no code beside it:  AssertionError: row: The assistant Asked for approval: Ingest Files Not described (code GATED) 2026-11-01: expected 'The assistant Asked for approval: Ing…' not to match /Not described|\\(code|\\b(GATED|APPROVE…/\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/sh"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPanel.allActivity.test.ts#arrives like Ctrl+K: Activity's earlier filter is reset and the keyboard is in its feed, not on the pill",
         "classification": "assertion",
-        "detail": "FC6a the status panel's \"All activity\" arrives like Ctrl+K: Activity's earlier filter is reset and the keyboard is in its feed, not on the pill:  AssertionError: the earlier filter is reset: every record shows: expected { quick: 'problems', …(6) } to deeply equal { quick: 'all', originators: [], …(5) }\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/components/StatusPanel.allActivity.test.ts:79:"
+        "detail": "FC6a the status panel's \"All activity\" arrives like Ctrl+K: Activity's earlier filter is reset and the keyboard is in its feed, not on the pill:  AssertionError: the earlier filter is reset: every record shows: expected { quick: 'problems', …(6) } to deeply equal { quick: 'all', originators: [], …(5) }\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/components/StatusPanel.allActivity.test.ts:79:"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.installCause.test.ts#ALL_DOWNLOADS_FAILED: says it failed, what went wrong and what to do, as the status panel does",
         "classification": "assertion",
-        "detail": "FC11a AI Brain after a failed install ALL_DOWNLOADS_FAILED: says it failed, what went wrong and what to do, as the status panel does:  AssertionError: the heading says the install failed: expected 'Installed — repair available' to be 'AI install failed' // Object.is equality\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/views/BrainSurface.installCause.test.ts:102:66\n    at file:///h"
+        "detail": "FC11a AI Brain after a failed install ALL_DOWNLOADS_FAILED: says it failed, what went wrong and what to do, as the status panel does:  AssertionError: the heading says the install failed: expected 'Installed — repair available' to be 'AI install failed' // Object.is equality\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/views/BrainSurface.installCause.test.ts:102:66\n    at file:///h"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.installCause.test.ts#INSTALL_IO_ERROR: says it failed, what went wrong and what to do, as the status panel does",
         "classification": "assertion",
-        "detail": "FC11a AI Brain after a failed install INSTALL_IO_ERROR: says it failed, what went wrong and what to do, as the status panel does:  AssertionError: the heading says the install failed: expected 'Installed — repair available' to be 'AI install failed' // Object.is equality\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/views/BrainSurface.installCause.test.ts:102:66\n    at file:///h"
+        "detail": "FC11a AI Brain after a failed install INSTALL_IO_ERROR: says it failed, what went wrong and what to do, as the status panel does:  AssertionError: the heading says the install failed: expected 'Installed — repair available' to be 'AI install failed' // Object.is equality\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/views/BrainSurface.installCause.test.ts:102:66\n    at file:///h"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.installCause.test.ts#SOMETHING_NEW: says it failed, what went wrong and what to do, as the status panel does",
         "classification": "assertion",
-        "detail": "FC11a AI Brain after a failed install SOMETHING_NEW: says it failed, what went wrong and what to do, as the status panel does:  AssertionError: the heading says the install failed: expected 'Installed — repair available' to be 'AI install failed' // Object.is equality\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/views/BrainSurface.installCause.test.ts:102:66\n    at file:///h"
+        "detail": "FC11a AI Brain after a failed install SOMETHING_NEW: says it failed, what went wrong and what to do, as the status panel does:  AssertionError: the heading says the install failed: expected 'Installed — repair available' to be 'AI install failed' // Object.is equality\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/views/BrainSurface.installCause.test.ts:102:66\n    at file:///h"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/aiVerdict.test.ts#kind install_failed → headline AI install failed, tone error",
         "classification": "assertion",
-        "detail": "presentAiEngineVerdict (Design pass 3 — the presentation projection) kind install_failed → headline AI install failed, tone error:  AssertionError: expected 'Install Failed' to be 'AI install failed' // Object.is equality\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/state/aiVerdict.test.ts:560:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui"
+        "detail": "presentAiEngineVerdict (Design pass 3 — the presentation projection) kind install_failed → headline AI install failed, tone error:  AssertionError: expected 'Install Failed' to be 'AI install failed' // Object.is equality\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/state/aiVerdict.test.ts:560:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#Needs you during an Engine outage: spoken as Needs you, then as the engine that cannot be reached",
         "classification": "assertion",
-        "detail": "FC10a the pill's spoken text agrees with what it shows Needs you during an Engine outage: spoken as Needs you, then as the engine that cannot be reached:  AssertionError: expected 'Service degraded' to be '1 needs you' // Object.is equality\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts:67:27\n    at processTicksAndRejections (node:internal/process/task_queues:10"
+        "detail": "FC10a the pill's spoken text agrees with what it shows Needs you during an Engine outage: spoken as Needs you, then as the engine that cannot be reached:  AssertionError: expected 'Service degraded' to be '1 needs you' // Object.is equality\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts:67:27\n    at processTicksAndRejections (node:internal/process/task_queues:10"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#AI not installed, nobody asked: nothing spoken that the pill never shows",
         "classification": "assertion",
-        "detail": "FC10a the pill's spoken text agrees with what it shows AI not installed, nobody asked: nothing spoken that the pill never shows:  AssertionError: spoken beside \"Up to date\": expected 'Search available' not to match /Catching up|Reconnecting|Service degr…/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts:93:77\n    at file:///home/elias/dev/"
+        "detail": "FC10a the pill's spoken text agrees with what it shows AI not installed, nobody asked: nothing spoken that the pill never shows:  AssertionError: spoken beside \"Up to date\": expected 'Search available' not to match /Catching up|Reconnecting|Service degr…/\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts:93:77\n    at file:///home/elias/dev/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#an AI install failed: nothing spoken that the pill never shows",
         "classification": "assertion",
-        "detail": "FC10a the pill's spoken text agrees with what it shows an AI install failed: nothing spoken that the pill never shows:  AssertionError: spoken beside \"1 needs you\": expected 'Service degraded' not to match /Catching up|Reconnecting|Service degr…/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts:93:77\n    at file:///home/elias/dev"
+        "detail": "FC10a the pill's spoken text agrees with what it shows an AI install failed: nothing spoken that the pill never shows:  AssertionError: spoken beside \"1 needs you\": expected 'Service degraded' not to match /Catching up|Reconnecting|Service degr…/\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts:93:77\n    at file:///home/elias/dev"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#search degraded: nothing spoken that the pill never shows",
         "classification": "assertion",
-        "detail": "FC10a the pill's spoken text agrees with what it shows search degraded: nothing spoken that the pill never shows:  AssertionError: spoken beside \"1 needs you\": expected 'Service degraded' not to match /Catching up|Reconnecting|Service degr…/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts:93:77\n    at file:///home/elias/dev"
+        "detail": "FC10a the pill's spoken text agrees with what it shows search degraded: nothing spoken that the pill never shows:  AssertionError: spoken beside \"1 needs you\": expected 'Service degraded' not to match /Catching up|Reconnecting|Service degr…/\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts:93:77\n    at file:///home/elias/dev"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#AI online: nothing spoken that the pill never shows",
         "classification": "assertion",
-        "detail": "FC10a the pill's spoken text agrees with what it shows AI online: nothing spoken that the pill never shows:  AssertionError: spoken beside \"Up to date\": expected 'Search available' not to match /Catching up|Reconnecting|Service degr…/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts:93:77\n    at file:///home/elias/dev/"
+        "detail": "FC10a the pill's spoken text agrees with what it shows AI online: nothing spoken that the pill never shows:  AssertionError: spoken beside \"Up to date\": expected 'Search available' not to match /Catching up|Reconnecting|Service degr…/\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts:93:77\n    at file:///home/elias/dev/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#speaks no AI-engine headline the pill never shows (FC10a)",
         "classification": "assertion",
-        "detail": "verdict and AI-engine announcers (595 §15.1 E1, moved from the status bar) speaks no AI-engine headline the pill never shows (FC10a):  AssertionError: expected <jf-system-notice …(6)></jf-system-notice> to be null\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts:79:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modu"
+        "detail": "verdict and AI-engine announcers (595 §15.1 E1, moved from the status bar) speaks no AI-engine headline the pill never shows (FC10a):  AssertionError: expected <jf-system-notice …(6)></jf-system-notice> to be null\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts:79:43\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modu"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#after the unsaid end, the spoken status moves on with what the pill shows, never the engine's own headline (FC10a)",
         "classification": "assertion",
-        "detail": "C6 live regions follow the same rule as notifications after the unsaid end, the spoken status moves on with what the pill shows, never the engine's own headline (FC10a):  AssertionError: the pill's state, in its words: expected 'Search available' to be 'Up to date' // Object.is equality\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:699:86\n    at file:///home/elias/dev/justsearch/."
+        "detail": "C6 live regions follow the same rule as notifications after the unsaid end, the spoken status moves on with what the pill shows, never the engine's own headline (FC10a):  AssertionError: the pill's state, in its words: expected 'Search available' to be 'Up to date' // Object.is equality\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts:700:8\n    at file:///home/elias/dev/justsearch/.c"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.notices.test.ts#an end observed live is still announced",
@@ -387,14 +432,29 @@
       {
         "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#announce no search warning when the only gap is AI nobody asked for",
         "classification": "assertion",
-        "detail": "FA3b the status pill's screen-reader announcements announce no search warning when the only gap is AI nobody asked for:  AssertionError: expected null to be 'Keyword search ready' // Object.is equality\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts:117:53\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-web/"
+        "detail": "FA3b the status pill's screen-reader announcements announce no search warning when the only gap is AI nobody asked for:  AssertionError: expected null to be 'Keyword search ready' // Object.is equality\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts:117:53\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-web/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#still announce it when the person asked for AI and it cannot run",
         "classification": "assertion",
-        "detail": "FA3b the status pill's screen-reader announcements still announce it when the person asked for AI and it cannot run:  AssertionError: expected 'Service degraded' to be '1 needs you' // Object.is equality\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-92VyKm/modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts:121:46\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui"
+        "detail": "FA3b the status pill's screen-reader announcements still announce it when the person asked for AI and it cannot run:  AssertionError: expected 'Service degraded' to be '1 needs you' // Object.is equality\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts:121:46\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.spokenWords.test.ts#each change of status is heard once, through calm, indexing, needs you and an outage",
+        "classification": "assertion",
+        "detail": "FC10a the pill's spoken text agrees with what it shows each change of status is heard once, through calm, indexing, needs you and an outage:  AssertionError: the first observation, calm: one announcement beside \"Up to date\": expected [ …(3) ] to have a length of 1 but got 3\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Pr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingPause.test.ts#R5-1 announces changed error counts after Resume without an intervening indexing sample",
+        "classification": "assertion",
+        "detail": "WP3.7 shared pause surfaces R5-1 announces changed error counts after Resume without an intervening indexing sample:  AssertionError: expected 'Checking…' to contain '1 file could not be indexed'\n    at /home/elias/.cache/am/qh83gazj/tmp/test-intent-before-9sgCCe/modules/ui-web/src/shell-v0/components/IndexingPause.test.ts:242:35\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-we"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/indexingMissedSurfaces.test.ts#S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims",
+        "classification": "assertion",
+        "detail": "WP3.3 independent inventory regressions S33.4 S33.6 migration announcements use one region and withdraw stale rebuild claims:  AssertionError: expected  to have a length of 1 but got +0\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1389:20)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/f-act"
       }
     ]
   },
-  "digest": "sha256:9421436da96f44b909ea347efcc45cf5e854b571c73b2ef1e02c3aa00ed20a5a"
+  "digest": "sha256:7e69a402e69da185aeb8908112c8967c10d921aaea1fa030cd502f18f1c2bdd6"
 }

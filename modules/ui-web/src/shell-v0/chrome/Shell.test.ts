@@ -224,7 +224,7 @@ describe('Shell — slice 492 substrate integration', () => {
       for (let i = 0; i < 4; i++) { await Promise.resolve(); await shell.updateComplete; await search.updateComplete; await deck.updateComplete; }
     }
     await feed(['energy_saver']);
-    const announcement = deck.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
+    const announcement = deck.shadowRoot!.querySelector('[data-testid="verdict-announcer"]')!;
     expect(announcement.textContent).toContain('saves energy');
     const changed = new Set<Element>();
     const observer = new MutationObserver(records => {
@@ -245,7 +245,7 @@ describe('Shell — slice 492 substrate integration', () => {
       const composer = search.shadowRoot!.querySelector('jf-sv3-composer') as Rendered;
       await composer.updateComplete;
       expect(composer.shadowRoot!.querySelector('[aria-live], [role="status"]'), 'Search banner remains quiet').toBeNull();
-      expect(search.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')).toBeNull();
+      expect(search.shadowRoot!.querySelector('[data-testid="verdict-announcer"]')).toBeNull();
     } finally { observer.disconnect(); }
   });
 
