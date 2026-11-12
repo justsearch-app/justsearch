@@ -1012,3 +1012,13 @@ Independent acceptance is pending.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-2h_b5wy_-20261112",
+  "verdict": "accept",
+  "digest": "sha256:ffdc1206dde918d8672fdec10d9203498d85759fd195f42eb96920ee3a03eee4"
+}
+```
