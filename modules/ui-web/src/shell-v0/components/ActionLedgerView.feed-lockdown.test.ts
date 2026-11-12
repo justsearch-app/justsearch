@@ -444,7 +444,8 @@ it.each(['light', 'dark'] as const)('A19 — on a %s forced-colours palette, the
     // Visible: an opaque fill that is not the page's own background colour.
     expect(state.dot!.fill, 'the unread mark is painted opaque').toMatch(/^rgb\(/);
     expect(state.dot!.fill, 'the unread mark is not painted in the background colour').not.toBe(state.canvas);
-    expect(state.outcome).toMatch(/^\S+ FAILURE$/);
+    // FC9 — the outcome in words, its glyph kept.
+    expect(state.outcome).toMatch(/^\S+ Failed$/);
   } finally {
     await context.close();
   }

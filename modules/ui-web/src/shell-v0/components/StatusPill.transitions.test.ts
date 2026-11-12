@@ -54,15 +54,30 @@ afterEach(() => { pill.remove(); store.stop(); __resetAiStateForTest(); __resetT
 describe('verdict and AI-engine announcers (595 §15.1 E1, moved from the status bar)', () => {
   it('mirrors the verdict politely and an error verdict assertively, never as "All systems operational"', async () => {
     await observe(verdict('operational', 'ok'));
+    // FC10a — in the pill's own words.
+    expect(pill.status.model.pill.label).toBe('Up to date');
     expect(notice('verdict-announcer')!.getAttribute('live')).toBe('status');
-    expect(notice('verdict-announcer')!.textContent).toBe('Search available');
+    expect(notice('verdict-announcer')!.textContent).toBe('Up to date');
     expect(pill.shadowRoot!.textContent).not.toContain('All systems operational');
-    await observe(verdict('unreachable', 'error'));
-    expect(notice('verdict-announcer')!.getAttribute('live')).toBe('alert');
+    // FC10 — spoken as the pill shows it: checking while contact is lost within the grace, then
+    // assertively that the engine cannot be reached.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const lost = { connection: { reachable: false, lastSuccessMs: Date.now(), lastContactMs: Date.now(), consecutiveFailures: 1 } } as Partial<AiState>;
+      await observe({ ...verdict('unreachable', 'error'), ...lost });
+      expect(notice('verdict-announcer')!.getAttribute('live')).toBe('status');
+      expect(notice('verdict-announcer')!.textContent).toBe('Checking search status');
+      vi.setSystemTime(Date.now() + 11_000);
+      await observe({ ...verdict('unreachable', 'error'), ...lost });
+      expect(pill.status.model.pill.kind).toBe('unreachable');
+      expect(notice('verdict-announcer')!.getAttribute('live')).toBe('alert');
+      expect(notice('verdict-announcer')!.textContent).toBe("Can't reach the engine");
+    } finally { vi.useRealTimers(); }
   });
-  it('announces the AI engine through its sibling region', async () => {
+  it('speaks no AI-engine headline the pill never shows (FC10a)', async () => {
     await observe(engine('online'));
-    expect(notice('ai-engine-announcer')!.textContent!.length).toBeGreaterThan(0);
+    expect(notice('ai-engine-announcer')).toBeNull();
+    expect(notice('verdict-announcer')!.textContent).toBe(pill.status.model.pill.label);
   });
 });
 

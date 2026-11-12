@@ -181,7 +181,8 @@ describe('what opened a drawer goes to the new home', () => {
     const shell = await mount();
     await invokeAction('core.action.shell.show-audit-log');
     await settle(shell);
-    expect(stage(shell).shadowRoot!.querySelector('jf-details-activity-probe')).not.toBeNull();
-    expect(takeActivitySection()).toBe('effect-journal');
+    const activity = stage(shell).shadowRoot!.querySelector('jf-details-activity-probe');
+    expect(activity).not.toBeNull();
+    expect(takeActivitySection(activity!)).toBe('effect-journal');
   });
 });

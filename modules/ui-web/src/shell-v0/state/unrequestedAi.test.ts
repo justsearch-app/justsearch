@@ -112,12 +112,13 @@ describe('FA3b the status pill\'s screen-reader announcements', () => {
     } finally { pill.remove(); vi.unstubAllGlobals(); }
   }
 
+  // FC10a — what is spoken is what the pill shows: a calm pill's words, never a search warning.
   it('announce no search warning when the only gap is AI nobody asked for', async () => {
-    expect(await announced(observe(NOT_INSTALLED))).toBeNull();
+    expect(await announced(observe(NOT_INSTALLED))).toBe('Keyword search ready');
   });
 
   it('still announce it when the person asked for AI and it cannot run', async () => {
-    expect(await announced(observe(FAILED))).toBe('Service degraded');
+    expect(await announced(observe(FAILED))).toBe('1 needs you');
   });
 });
 
@@ -135,7 +136,10 @@ describe('FA3c an AI install the person started that was interrupted or failed n
   });
 
   it('the rows say what happened in the AI verdict\'s own words', () => {
-    expect(derive(observe(FAILED)).sections.needs.map(row => row.detail)).toEqual(['Could not write to the models folder']);
+    // FC11 — the failed install in the verdict's words; the Engine's own message is detail for support.
+    expect(derive(observe(FAILED)).sections.needs.map(row => row.detail)).toEqual([
+      'The folder for AI models could not be created or written to. Check the free space on the disk and that the folder can be written to, then install again.']);
+    expect(derive(observe(FAILED)).sections.needs[0]!.details?.map(row => row.title)).toEqual(['Detail for support: Could not write to the models folder']);
     expect(derive(observe(INTERRUPTED)).sections.needs.map(row => row.detail))
       .toEqual([expect.stringContaining('already downloaded is kept on disk')]);
   });

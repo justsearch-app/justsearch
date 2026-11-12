@@ -36,11 +36,14 @@ import {
   groupDurationOf,
   operationKeyOf,
   runOf,
-  transportOf,
   type FeedRow,
   type SelectedRecord,
 } from '../operations/activityFeed.js';
-import { formatScanDuration, indexResultOf } from '../operations/ActionLedgerClient.js';
+import { formatScanDuration } from '../operations/ActionLedgerClient.js';
+import {
+  ASKED_WORDS, GATE_WORDS, GRANT_WORDS, OUTCOME_WORDS, RECEIPT_WORDS, RECORD_WORDS,
+  groupSourceWords, indexResultWords, recordTitle, rowOutcomeWords, rowTitle, sourceWords, whoWords, words,
+} from '../operations/activityWords.js';
 import { ReceiptWatch, isPending, isTerminalReceipt, type ReceiptState } from '../operations/operationReceipt.js';
 import {
   getCausationChain,
@@ -74,79 +77,13 @@ interface JournalPreview {
   readonly entries: readonly JournalEntry[];
 }
 
-const SOURCE_WORDS: Record<string, string> = {
-  WORKER_INDEXER: 'Background indexing',
-  URL_BAR: 'You, from the address bar',
-  URL_DEEPLINK: 'A link from another app',
-  PALETTE: 'You, from the command palette',
-  RAIL: 'You, in the app',
-  PLUGIN_EMITTED: 'A plugin',
-  BUTTON: 'You, in the app',
-  KEYBOARD: 'You, from the keyboard',
-  COMMAND_PALETTE: 'You, from the command palette',
-  LLM_EMISSION: 'The assistant',
-  AGENT_LOOP: 'The assistant',
-  WORKFLOW: 'A workflow',
-  MCP: 'An outside assistant (MCP)',
-  HTTP_API: 'The local API',
-  SYSTEM_INTERNAL: 'The engine',
-  SCHEDULED: 'A schedule',
-  RULE_ENGINE: 'A rule',
-};
-
-const RECORD_WORDS = { ledger: 'Activity ledger', history: 'Operation history', journal: "This window's journal" } as const;
-
-const WHO_WORDS: Record<string, string> = { user: 'You', agent: 'The assistant', system: 'The engine' };
-
-const GATE_WORDS: Record<string, string> = {
-  GATED: 'Asked for approval', APPROVED: 'Approved', DENIED: 'Denied',
-  EXPIRED: 'Expired without an answer', WITHDRAWN: 'Withdrawn',
-};
-
-const GRANT_WORDS: Record<string, string> = {
-  ISSUED: 'Permission granted', CONSUMED: 'Permission used', REVOKED: 'Permission withdrawn',
-};
-
-/** A recorded outcome, in words. */
-const OUTCOME_WORDS: Record<string, string> = {
-  SUCCESS: 'Succeeded', FAILURE: 'Failed', UNDONE: 'Undone', PARTIAL: 'Partly done',
-};
-
-/** How an approval was asked for, in words. */
-const ASKED_WORDS: Record<string, string> = {
-  AUTO: 'Not asked: allowed to run directly', INLINE_CONFIRM: 'A confirmation',
-  TYPED_CONFIRM: 'A typed confirmation', DENY: 'Not asked: refused outright',
-};
-
 /** Who recorded a journal entry, by its provenance tier: the app itself, or a plugin and how far it is trusted. */
 const RECORDER_WORDS: Record<string, string> = {
   CORE: 'JustSearch itself', TRUSTED_PLUGIN: 'A plugin', UNTRUSTED_PLUGIN: 'A plugin without trusted status',
 };
 
-const RECEIPT_WORDS: Record<string, string> = {
-  accepted: 'Accepted; waiting to run', running: 'Running', complete: 'Completed', failed: 'Failed',
-};
-
-/** A code with no words of its own is said as a code, never as if it were a word. */
-function words(map: Record<string, string>, code: string): string {
-  return map[code] ?? `Not described (code ${code})`;
-}
-
 function count(n: number, noun: string): string {
   return `${n} ${noun}${n === 1 ? '' : 's'}`;
-}
-
-/** Where a record came from, in words: its recorded transport, this window's journal, or not recorded. */
-function sourceWords(row: FeedRow): string {
-  const transport = transportOf(row);
-  return transport ? (SOURCE_WORDS[transport] ?? 'Another source') : row.journal ? 'This window' : 'Not recorded';
-}
-
-/** A group's source: the one its members share, else each of theirs, in the order the members are listed. */
-function groupSourceWords(members: readonly FeedRow[]): string {
-  const words = [...new Set(members.map(sourceWords))];
-  if (words.length === 0) return 'Not recorded';
-  return words.length === 1 ? words[0]! : `Several: ${words.join(' · ')}`;
 }
 
 function durationWords(ms: number | undefined): string {
@@ -159,36 +96,6 @@ function recorderWords(entry: JournalEntry): string {
   if (!by?.tier) return 'Not recorded';
   if (by.tier === 'CORE') return RECORDER_WORDS.CORE!;
   return `${words(RECORDER_WORDS, by.tier)}${by.contributorId ? ` (${by.contributorId})` : ''}`;
-}
-
-/**
- * What the details call a record. The feed's titles are kept where they are words already; an
- * approval, a permission and an action this window journaled are titled here from their recorded
- * fields, so no recorded code reads as a word (decision 2026-11-11). An effect another window
- * recorded keeps the title its backend copy gives: the details hold nothing more to word it from.
- */
-export function recordTitle(record: SelectedRecord): string {
-  return record.row ? rowTitle(record.row) : record.label;
-}
-
-function rowTitle(row: FeedRow): string {
-  const ledger = row.ledger;
-  if (ledger?.kind === 'gate') {
-    return `${ledger.disposition ? words(GATE_WORDS, ledger.disposition) : 'Approval'}: ${operationWords(ledger.operationId)}`;
-  }
-  if (ledger?.kind === 'grant') {
-    return `${ledger.action ? words(GRANT_WORDS, ledger.action) : 'Permission'}${ledger.subject ? `: ${operationWords(ledger.subject)}` : ''}`;
-  }
-  const effect = row.journal?.effect;
-  // An invocation is titled by its operation already, as the ledger's own operation rows are.
-  if (!effect || effect.kind === 'invoke-operation') return row.entry.label;
-  const decision = row.journal?.pendingOutcome === 'rejected' ? 'Proposal rejected · '
-    : row.journal?.pendingOutcome === 'accepted' ? 'Proposal accepted · ' : '';
-  return `${decision}${present({ kind: 'effect', effect }).label}`;
-}
-
-function operationWords(id: string | undefined): string {
-  return id ? present({ kind: 'operation', id }).label : 'an operation not recorded';
 }
 
 function when(iso: string): string {
@@ -335,7 +242,7 @@ export class ActivityDetails extends JfElement {
     return html`<dl data-testid="activity-details-facts">
       <dt>When</dt><dd>${when(row.entry.occurredAt)}</dd>
       <dt>Duration</dt><dd data-testid="activity-details-duration">${durationWords(durationOf(row) ?? this.receiptDuration())}</dd>
-      <dt>Who</dt><dd>${WHO_WORDS[row.entry.originator] ?? row.entry.originator}</dd>
+      <dt>Who</dt><dd>${whoWords(row.entry.originator)}</dd>
       <dt>Source</dt><dd data-testid="activity-details-source">${sourceWords(row)}</dd>
       <dt>Recorded in</dt><dd data-testid="activity-details-records">${contributionsOf(row).map((r) => RECORD_WORDS[r]).join(' · ')}</dd>
       ${row.entry.kind === 'operation' || operationKeyOf(row) ? html`<dt>Outcome</dt><dd data-testid="activity-details-outcome">${this.outcomeWords(row)}</dd>` : nothing}
@@ -442,7 +349,9 @@ export class ActivityDetails extends JfElement {
     // A success needs no code: a code is kept, for support, only beside something other than success.
     const code = recorded && !(outcome.state !== 'failed' && recorded === 'SUCCESS') ? recorded : undefined;
     return html`<dl data-testid="activity-details-receipt" data-state=${outcome.state}>
-      <dt>Receipt</dt><dd>${RECEIPT_WORDS[outcome.state] ?? outcome.state}${outcome.phase ? ` · ${outcome.phase}` : ''}</dd>
+      <dt>Receipt</dt><dd>${words(RECEIPT_WORDS, outcome.state)}</dd>
+      ${outcome.phase ? html`<dt>Step</dt><dd data-testid="activity-details-phase">${outcome.phase}
+        <span class="note">(the engine's name for it, for support)</span></dd>` : nothing}
       ${outcome.unitsCompleted !== undefined || outcome.unitsFailed !== undefined ? html`<dt>Items</dt><dd>${
         [outcome.unitsCompleted !== undefined ? `${outcome.unitsCompleted} done` : '',
           outcome.unitsFailed ? `${outcome.unitsFailed} failed` : ''].filter(Boolean).join(' · ')}</dd>` : nothing}
@@ -456,12 +365,9 @@ export class ActivityDetails extends JfElement {
   }
 
   private renderIndex(row: FeedRow, paths: Readonly<Record<string, string>>): TemplateResult {
-    const state = row.entry.indexState;
-    const result = indexResultOf(state);
     const path = row.entry.pathHash ? paths[row.entry.pathHash] : undefined;
     return html`<h4>Indexing</h4><dl data-testid="activity-details-index">
-      <dt>Result</dt><dd>${result === 'indexed' ? 'Indexed' : result === 'failed'
-        ? (state === 'RETRY_EXHAUSTED' ? 'Gave up after retrying' : 'Failed') : `Unknown${state ? ` (${state})` : ''}`}</dd>
+      <dt>Result</dt><dd>${indexResultWords(row.entry.indexState)}</dd>
       <dt>Collection</dt><dd>${row.entry.collection ?? 'default'}</dd>
       <dt>File</dt><dd data-testid="activity-details-file">${path ?? 'Not resolved yet'}</dd>
     </dl>${path ? this.fileActions(path) : nothing}`;
@@ -486,14 +392,15 @@ export class ActivityDetails extends JfElement {
         are retained for this scan.</p>` : html`
         ${failed ? html`<p data-testid="activity-details-members-failed">${count(failed, 'record')} failed.</p>` : nothing}
         <ul data-testid="activity-details-members">${record.members.map((member) => html`<li data-testid="activity-details-member"
-          ?data-problem=${member.problem}>${member.entry.label} · ${when(member.entry.occurredAt)}</li>`)}</ul>`}`;
+          ?data-problem=${member.problem}>${rowTitle(member)} · ${when(member.entry.occurredAt)}</li>`)}</ul>`}`;
   }
 
   private renderRelated(related: readonly FeedRow[]): TemplateResult {
     // An approval's or a permission's title says its decision; only an execution adds how it ended.
-    return html`<h4>Same request</h4><ul data-testid="activity-details-related">${related.map((r) => html`<li>${rowTitle(r)}${
-      r.entry.outcome && r.ledger?.kind !== 'gate' && r.ledger?.kind !== 'grant' ? ` · ${words(OUTCOME_WORDS, r.entry.outcome)}` : ''
-    } · ${when(r.entry.occurredAt)}</li>`)}</ul>`;
+    return html`<h4>Same request</h4><ul data-testid="activity-details-related">${related.map((r) => {
+      const ended = r.entry.outcome ? rowOutcomeWords(r.entry.kind, r.entry.outcome) : null;
+      return html`<li>${rowTitle(r)}${ended ? ` · ${ended}` : ''} · ${when(r.entry.occurredAt)}</li>`;
+    })}</ul>`;
   }
 
   /** The agent run a record names, linked only where Activity knows that run. */

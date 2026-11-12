@@ -2669,10 +2669,12 @@ export class BrainSurface extends JfElement {
       // Tempdoc 663 §E — install failure was previously unrepresented as a lifecycle state (folded
       // silently into a generic 'offline'/'not_installed' render, with only a separate dismissable
       // `runtimeError` banner hinting at it). Now a real, named state.
+      // FC11, FC11a — in the AI verdict's words, as the status panel says it; the install service's own
+      // message is the alert below, once.
       install_failed: {
         dot: 'offline',
-        label: 'Install Failed',
-        sub: this.installStatus?.lastError || this.installStatus?.message || 'Installation failed — try again.',
+        label: aiEngineHeadline(aiVerdict),
+        sub: aiEngineBody(aiVerdict),
       },
       offline: {
         dot: 'offline',
@@ -2870,8 +2872,11 @@ export class BrainSurface extends JfElement {
     const processorOnly = this.runtimeStatus?.active?.gpuLayers === 0;
     const reindexRequired = this.systemStatus?.embedding?.compatState === 'BLOCKED_LEGACY'
       || this.systemStatus?.embedding?.compatState === 'BLOCKED_MISMATCH';
+    // FC11a — a failed install is said as failed, whatever its files on disk would owe a repair: after
+    // it, nothing usable is installed until it runs again, and the verdict's words say what to do.
+    const failed = known && aiState === 'install_failed';
     const headline = !known ? 'Checking AI status…'
-      : aiState === 'installing' ? sc.label
+      : aiState === 'installing' || failed ? sc.label
       : activationRequired ? 'Downloaded — activation required'
       : reindexRequired ? 'Rebuild search to use these models'
       : repairRemedyHeadline(repairRemedy) ? repairRemedyHeadline(repairRemedy)
@@ -2889,10 +2894,10 @@ export class BrainSurface extends JfElement {
       <div data-testid="brain-simple-panel">
         <h1 class="brain-headline" tabindex="-1">${headline}${aiState === 'installing' && pct !== null ? ` ${pct}%` : ''}</h1>
         <p class="brain-sentence">${this.inference?.answersPausedWhileIndexing === true && known ? html`Answers resume automatically when bulk file indexing ends. The answer model stays loaded.` : this.renderBrainSentence(aiVerdict, installed, features, readingPictures)}</p>
-        <div class="brain-status-detail">${aiState === 'connecting' ? html`<jf-pulse-dots></jf-pulse-dots>` : nothing}${known ? (aiState === 'installing' || repairRemedy.kind === 'none' ? sc.sub : repairRemedy.kind === 'manual' ? repairRemedySub(repairRemedy) : nothing) : `Waiting for live install and AI observations. ${indexingActivity.summary}${indexingActivity.detail ? ` — ${indexingActivity.detail}` : ''}`}${this.installStalled() ? html` <span role="status">Download stalled — no recent progress.</span>` : nothing}</div>
-        ${known && (!installed || aiState === 'installing' || activationRequired) ? html`<div class="status-row">
-          <jf-button class=${primaryAction.primary && !installed ? 'install-action' : ''}
-            variant=${primaryAction.primary && !installed ? 'primary' : 'ghost'}
+        <div class="brain-status-detail">${aiState === 'connecting' ? html`<jf-pulse-dots></jf-pulse-dots>` : nothing}${known ? (aiState === 'installing' || failed || repairRemedy.kind === 'none' ? sc.sub : repairRemedy.kind === 'manual' ? repairRemedySub(repairRemedy) : nothing) : `Waiting for live install and AI observations. ${indexingActivity.summary}${indexingActivity.detail ? ` — ${indexingActivity.detail}` : ''}`}${this.installStalled() ? html` <span role="status">Download stalled — no recent progress.</span>` : nothing}</div>
+        ${known && (!installed || aiState === 'installing' || activationRequired || failed) ? html`<div class="status-row">
+          <jf-button class=${primaryAction.primary && (!installed || failed) ? 'install-action' : ''}
+            variant=${primaryAction.primary && (!installed || failed) ? 'primary' : 'ghost'}
             .availability=${primaryAction.availability}
             .onActivate=${primaryAction.onClick}
             label=${actionLabel}
@@ -2953,8 +2958,9 @@ export class BrainSurface extends JfElement {
           : nothing}
         ${this.renderAlerts()}
         ${this.renderCompatibilityCallouts()}
-        ${known && aiState === 'install_failed' ? html`<jf-error-alert tone="error">Install failed: ${this.deriveAiEngineVerdict().installFailure ?? this.installStatus?.lastError ?? this.installStatus?.message}</jf-error-alert>` : nothing}
-        ${known ? this.renderRepairAlert() : nothing}
+        ${known && aiState === 'install_failed' && this.deriveAiEngineVerdict().installFailure ? html`<jf-error-alert tone="error"
+          data-testid="brain-install-failure-detail">Detail for support: ${this.deriveAiEngineVerdict().installFailure}</jf-error-alert>` : nothing}
+        ${known && !(failed && repairRemedy.kind !== 'manual') ? this.renderRepairAlert() : nothing}
         ${this.renderFeaturePath()}
         ${this.renderGraphicsCard()}
         <div class="row brain-links">
