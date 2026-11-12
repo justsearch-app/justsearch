@@ -8,6 +8,8 @@ import org.apache.tika.language.detect.LanguageResult;
 
 /** Bundled statistical detection for Latin prose, confined to the extraction owner. */
 public final class LatinLanguageDetector {
+  /** The longest text the detector reads: a document's whole language sample. */
+  public static final int MAX_TEXT_CHARS = 16_384;
   private static final int MIN_LATIN_LETTERS = 50;
   /** Word-like tokens on prose lines: a couple of sentences, more than a heading or a list. */
   private static final int MIN_PROSE_WORDS = 12;
@@ -32,7 +34,7 @@ public final class LatinLanguageDetector {
    * buffer, so calls are serialized on it.
    */
   private static final class Shared {
-    private static final LanguageDetector DETECTOR = new OptimaizeLangDetector(4096).loadModels();
+    private static final LanguageDetector DETECTOR = new OptimaizeLangDetector(MAX_TEXT_CHARS).loadModels();
 
     private Shared() {}
 

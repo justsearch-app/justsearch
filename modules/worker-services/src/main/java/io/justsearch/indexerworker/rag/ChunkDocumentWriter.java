@@ -76,14 +76,25 @@ public final class ChunkDocumentWriter {
         parentTokenCountRaw == null || parentTokenCountRaw.isBlank()
             ? null
             : Long.parseLong(parentTokenCountRaw);
+    // Passages get the label of the text they are cut from, by the rule every write path uses.
+    // This does not change the parent's own label.
+    String language = LanguageUtils.contentLanguage(content,
+        documentFieldOps.getDocumentField(parentDocId, SchemaFields.FILE_KIND),
+        documentFieldOps.getDocumentField(parentDocId, SchemaFields.MIME_BASE));
     return regenerateChunksFromExistingParent(documentFieldOps, indexingCoordinator,
-        parentDocId, content, chunkSpladeEnabled, parentTokenCount);
+        parentDocId, content, chunkSpladeEnabled, parentTokenCount, language);
   }
 
-  /** Regenerates replacement text with its refreshed count before the parent update is published. */
+  /**
+   * Regenerates replacement text with its refreshed count and label before the parent update is
+   * published.
+   *
+   * @param language the replacement text's label ({@link LanguageUtils#contentLanguage})
+   */
   public static int regenerateChunksFromExistingParent(
       DocumentFieldOps documentFieldOps, IndexingCoordinator indexingCoordinator,
-      String parentDocId, String content, boolean chunkSpladeEnabled, Long parentTokenCount) {
+      String parentDocId, String content, boolean chunkSpladeEnabled, Long parentTokenCount,
+      String language) {
     if (documentFieldOps == null) {
       return 0;
     }
@@ -105,10 +116,6 @@ public final class ChunkDocumentWriter {
           io.justsearch.adapters.lucene.runtime.IndexRuntimeIOException.Reason.DISK_IO,
           "Cannot read parent provenance before chunk replacement", unreadable);
     }
-
-    boolean isMarkdown = "markdown".equalsIgnoreCase(fileKind);
-    String preview = LanguageUtils.contentPreview(content, CONTENT_PREVIEW_MAX_CHARS, isMarkdown);
-    String language = LanguageUtils.resolveLanguage(preview, fileKind, mimeBase);
 
     return regenerateChunks(
         documentFieldOps,
