@@ -622,3 +622,14 @@ re-ingest for a v5 marker) and pass on the candidate (evidence lang-body-sample-
   "note": "Verified on 421a1dd9ec against base 5358c3952a. Before-state run of the candidate's three language test classes overlaid on 5358c3952a: every repaired check fails by assertion for the reason under test (opening language en, or the opening's language, instead of the body's: de/fr/nl/zh/ru/en/nl/cy; parent and passages en instead of de/nl); every preserved check passes on 5358c3952a (ContentLanguageBodySampleTest 40 preserved cases; VduResultWriterCoherenceTest 21 of 22, only vc1b fails) and all pass on the candidate. Adaptation entries keep inputs and expected labels; every input is under 4,096 characters, where contentLanguage applies the old single-window rule. The exempt ContentLanguageBodyWritePathsTest changes no global state, is read by no other test (full module suites pass), and its four checks fail by assertion before. Non-blocking: n2ShortMixedScriptFilesKeepTheirLabels pins two known short-text mislabels (Japanese kanji text as zh); its warrant is the delegated 'shorter than 4,096 characters keeps today's rule', not N2, which does not require keeping mistakes. The choice text says Markdown is prepared once and shared with the preview; the indexing writer still prepares it twice, as on main (measured: no added allocation)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "cb931fec-4aa3-4c83-8112-969f6334cf08:verifier-6",
+  "verdict": "accept",
+  "digest": "sha256:e4771d002fa0fad24f2bb7916246a5315297c9a2ec34b75283d7128dcbcb2d5a",
+  "note": "Verified on aa40a3c38b against base 36738eb4d6 (merge-base with origin/main). Merge commit 12dff36276 equals the automatic merge tree; the six round-2 entries and their items are unchanged from the accepted 2d104e6486 copy and their before content is the same at the new base. Bump entries: the candidate's 14 bump-entry files overlaid on 36738eb4d6 fail 160 cases, every one an AssertionFailedError expecting tika-default-v12 / tika-config-v12-* / v6 (or one v5 re-ingest) and getting v11 / v5 (or none); the other 165 cases of those classes pass on the base, so only current-identity expectations moved; historical v3/v5/v7/v8/v9 fixtures are unchanged. All named checks pass on the candidate in the full module run. The help v4 check keeps its once-only oracle; v5MarkerReingestsOnceAndWritesV6 mirrors it. Real-system upgrade from a v0.3.3 dist confirms one v12 re-extraction per source, marker v6 and no repeat. Non-blocking: the bump entries' delegationScope text names only label estimation and write paths; the identity bump is within the agreed question, which stated every file is re-read once after the update. Entry 3's quoted round-2 choice still says 'No policy bump: policy v10 is unreleased', now superseded by the v12 choice; its expectations do not depend on it."
+}
+```
