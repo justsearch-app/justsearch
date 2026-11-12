@@ -30,9 +30,9 @@ class Repair3Tests(unittest.TestCase):
                 linux.install_ai(run)
         run.evidence.assert_any_call('J3-activation-memory', [run.target.json.return_value] * 2)
 
-    def test_dense_retrieval_without_executed_cross_encoder_is_rejected(self):
+    def test_cpu_dense_retrieval_requires_observed_skipped_cross_encoder(self):
         run = Mock()
-        for cross in ([], [{'id': 'cross-encoder', 'status': 'skipped'}]):
+        for cross in ([], [{'id': 'cross-encoder', 'status': 'executed'}]):
             with self.subTest(cross=cross):
                 run.api.return_value = {'results': [linux.OPEN_FILE], 'searchTrace': {
                     'effectiveMode': 'VECTOR', 'stages': [

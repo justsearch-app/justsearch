@@ -1,10 +1,10 @@
-"""Bounded regression checks for cached activation and Wayland dispatch attribution."""
+"""Bounded regression checks for Wayland dispatch attribution."""
 import json
 import unittest
 from unittest.mock import Mock, patch
 
 import linux
-from runner import Infrastructure, classify
+from runner import classify
 
 
 def immediate(fn, description, *args, error=AssertionError, **kwargs):
@@ -15,63 +15,6 @@ def immediate(fn, description, *args, error=AssertionError, **kwargs):
 
 
 class Repair2Tests(unittest.TestCase):
-    def test_cached_j3_waits_past_installed_fully_transient_then_activates(self):
-        run = Mock()
-        run.facts = {'resumedSetup': True}
-        run.wd.text.return_value = 'Chat is not supported here.'
-        run.wd.execute.return_value = []
-        inactive = {'onnxFeatures': []}
-        runtime = {'onnxFeatures': [{'id': name, 'modelActive': name != 'reranker'}
-                   for name in ('embed', 'splade', 'reranker', 'citation_scorer')]}
-        transient = {'state': 'idle', 'phase': 'idle', 'installedFully': True}
-        staged = dict(transient, phase='activation_required', installedFully=False)
-        active = dict(transient, phase='done', readyCapabilities=[])
-        activated = False
-        statuses = iter([transient, staged])
-        retrieval = {'results': [linux.OPEN_FILE], 'searchTrace': {'effectiveMode': 'VECTOR',
-            'stages': [{'id': 'dense-retrieval', 'status': 'executed'},
-                       {'id': 'cross-encoder', 'status': 'executed'}]}}
-        def activate(_):
-            nonlocal activated
-            activated = True
-        def api(path, *args):
-            if path == '/api/ai/install/status':
-                return active if activated else next(statuses)
-            return {'/api/ai/install/plan-preview': {'downloadProfile': 'CPU', 'components': [
-                        {'id': 'chat', 'state': 'unavailable'}, {'id': 'embed', 'state': 'installed'}]},
-                    '/api/ai/install/manifest': {}, '/api/ai/runtime/status': runtime if activated else inactive,
-                    '/api/knowledge/search': retrieval}[path]
-        run.api.side_effect = api
-        def bounded(fn, description, **kwargs):
-            if description == 'Default CPU AI install':
-                first = fn()
-                self.assertIsNone(first, 'installedFully transient must not settle cached J3')
-                return immediate(fn, description, **kwargs)
-            return immediate(fn, description, **kwargs)
-        with patch.object(linux, 'wait_for', bounded), patch.object(linux, 'activate_downloaded', activate):
-            with self.assertRaises(AssertionError) as failure:
-                linux.install_ai(run)
-        self.assertTrue(activated)
-        self.assertEqual(classify(failure.exception), 'failed-product')
-        reason = str(failure.exception)
-        for expected in ('reranker.modelActive=false', 'embed.modelActive=true',
-                         'splade.modelActive=true', 'citation_scorer.modelActive=true', 'cross-encoder'):
-            self.assertIn(expected, reason)
-        run.wd.click.assert_not_called()  # No repeated download.
-        self.assertNotIn('ai', run.facts)
-
-    def test_cached_j3_unsettled_resume_is_infrastructure_with_deadline(self):
-        run = Mock()
-        run.facts = {'resumedSetup': True}
-        run.api.return_value = {'downloadProfile': 'CPU', 'state': 'idle', 'phase': 'idle',
-                                'installedFully': True, 'onnxFeatures': []}
-        run.wd.execute.return_value = []
-        with patch.object(linux.time, 'monotonic', side_effect=[0, 0, 901, 901, 901, 1802]), \
-             patch.object(linux.time, 'sleep'), patch.object(linux, 'activate_downloaded') as activate:
-            with self.assertRaisesRegex(Infrastructure, 'Default CPU AI install timed out after 900s'):
-                linux.install_ai(run)
-        activate.assert_not_called()
-
     def test_wayland_dispatch_precedes_product_focus_classification(self):
         for dispatch, expected in ((None, 'failed-infrastructure'),
                                    ({'pid': 123, 'time': '2026-10-28T21:00:00Z'}, 'failed-product')):

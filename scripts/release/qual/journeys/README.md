@@ -148,10 +148,10 @@ python3 scripts/release/qual/journeys/vm-run.py \
 
 Only the named journeys run; prerequisites are restored from the stopped
 checkpoint, never silently rerun. Candidate snapshots support J4/J7/J8;
-predecessor snapshots support J5/J6. Cached J3 waits up to 15 minutes for
-activation_required or active runtime encoders before deciding whether to activate.
-It ignores transient installedFully status for that decision; an unsettled resume
-is an infrastructure failure. Use fresh J3 for acceptance. J1/J2 require a fresh lane
+predecessor snapshots support J5/J6. Cached J3 reports `cpu-ai` as unavailable:
+"cached setup: activation cannot be re-observed; run J3 on a fresh install".
+It records runtime evidence without activating or judging the cached models.
+Use fresh J3 for acceptance. J1/J2 require a fresh lane
 (`--mode fresh --journeys J1 J2 J3`, with exactly the prerequisites required
 by that selection). Named fresh subsets and snapshot reruns set
 `execution.releaseQualification` to false. A failed setup assertion remains a
@@ -421,7 +421,7 @@ are activated through the existing UI activation consent. Preview must select GP
 readiness must agree and must not install the Windows native runtime. The separate
 **Start answers** control then sets chat intent; the observed runtime must become
 healthy with a realized model before a chat request. Embedding
-and SPLADE must report **observed** CUDA execution without GPU fallback.
+must report **observed** CUDA execution without GPU fallback. SPLADE is downloaded but runs only when enabled (off by default since #1162), so it is not required.
 The production RAG chat request goes through the shell's own authenticated
 origin; a completed answer must name the fixture's turquoise telescope and cite
 the inspection message. The selected llama-server must be the installed cuda12
@@ -619,11 +619,16 @@ qualification. Explicit `--journeys` subsets likewise never qualify a release.
   determine which file was opened.
 - J3: default production downloads, then **Activate downloaded models** and the
   UI's typed authorization when requested (immediate operation acceptance is
-  also observed). All four reported retrieval models must be active
-  and installation fully complete. A semantic vector query must return the
-  fixture with a dense-only execution trace and an executed cross-encoder, without
-  keyword fallback. Fresh downloads also require the session acquisition capability;
-  cached reboots prove readiness through active runtime encoders and that query.
+  also observed). The embedding and citation-scorer models must be active;
+  SPLADE and CPU reranking are off by default (#1162, #1182), so their models
+  need not be active on CPU. Installation must meet the completion checks below.
+  A semantic vector query must return the
+  fixture with a dense-only execution trace, without keyword fallback or blocked
+  vector retrieval. CPU requires a cross-encoder stage explicitly skipped for
+  `PIPELINE_NOT_ELIGIBLE`;
+  GPU still requires an executed cross-encoder. Fresh downloads also require the session acquisition capability.
+  Cached CPU setups report J3 unavailable because activation cannot be re-observed;
+  run J3 on a fresh install.
   Activation polls record `/proc/meminfo` samples about every five seconds. The CPU
   plan and chat-unavailable explanation are also checked. Downloads are not seeded.
 - J4: a UI-authored **Skip these files** rule (`justsearch-journey-skip-1.tmp`)
@@ -880,9 +885,9 @@ overlays; no model cache or candidate data is moved into the predecessor.
 Cleanly stopped failed stages retain their checkpoint as well as their
 failed summary, so a diagnostic rerun can reuse production downloads without
 certifying the failed stage. Refreshing an application snapshot's guest controls
-keeps its original phase and checkpoint. Cached J3 also recognizes complete
-acquisition through the production install-status API; activation, all four
-runtime components and semantic retrieval still have to pass. Windows J3 retains
+keeps its original phase and checkpoint. Cached Windows J3 reports `cpu-ai` as
+unavailable because activation cannot be re-observed; run J3 on a fresh install.
+Fresh Windows J3 retains
 the actual activation click events and disabled control state through its own
 WebDriver session in `J3-activation-input.json`.
 
@@ -979,7 +984,8 @@ when chat and CUDA are hardware-skipped. That status is accepted only with
 completed activation, no repair needed, retrieval-core acquisition ready, all
 five downloadable model packages installed without errors, and exactly those
 two hardware skips. The semantic query, executed retrieval stages, chat
-unavailability and all four active runtime components remain required. Linux's
+unavailability and the two required active CPU runtime components (embedding and
+citation scorer) remain required. Linux's
 existing completion checks are unchanged.
 
 J5 uses the production HTTPS URL, descriptor v2, generated test trust pins and a

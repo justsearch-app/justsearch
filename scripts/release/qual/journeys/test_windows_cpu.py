@@ -29,19 +29,23 @@ class WindowsCPUReadinessTests(unittest.TestCase):
         run = Mock(platform=platform, facts={})
         run.wd.execute.return_value = []
         run.wd.text.return_value = 'Chat is not supported here.'
+        runtime = {'onnxFeatures': [
+            {'id': name, 'modelActive': name != inactive}
+            for name in ('embed', 'splade', 'reranker', 'citation_scorer')]}
+        if inactive == 'splade':
+            runtime['onnxFeatures'][1].update(status='unknown', reason='worker_not_answered')
         def api(path, *args):
             return {'/api/ai/install/plan-preview': {'downloadProfile': 'CPU', 'components': [
                         {'id': 'chat', 'state': 'unavailable'}, {'id': 'embedding', 'state': 'installed'}]},
                     '/api/ai/install/manifest': {}, '/api/ai/install/status': status,
-                    '/api/ai/runtime/status': {'onnxFeatures': [
-                        {'id': name, 'modelActive': name != inactive}
-                        for name in ('embed', 'splade', 'reranker', 'citation_scorer')]}}[path]
+                    '/api/ai/runtime/status': runtime}[path]
         run.api.side_effect = api
         retrieval = {'results': [linux.OPEN_FILE]}
         with patch.object(linux, 'wait_for', immediate), patch.object(linux, 'activate_downloaded'), \
              patch.object(linux, 'semantic_search', return_value=retrieval) as semantic:
             result = linux.install_ai(run)
             semantic.assert_called_once_with(run)
+            run.evidence.assert_any_call('J3-runtime', runtime)
         return result
 
     def test_complete_cpu_hardware_limitations_reach_semantic_search_and_runtime_checks(self):
@@ -67,10 +71,38 @@ class WindowsCPUReadinessTests(unittest.TestCase):
             with self.subTest(status=value), self.assertRaisesRegex(AssertionError, 'Downloaded default CPU search encoders activated'):
                 self.run_ai(value)
 
-    def test_all_four_active_components_remain_required(self):
-        for inactive in ('reranker', 'citation_scorer'):
-            with self.subTest(inactive=inactive), self.assertRaisesRegex(AssertionError, 'All default retrieval models active'):
-                self.run_ai(self.status(), inactive=inactive)
+    def test_disabled_splade_allows_fresh_cpu_activation(self):
+        for platform in ('linux', 'windows'):
+            with self.subTest(platform=platform):
+                status = self.status()
+                status['installedFully'] = platform == 'linux'
+                result = self.run_ai(status, platform=platform, inactive='splade')
+                self.assertEqual(result['runtime']['onnxFeatures'][1], {
+                    'id': 'splade', 'status': 'unknown', 'reason': 'worker_not_answered',
+                    'modelActive': False})
+
+    def test_inactive_embed_does_not_satisfy_cpu_activation(self):
+        for platform in ('linux', 'windows'):
+            with self.subTest(platform=platform), self.assertRaisesRegex(
+                    AssertionError, 'Default CPU AI install|Downloaded default CPU search encoders activated'):
+                status = self.status()
+                status['installedFully'] = platform == 'linux'
+                self.run_ai(status, platform=platform, inactive='embed')
+
+    def test_default_off_reranker_allows_fresh_cpu_activation(self):
+        for platform in ('linux', 'windows'):
+            with self.subTest(platform=platform):
+                status = self.status()
+                status['installedFully'] = platform == 'linux'
+                result = self.run_ai(status, platform=platform, inactive='reranker')
+                self.assertFalse(result['runtime']['onnxFeatures'][2]['modelActive'])
+
+    def test_citation_scorer_remains_required(self):
+        for platform in ('linux', 'windows'):
+            with self.subTest(platform=platform), self.assertRaisesRegex(AssertionError, 'All default retrieval models active'):
+                status = self.status()
+                status['installedFully'] = platform == 'linux'
+                self.run_ai(status, platform=platform, inactive='citation_scorer')
 
     def test_linux_completion_requirement_is_preserved(self):
         with self.assertRaisesRegex(AssertionError, 'Downloaded default CPU search encoders activated'):
