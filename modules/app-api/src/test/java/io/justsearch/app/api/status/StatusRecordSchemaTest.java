@@ -888,7 +888,10 @@ final class StatusRecordSchemaTest {
         2048000,
         4096000,
         null,
-        WorkerOperationalView.fallback("SERVING"),
+        // A live status: the Worker answered, so its zero counts are known (the fallback's are not).
+        WorkerOperationalViewBuilder.from(WorkerOperationalView.fallback("SERVING")).withCore(
+            new CoreIndexView(false, 0, 0, "SERVING", 0, 0, 0L, 0L, 0L, 0L, new long[0],
+                new double[0], 0L, 0L, 0L, 0L, 0L, false, null)),
         true,
         null,
         null,

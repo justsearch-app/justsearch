@@ -194,7 +194,8 @@ async function main() {
         apiBaseUrl: stack.apiBaseUrl,
         worker: worker?.state,
         workerStarting,
-        indexedDocuments: status.worker?.core?.indexedDocuments,
+        // null when the Engine says the count is unknown (its 0 is then a placeholder, not an empty index).
+        indexedDocuments: status.worker?.core?.indexedDocumentsUnknown === true ? null : status.worker?.core?.indexedDocuments,
         aiReady: status.aiReady,
         embeddingReady: status.embeddingReady,
         aiReason: manifest?.ai?.pendingReason ?? status.components?.inference?.reason_code ?? null,
@@ -211,7 +212,7 @@ async function main() {
     console.log(`GPU runtime resolvable: ${offline.runtime ? 'yes' : 'no'}` +
       (offline.runtime ? ` (GPU verified: ${offline.gpuVerified === true ? 'yes' : 'not verified'})` : ''));
     if (report.live) {
-      console.log(`\nLive stack (${report.live.apiBaseUrl}): worker=${report.live.worker}, indexed=${report.live.indexedDocuments}, aiReady=${report.live.aiReady}` +
+      console.log(`\nLive stack (${report.live.apiBaseUrl}): worker=${report.live.worker}, indexed=${report.live.indexedDocuments ?? 'unknown'}, aiReady=${report.live.aiReady}` +
         (report.live.aiReason ? `, ai=${report.live.aiReason}` : ''));
       if (report.live.workerStarting) console.log(`(stack is starting — worker not yet READY; this is informational, not an error)`);
     } else {

@@ -959,7 +959,8 @@ export async function main() {
     {
       description:
         'Get the current status of the JustSearch knowledge index. ' +
-        'Returns document count, queue depth, readiness state, health, and enrichment coverage ' +
+        'Returns document count (omitted while the Engine cannot count the index), queue depth, ' +
+        'readiness state, health, and enrichment coverage ' +
         '(embeddingCoveragePercent, spladeCoveragePercent, pendingNerCount, completedNerCount). ' +
         'After ingesting documents, poll this endpoint to check if enrichment (embeddings, NER, SPLADE) ' +
         'is complete before using entity filters or semantic search.',
@@ -981,7 +982,9 @@ export async function main() {
           ok: true,
           state: parsed.state,
           ready: parsed.ready,
-          docCount: parsed.docCount ?? parsed.indexedDocuments,
+          // The Engine marks a count it could not read; its placeholder 0 is not an empty index.
+          docCount: parsed.indexedDocumentsUnknown === true
+            ? undefined : parsed.docCount ?? parsed.indexedDocuments,
           queueDepth: parsed.queueDepth ?? parsed.pendingJobs,
           healthy: parsed.healthy,
           indexState: parsed.indexState,

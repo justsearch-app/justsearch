@@ -54,8 +54,9 @@ package io.justsearch.app.api.status;
  *
  * <p>#758 added {@code indexedDocumentsUnknown}: true when {@code
  * indexedDocuments} and {@code searchableDocuments} are not counts — the index could not be counted
- * and no earlier count exists. Both then carry 0 for older readers; a surface that knows this field
- * shows the count as checking or unknown, never as an empty index. False means the counts are known.
+ * and no earlier count exists, or the Engine has no Worker reading to publish ({@link #fallback}).
+ * Both then carry 0 for older readers; a surface that knows this field shows the count as checking
+ * or unknown, never as an empty index. False means the counts are known.
  *
  * <p>{@code ownSearchableDocuments} is the same default-search population minus InternalCollections
  * (including bundled Help), measured with searchableDocuments on one reader. Null means unknown
@@ -221,10 +222,14 @@ public record CoreIndexView(
         recentJobQueueDepth, recentDocsPerSec, 0L, 0L, indexedDocuments, 0L, 0L, false, null);
   }
 
+  /**
+   * The placeholder published while the Engine has no Worker reading (not connected yet, a slow
+   * first answer, a failed RPC). Its document counts are not counts, so it says they are unknown.
+   */
   public static CoreIndexView fallback(String indexState) {
     return new CoreIndexView(
         false, 0, 0, indexState, 0, 0, 0L, 0L, 0L, 0L, new long[0], new double[0], 0L, 0L, 0L, 0L,
-        0L, false, null);
+        0L, true, null);
   }
 
   /**

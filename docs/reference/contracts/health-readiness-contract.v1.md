@@ -103,7 +103,9 @@ agent-history); `worker.migration.buildingIndexedDocuments` separately describes
 Health and the status deck prefer a fresh known serving count during migration over a cached
 pre-migration count. They retain the existing last-known fallback when the observation is stale
 or unavailable. With no readable count and no prior count from that reader, `indexedDocumentsUnknown`
-is true.
+is true. It is also true while the Engine has no Worker reading to publish (the Worker is not
+connected yet, its first answer is pending, or the status RPC failed): the zero counts it then
+carries are placeholders, never an empty index.
 Runnable enrichment may continue alongside terminal file failures. Once it settles, those failures
 remain indexing errors in the UI, with their failure count; an empty queue containing failures never
 opens the successful completion window. The same observations
