@@ -11,7 +11,7 @@ import time
 import zipfile
 
 from corpus import generate, OPEN_FILE, QUERY, OCR_QUERY
-from runner import HERE, Infrastructure, OwnerValidation, ProductFailure, Unavailable, digest, wait_for, require_disposable_host
+from runner import HERE, Infrastructure, OwnerValidation, ProductFailure, RunStopped, Unavailable, digest, wait_for, require_disposable_host
 
 
 def apt(run, *args):
@@ -386,20 +386,83 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
 
 
 def activate_downloaded(run):
-    run.wd.click('button[aria-label="Activate downloaded models"]')
-    # The installed version/policy may accept this UI action immediately or
-    # request typed authorization. Observe what it actually presents.
-    consent = wait_for(lambda: run.wd.execute("""
-const typed=all(document,'input[data-testid="authorization-typed-input"]').some(e=>{
- const r=e.getBoundingClientRect();return r.width>0 && r.height>0;
+    # Consent observations are evidence only. The caller must wait for the
+    # installed/active end state even if no prompt or operation is observed.
+    last = {'typed': False, 'operationKeys': []}
+    observations = []
+    seen_prompt = False
+    last_failure = None
+
+    def evidence(path=None):
+        observed = dict(last, observations=list(observations))
+        if path:
+            observed['path'] = path
+        run.evidence('J3-activation-consent', observed)
+
+    def observe():
+        nonlocal last
+        last = run.wd.execute("""
+const inputs=all(document,'input[data-testid="authorization-typed-input"]').filter(e=>{
+ const r=e.getBoundingClientRect();
+ const style=getComputedStyle(e);
+ return r.width>0 && r.height>0 && style.visibility!=='hidden' && style.display!=='none';
 });
+const typed=inputs.length>0;
+const blocked=typed && !inputs.some(e=>!e.disabled && !e.readOnly);
 const operationKeys=all(document,'jf-operation-outcome-detail').map(e=>e.operationKey).filter(Boolean);
-return typed || operationKeys.length ? {typed,operationKeys} : null;
-"""), 'Activation authorization or accepted operation visible', seconds=30)
-    run.evidence('J3-activation-consent', consent)
-    if consent['typed']:
-        run.wd.keys('input[data-testid="authorization-typed-input"]', 'core.activate-installed-models')
-        run.wd.click('button[aria-label="Approve"]')
+return {typed,blocked,operationKeys};
+""") or {'typed': False, 'operationKeys': []}
+        observations.append(dict(last))
+        evidence()
+        return last
+
+    def consent():
+        nonlocal seen_prompt, last_failure
+        try:
+            observe()
+            last_failure = None
+            if last['typed']:
+                seen_prompt = True
+                if last.get('blocked'):
+                    return None
+                try:
+                    run.wd.keys('input[data-testid="authorization-typed-input"]', 'core.activate-installed-models')
+                    run.wd.click('button[aria-label="Approve"]')
+                except RunStopped:
+                    raise
+                except Infrastructure as exc:
+                    observations.append({'interactionError': str(exc)})
+                    # keys/click may exhaust their own timeout as the prompt
+                    # disappears. Recheck even if the polling deadline elapsed.
+                    if not observe()['typed']:
+                        return 'withdrawn'
+                    raise
+                return 'typedApproved'
+            if seen_prompt:
+                return 'withdrawn'
+        except RunStopped:
+            raise
+        except (OSError, KeyError, ValueError, Infrastructure) as exc:
+            last_failure = exc
+            observations.append({'failureCause': str(exc)})
+            evidence()
+            raise
+        return None
+
+    run.wd.click('button[aria-label="Activate downloaded models"]')
+    try:
+        path = wait_for(consent, 'Activation typed authorization', seconds=30, error=Infrastructure)
+    except RunStopped:
+        raise
+    except (Infrastructure, AssertionError) as exc:
+        if last_failure:
+            raise Infrastructure('Activation typed authorization did not settle; last observation: '
+                                 + json.dumps(last) + '; last failure cause: '
+                                 + str(last_failure)) from exc
+        # No usable prompt is allowed: this says nothing about activation.
+        path = 'immediate' if not seen_prompt and any(
+            observation.get('operationKeys') for observation in observations) else 'noneObserved'
+    evidence(path)
 
 
 def semantic_search(run, *, reranking=False):
