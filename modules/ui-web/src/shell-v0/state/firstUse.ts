@@ -62,7 +62,7 @@ export function firstUseWatchedPaths(): readonly string[] | null {
 }
 export function firstUseFacts(ai: AiState): FirstUseFacts {
   const measured = ai.status?.worker?.core?.ownSearchableDocuments;
-  const count = ai.indexingStatusLive && isWorkerReportedIndex(ai.status) && !ai.status?.worker?.core?.indexedDocumentsUnknown
+  const count = ai.indexingStatusLive && isWorkerReportedIndex(ai.status)
     && !['stale', 'unknown'].includes(ai.status?.worker?.countObservations?.searchable?.state ?? 'fresh')
     ? measured ?? null : null;
   const progress = selectIndexingProgress(ai.status, ai.indexingStatusLive, ai.episodeMaxPendingJobs, ai.enrichSettleSamples);

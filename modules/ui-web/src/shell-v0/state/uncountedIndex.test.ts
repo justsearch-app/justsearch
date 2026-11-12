@@ -84,11 +84,12 @@ describe('count observation provenance', () => {
     }
   });
 
-  it('distinguishes a failed filtered count from the fresh whole-index count', () => {
+  it('a failed filtered count leaves every count unknown, also beside a fresh whole-index count', () => {
     __feedForTest({ status: { worker: { core: { indexedDocuments: 12, searchableDocuments: 0, indexedDocumentsUnknown: true },
       countObservations: { active: { state: 'fresh', observedAtMs: 1234 }, searchable: { state: 'unknown', observedAtMs: 0 } },
     } } as unknown as StatusSnapshot });
-    expect(getAiState().index.documentCount).toEqual(known(12));
+    // The status marks its counts unknown, and that covers every Worker count, the fresh 12 too.
+    expect(getAiState().index.documentCount.known).toBe(false);
     expect(getAiState().index.searchableDocumentCount.known).toBe(false);
     expect(getAiState().lastSettledIndex).toBeNull();
     // Files counts the person's own files, a subset of the searchable population: that count failed,

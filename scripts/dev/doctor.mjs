@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import runtime from './lib/dev-runtime.cjs';
 import nativeTargets from '../lib/native-targets.cjs';
 import processRecords from './lib/process-record.cjs';
+import { workerCountsKnown } from '../lib/worker-counts.mjs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -193,8 +194,8 @@ async function main() {
         apiBaseUrl: stack.apiBaseUrl,
         worker: workerState,
         workerStarting,
-        // null when the Engine says the count is unknown (its 0 is then a placeholder, not an empty index).
-        indexedDocuments: status.worker?.core?.indexedDocumentsUnknown === true ? null : status.worker?.core?.indexedDocuments,
+        // null when the Engine says its Worker counts are unknown (its 0 is then a placeholder, not an empty index).
+        indexedDocuments: workerCountsKnown(status) ? status.worker?.core?.indexedDocuments : null,
         aiReady: status.aiReady,
         embeddingReady: status.embeddingReady,
         aiReason: manifest?.ai?.pendingReason ?? status.components?.inference?.reason_code ?? null,

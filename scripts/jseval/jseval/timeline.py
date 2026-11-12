@@ -7,6 +7,8 @@ import io
 import logging
 from pathlib import Path
 
+from jsharness.readiness import worker_counts_known
+
 log = logging.getLogger(__name__)
 
 # Fields captured per snapshot.
@@ -75,10 +77,16 @@ _BATCH_TIMING_COLUMNS = {
 def snapshot_to_row(elapsed_s: float, snapshot: dict) -> dict:
     """Extract a timeline row from a status snapshot.
 
-    ``indexed`` is None (a blank TSV cell, the timeline's form for a value it does not have) when
-    the Engine reports the document count unknown; its 0 is then a placeholder, not an empty index.
+    The Worker's counts (``indexed``, ``pending``, the writer gauges, ``vdu_pending``) are None (a
+    blank TSV cell, the timeline's form for a value it does not have) when the status does not know
+    its Worker counts (:func:`jsharness.readiness.worker_counts_known`); their 0 is then a placeholder,
+    not an empty index or a drained queue.
     """
     heap_bytes = snapshot.get("memoryUsedBytes", 0)
+    counts_known = worker_counts_known(snapshot)
+
+    def worker_count(key: str, default: object = 0) -> object:
+        return snapshot.get(key, default) if counts_known else None
 
     # GPU metrics (335 §9: from GpuStatusView in /api/status)
     gpu = snapshot.get("gpu") or {}
@@ -87,13 +95,10 @@ def snapshot_to_row(elapsed_s: float, snapshot: dict) -> dict:
 
     row = {
         "elapsed_s": round(elapsed_s, 1),
-        "indexed": (
-            None if snapshot.get("indexedDocumentsUnknown") is True
-            else snapshot.get("indexedDocuments", 0)
-        ),
+        "indexed": worker_count("indexedDocuments"),
         "pending": (
-            snapshot.get("pendingJobsCount", 0)
-            + snapshot.get("processingJobsCount", 0)
+            snapshot.get("pendingJobsCount", 0) + snapshot.get("processingJobsCount", 0)
+            if counts_known else None
         ),
         "embed_pct": round(snapshot.get("embeddingCoveragePercent", 0), 1),
         "splade_pct": round(snapshot.get("spladeCoveragePercent", 0), 1),
@@ -116,11 +121,11 @@ def snapshot_to_row(elapsed_s: float, snapshot: dict) -> dict:
         row[col] = timing.get(map_name, {}).get(key, 0)
     # 406: Lucene runtime gauges. Source = /api/status flattens worker.core to
     # top-level, so writerQueueDepth etc. surface as snapshot keys directly.
-    row["writer_queue_depth"] = snapshot.get("writerQueueDepth", 0)
-    row["writer_pending_docs"] = snapshot.get("writerPendingDocs", 0)
-    row["commit_count"] = snapshot.get("commitCount", 0)
-    row["refresh_lag_ms"] = snapshot.get("refreshLagMs", 0)
-    row["vdu_pending"] = snapshot.get("pendingVduCount", "")
+    row["writer_queue_depth"] = worker_count("writerQueueDepth")
+    row["writer_pending_docs"] = worker_count("writerPendingDocs")
+    row["commit_count"] = worker_count("commitCount")
+    row["refresh_lag_ms"] = worker_count("refreshLagMs")
+    row["vdu_pending"] = worker_count("pendingVduCount", "")
     vdu_processing = snapshot.get("vduProcessing")
     row["vdu_processing"] = int(vdu_processing) if isinstance(vdu_processing, bool) else ""
     # 357: encoder profiles (carried in row dict, not written to TSV).
@@ -169,13 +174,13 @@ def compute_pipeline_summary(rows: list[dict]) -> dict:
 
     # Primary indexing: time from first row with pending > 0 to first row
     # with pending == 0 AND indexed > initial (after indexing started).
-    # Document counts come from the rows that have one (an unknown count is None).
+    # Counts come from the rows that have them (an unknown count is None).
     counted = [row["indexed"] for row in rows if row["indexed"] is not None]
     initial_indexed = counted[0] if counted else 0
     indexing_start = None
     indexing_end = None
     for row in rows:
-        if indexing_start is None and row["pending"] > 0:
+        if indexing_start is None and row["pending"] is not None and row["pending"] > 0:
             indexing_start = row["elapsed_s"]
         if indexing_start is not None and indexing_end is None:
             if row["pending"] == 0 and row["indexed"] is not None and row["indexed"] > initial_indexed:

@@ -15,7 +15,11 @@ the V1.5 follow-up per slice 3a-1-8f.
   reading (not connected yet, first answer pending, status RPC failed), `indexedDocumentsUnknown`
   is true. It used to publish the placeholder zero `indexedDocuments` and `searchableDocuments` as
   known counts. Readers of the field already show such counts as unknown; a genuinely empty index stays a
-  known zero. No `.proto` change, so no VERSION bump; no stored state.
+  known zero. The flag's meaning is stated in full (health-readiness contract): while it is true, every
+  count the Worker supplies in that status (documents, pending jobs, index size, job-queue, failed-job
+  and enrichment counts) is unknown, here and on `/api/knowledge/status`; first-party readers no longer
+  read any of them as 0. No field, type or value changes, no `.proto` change, so no VERSION bump; no
+  stored state.
 
 - Indexed-root JSON view (`SSOT/schemas/indexed-root.v1.json`, outside the protobuf spec): job
   counts and their enrichment coverage are nullable. A failed count query reports null (unknown)

@@ -582,7 +582,7 @@ def _check_index_idle_conditions(s: dict, expected_doc_count_min: int) -> list[s
         if reading.get("state") in ("unknown", "stale"):
             reasons.append(f"index_count_{reading['state']}({name})")
 
-    if s.get("indexedDocumentsUnknown", False):
+    if not worker_counts_known(s):
         reasons.append("indexed_doc_count_unknown")
 
     if expected_doc_count_min >= 0:
@@ -606,8 +606,23 @@ def _fetch_status(client: httpx.Client) -> dict:
     return flatten_status(resp.json())
 
 
-# The core counts ``indexedDocumentsUnknown`` qualifies (CoreIndexView; health-readiness contract).
-_UNCOUNTED_PLACEHOLDERS = ("indexedDocuments", "searchableDocuments")
+# The Worker's count records: documents, pending jobs and index size (core), the job-queue counts
+# (migration) and the failed-job count (failure). ``indexedDocumentsUnknown`` qualifies all of them.
+_WORKER_COUNT_RECORDS = ("core", "migration", "failure")
+
+
+def worker_counts_known(status: dict) -> bool:
+    """Whether the Worker's counts in an ``/api/status`` body (nested or flattened) are counts.
+
+    False when the status marks its document counts unknown (``worker.core.indexedDocumentsUnknown``,
+    also set while the Engine has no Worker reading). That flag covers every count the Worker block
+    carries (health-readiness contract): their zeros are placeholders, never an empty index or a
+    drained queue. The one answer every reader in this harness and jseval asks.
+    """
+    worker = status.get("worker")
+    core = worker.get("core") if isinstance(worker, dict) else None
+    flag = core.get("indexedDocumentsUnknown") if isinstance(core, dict) else status.get("indexedDocumentsUnknown")
+    return flag is not True
 
 
 def flatten_status(data: dict) -> dict:
@@ -628,14 +643,16 @@ def flatten_status(data: dict) -> dict:
     makes two sub-records claim the same top-level key from silent
     first-writer-wins data loss into a loud failure.
 
-    When ``worker.core.indexedDocumentsUnknown`` is true, the core's document
-    counts are placeholders the Engine keeps for older readers, not counts: the
-    flattened ``indexedDocuments`` and ``searchableDocuments`` are ``None``
-    (unknown), never 0. A counted 0 stays 0.
+    When the status's Worker counts are not known (:func:`worker_counts_known`),
+    the numbers of the Worker's count records (documents, pending jobs, index
+    size, job-queue and failed-job counts) are placeholders the Engine keeps for
+    older readers, not counts: they flatten to ``None`` (unknown), never 0. A
+    counted 0 stays 0.
     """
     worker = data.get("worker")
     if not isinstance(worker, dict):
         return data
+    counts_known = worker_counts_known(data)
 
     contributed: dict = {}  # child-key -> the sub-record that first contributed it
     for sub_key, sub in worker.items():
@@ -656,7 +673,8 @@ def flatten_status(data: dict) -> dict:
                     f"the wire contract (rename one) before flattening."
                 )
             if k not in data:
-                if sub_key == "core" and k in _UNCOUNTED_PLACEHOLDERS and sub.get("indexedDocumentsUnknown") is True:
+                if (not counts_known and sub_key in _WORKER_COUNT_RECORDS
+                        and isinstance(v, (int, float)) and not isinstance(v, bool)):
                     v = None
                 data[k] = v
                 contributed[k] = sub_key

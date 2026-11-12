@@ -201,7 +201,10 @@ const FACTS: Record<string, FactDef> = {
     label: 'Size',
     source: {
       kind: 'observed',
-      read: (s) => (s.status ? formatBytes(s.status.worker?.core?.indexSizeBytes) : undefined),
+      // A Worker count like the Files count: unknown words while the Engine has none, never "0 B".
+      read: (s) => (s.status
+        ? unknownDocumentCountLabel(s.status) ?? formatBytes(s.status.worker?.core?.indexSizeBytes)
+        : undefined),
     },
   },
   'core.memory': {

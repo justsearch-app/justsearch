@@ -106,6 +106,13 @@ or unavailable. With no readable count and no prior count from that reader, `ind
 is true. It is also true while the Engine has no Worker reading to publish (the Worker is not
 connected yet, its first answer is pending, or the status RPC failed): the zero counts it then
 carries are placeholders, never an empty index.
+While `indexedDocumentsUnknown` is true, every count in that status that comes from the Worker is
+unknown, not only the document counts: pending jobs, index size, the job-queue and failed-job
+counts and the enrichment counts. Every consumer (the UI, jsharness, jseval, the MCP server, the
+doctor) reads them as unknown and never shows or uses them as 0 or as an empty index or queue;
+`/api/knowledge/status` carries the same flag with the same meaning. When the Worker answers with
+known counts the real numbers return, and a counted empty index stays a known 0. The wire is
+unchanged: the numeric fields keep their placeholder values for older readers.
 Runnable enrichment may continue alongside terminal file failures. Once it settles, those failures
 remain indexing errors in the UI, with their failure count; an empty queue containing failures never
 opens the successful completion window. The same observations

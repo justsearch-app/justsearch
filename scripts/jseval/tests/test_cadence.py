@@ -219,6 +219,16 @@ def test_trigger_does_not_double_fire_for_the_same_batch():
     assert trigger.fired == 2
 
 
+
+def test_trigger_skips_a_count_that_is_not_known():
+    """FB2c: a failed or unknown count read (None) is no reading: no fire, no baseline, no crash."""
+    trigger = cadence.BatchTrigger(50)
+    assert trigger.observe(None) is False   # before any baseline
+    trigger.observe(0)
+    assert trigger.observe(None) is False   # mid-run
+    assert trigger.observe(50) is True      # the baseline survived the gap
+    assert trigger.fired == 1
+
 def test_trigger_rebaselines_when_the_index_shrinks():
     trigger = cadence.BatchTrigger(10)
     trigger.observe(100)

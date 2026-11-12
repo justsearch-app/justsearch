@@ -76,7 +76,7 @@ import { engineLossAge } from '../components/EngineLoss.js';
 import { type Maybe, UNKNOWN } from '../state/known.js';
 import { unavailableBecause } from '../state/availability.js';
 import { readinessNotice, reasonFor } from '../state/readinessNotice.js';
-import { isWorkerReportedIndex } from '../state/indexingProgress.js';
+import { isWorkerReportedIndex, workerCountsUnknown } from '../state/indexingProgress.js';
 import '../components/IndexingControls.js';
 import {
   ENRICHMENT_BLOCKED_LABEL,
@@ -1177,6 +1177,8 @@ export class HealthSurface extends JfElement {
       ? formatCount(settled!.ownDocumentCount!)
       : wkr(filesVal);
     const sizeDisp = lastKnownSize ? formatBytes(settled!.indexSizeBytes!) : wkr(sizeVal);
+    // An unknown Worker queue is no queue reading, never an empty one.
+    const queueDisp = wkr(isWorkerReportedIndex(this.status) ? NUM.format(queue) : '—');
     // 569 §15 — when CORE_DECLARED declares the Health stats region, project the metric cards through
     // the engine (the `metric-card` renderer) + the co-projected OVERFLOW strip; else the built-in
     // grid (degrade-never-fail). The surface pre-cooks the formatted metrics into the declared body.
@@ -1186,7 +1188,7 @@ export class HealthSurface extends JfElement {
         { label: 'Files', value: filesDisp, icon: 'file-text', tone: !this.provisional && this.aiState?.indexingStatusLive && docs > 0 ? 'success' : 'neutral', sub: lastKnownFiles ? 'Last known' : undefined },
         { label: 'Size', value: sizeDisp, icon: 'database', tone: 'neutral', sub: lastKnownSize ? 'Last known' : undefined },
         { label: 'Memory', value: memVal, icon: 'memory-stick', tone: memDot === 'healthy' ? 'success' : memDot, sub: memMax > 0 ? `of ${formatBytes(memMax)}` : undefined },
-        { label: 'Queue', value: wkr(NUM.format(queue)), icon: 'zap', tone: progress.activity.confirmed && !this.provisional && queue > 0 ? 'warning' : 'neutral', sub: this.queueSubLabel(queue, known) },
+        { label: 'Queue', value: queueDisp, icon: 'zap', tone: progress.activity.confirmed && !this.provisional && queue > 0 ? 'warning' : 'neutral', sub: this.queueSubLabel(queue, known) },
       ];
       // 594 §11.3 #4 — thread THIS surface's 571 altitude (read from the catalog, not re-declared) so
       // the engine renders absent capabilities as "<name> off" on this DIAGNOSTIC surface.
@@ -1258,7 +1260,7 @@ export class HealthSurface extends JfElement {
               ?live=${progress.activity.confirmed && !this.provisional && queue > 0}
             ></jf-status-dot>
           </div>
-          <div class="card-value">${wkr(NUM.format(queue))}</div>
+          <div class="card-value">${queueDisp}</div>
           <div class="card-sub">${this.queueSubLabel(queue, known)}</div>
         </div>
       </div>
@@ -2082,13 +2084,16 @@ export class HealthSurface extends JfElement {
     const frozen = observed != null && sampledAt != null && (ai?.status?.meta?.workerRpcStale === true
       || observed - sampledAt > (ai?.status?.operating?.freshness?.staleAfterMs ?? 30_000));
     const sample = frozen ? `sampled by the engine ${engineLossAge(sampledAt, now) ?? ''}`.trim() : undefined;
-    // A fallback block's zeros are absence, and an uncounted index is no count (never an observed zero).
+    // A status whose Worker counts are unknown carries no Worker count at all, and a fallback block's
+    // zeros are absence: neither is ever an observed number.
+    const uncounted = workerCountsUnknown(ai?.status);
     const fallbackZero = (value: number | null | undefined) => value === 0 && !isWorkerReportedIndex(ai?.status);
-    const countObservations = ai?.status?.worker?.countObservations;
-    const rawCount = core?.ownSearchableDocuments ?? core?.searchableDocuments;
-    const count = rawCount == null || rawCount < 0 || core?.indexedDocumentsUnknown || fallbackZero(rawCount)
-      || countObservations?.searchable?.state === 'unknown' || countObservations?.active?.state === 'unknown' ? null : rawCount;
-    const pending = core?.pendingJobs == null || fallbackZero(core.pendingJobs) ? null : core.pendingJobs;
+    // The person's own files, the count Files shows everywhere; the Help-inclusive searchable count
+    // is never shown in its place, so an Engine that reports no own count reads Unknown.
+    const own = ai?.index.ownDocumentCount;
+    const count = !uncounted && own?.known && own.value >= 0 && !fallbackZero(own.value)
+      && ai?.status?.worker?.countObservations?.active?.state !== 'unknown' ? own.value : null;
+    const pending = uncounted || core?.pendingJobs == null || fallbackZero(core.pendingJobs) ? null : core.pendingJobs;
     const reason = engineLossReason(loss);
     const supervisorWords: Record<string, string> = {
       starting: 'Starting', running: 'Running', stopping: 'Stopping', restarting: 'Restarting',

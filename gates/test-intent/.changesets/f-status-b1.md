@@ -103,9 +103,17 @@ and needs no entry.
         "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts"
       ],
       "class": "New",
-      "behaviour": "FB5: when the whole-index (active) count is fresh at 12 but the searchable population the own count belongs to could not be counted (countObservations.searchable unknown), the Files fact says 'Unknown' instead of the whole-index 12. The case's other assertions (documentCount known 12, searchableDocumentCount unknown, no last settled index) are unchanged.",
+      "behaviour": "FB5 and FB2b: a status that marks its counts unknown (indexedDocumentsUnknown true) beside a fresh whole-index (active) observation of 12 and an unknown searchable observation: the whole-index documentCount and the searchable count are both unknown (FB2b: the flag covers every Worker count, the fresh 12 too), and the Files fact says 'Unknown' instead of the whole-index 12 (FB5). No last settled index is taken.",
       "repaired": true,
       "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (top bar, Settings, status pill, counts): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "Follow-up B1 FB2b (orchestrator amendment, 2026-11-12): when a status marks its document counts unknown (indexedDocumentsUnknown true), every count in that status that comes from the worker (pending jobs, index size, documents) is unknown to every consumer (UI, jsharness, jseval, MCP, doctor); no wire change; the rule is written into the health-readiness contract doc and the wire CHANGELOG note.",
+          "label": "agent choice"
+        },
         {
           "kind": "delegated-choice",
           "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
@@ -120,10 +128,178 @@ and needs no entry.
           "location": "task t-20261103-shell request"
         }
       ],
-      "evidence": "gates/test-intent/evidence/f-status-b1-fb5.json",
+      "evidence": "gates/test-intent/evidence/f-status-b1-fb2b.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts#distinguishes a failed filtered count from the fresh whole-index count"
+        "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts#a failed filtered count leaves every count unknown, also beside a fresh whole-index count"
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/workerCountsUnknown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "FB2b: a Worker block with pendingJobs 3, indexSizeBytes 4096 and documents 12 that marks its counts unknown is no Worker-reported index (isWorkerReportedIndex false): the store's documentCount and pendingJobs are unknown, the queue counts are null, the indexing phase is 'unknown' with no confirmed activity, and the Size fact reads Checking…/Unknown. The same block counted reads as counted, a known 0 queue and '0 B' included.",
+      "repaired": true,
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (top bar, Settings, status pill, counts): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "Follow-up B1 FB2b (orchestrator amendment, 2026-11-12): when a status marks its document counts unknown (indexedDocumentsUnknown true), every count in that status that comes from the worker (pending jobs, index size, documents) is unknown to every consumer (UI, jsharness, jseval, MCP, doctor); no wire change; the rule is written into the health-readiness contract doc and the wire CHANGELOG note.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell request"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-status-b1-fb2b.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/workerCountsUnknown.test.ts#a status that marks its counts unknown gives no Worker count to any reader"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.unknown-worker-counts.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "FB2b: with a status that marks its counts unknown but carries pendingJobs 3 and indexSizeBytes 4096, Health's overview and Diagnostics show no number for Size, Queue and Files (Memory, not a Worker count, still shows its number). FB5a: an Engine that reported 12 searchable documents and no own count, then stops answering, makes Health's 'Searchable files' fact read Unknown, never the Help-inclusive 12; a reported own count of 7 is shown as '7 · last seen' (that preservation case passes before and is not a new check).",
+      "repaired": true,
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (top bar, Settings, status pill, counts): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "Follow-up B1 FB2b (orchestrator amendment, 2026-11-12): when a status marks its document counts unknown (indexedDocumentsUnknown true), every count in that status that comes from the worker (pending jobs, index size, documents) is unknown to every consumer (UI, jsharness, jseval, MCP, doctor); no wire change; the rule is written into the health-readiness contract doc and the wire CHANGELOG note.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (top bar, Settings, status pill, counts): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "Follow-up B1 FB5a (orchestrator amendment, 2026-11-12): Health never shows a Help-inclusive count as Files: without an own count (never reported, or an older Engine) it says not known, also during an outage.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell request"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-status-b1-fb2b.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.unknown-worker-counts.test.ts#Size and Queue are not known, never the placeholder or the carried number",
+        "modules/ui-web/src/shell-v0/views/HealthSurface.unknown-worker-counts.test.ts#during an outage, an Engine that reported no own count reads Unknown, not the searchable count"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/indexingProgress.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "FB2b: in the 'unknown' variant of 'does not infer zero passage work from a %s parent count' (indexedDocumentsUnknown true), once the zero-chunk declaration arrives the indexing phase stays 'unknown': a status whose counts are unknown has no known queue to call settled. The 'stale' variant (counts known) still reads 'ready'; the case's other assertions are unchanged.",
+      "repaired": true,
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (top bar, Settings, status pill, counts): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "Follow-up B1 FB2b (orchestrator amendment, 2026-11-12): when a status marks its document counts unknown (indexedDocumentsUnknown true), every count in that status that comes from the worker (pending jobs, index size, documents) is unknown to every consumer (UI, jsharness, jseval, MCP, doctor); no wire change; the rule is written into the health-readiness contract doc and the wire CHANGELOG note.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell request"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-status-b1-fb2b.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/state/indexingProgress.test.ts#does not infer zero passage work from a unknown parent count"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/indexingProgress.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (top bar, Settings, status pill, counts): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "Follow-up B1 FB2b (orchestrator amendment, 2026-11-12): when a status marks its document counts unknown (indexedDocumentsUnknown true), every count in that status that comes from the worker (pending jobs, index size, documents) is unknown to every consumer (UI, jsharness, jseval, MCP, doctor); no wire change; the rule is written into the health-readiness contract doc and the wire CHANGELOG note.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none (docs/decisions has no record on how a status's Worker counts read while indexedDocumentsUnknown is true; 0040-wire-contract-format only names pendingJobs as the canonical field)"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.truthfulness.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "FB2b: a frozen Worker sample that marks its counts unknown and carries pendingJobs 3, read during an Engine outage: Health's 'Files waiting' fact says Unknown and never 3, like 'Searchable files'. The sample age and last-seen wording the case asserted on 'Files waiting' are asserted unchanged on the 'Index' fact, which still has a last-known value.",
+      "repaired": true,
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (top bar, Settings, status pill, counts): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "Follow-up B1 FB2b (orchestrator amendment, 2026-11-12): when a status marks its document counts unknown (indexedDocumentsUnknown true), every count in that status that comes from the worker (pending jobs, index size, documents) is unknown to every consumer (UI, jsharness, jseval, MCP, doctor); no wire change; the rule is written into the health-readiness contract doc and the wire CHANGELOG note.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "location": "task t-20261103-shell request"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-status-b1-fb2b.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.truthfulness.test.ts#last-known facts keep an uncounted index unknown and state the sample age beside the receipt"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/HealthSurface.truthfulness.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (top bar, Settings, status pill, counts): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "Follow-up B1 FB2b (orchestrator amendment, 2026-11-12): when a status marks its document counts unknown (indexedDocumentsUnknown true), every count in that status that comes from the worker (pending jobs, index size, documents) is unknown to every consumer (UI, jsharness, jseval, MCP, doctor); no wire change; the rule is written into the health-readiness contract doc and the wire CHANGELOG note.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none (docs/decisions has no record on how a status's Worker counts read while indexedDocumentsUnknown is true; 0040-wire-contract-format only names pendingJobs as the canonical field)"
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/uncountedIndex.test.ts"
+      ],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell user turn (2026-11-03)",
+          "delegationScope": "Design choices for the in-between UI of the main windows (top bar, Settings, status pill, counts): i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design.",
+          "choice": "Follow-up B1 FB2b (orchestrator amendment, 2026-11-12): when a status marks its document counts unknown (indexedDocumentsUnknown true), every count in that status that comes from the worker (pending jobs, index size, documents) is unknown to every consumer (UI, jsharness, jseval, MCP, doctor); no wire change; the rule is written into the health-readiness contract doc and the wire CHANGELOG note.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none (docs/decisions has no record on how a status's Worker counts read while indexedDocumentsUnknown is true; 0040-wire-contract-format only names pendingJobs as the canonical field)"
     },
     {
       "items": [
@@ -186,6 +362,16 @@ and needs no entry.
         "input re-encoding"
       ],
       "whatMoved": "The stand-in Engine's status core gains ownSearchableDocuments 5 beside indexedDocuments 5 and searchableDocuments 5, so Health's Files metric, which now reads the own count, has its input. Expected '5' and the last-known/unconfirmed assertions are unchanged."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss.test.ts"
+      ],
+      "class": "Adaptation",
+      "moved": [
+        "input re-encoding"
+      ],
+      "whatMoved": "The four stand-in Engine statuses of 'SC4 Open Health' and 'SC4 each Health fact carries the time it was itself observed' gain ownSearchableDocuments 1234 beside searchableDocuments 1234, so Health's 'Searchable files' fact, which now reads only the person's own count (FB5a: never the Help-inclusive searchable count), has its input. Expected 'Searchable files 1,234 · last seen …', the 'Files waiting 7' and 'Index Serving' wording, every age assertion and every other input are unchanged."
     }
   ]
 }
@@ -208,5 +394,31 @@ check files copied in): `scripts/jsharness/tests/test_flatten_unknown_count.py` 
 `scripts/jseval/tests/test_unknown_document_count.py` (pytest, 8 of 10 fail by assertion before,
 10 pass after; the two counted-zero cases pass on both), `scripts/dev/doctor.test.mjs` (fails before
 on `worker=undefined`, passes after).
+
+Follow-up B1 amendments FB2b, FB2c and FB5a (2026-11-12):
+
+FB2b: `indexedDocumentsUnknown` covers every Worker count of the status it is in. One helper per
+language answers whether a status's Worker counts are known: `workerCountsUnknown`
+(`modules/ui-web/src/shell-v0/state/indexingProgress.ts`, also behind `isWorkerReportedIndex`),
+`worker_counts_known` (`scripts/jsharness/jsharness/readiness.py`, used by `flatten_status`, jseval's
+timeline and ingest) and `workerCountsKnown` (`scripts/lib/worker-counts.mjs`, the doctor and the
+production MCP server). The frontend checks are in the entries above, their fail-before against the
+branch head 0ed9b40662 in `gates/test-intent/evidence/f-status-b1-fb2b.json`; the FB5 evidence was
+re-run against its original before (c95be3048f) because `uncountedIndex.test.ts` changed. FB5a's
+outage case is in `HealthSurface.unknown-worker-counts.test.ts`.
+
+FB2b in the scripts and FB2c (jseval's initial count read: a failed read is unknown, it waits up to
+`index_timeout_sec` for a known count, bounded by reads as well so a clock that does not advance
+cannot make it spin, and stops with an error naming that timeout; a known 0 is taken at once) are
+covered by checks outside this gate's scope. Recorded by running the candidate's check files on the
+candidate and on a shared clone of 0ed9b40662 with those files copied in:
+`scripts/jseval/tests/test_unknown_document_count.py` (7 fail before by assertion, one of them the
+frozen-clock bound, which before ends only by the test's own 1000-sleep guard; 15 pass after),
+`scripts/jseval/tests/test_ingest.py` (`test_get_indexed_doc_count_on_error` fails before, `0 is
+None`), `scripts/jseval/tests/test_cadence.py` (`test_trigger_skips_a_count_that_is_not_known`
+fails before with the TypeError that ended the first-search probe on a None count),
+`scripts/jsharness/tests/test_flatten_unknown_count.py` (2 fail before by assertion, 5 pass after),
+`scripts/prod/test-prod-mcp-status-counts.mjs` (fails before: `queueDepth while unknown`, 0 for
+undefined; passes after).
 
 ## Acceptance records

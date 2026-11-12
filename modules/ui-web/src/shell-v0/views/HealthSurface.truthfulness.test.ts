@@ -208,8 +208,11 @@ describe('frozen worker sample, then engine loss', () => {
     const fact = (label: string) => el!.shadowRoot!.querySelector(`[data-fact="${label}"]`)?.textContent ?? '';
     expect(fact('Searchable files')).toContain('Unknown');
     expect(fact('Searchable files')).not.toMatch(/\b0\b/);
-    expect(fact('Files waiting')).toMatch(/last seen (just now|\d+ s ago)/);
-    expect(fact('Files waiting')).toMatch(/sampled by the engine 10 min ago/);
+    // The unknown flag covers every Worker count: the sample's 3 waiting files are no reading either.
+    expect(fact('Files waiting')).toContain('Unknown');
+    expect(fact('Files waiting')).not.toMatch(/\b3\b/);
+    expect(fact('Index')).toMatch(/last seen (just now|\d+ s ago)/);
+    expect(fact('Index')).toMatch(/sampled by the engine 10 min ago/);
   });
 });
 

@@ -60,6 +60,7 @@ import {
   ENRICH_SETTLE_SAMPLE_CAP,
   enrichSettledSum,
   isWorkerReportedIndex,
+  workerCountsUnknown,
   selectIndexingPhase,
   type EnrichSettleSample,
 } from './indexingProgress.js';
@@ -455,15 +456,13 @@ function friendlyModel(id: string | null | undefined): string | null {
 const DOCUMENT_COUNT_STARTUP_WINDOW_MS = 120_000;
 
 /**
- * #758 — whether the backend reported that it could not count the index
- * (`indexedDocumentsUnknown`). Its `indexedDocuments`/`searchableDocuments` then carry a 0 kept only
- * for older readers; it is not a count and must never read as an empty index. Absent ⇒ known.
+ * #758 — whether a status's document count for `population` is not a count: the Worker's counts are
+ * unknown ({@link workerCountsUnknown}, which wins over any single population's observation), or
+ * that population's observation is unknown. The 0 then carried is kept only for older readers and
+ * must never read as an empty index. Absent ⇒ known.
  */
 function documentCountUnknown(status: StatusSnapshot | null | undefined, population = 'active'): boolean {
-  const observation = status?.worker?.countObservations?.[population];
-  if (observation?.state === 'unknown') return true;
-  if (observation?.state === 'fresh' || observation?.state === 'stale') return false;
-  return status?.worker?.core?.indexedDocumentsUnknown === true;
+  return workerCountsUnknown(status) || status?.worker?.countObservations?.[population]?.state === 'unknown';
 }
 
 /**
@@ -784,7 +783,7 @@ function computeIndex(): AiIndex {
   const fromInference = <T>(v: T | undefined | null): Maybe<T> =>
     inference === null || v === undefined || v === null ? UNKNOWN : known(v);
   // #758: when the backend could not count the index, the 0 it carries for older
-  // readers is not a count — both counts are UNKNOWN, never a known 0 that reads as an empty index.
+  // readers is not a count — the counts are UNKNOWN, never a known 0 that reads as an empty index.
   const countsUnknown = documentCountUnknown(status);
   return {
     documentCount: countsUnknown ? UNKNOWN : fromStatus(status?.worker?.core?.indexedDocuments),
@@ -794,7 +793,7 @@ function computeIndex(): AiIndex {
     ownDocumentCount: documentCountUnknown(status, 'searchable')
       ? UNKNOWN
       : fromStatus(status?.worker?.core?.ownSearchableDocuments),
-    pendingJobs: fromStatus(status?.worker?.core?.pendingJobs),
+    pendingJobs: isWorkerReportedIndex(status) ? fromStatus(status?.worker?.core?.pendingJobs) : UNKNOWN,
     embeddingPending: fromStatus(status?.embedding?.pendingCount),
     embeddingBlocked:
       status === null ? UNKNOWN : known((status.embedding?.compatState ?? '').startsWith('BLOCKED')),

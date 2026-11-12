@@ -216,7 +216,10 @@ class BatchTrigger:
         self._baseline: int | None = None
         self.fired = 0
 
-    def observe(self, indexed_docs: int) -> bool:
+    def observe(self, indexed_docs: int | None) -> bool:
+        if indexed_docs is None:
+            # No count (the Engine does not know it, or the read failed): no reading, no fire.
+            return False
         if self._baseline is None or indexed_docs < self._baseline:
             # First observation, or the index shrank (rebuild/reset): re-baseline, don't fire.
             self._baseline = indexed_docs

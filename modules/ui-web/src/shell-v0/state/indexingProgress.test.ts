@@ -1192,7 +1192,8 @@ it.each(['unknown', 'stale'] as const)('does not infer zero passage work from a 
   expect(select(status, true).enrichingPercent).toBeNull();
   expect(select(status, true).activity.summary).not.toContain('fully searchable');
   status.worker!.enrichment!.chunk!.chunkingNotRequired = true;
-  expect(selectIndexingPhase(status)).toBe('ready');
+  // A status whose counts are unknown (indexedDocumentsUnknown) has no known queue to call settled.
+  expect(selectIndexingPhase(status)).toBe(state === 'unknown' ? 'unknown' : 'ready');
 });
 
 
