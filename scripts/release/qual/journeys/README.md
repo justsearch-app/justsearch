@@ -618,8 +618,15 @@ qualification. Explicit `--journeys` subsets likewise never qualify a release.
   The process must belong to this run. Window titles and maximization do not
   determine which file was opened.
 - J3: default production downloads, then **Activate downloaded models** and the
-  UI's typed authorization when requested (immediate operation acceptance is
-  also observed). The embedding and citation-scorer models must be active;
+  UI's typed authorization when it remains interactable. A duplicate typed prompt
+  may disappear after the page approves the same request. After observing a typed
+  prompt, the harness polls for up to 60 seconds for typed approval or withdrawal
+  with an accepted operation key or install status leaving `activation_required`
+  (excluding idle, missing phase, and failed/error status). Withdrawal alone cannot
+  pass. `J3-activation-consent.json` records `typedApproved`,
+  `withdrawnAfterPageApproval` with the progress observation, or `immediate` for
+  immediate operation acceptance. An unsettled prompt fails as infrastructure
+  with the last observation retained. The embedding and citation-scorer models must be active;
   SPLADE and CPU reranking are off by default (#1162, #1182), so their models
   need not be active on CPU. Installation must meet the completion checks below.
   A semantic vector query must return the

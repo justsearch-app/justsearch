@@ -388,18 +388,71 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
 def activate_downloaded(run):
     run.wd.click('button[aria-label="Activate downloaded models"]')
     # The installed version/policy may accept this UI action immediately or
-    # request typed authorization. Observe what it actually presents.
-    consent = wait_for(lambda: run.wd.execute("""
-const typed=all(document,'input[data-testid="authorization-typed-input"]').some(e=>{
+    # request typed authorization. The page may also approve the same pending
+    # request while the broadcast bridge briefly shows a duplicate typed prompt.
+    last = {'typed': False, 'operationKeys': []}
+    interaction_error = None
+    def observe():
+        nonlocal last
+        last = run.wd.execute("""
+const inputs=all(document,'input[data-testid="authorization-typed-input"]').filter(e=>{
  const r=e.getBoundingClientRect();return r.width>0 && r.height>0;
 });
+const typed=inputs.length>0;
+const blocked=typed && !inputs.some(e=>!e.disabled && !e.readOnly);
 const operationKeys=all(document,'jf-operation-outcome-detail').map(e=>e.operationKey).filter(Boolean);
-return typed || operationKeys.length ? {typed,operationKeys} : null;
-"""), 'Activation authorization or accepted operation visible', seconds=30)
-    run.evidence('J3-activation-consent', consent)
-    if consent['typed']:
-        run.wd.keys('input[data-testid="authorization-typed-input"]', 'core.activate-installed-models')
-        run.wd.click('button[aria-label="Approve"]')
+return {typed,blocked,operationKeys};
+""") or {'typed': False, 'operationKeys': []}
+        if interaction_error:
+            last['interactionError'] = interaction_error
+        run.evidence('J3-activation-consent', last)
+        return last
+
+    def initial():
+        observed = observe()
+        return observed if observed['typed'] or observed['operationKeys'] else None
+
+    consent = wait_for(initial, 'Activation authorization or accepted operation visible', seconds=30)
+    if not consent['typed']:
+        run.evidence('J3-activation-consent', dict(consent, path='immediate'))
+        return
+
+    def settle():
+        nonlocal interaction_error
+        observed = observe()
+        if observed['typed']:
+            if observed.get('blocked'):
+                return None
+            try:
+                run.wd.keys('input[data-testid="authorization-typed-input"]', 'core.activate-installed-models')
+                run.wd.click('button[aria-label="Approve"]')
+            except Infrastructure as exc:
+                # Withdrawal may race even this second observation. Recheck the
+                # real UI/status instead of requiring a now-stale input.
+                interaction_error = str(exc)
+                observed['interactionError'] = interaction_error
+                run.evidence('J3-activation-consent', observed)
+                return None
+            observed['path'] = 'typedApproved'
+        else:
+            if observed['operationKeys']:
+                progress = {'operationKeys': observed['operationKeys']}
+            else:
+                install = run.api('/api/ai/install/status')
+                observed['install'] = install
+                run.evidence('J3-activation-consent', observed)
+                if (not install.get('phase') or install['phase'] in ('activation_required', 'idle')
+                        or install.get('state') in ('failed', 'error')):
+                    return None
+                progress = {'install': install}
+            observed.update(path='withdrawnAfterPageApproval', progress=progress)
+        run.evidence('J3-activation-consent', observed)
+        return observed
+
+    try:
+        wait_for(settle, 'Activation typed approval or page-approved progress', seconds=60, error=Infrastructure)
+    except Infrastructure as exc:
+        raise Infrastructure('Activation consent did not settle; last observation: ' + json.dumps(last)) from exc
 
 
 def semantic_search(run, *, reranking=False):
