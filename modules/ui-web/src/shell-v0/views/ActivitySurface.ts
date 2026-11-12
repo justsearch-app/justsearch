@@ -174,8 +174,9 @@ export class ActivitySurface extends JfElement {
    * is for the Activity in the window its navigation lands on (FC6), and is taken by it only while
    * it is still connected once rendered, so another Activity (a dismissed preview, the other window
    * of a split) or one closing meanwhile cannot consume it without revealing it. The journal's
-   * arrival shows the feed scoped to what this window recorded, with every other filter cleared, so a
-   * filter left from earlier cannot hide what the pointer named.
+   * arrival shows the feed scoped to what this window recorded, the whole feed's (the status panel's
+   * "All activity", FC6a) every record, each with every other filter cleared, so a filter left from
+   * earlier cannot hide what the pointer named; the keyboard goes to the feed.
    */
   private arriveAtSection(): void {
     if (!this.isConnected || peekActivitySection(this) === null) return;
@@ -191,11 +192,14 @@ export class ActivitySurface extends JfElement {
       }
       const feed = this.feed();
       if (!feed) return;
-      feed.filter = { ...DEFAULT_FEED_FILTER, scope: 'local' };
+      // The journal is this window's records; the whole feed is every record (FC6a).
+      feed.filter = section === 'effect-journal' ? { ...DEFAULT_FEED_FILTER, scope: 'local' } : { ...DEFAULT_FEED_FILTER };
       await feed.updateComplete;
       feed.scrollIntoView?.({ block: 'start' });
+      // The feed's tab stop: its entry, else the journal's scope, else (no records yet) its quick filter.
       const target = feed.shadowRoot?.querySelector<HTMLElement>('.entry[tabindex="0"]')
-        ?? feed.shadowRoot?.querySelector<HTMLElement>('[data-testid="feed-scope"] button');
+        ?? feed.shadowRoot?.querySelector<HTMLElement>('[data-testid="feed-scope"] button')
+        ?? feed.shadowRoot?.querySelector<HTMLElement>('[data-testid="feed-quick"] [tabindex="0"]');
       target?.focus();
     });
   }

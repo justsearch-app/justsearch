@@ -51,7 +51,8 @@ export function renderEventWhen(iso: string): TemplateResult {
  * accent fill, which would be accent-as-text). Rows with no outcome (navigation/effect) render nothing.
  */
 function renderEventOutcome(kind: string, outcome: string | undefined): TemplateResult {
-  if (!outcome) return html`${''}`;
+  const said = outcome ? rowOutcomeWords(kind, outcome) : null;
+  if (!outcome || said === null) return html`${''}`;
   const tone = statusToTone(outcome);
   const glyph = glyphChar(statusGlyph(outcome));
   return html`<span
@@ -59,7 +60,7 @@ function renderEventOutcome(kind: string, outcome: string | undefined): Template
     data-testid="ledger-outcome"
     data-tone=${tone}
     style=${`color: ${toneText(tone)}`}
-    >${glyph ? html`<span aria-hidden="true">${glyph}</span> ` : ''}${rowOutcomeWords(kind, outcome)}</span
+    >${glyph ? html`<span aria-hidden="true">${glyph}</span> ` : ''}${said}</span
   >`;
 }
 

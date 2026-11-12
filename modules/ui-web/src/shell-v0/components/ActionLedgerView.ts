@@ -130,15 +130,19 @@ const HISTORY_RESOURCE = 'core.operation-history';
 const VIRTUALIZE_ABOVE = 100;
 
 /**
- * FC8 — the windowed list's layout. The library measures drawn rows in a ResizeObserver callback and
- * reflows at once, in that callback: whenever the measured rows differ from what was assumed (the
- * library's 100 px guess is about three feed rows, and rows that wrap, carry notes or measure a
- * fraction of a pixel differ from any guess), the list resized itself and drew more rows during the
- * observer's delivery, and the browser reported "ResizeObserver loop completed with undelivered
- * notifications" as an uncaught error. This layout starts from a feed row's real size, at this feed's
- * text size, and applies what was measured in the next frame, outside the delivery, where the
- * browser observes the resized list in its next pass. Both go through the layout's public extension
- * point (`{ type, ...config }` and its `updateItemSizes`); the library itself is not changed.
+ * FC8, FC8a — the windowed list's layout. The library reflows the list in a microtask after its
+ * ResizeObservers report (a measured row, the list's own size), so within the observers' delivery:
+ * whenever that reflow resized the list or drew more rows (rows measured other than assumed — the
+ * library's 100 px guess is about three feed rows, and rows wrap, carry notes or measure a fraction
+ * of a pixel — or a view that moved since the list last read it, as the keys move it), the browser
+ * could not deliver the new sizes in that frame and reported "ResizeObserver loop completed with
+ * undelivered notifications" as an uncaught error. This layout starts from a feed row's real size,
+ * at this feed's text size, and reflows only in the frame's animation callback: what the observers
+ * and the scroller report is recorded at once, and the list is resized and redrawn before the
+ * browser's next observation, never during one. A scroll made after the library last read the view
+ * (another animation callback can make one first) is added to that view before the reflow, so the
+ * list is laid out where the scroller is. All of it goes through the layout's public extension point
+ * (`{ type, ...config }`, `viewportScroll`, `reflowIfNeeded`); the library itself is not changed.
  *
  * FC12 — the library measures its view as the part of the list its scroller shows, and with none of
  * the list showing (at 600×400 with 200% text the list starts below what the window shows) that
@@ -148,14 +152,19 @@ const VIRTUALIZE_ABOVE = 100;
  * scroller shows, so the rows nearest it are drawn; a list in a hidden panel (no width) draws none.
  */
 class FeedRowsLayout extends FlowLayout {
-  private measured: Parameters<FlowLayout['updateItemSizes']>[0] = {};
   private frame: number | null = null;
+  private forced = false;
+  /** The scroller that shows the list (config). */
+  scroller: (() => Element) | null = null;
+  /** Where the scroller was when the library last read the view. */
+  private readAt: number | null = null;
 
   constructor(...args: ConstructorParameters<typeof FlowLayout>) {
     super(...args);
     // Before the first reflow: the config itself is applied a microtask later.
-    const px = (args[1] as { rowEstimatePx?: number } | undefined)?.rowEstimatePx;
-    if (px) this.rowEstimatePx = px;
+    const config = args[1] as { rowEstimatePx?: number; scroller?: () => Element } | undefined;
+    if (config?.rowEstimatePx) this.rowEstimatePx = config.rowEstimatePx;
+    this.scroller = config?.scroller ?? null;
   }
 
   set rowEstimatePx(px: number) {
@@ -170,14 +179,27 @@ class FeedRowsLayout extends FlowLayout {
     super.viewportSize = view.width > 0 ? { width: view.width, height: Math.max(1, view.height) } : view;
   }
 
-  override updateItemSizes(sizes: Parameters<FlowLayout['updateItemSizes']>[0]): void {
-    this.measured = { ...this.measured, ...sizes };
+  override get viewportScroll(): FlowLayout['viewportScroll'] {
+    return super.viewportScroll;
+  }
+
+  override set viewportScroll(at: FlowLayout['viewportScroll']) {
+    this.readAt = this.scroller?.().scrollTop ?? null;
+    super.viewportScroll = at;
+  }
+
+  override reflowIfNeeded(force = false): void {
+    this.forced ||= force;
     this.frame ??= requestAnimationFrame(() => {
       this.frame = null;
-      const measured = this.measured;
-      this.measured = {};
-      super.updateItemSizes(measured);
-      this.reflowIfNeeded();
+      const moved = this.readAt === null || !this.scroller ? 0 : this.scroller().scrollTop - this.readAt;
+      if (Math.abs(moved) >= 1) {
+        const at = this.viewportScroll;
+        this.viewportScroll = { top: (at.top ?? 0) + moved, left: at.left ?? 0 };
+      }
+      const forced = this.forced;
+      this.forced = false;
+      super.reflowIfNeeded(forced);
     });
   }
 }
@@ -736,19 +758,21 @@ export class ActionLedgerView extends JfElement {
   }
 
   /** The windowed list's layout, kept while the row estimate it carries stays the same. */
-  private rowsLayout: { type: typeof FeedRowsLayout; rowEstimatePx: number } | null = null;
+  private rowsLayout: { type: typeof FeedRowsLayout; rowEstimatePx: number; scroller: () => Element } | null = null;
 
   /**
    * One row's size before it is measured: a line of row text and the row's padding and rule, at
    * this feed's text size (so 200% text estimates twice the height).
    */
-  private feedRowsLayout(): { type: typeof FeedRowsLayout; rowEstimatePx: number } {
+  private feedRowsLayout(): { type: typeof FeedRowsLayout; rowEstimatePx: number; scroller: () => Element } {
     const style = getComputedStyle(this);
     const fontPx = parseFloat(style.fontSize) || 14;
     const linePx = parseFloat(style.lineHeight) || fontPx * 1.2;
     const remPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
     const rowEstimatePx = Math.round(linePx + 0.5 * remPx + 1);
-    if (this.rowsLayout?.rowEstimatePx !== rowEstimatePx) this.rowsLayout = { type: FeedRowsLayout, rowEstimatePx };
+    if (this.rowsLayout?.rowEstimatePx !== rowEstimatePx) {
+      this.rowsLayout = { type: FeedRowsLayout, rowEstimatePx, scroller: () => scrollerOf(this) };
+    }
     return this.rowsLayout;
   }
 

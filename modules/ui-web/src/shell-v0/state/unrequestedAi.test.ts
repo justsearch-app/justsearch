@@ -112,12 +112,13 @@ describe('FA3b the status pill\'s screen-reader announcements', () => {
     } finally { pill.remove(); vi.unstubAllGlobals(); }
   }
 
+  // FC10a — what is spoken is what the pill shows: a calm pill's words, never a search warning.
   it('announce no search warning when the only gap is AI nobody asked for', async () => {
-    expect(await announced(observe(NOT_INSTALLED))).toBeNull();
+    expect(await announced(observe(NOT_INSTALLED))).toBe('Keyword search ready');
   });
 
   it('still announce it when the person asked for AI and it cannot run', async () => {
-    expect(await announced(observe(FAILED))).toBe('Service degraded');
+    expect(await announced(observe(FAILED))).toBe('1 needs you');
   });
 });
 

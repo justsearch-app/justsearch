@@ -54,8 +54,10 @@ afterEach(() => { pill.remove(); store.stop(); __resetAiStateForTest(); __resetT
 describe('verdict and AI-engine announcers (595 §15.1 E1, moved from the status bar)', () => {
   it('mirrors the verdict politely and an error verdict assertively, never as "All systems operational"', async () => {
     await observe(verdict('operational', 'ok'));
+    // FC10a — in the pill's own words.
+    expect(pill.status.model.pill.label).toBe('Up to date');
     expect(notice('verdict-announcer')!.getAttribute('live')).toBe('status');
-    expect(notice('verdict-announcer')!.textContent).toBe('Search available');
+    expect(notice('verdict-announcer')!.textContent).toBe('Up to date');
     expect(pill.shadowRoot!.textContent).not.toContain('All systems operational');
     // FC10 — spoken as the pill shows it: checking while contact is lost within the grace, then
     // assertively that the engine cannot be reached.
@@ -72,9 +74,10 @@ describe('verdict and AI-engine announcers (595 §15.1 E1, moved from the status
       expect(notice('verdict-announcer')!.textContent).toBe("Can't reach the engine");
     } finally { vi.useRealTimers(); }
   });
-  it('announces the AI engine through its sibling region', async () => {
+  it('speaks no AI-engine headline the pill never shows (FC10a)', async () => {
     await observe(engine('online'));
-    expect(notice('ai-engine-announcer')!.textContent!.length).toBeGreaterThan(0);
+    expect(notice('ai-engine-announcer')).toBeNull();
+    expect(notice('verdict-announcer')!.textContent).toBe(pill.status.model.pill.label);
   });
 });
 

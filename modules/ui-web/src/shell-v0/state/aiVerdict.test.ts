@@ -548,7 +548,8 @@ describe('presentAiEngineVerdict (Design pass 3 — the presentation projection)
     ['installing', 'Installing…', 'info'],
     // Critical-review fix (2026-07-01) — 'error', not 'neutral': must agree with the
     // `core.ai-engine.failed` toast's `defaultSeverity: 'error'` (messageClasses.ts).
-    ['install_failed', 'Install Failed', 'error'],
+    // FC11a — the status panel's and AI Brain's one sentence for it.
+    ['install_failed', 'AI install failed', 'error'],
     ['offline', 'Offline', 'neutral'],
     ['starting', 'Starting…', 'warning'],
     ['connecting', 'Connecting…', 'warning'],
@@ -582,15 +583,5 @@ describe('presentAiEngineVerdict (Design pass 3 — the presentation projection)
     const p = presentAiEngineVerdict(verdictFor('install_failed', 'disk full'));
     expect(p.body).toBe('The AI install stopped before it finished. Install again to continue.');
     expect(p.body).not.toContain('disk full');
-  });
-
-  it('install_failed announces with assertive politeness (the one error-toned kind)', () => {
-    const p = presentAiEngineVerdict(verdictFor('install_failed'));
-    expect(p.announce).toEqual({ text: 'Install Failed', politeness: 'alert' });
-  });
-
-  it('every other kind announces with polite status politeness', () => {
-    const p = presentAiEngineVerdict(verdictFor('online'));
-    expect(p.announce).toEqual({ text: 'Online', politeness: 'status' });
   });
 });

@@ -88,8 +88,13 @@ export function indexResultWords(state: string | undefined): string {
     ? (state === 'RETRY_EXHAUSTED' ? 'Gave up after retrying' : 'Failed') : `Unknown${state ? ` (${state})` : ''}`;
 }
 
-/** How a record ended, in words: an index record by its state, anything else by its recorded outcome. */
-export function rowOutcomeWords(kind: string, outcome: string): string {
+/**
+ * How a record ended, in words, beside its title: an index record by its state, anything else by its
+ * recorded outcome. An approval's or a permission's title says its decision already (the Engine
+ * records that decision as the outcome too), so it has no second outcome: null (FC9a).
+ */
+export function rowOutcomeWords(kind: string, outcome: string): string | null {
+  if (kind === 'gate' || kind === 'grant') return null;
   return kind === 'index' ? indexResultWords(outcome) : words(OUTCOME_WORDS, outcome);
 }
 

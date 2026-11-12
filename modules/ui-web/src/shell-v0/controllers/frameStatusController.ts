@@ -2,7 +2,7 @@
 import { setFirstUseRoots, getFirstUse, subscribeFirstUse } from '../state/firstUse.js';
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
-import { deriveFrameStatus, spokenStatus, completedLongWork, transientPlacement, FINISHED_DWELL_MS, type FrameStatus, type StatusFact, type DurableStatusOperation } from '../state/frameStatus.js';
+import { deriveFrameStatus, spokenStatus, completedLongWork, transientPlacement, FINISHED_DWELL_MS, type FrameStatus, type Spoken, type StatusFact, type DurableStatusOperation } from '../state/frameStatus.js';
 import { subscribeTasks, listTasks, completeTask } from '../substrates/tasks/index.js';
 import { subscribePending, listPending } from '../substrates/pending-effects/index.js';
 import { subscribeConsent, listPendingConsentRequests } from '../substrates/consent/index.js';
@@ -25,8 +25,6 @@ import type { PluginErrorEventDetail } from '../state/pluginLoadEvents.js';
 import { presentationForSeverity } from '../state/messageClasses.js';
 import { isWindowFocused } from '../../utils/windowFocus.js';
 import { onWindowFocusChange } from '../../utils/windowFocusChange.js';
-import type { VerdictPresentation } from '../state/verdict.js';
-import { presentAiEngineVerdict, type AiEngineVerdictPresentation } from '../state/aiVerdict.js';
 import { isIndexingObservation } from '../state/readinessNotice.js';
 import { getSeenCursor, subscribeSeenCursor } from '../substrates/recall/recallCursor.js';
 import { getIndexedRoots, readIndexedRoots, subscribeIndexedRoots } from '../state/indexedRoots.js';
@@ -62,8 +60,7 @@ export class FrameStatusController implements ReactiveController {
   polite = '';
   politeKey = '';
   indexingAnnouncement = '';
-  verdictAnnouncement: VerdictPresentation['announce'] | null = null;
-  aiEngineAnnouncement: AiEngineVerdictPresentation['announce'] | null = null;
+  verdictAnnouncement: Spoken | null = null;
   private indexingTransition = false;
   private indexingWasPaused = false;
   private indexingAnnouncementKey: string | null = null;
@@ -121,8 +118,6 @@ export class FrameStatusController implements ReactiveController {
   private gaps = 0;
   private workSeenAtGap = 0;
   private installSeenAtGap = 0;
-  /** The AI engine state an unobserved install end left: stays unsaid until the state moves on (C6). */
-  private unsaidEngineKind: string | null = null;
   /** The engine's time of the last settling seen here, and how many settlings have shared it. */
   private settled: { readonly since: string; readonly repeat: number } | null = null;
   /** Grows with every focus change, so a focus read that began before one is known to be old. */
@@ -452,7 +447,6 @@ export class FrameStatusController implements ReactiveController {
       // One install, one start: the engine's time for it, the same in every window.
       const installStart = this.ai.installStatus?.startedAtEpochMs || now;
       this.installingSince = null;
-      if (!installEndSeenLive) this.unsaidEngineKind = this.ai.aiEngine.kind;
       if (this.ai.aiEngine.kind === 'online') {
         this.finished = { title: 'AI install complete', at: now };
         emitEphemeralToast({ message: 'AI install complete', classId: 'core.ai-engine.settled', silent: !installEndSeenLive });
@@ -462,19 +456,17 @@ export class FrameStatusController implements ReactiveController {
         void this.notifyDesktop(workFailedNotice('AI install failed', installEndSeenLive, endEventId('AI install failed', installStart)));
       }
     }
-    // 595 §15.1 — one verdict announcer and its AI-engine sibling, moved from the retired status
-    // bar into this always-mounted owner. Indexing transitions speak through the indexing announcer.
-    // A gap that only AI nobody asked for would fill is no warning here either (FA3b): the pill says it.
-    // FC10 — spoken by the rule that decides the visible pill (frameStatus), never a second one.
+    // 595 §15.1 — one verdict announcer, moved from the retired status bar into this always-mounted
+    // owner. Indexing transitions speak through the indexing announcer, in the indexing row's words.
+    // FC10, FC10a — spoken by the rule that decides the visible pill (frameStatus), in its words: the
+    // AI engine's own headlines ("Not Installed", "Install Failed") are words the pill never shows, so
+    // they are not spoken; its install's end is said by its notice, its needs by the pill's state.
     const spoken = spokenStatus(next, this.ai);
-    const verdict = spoken.verdict;
     this.indexingTransition = this.ai?.verdict.kind === 'transitioning' && this.ai.verdict.reasons.some(isIndexingObservation);
-    this.verdictAnnouncement = verdict && !this.indexingTransition ? verdict : null;
-    if (this.ai?.aiEngine.kind !== this.unsaidEngineKind) this.unsaidEngineKind = null;
-    this.aiEngineAnnouncement = this.ai && this.ai.aiEngine.kind !== 'indexing' && this.unsaidEngineKind === null
-      ? presentAiEngineVerdict(this.ai.aiEngine).announce : null;
-    const activityAnnouncement = [this.indexingTransition && p.activity.confirmed
-      ? verdict?.text ?? p.activity.summary : p.activity.summary, p.activity.detail].filter(Boolean).join(' — ');
+    this.verdictAnnouncement = spoken.verdict && !this.indexingTransition ? spoken.verdict : null;
+    // An indexing transition (a rebuild) is said by the indexing announcer, as the work it runs is titled.
+    const transition = this.indexingTransition && p.activity.confirmed && next.pill.kind === 'working' ? spoken.verdict?.text ?? null : null;
+    const activityAnnouncement = [transition ?? p.activity.summary, p.activity.detail].filter(Boolean).join(' — ');
     if (!spoken.indexing) {
       // Indexing work left out of the panel because it only waits for AI: nothing about it is said.
       this.indexingAnnouncement = '';

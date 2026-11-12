@@ -424,9 +424,9 @@ export function applyLocalIntent(observed: AiEngineVerdict, intent: AiEngineLoca
 // ---------------------------------------------------------------------------------------------
 // Presentation projection (Design pass 3) - mirrors `verdict.ts`'s `verdictHeadline`/`verdictTone`/
 // `presentVerdict` EXACTLY, extending `aiEngine` from a single-sourced VALUE (Design pass 2) to a
-// single-sourced PRESENTATION (headline/tone/body/announce) - the same 557 Display-to-Presentation
+// single-sourced PRESENTATION (headline/tone/body) - the same 557 Display-to-Presentation
 // lineage `verdict.ts` already documents for the search axis, now given to the AI axis. Every consumer
-// (the global footer pill via `computeStatusLabel`/`computeStatusTone`, the a11y announcer, the
+// (the global footer pill via `computeStatusLabel`/`computeStatusTone`, the
 // completion/failure toast) reads THIS, never `AiEngineKind` directly with its own switch - the same
 // discipline that keeps 594/595/596 from re-forking.
 //
@@ -435,7 +435,8 @@ export function applyLocalIntent(observed: AiEngineVerdict, intent: AiEngineLoca
 import type { NoticeTone } from '../components/SystemNotice.js';
 
 /**
- * The ONE human headline for the AI-engine verdict (the footer pill + a11y announcer read this).
+ * The ONE human headline for the AI-engine verdict (the footer pill, Health, AI Brain and the status
+ * panel read this).
  *
  * Wording note: `BrainSurface.ts`'s `statusConfig` table (its status card) used to keep its OWN copy of
  * this wording, saying "AI Online" for both `online`/`indexing` and carrying the online-vs-indexing
@@ -458,14 +459,14 @@ export function aiEngineHeadline(v: AiEngineVerdict): string {
     case 'installing':
       return 'Installing…';
     case 'install_failed':
-      return 'Install Failed';
+      // FC11a — the status panel's row, AI Brain's heading and Health read this one sentence.
+      return 'AI install failed';
     case 'offline':
       return 'Offline';
     case 'starting':
       // Callers needing the live "Starting… Ns" count-up (the footer pill) special-case this kind
       // themselves, reading `runtime.loadStartedAtMs` directly - a static headline cannot carry a
-      // ticking value. This plain label is still correct for non-live consumers (e.g. the a11y
-      // announcer, which announces the moment of transition, not a live count).
+      // ticking value. This plain label is still correct for non-live consumers (e.g. Health).
       return 'Starting…';
     case 'connecting':
       return 'Connecting…';
@@ -533,7 +534,7 @@ export function aiEngineBody(v: AiEngineVerdict): string {
     case 'installing':
       return 'Downloading models.';
     case 'install_failed':
-      return installFailureWords(v.installFailureCode);
+      return installFailureWords(v.installFailureCode, v.installFailure !== null);
     case 'offline':
       return 'Start AI to enable chat and summaries.';
     case 'starting':
@@ -551,15 +552,20 @@ export function aiEngineBody(v: AiEngineVerdict): string {
 }
 
 /**
- * FC11 — a failed AI install in words: what went wrong and what to do, by the install service's error
- * code (AiInstallService). The service's own message (a path, an exception) is not words for the
+ * FC11, FC11a — a failed AI install in words: what went wrong and what to do, by the install service's
+ * error code (AiInstallService). Advice follows a cause only where the code names it (a models folder
+ * that cannot be created or written is INSTALL_IO_ERROR); a code that says only that downloads failed
+ * does not say why (a network, a disk, a folder), so its words guess no cause and point to the detail
+ * for support when there is one. The service's own message (a path, an exception) is not words for the
  * person; surfaces show it once, labelled as detail for support (`installFailure`).
  */
-function installFailureWords(code: string | undefined): string {
+function installFailureWords(code: string | undefined, detailed: boolean): string {
+  const again = detailed ? 'Install again; if it stops again, the detail for support says why.' : 'Install again.';
   switch (code) {
     case 'ALL_DOWNLOADS_FAILED':
+      return `None of the AI model files could be downloaded and saved. ${again}`;
     case 'REQUIRED_DOWNLOADS_FAILED':
-      return 'The AI model files could not be downloaded or saved. Check the internet connection and the free space on the disk, then install again.';
+      return `Some AI model files that are needed could not be downloaded and saved. ${again}`;
     case 'INSTALL_IO_ERROR':
     case 'IO_ERROR':
       return 'The folder for AI models could not be created or written to. Check the free space on the disk and that the folder can be written to, then install again.';
@@ -578,17 +584,14 @@ export interface AiEngineVerdictPresentation {
   readonly tone: NoticeTone;
   readonly headline: string;
   readonly body: string;
-  /** The screen-reader announcement of an AI-ENGINE VERDICT CHANGE - mirrors `presentVerdict`'s
-   * `announce` exactly (595 §15.1 / E1's pattern, a second instance for the AI axis). `alert`
-   * (assertive) only for the one error-toned kind (`install_failed`), else `status` (polite). */
-  readonly announce: { readonly text: string; readonly politeness: 'status' | 'alert' };
 }
 
 /**
  * The ONE AI-engine verdict-presentation projection (Design pass 3, mirroring `presentVerdict`
  * structurally). Every surface consumes this - the footer pill (headline + tone, via
- * `computeStatusLabel`/`computeStatusTone`), the a11y announcer (`announce`), and (indirectly, via the
- * `AiEngineKind` transition it drives) the completion/failure toast tracker.
+ * `computeStatusLabel`/`computeStatusTone`) and (indirectly, via the `AiEngineKind` transition it
+ * drives) the completion/failure toast tracker. Its headlines are not spoken by the status pill, which
+ * says only what it shows (FC10a).
  */
 export function presentAiEngineVerdict(v: AiEngineVerdict): AiEngineVerdictPresentation {
   const headline = aiEngineHeadline(v);
@@ -597,6 +600,5 @@ export function presentAiEngineVerdict(v: AiEngineVerdict): AiEngineVerdictPrese
     tone,
     headline,
     body: aiEngineBody(v),
-    announce: { text: headline, politeness: v.kind === 'install_failed' ? 'alert' : 'status' },
   };
 }

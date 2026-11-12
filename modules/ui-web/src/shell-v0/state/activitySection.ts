@@ -7,7 +7,7 @@
  * split) is not the consumer and leaves it alone. The request is held until that Activity takes it,
  * because navigating there is asynchronous and the Activity may mount after the address is known.
  */
-export type ActivitySection = 'background-runs' | 'effect-journal';
+export type ActivitySection = 'background-runs' | 'effect-journal' | 'all-activity';
 
 let requested: ActivitySection | null = null;
 /** The window the navigation that followed the request lands on; null until it is applied. */

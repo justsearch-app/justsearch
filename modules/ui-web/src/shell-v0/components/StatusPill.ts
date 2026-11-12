@@ -302,7 +302,9 @@ export class StatusPill extends JfElement {
   private clickedNotice: string | null = null;
   private readonly executing = new Set<string>();
   private async act(action: StatusAction): Promise<void> {
-    if (action.kind === 'background-runs') { this.close(); requestActivitySection('background-runs'); requestSurfaceNavigation('core.activity-surface'); return; }
+    // FC6a — Activity is arrived at as Ctrl+K arrives at its journal: the request goes to the Activity
+    // the navigation shows, which takes the keyboard from the closing panel.
+    if (action.kind === 'background-runs' || action.kind === 'all-activity') { this.close(); requestActivitySection(action.kind); requestSurfaceNavigation('core.activity-surface'); return; }
     if (action.kind === 'navigate') { this.close(); requestSurfaceNavigation(action.target); return; }
     if (action.kind === 'install-toggle') {
       if (this.executing.has('install')) return;
@@ -447,8 +449,6 @@ export class StatusPill extends JfElement {
       <jf-system-notice class="visually-hidden" live="status" data-testid="indexing-announcer">${this.status.indexingAnnouncement}</jf-system-notice>
       ${this.status.verdictAnnouncement ? html`<jf-system-notice class="visually-hidden" live=${this.status.verdictAnnouncement.politeness}
         data-testid="verdict-announcer">${this.status.verdictAnnouncement.text}</jf-system-notice>` : nothing}
-      ${this.status.aiEngineAnnouncement ? html`<jf-system-notice class="visually-hidden" live=${this.status.aiEngineAnnouncement.politeness}
-        data-testid="ai-engine-announcer">${this.status.aiEngineAnnouncement.text}</jf-system-notice>` : nothing}
       ${keyed(this.status.politeKey, html`<span class="visually-hidden" role="status" aria-live="polite">${this.status.polite}</span>`)}
       ${keyed(this.status.assertiveKey, html`<span class="visually-hidden" role="alert" aria-live="assertive">${this.status.assertive}</span>`)}`;
   }

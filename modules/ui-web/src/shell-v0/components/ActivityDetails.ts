@@ -42,7 +42,7 @@ import {
 import { formatScanDuration } from '../operations/ActionLedgerClient.js';
 import {
   ASKED_WORDS, GATE_WORDS, GRANT_WORDS, OUTCOME_WORDS, RECEIPT_WORDS, RECORD_WORDS,
-  groupSourceWords, indexResultWords, recordTitle, rowTitle, sourceWords, whoWords, words,
+  groupSourceWords, indexResultWords, recordTitle, rowOutcomeWords, rowTitle, sourceWords, whoWords, words,
 } from '../operations/activityWords.js';
 import { ReceiptWatch, isPending, isTerminalReceipt, type ReceiptState } from '../operations/operationReceipt.js';
 import {
@@ -397,9 +397,10 @@ export class ActivityDetails extends JfElement {
 
   private renderRelated(related: readonly FeedRow[]): TemplateResult {
     // An approval's or a permission's title says its decision; only an execution adds how it ended.
-    return html`<h4>Same request</h4><ul data-testid="activity-details-related">${related.map((r) => html`<li>${rowTitle(r)}${
-      r.entry.outcome && r.ledger?.kind !== 'gate' && r.ledger?.kind !== 'grant' ? ` · ${words(OUTCOME_WORDS, r.entry.outcome)}` : ''
-    } · ${when(r.entry.occurredAt)}</li>`)}</ul>`;
+    return html`<h4>Same request</h4><ul data-testid="activity-details-related">${related.map((r) => {
+      const ended = r.entry.outcome ? rowOutcomeWords(r.entry.kind, r.entry.outcome) : null;
+      return html`<li>${rowTitle(r)}${ended ? ` · ${ended}` : ''} · ${when(r.entry.occurredAt)}</li>`;
+    })}</ul>`;
   }
 
   /** The agent run a record names, linked only where Activity knows that run. */

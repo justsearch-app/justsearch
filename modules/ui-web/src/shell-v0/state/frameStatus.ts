@@ -3,11 +3,11 @@
 import type { AiState } from './aiStateStore.js';
 import { selectIndexingProgress, type IndexingProgress } from './indexingProgress.js';
 import { awaitsUnrequestedAi, gapOnlyAiProvides, isSearchUnavailableCause, isReindexCause, readinessNotice, warrantsSearchDegradationBanner } from './readinessNotice.js';
-import { aiEngineBody } from './aiVerdict.js';
+import { aiEngineBody, aiEngineHeadline } from './aiVerdict.js';
 import { formatBytes, formatCount } from '../display/format.js';
 import { indexingCountsLine, indexingCountsLabel, enrichingCountsLine, enrichingCountsLabel } from './statusProgress.js';
 import { indexingTaskStatus } from './indexingProgress.js';
-import { presentVerdict, verdictHeadline, type VerdictPresentation } from './verdict.js';
+import { verdictHeadline } from './verdict.js';
 import type { AdvisoryRecord } from '../components/advisory/AdvisoryStore.js';
 import { advisoryClassChrome, healthAdvisoryReasonBody } from '../components/advisory/AdvisoryClassChrome.js';
 import { interpolateMessage } from '../../i18n/resourceCatalog.js';
@@ -27,6 +27,8 @@ export const FINISHED_DWELL_MS = 6_000;
 const FILE_ACTIVITY_ID = 'indexing-files';
 export type StatusSection = 'needs' | 'problems' | 'running' | 'earlier';
 export interface StatusAction { readonly label: string; readonly kind: 'navigate' | 'advisory' | 'proposal' | 'reject-proposal' | 'authorization' | 'consent' | 'cancel-task' | 'plugin-copy' | 'dismiss-plugin' | 'install-toggle' | 'background-runs'
+  /** FC6a — Activity's whole feed, arrived at like Ctrl+K's journal: its filters reset, the keyboard in it. */
+  | 'all-activity'
   | 'authorization-allow' | 'authorization-allow-always' | 'authorization-deny' | 'authorization-review'
   /** Opens the row's review inside the panel (the panel handles it; nothing leaves the panel). */
   | 'review'
@@ -135,6 +137,8 @@ interface FrameStatusInput {
 interface StatusPillState {
   readonly kind: 'unreachable' | 'limited' | 'needs' | 'problems' | 'working' | 'finished' | 'calm' | 'unknown';
   readonly label: string;
+  /** A stale pill's state in its own words, without the age and the checking its label adds (FC10a). */
+  readonly words?: string;
   readonly stale: boolean;
   readonly percent?: number | null;
   /** Needs-you or problems count, shown as the pill's badge. */
@@ -326,27 +330,40 @@ function foldDecisions(activity: readonly UnifiedActionEntry[]): { folded: Set<s
 const CHECKING = 'Checking search status';
 const UNREACHABLE = "Can't reach the engine";
 
+/** A live region's words and how urgently they are said. */
+export interface Spoken { readonly text: string; readonly politeness: 'status' | 'alert' }
+
 /**
- * FC10 — what the status pill's hidden live regions say, by the rule that decides the visible pill.
- * While the pill says it is checking the search status, or that the engine cannot be reached, the
- * search status is spoken as that: never a verdict the pill does not show ("Catching up…" beside
- * "Checking search status"). Otherwise the search verdict is spoken, except a gap only AI nobody asked
- * for would fill (the AI verdict says who asked), where the pill is calm. Indexing work the panel
- * leaves out because it only waits for AI (semantic work waiting for AI nobody asked for, or for the
- * AI install row that speaks for it) is not spoken either: `indexing` is false then.
+ * FC10, FC10a — what the status pill's hidden live regions say, by the rule that decides the visible
+ * pill: its search status is the pill's own words, in every state, and no others. While the pill is
+ * checking the search status (or a calm claim can no longer be confirmed) that is "Checking search
+ * status"; once the engine cannot be reached, assertively, that it cannot; otherwise what the pill
+ * shows ("Up to date", "Keyword search ready", "1 needs you", "Search limited"), without the age a
+ * stale pill adds, so a verdict the pill does not show ("Catching up…", "Service degraded") is never
+ * spoken. While work runs, indexing is said by the indexing announcer; the first other work that runs
+ * now is said by its row's title ("Rebuilding search", "Installing AI models") — by the indexing
+ * announcer while it is an indexing transition — and nothing for work whose state is unconfirmed. A
+ * passing completion is said by its own notice, not twice. Indexing work the panel leaves
+ * out because it only waits for AI (semantic work waiting for AI nobody asked for, or for the AI
+ * install row that speaks for it) is not spoken either: `indexing` is false then.
  */
 export function spokenStatus(model: FrameStatus, ai: AiState | null): {
-  readonly verdict: VerdictPresentation['announce'] | null;
+  readonly verdict: Spoken | null;
   readonly indexing: boolean;
 } {
   const pill = model.pill;
   const listed = [...model.sections.needs, ...model.sections.problems, ...model.sections.running]
     .some(row => row.id === 'indexing' || row.id === 'indexing-hold');
   const indexing = listed || ['ready', 'unknown'].includes(model.progress.phase);
-  if (pill.kind === 'unreachable') return { verdict: { text: UNREACHABLE, politeness: 'alert' }, indexing };
-  if (pill.kind === 'unknown') return { verdict: { text: CHECKING, politeness: 'status' }, indexing };
-  if (!ai || awaitsUnrequestedAi(ai.verdict, ai.aiEngine)) return { verdict: null, indexing };
-  return { verdict: presentVerdict(ai.verdict).announce, indexing };
+  if (pill.kind === 'finished') return { verdict: null, indexing };
+  if (pill.kind === 'working') {
+    const work = model.sections.running.find(row => !row.stale && row.id !== 'indexing' && row.id !== FILE_ACTIVITY_ID
+      && row.id !== 'file-window' && !row.id.startsWith('folder-work:'));
+    return { verdict: work ? { text: work.title, politeness: 'status' } : null, indexing };
+  }
+  const text = pill.kind === 'unknown' || (pill.stale && pill.kind === 'calm') ? CHECKING : pill.words ?? pill.label;
+  const urgent = pill.kind === 'unreachable' || (pill.kind === 'limited' && ai?.verdict.severity === 'error');
+  return { verdict: { text, politeness: urgent ? 'alert' : 'status' }, indexing };
 }
 
 export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
@@ -431,7 +448,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
         ...(removed.collection && removed.collection !== 'default' ? { collection: removed.collection } : {}) }] : [];
     add({ id: `activity:${entry.id}`, section: 'earlier', title: words.title,
       ...(words.detail ? { detail: words.detail } : {}), tone: words.tone, occurredAt: entry.occurredAt,
-      actions: [...addAgain, go('All activity', 'core.activity-surface')] });
+      actions: [...addAgain, { kind: 'all-activity', target: 'core.activity-surface', label: 'All activity' }] });
   }
   for (const root of input.roots ?? []) {
     // R4 — a folder is named by its folder name, with the full path as detail; the collection
@@ -547,7 +564,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   // FC11 — what went wrong and what to do in the AI verdict's words; the install service's own message
   // only once, under Details, labelled for support.
   if (ai && engine && aiInstallNeedsYou) add({ id: engine.kind === 'install_failed' ? 'ai-install-failed' : 'ai-install-paused',
-    section: 'needs', title: engine.kind === 'install_failed' ? 'AI install failed' : 'AI download paused', detail: aiEngineBody(engine),
+    section: 'needs', title: engine.kind === 'install_failed' ? aiEngineHeadline(engine) : 'AI download paused', detail: aiEngineBody(engine),
     ...(engine.kind === 'install_failed' && engine.installFailure ? { details: [{ id: 'ai-install-support', section: 'needs' as const,
       title: `Detail for support: ${engine.installFailure}` }] } : {}),
     stale: !ai.installObservationLive, actions: [go('Open AI Brain', 'core.brain-surface')] });
@@ -645,7 +662,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     const age = ai?.connection.lastSuccessMs == null ? null : Math.max(0, Math.floor((now - ai.connection.lastSuccessMs) / 60_000));
     // No retained calm claim while an observation is stale. The contact signal determines ONLY
     // "reconnecting"; a reachable origin with a stale poll says "checking".
-    pill = { ...pill, label: `${pill.kind === 'calm' ? 'Search status' : pill.label} · ${age === null ? 'not yet observed' : `last seen ${age < 1 ? 'just now' : `${age} min ago`}`} · ${ai?.connection.reachable || !pastGrace ? 'checking' : 'reconnecting'}` };
+    pill = { ...pill, words: pill.label, label: `${pill.kind === 'calm' ? 'Search status' : pill.label} · ${age === null ? 'not yet observed' : `last seen ${age < 1 ? 'just now' : `${age} min ago`}`} · ${ai?.connection.reachable || !pastGrace ? 'checking' : 'reconnecting'}` };
   }
   return { pill, sections, progress };
 }

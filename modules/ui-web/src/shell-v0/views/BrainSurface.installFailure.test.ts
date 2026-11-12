@@ -71,8 +71,9 @@ describe('FC11 the status panel\'s failed AI install', () => {
     const row = panel.shadowRoot!.querySelector<HTMLElement>('article[data-fact="ai-install-failed"]');
     expect(row, 'the failed install is listed').not.toBeNull();
     expect(words(row)).toContain('AI install failed');
-    expect(words(row), 'what went wrong').toMatch(/could not be downloaded or saved/);
-    expect(words(row), 'what to do').toMatch(/Check the internet connection and the free space on the disk, then install again/);
+    expect(words(row), 'what went wrong').toMatch(/None of the AI model files could be downloaded and saved/);
+    // FC11a — the code says the downloads failed, not why: no guessed cause, the detail says it.
+    expect(words(row), 'what to do').toMatch(/Install again; if it stops again, the detail for support says why/);
     expect(occurrences(words(panel.shadowRoot)), 'the Engine\'s message is not the row\'s words').toBe(0);
     const details = [...row!.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.trim() === 'Details');
     expect(details, 'Details are offered').toBeDefined();
@@ -95,8 +96,8 @@ describe('FC11 AI Brain\'s failed install', () => {
     document.body.append(el);
     for (let i = 0; i < 3; i++) { await new Promise((resolve) => setTimeout(resolve, 0)); await el.updateComplete; }
     const text = words(el.shadowRoot);
-    expect(text, 'what went wrong').toMatch(/could not be downloaded or saved/);
-    expect(text, 'what to do').toMatch(/then install again/);
+    expect(text, 'what went wrong').toMatch(/None of the AI model files could be downloaded and saved/);
+    expect(text, 'what to do').toMatch(/Install again/);
     expect(occurrences(text), `the Engine's message once: ${text}`).toBe(1);
     const support = [...el.shadowRoot!.querySelectorAll('jf-error-alert')].filter((node) => (node.textContent ?? '').includes(RAW));
     expect(support).toHaveLength(1);

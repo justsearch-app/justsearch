@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-12T09:39:13.598Z",
-  "revision": "a3457998b6d695c614e696712bdfa6c275824e32",
-  "tree": "1939efbe997454be5eff6cb270660826d16b552d",
+  "createdAt": "2026-11-12T12:13:03.693Z",
+  "revision": "2cc52382dc285162539580fe4e17a5b4673f6d8f",
+  "tree": "95e5a3c6efa36feb6ccd0ff5a4aefa733042d00f",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts\" \"src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts\" \"src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/8jrt7cf8/tmp/test-intent-vitest-29419-1794476192783.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts\" \"src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts\" \"src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/kplvoidg/tmp/test-intent-vitest-74261-1794485422711.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 82534
+      "durationMs": 84186
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts\" \"src/shell-v0/components/ActionLedgerView.rowWords.test.ts\" \"src/shell-v0/components/ActionLedgerView.test.ts\" \"src/shell-v0/state/pillAnnouncements.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" \"src/shell-v0/views/BrainSurface.installFailure.test.ts\" \"src/shell-v0/state/aiVerdict.test.ts\" \"src/shell-v0/state/unrequestedAi.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8jrt7cf8/tmp/test-intent-vitest-29419-1794476275318.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts\" \"src/shell-v0/components/ActionLedgerView.rowWords.test.ts\" \"src/shell-v0/components/ActionLedgerView.test.ts\" \"src/shell-v0/state/pillAnnouncements.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" \"src/shell-v0/views/BrainSurface.installFailure.test.ts\" \"src/shell-v0/state/aiVerdict.test.ts\" \"src/shell-v0/state/unrequestedAi.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/kplvoidg/tmp/test-intent-vitest-74261-1794485506899.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1492
+      "durationMs": 2067
     }
   ],
   "checks": [
@@ -395,7 +395,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#mirrors the verdict politely and an error verdict assertively, never as \"All systems operational\"",
       "file": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:02f7c0507e48780fdc58a49aafb123de96b2d2a1acfde42444893d1fa9bf0dfd",
+      "contentDigest": "sha256:661c29bc26f904dd02127b7e80087380b3a8d9c374b224eec7b194625ed67214",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -410,7 +410,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.installFailure.test.ts#says what went wrong and what to do, with the Engine's message once, under Details, labelled for support",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.installFailure.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:7138071cf5e8dc8e7c1c84fef218e420e7b3c1921131aad7f72f7fec7d4a927f",
+      "contentDigest": "sha256:55eeb901371466c3a7fe44964385aeeb78deb706e1a8120811d039b57ff7fe6e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -425,7 +425,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.installFailure.test.ts#says what went wrong and what to do, with the Engine's message once, labelled for support",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.installFailure.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:7138071cf5e8dc8e7c1c84fef218e420e7b3c1921131aad7f72f7fec7d4a927f",
+      "contentDigest": "sha256:55eeb901371466c3a7fe44964385aeeb78deb706e1a8120811d039b57ff7fe6e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -440,7 +440,7 @@
       "id": "modules/ui-web/src/shell-v0/state/aiVerdict.test.ts#install_failed says in words what went wrong and what to do; the service's own text is not the body (FC11)",
       "file": "modules/ui-web/src/shell-v0/state/aiVerdict.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b22b798a8b34c5435aed6bdaa28410e99410f6c2aa6ac50bd082df904ca20c53",
+      "contentDigest": "sha256:55cb0d01e515300e9375dd00a9bd6416edcd608afee66483a88c3c1307dab4e2",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -455,7 +455,7 @@
       "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#the rows say what happened in the AI verdict's own words",
       "file": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b0cfc1f2fdd1ea1a154aa172999892c9a36c1add4a5eece8526838656ec414d7",
+      "contentDigest": "sha256:ec85bd2fa967a5dbe383629cb3a5fce451e3c1bf7676feaed9c879b3e6f0caa5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -468,173 +468,173 @@
     }
   ],
   "failBefore": {
-    "ref": "origin/main",
+    "ref": "d8f6c9d13f",
     "revision": "d8f6c9d13ff0e8fb6af13a248855d3f7508c0d9d",
     "overlays": [],
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts\" \"src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts\" \"src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/8jrt7cf8/tmp/test-intent-vitest-29419-1794476279288.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts\" \"src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts\" \"src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/kplvoidg/tmp/test-intent-vitest-74261-1794485510586.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 72105,
-        "output": "JSON report written to /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-vitest-29419-1794476279288.json\n\n"
+        "durationMs": 70341,
+        "output": "JSON report written to /home/elias/.cache/am/kplvoidg/tmp/test-intent-vitest-74261-1794485510586.json\n\n"
       },
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts\" \"src/shell-v0/components/ActionLedgerView.rowWords.test.ts\" \"src/shell-v0/components/ActionLedgerView.test.ts\" \"src/shell-v0/state/pillAnnouncements.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" \"src/shell-v0/views/BrainSurface.installFailure.test.ts\" \"src/shell-v0/state/aiVerdict.test.ts\" \"src/shell-v0/state/unrequestedAi.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/8jrt7cf8/tmp/test-intent-vitest-29419-1794476351393.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts\" \"src/shell-v0/components/ActionLedgerView.rowWords.test.ts\" \"src/shell-v0/components/ActionLedgerView.test.ts\" \"src/shell-v0/state/pillAnnouncements.test.ts\" \"src/shell-v0/components/StatusPill.transitions.test.ts\" \"src/shell-v0/views/BrainSurface.installFailure.test.ts\" \"src/shell-v0/state/aiVerdict.test.ts\" \"src/shell-v0/state/unrequestedAi.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/kplvoidg/tmp/test-intent-vitest-74261-1794485580928.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1961,
-        "output": "JSON report written to /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-vitest-29419-1794476351393.json\n\n"
+        "durationMs": 2507,
+        "output": "JSON report written to /home/elias/.cache/am/kplvoidg/tmp/test-intent-vitest-74261-1794485580928.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts#FC6 at 1280×720, a hidden Activity connected first leaves the arrival to the Activity navigation shows",
         "classification": "assertion",
-        "detail": "FC6 at 1280×720, a hidden Activity connected first leaves the arrival to the Activity navigation shows:  AssertionError: its feed is scoped to this window's records: expected 'all' to be 'local' // Object.is equality\n    at expectArrivedAt (/home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts:216:72)\n    at /home/elias/."
+        "detail": "FC6 at 1280×720, a hidden Activity connected first leaves the arrival to the Activity navigation shows:  AssertionError: its feed is scoped to this window's records: expected 'all' to be 'local' // Object.is equality\n    at expectArrivedAt (/home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts:216:72)\n    at /home/elias/."
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts#FC6 at 600×400 with 200% text, a hidden Activity connected first leaves the arrival to the Activity navigation shows",
         "classification": "assertion",
-        "detail": "FC6 at 600×400 with 200% text, a hidden Activity connected first leaves the arrival to the Activity navigation shows:  AssertionError: its feed is scoped to this window's records: expected 'all' to be 'local' // Object.is equality\n    at expectArrivedAt (/home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts:216:72)\n    at /home/elias/."
+        "detail": "FC6 at 600×400 with 200% text, a hidden Activity connected first leaves the arrival to the Activity navigation shows:  AssertionError: its feed is scoped to this window's records: expected 'all' to be 'local' // Object.is equality\n    at expectArrivedAt (/home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts:216:72)\n    at /home/elias/."
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts#FC6 at 1280×720 in forced colours, a hidden Activity connected first leaves the arrival to the Activity navigation shows",
         "classification": "assertion",
-        "detail": "FC6 at 1280×720 in forced colours, a hidden Activity connected first leaves the arrival to the Activity navigation shows:  AssertionError: its feed is scoped to this window's records: expected 'all' to be 'local' // Object.is equality\n    at expectArrivedAt (/home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts:216:72)\n    at /home/elias/."
+        "detail": "FC6 at 1280×720 in forced colours, a hidden Activity connected first leaves the arrival to the Activity navigation shows:  AssertionError: its feed is scoped to this window's records: expected 'all' to be 'local' // Object.is equality\n    at expectArrivedAt (/home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts:216:72)\n    at /home/elias/."
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts#FC6 split: with Activity in the second window, the arrival goes to the Activity the navigation shows",
         "classification": "assertion",
-        "detail": "FC6 split: with Activity in the second window, the arrival goes to the Activity the navigation shows:  AssertionError: it has the keyboard: expected false to be true // Object.is equality\n    at expectArrivedAt (/home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts:218:49)\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-"
+        "detail": "FC6 split: with Activity in the second window, the arrival goes to the Activity the navigation shows:  AssertionError: it has the keyboard: expected false to be true // Object.is equality\n    at expectArrivedAt (/home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/views/ActivitySurface.arrival-lockdown.test.ts:218:49)\n    at /home/elias/.cache/am/kplvoidg/tmp/test-"
       },
       {
         "id": "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts#two Engines with the same hash: each name is read from, and remembered for, its own Engine",
         "classification": "assertion",
-        "detail": "FC7 the resolver remembers each Engine's own answer two Engines with the same hash: each name is read from, and remembered for, its own Engine:  AssertionError: expected '/engine-a/reports/report.pdf' to be '/engine-b/notes/other.txt' // Object.is equality\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts:70:74\n    at processTicksAndRejections (node:int"
+        "detail": "FC7 the resolver remembers each Engine's own answer two Engines with the same hash: each name is read from, and remembered for, its own Engine:  AssertionError: expected '/engine-a/reports/report.pdf' to be '/engine-b/notes/other.txt' // Object.is equality\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts:70:74\n    at processTicksAndRejections (node:int"
       },
       {
         "id": "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts#one Engine's \"not found\" is not another Engine's answer (a profile switched to another Engine)",
         "classification": "assertion",
-        "detail": "FC7 the resolver remembers each Engine's own answer one Engine's \"not found\" is not another Engine's answer (a profile switched to another Engine):  AssertionError: expected null to be '/engine-b/notes/other.txt' // Object.is equality\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts:81:74\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activit"
+        "detail": "FC7 the resolver remembers each Engine's own answer one Engine's \"not found\" is not another Engine's answer (a profile switched to another Engine):  AssertionError: expected null to be '/engine-b/notes/other.txt' // Object.is equality\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts:81:74\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activit"
       },
       {
         "id": "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts#a tray whose Engine has its own address names the file from that Engine, not the page's origin",
         "classification": "assertion",
-        "detail": "FC7 the Tasks tray asks the Engine it reads from a tray whose Engine has its own address names the file from that Engine, not the page's origin:  AssertionError: every file-name read went to the Engine: http://localhost:3000/api/library/path-label: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts:133:130"
+        "detail": "FC7 the Tasks tray asks the Engine it reads from a tray whose Engine has its own address names the file from that Engine, not the page's origin:  AssertionError: every file-name read went to the Engine: http://localhost:3000/api/library/path-label: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts:133:130"
       },
       {
         "id": "modules/ui-web/src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts#after the tray moves to another Engine, the earlier Engine's late answer names nothing",
         "classification": "assertion",
-        "detail": "FC7 the Tasks tray asks the Engine it reads from after the tray moves to another Engine, the earlier Engine's late answer names nothing:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts:140:56\n    at Timeout.checkCallback (file:///home/elias/dev/justsearch/.claude/worktrees/f-activ"
+        "detail": "FC7 the Tasks tray asks the Engine it reads from after the tray moves to another Engine, the earlier Engine's late answer names nothing:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/hooks/resolvePathLazy.engineAddress.test.ts:140:56\n    at Timeout.checkCallback (file:///home/elias/dev/justsearch/.claude/worktrees/f-activ"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC8 at 600×400 with 200% text, 160 records draw and scroll without an uncaught ResizeObserver loop error",
         "classification": "assertion",
-        "detail": "FC8 at 600×400 with 200% text, 160 records draw and scroll without an uncaught ResizeObserver loop error:  AssertionError: no loop error while scrolling to the oldest record and back: expected [ …(17) ] to deeply equal []\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts:211:101\n    at file:///home/elias/dev/jus"
+        "detail": "FC8 at 600×400 with 200% text, 160 records draw and scroll without an uncaught ResizeObserver loop error:  AssertionError: no loop error while scrolling to the oldest record and back: expected [ …(17) ] to deeply equal []\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts:211:101\n    at file:///home/elias/dev/jus"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC9 at 1280×720, the rows on screen read in words, never in recorded codes",
         "classification": "assertion",
-        "detail": "FC9 at 1280×720, the rows on screen read in words, never in recorded codes:  AssertionError: row text: agent GATED Rebuild Index (TYPED_CONFIRM) backend just now: expected 'agent GATED Rebuild Index (TYPED_CONF…' not to match /\\b(SUCCESS|FAILURE|DENIED|GATED|DONE|…/\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/views/Activity"
+        "detail": "FC9 at 1280×720, the rows on screen read in words, never in recorded codes:  AssertionError: row text: agent GATED Rebuild Index (TYPED_CONFIRM) backend just now: expected 'agent GATED Rebuild Index (TYPED_CONF…' not to match /\\b(SUCCESS|FAILURE|DENIED|GATED|DONE|…/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/views/Activity"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC9 at 600×400 with 200% text, the rows on screen read in words, never in recorded codes",
         "classification": "assertion",
-        "detail": "FC9 at 600×400 with 200% text, the rows on screen read in words, never in recorded codes:  AssertionError: row text: agent GATED Rebuild Index (TYPED_CONFIRM) backend just now: expected 'agent GATED Rebuild Index (TYPED_CONF…' not to match /\\b(SUCCESS|FAILURE|DENIED|GATED|DONE|…/\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/views/Activity"
+        "detail": "FC9 at 600×400 with 200% text, the rows on screen read in words, never in recorded codes:  AssertionError: row text: agent GATED Rebuild Index (TYPED_CONFIRM) backend just now: expected 'agent GATED Rebuild Index (TYPED_CONF…' not to match /\\b(SUCCESS|FAILURE|DENIED|GATED|DONE|…/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/views/Activity"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/ActivitySurface.manyRows-lockdown.test.ts#FC9 at 1280×720 in forced colours, the rows on screen read in words, never in recorded codes",
         "classification": "assertion",
-        "detail": "FC9 at 1280×720 in forced colours, the rows on screen read in words, never in recorded codes:  AssertionError: row text: agent GATED Rebuild Index (TYPED_CONFIRM) backend just now: expected 'agent GATED Rebuild Index (TYPED_CONF…' not to match /\\b(SUCCESS|FAILURE|DENIED|GATED|DONE|…/\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/views/Activity"
+        "detail": "FC9 at 1280×720 in forced colours, the rows on screen read in words, never in recorded codes:  AssertionError: row text: agent GATED Rebuild Index (TYPED_CONFIRM) backend just now: expected 'agent GATED Rebuild Index (TYPED_CONF…' not to match /\\b(SUCCESS|FAILURE|DENIED|GATED|DONE|…/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/views/Activity"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#the backend's records: who, what and how it ended in words, never their codes",
         "classification": "assertion",
-        "detail": "FC9 rows read in words the backend's records: who, what and how it ended in words, never their codes:  AssertionError: row: user copy-to-clipboard backend 2026-11-01: expected 'user copy-to-clipboard backend 2026-1…' not to match /\\b(SUCCESS|FAILURE|UNDONE|DENIED|GATE…/\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords"
+        "detail": "FC9 rows read in words the backend's records: who, what and how it ended in words, never their codes:  AssertionError: row: user copy-to-clipboard backend 2026-11-01: expected 'user copy-to-clipboard backend 2026-1…' not to match /\\b(SUCCESS|FAILURE|UNDONE|DENIED|GATE…/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#index records say indexed or failed, and who did it is the engine",
         "classification": "assertion",
-        "detail": "FC9 rows read in words index records say indexed or failed, and who did it is the engine:  AssertionError: row: system Index failed · notes (bbbbbb) ✕ FAILED backend 2026-11-01: expected 'system Index failed · notes (bbbbbb) …' not to match /\\b(SUCCESS|FAILURE|UNDONE|DENIED|GATE…/\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/components/Ac"
+        "detail": "FC9 rows read in words index records say indexed or failed, and who did it is the engine:  AssertionError: row: system Index failed · notes (bbbbbb) ✕ FAILED backend 2026-11-01: expected 'system Index failed · notes (bbbbbb) …' not to match /\\b(SUCCESS|FAILURE|UNDONE|DENIED|GATE…/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/components/Ac"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#this window's journal: its actions in words, an invocation by its operation",
         "classification": "assertion",
-        "detail": "FC9 rows read in words this window's journal: its actions in words, an invocation by its operation:  AssertionError: row: user navigate: Library local just now Recorded locally: expected 'user navigate: Library local just now…' not to match /\\b(SUCCESS|FAILURE|UNDONE|DENIED|GATE…/\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/components/ActionLedger"
+        "detail": "FC9 rows read in words this window's journal: its actions in words, an invocation by its operation:  AssertionError: row: user copy-to-clipboard local just now Recorded locally: expected 'user copy-to-clipboard local just now…' not to match /\\b(SUCCESS|FAILURE|UNDONE|DENIED|GATE…/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/components/ActionLedger"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.rowWords.test.ts#after a reload, the restored journal's rows read in words too",
         "classification": "assertion",
-        "detail": "FC9 rows read in words after a reload, the restored journal's rows read in words too:  AssertionError: row: agent Rebuild Index local 2026-11-01 Recorded locally: expected 'agent Rebuild Index local 2026-11-01 …' not to match /\\b(SUCCESS|FAILURE|UNDONE|DENIED|GATE…/\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/components/ActionLedgerV"
+        "detail": "FC9 rows read in words after a reload, the restored journal's rows read in words too:  AssertionError: row: agent Rebuild Index local 2026-11-01 Recorded locally: expected 'agent Rebuild Index local 2026-11-01 …' not to match /\\b(SUCCESS|FAILURE|UNDONE|DENIED|GATE…/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/components/ActionLedgerV"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts#projects occurredAt + outcome — the \"timing\" and \"outcomes\" the subtitle promises (tempdoc 558 Deepening 3)",
         "classification": "assertion",
-        "detail": "<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view) projects occurredAt + outcome — the \"timing\" and \"outcomes\" the subtitle promises (tempdoc 558 Deepening 3):  AssertionError: expected '✓ SUCCESS' to contain 'Succeeded'\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts:240:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-web/node_modules/"
+        "detail": "<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view) projects occurredAt + outcome — the \"timing\" and \"outcomes\" the subtitle promises (tempdoc 558 Deepening 3):  AssertionError: expected '✓ SUCCESS' to contain 'Succeeded'\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts:240:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-web/node_modules/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts#renders a FAILURE outcome as the error tone + glyph — failed must read as failed (tempdoc 558)",
         "classification": "assertion",
-        "detail": "<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view) renders a FAILURE outcome as the error tone + glyph — failed must read as failed (tempdoc 558):  AssertionError: expected '✕ FAILURE' to contain 'Failed'\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts:264:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-web/node_modules/@vi"
+        "detail": "<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view) renders a FAILURE outcome as the error tone + glyph — failed must read as failed (tempdoc 558):  AssertionError: expected '✕ FAILURE' to contain 'Failed'\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts:264:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-web/node_modules/@vi"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts#filters the stream by originator via FilterChip facets (tempdoc 558 §E1)",
         "classification": "assertion",
-        "detail": "<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view) filters the stream by originator via FilterChip facets (tempdoc 558 §E1):  AssertionError: expected 'agent' to contain 'The assistant'\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts:375:57\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-web/node_modules/"
+        "detail": "<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view) filters the stream by originator via FilterChip facets (tempdoc 558 §E1):  AssertionError: expected 'agent' to contain 'The assistant'\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/components/ActionLedgerView.test.ts:375:57\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-web/node_modules/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A19 — on a light forced-colours palette, the unread mark stays visible with its label, and an outcome reads as a glyph and a word",
         "classification": "assertion",
-        "detail": "A19 — on a light forced-colours palette, the unread mark stays visible with its label, and an outcome reads as a glyph and a word:  AssertionError: expected '✕ FAILURE' to match /^\\S+ Failed$/\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts:448:27\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-we"
+        "detail": "A19 — on a light forced-colours palette, the unread mark stays visible with its label, and an outcome reads as a glyph and a word:  AssertionError: expected '✕ FAILURE' to match /^\\S+ Failed$/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts:448:27\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-we"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts#A19 — on a dark forced-colours palette, the unread mark stays visible with its label, and an outcome reads as a glyph and a word",
         "classification": "assertion",
-        "detail": "A19 — on a dark forced-colours palette, the unread mark stays visible with its label, and an outcome reads as a glyph and a word:  AssertionError: expected '✕ FAILURE' to match /^\\S+ Failed$/\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts:448:27\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-we"
+        "detail": "A19 — on a dark forced-colours palette, the unread mark stays visible with its label, and an outcome reads as a glyph and a word:  AssertionError: expected '✕ FAILURE' to match /^\\S+ Failed$/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/components/ActionLedgerView.feed-lockdown.test.ts:448:27\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-we"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/pillAnnouncements.test.ts#the pill says keyword search is ready (semantic queue pending), and nothing spoken says Needs you or waiting for AI",
         "classification": "assertion",
-        "detail": "FC10 a fresh install where nobody asked for AI says nothing of AI it did not ask for the pill says keyword search is ready (semantic queue pending), and nothing spoken says Needs you or waiting for AI:  AssertionError: spoken: Semantic search waiting for AI install: expected 'Semantic search waiting for AI install' not to match /semantic search waiting for AI insta…/i\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/state/pillAnnouncements.test.ts:7"
+        "detail": "FC10 a fresh install where nobody asked for AI says nothing of AI it did not ask for the pill says keyword search is ready (semantic queue pending), and nothing spoken says Needs you or waiting for AI:  AssertionError: spoken: Semantic search waiting for AI install: expected 'Semantic search waiting for AI install' not to match /semantic search waiting for AI insta…/i\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/state/pillAnnouncements.test.ts:7"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/pillAnnouncements.test.ts#after a reload, before the AI install status is read again: the pill and its spoken status both say it is checking",
         "classification": "assertion",
-        "detail": "FC10 a fresh install where nobody asked for AI says nothing of AI it did not ask for after a reload, before the AI install status is read again: the pill and its spoken status both say it is checking:  AssertionError: spoken: Semantic search waiting for AI install: expected 'Semantic search waiting for AI install' not to match /semantic search waiting for AI insta…/i\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/state/pillAnnouncements.test.ts:81"
+        "detail": "FC10 a fresh install where nobody asked for AI says nothing of AI it did not ask for after a reload, before the AI install status is read again: the pill and its spoken status both say it is checking:  AssertionError: spoken: Semantic search waiting for AI install: expected 'Semantic search waiting for AI install' not to match /semantic search waiting for AI insta…/i\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/state/pillAnnouncements.test.ts:81"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/pillAnnouncements.test.ts#the Engine stops answering: the spoken search status says what the pill shows, never \"Catching up…\"",
         "classification": "assertion",
-        "detail": "FC10 during an Engine outage, the spoken status says what the pill shows the Engine stops answering: the spoken search status says what the pill shows, never \"Catching up…\":  AssertionError: spoken beside \"Checking search status · last seen just now · checking\": Catching up…: expected 'Catching up…' not to match /Catching up|Search available|Service …/\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/state/pillAnnouncements."
+        "detail": "FC10 during an Engine outage, the spoken status says what the pill shows the Engine stops answering: the spoken search status says what the pill shows, never \"Catching up…\":  AssertionError: spoken beside \"Checking search status · last seen just now · checking\": Catching up…: expected 'Catching up…' not to match /Catching up|Search available|Service …/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/state/pillAnnouncements."
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts#mirrors the verdict politely and an error verdict assertively, never as \"All systems operational\"",
         "classification": "assertion",
-        "detail": "verdict and AI-engine announcers (595 §15.1 E1, moved from the status bar) mirrors the verdict politely and an error verdict assertively, never as \"All systems operational\":  AssertionError: expected 'alert' to be 'status' // Object.is equality\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts:66:65\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file"
+        "detail": "verdict and AI-engine announcers (595 §15.1 E1, moved from the status bar) mirrors the verdict politely and an error verdict assertively, never as \"All systems operational\":  AssertionError: expected 'Search available' to be 'Up to date' // Object.is equality\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts:60:54\n    at processTicksAndRejections (node:internal/process/task_queues:104"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.installFailure.test.ts#says what went wrong and what to do, with the Engine's message once, under Details, labelled for support",
         "classification": "assertion",
-        "detail": "FC11 the status panel's failed AI install says what went wrong and what to do, with the Engine's message once, under Details, labelled for support:  AssertionError: what went wrong: expected '!AI install failed AI installation fa…' to match /could not be downloaded or saved/\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/views/BrainSurface.installFailure.test.ts:74:43\n    at processTicksAndRejecti"
+        "detail": "FC11 the status panel's failed AI install says what went wrong and what to do, with the Engine's message once, under Details, labelled for support:  AssertionError: what went wrong: expected '!AI install failed AI installation fa…' to match /None of the AI model files could be d…/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/views/BrainSurface.installFailure.test.ts:74:43\n    at processTicksAndR"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.installFailure.test.ts#says what went wrong and what to do, with the Engine's message once, labelled for support",
         "classification": "assertion",
-        "detail": "FC11 AI Brain's failed install says what went wrong and what to do, with the Engine's message once, labelled for support:  AssertionError: what went wrong: expected 'Install Failed Search already works w…' to match /could not be downloaded or saved/\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/views/BrainSurface.installFailure.test.ts:98:37\n    at file:///home/elias/dev"
+        "detail": "FC11 AI Brain's failed install says what went wrong and what to do, with the Engine's message once, labelled for support:  AssertionError: what went wrong: expected 'Install Failed Search already works w…' to match /None of the AI model files could be d…/\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/views/BrainSurface.installFailure.test.ts:99:37\n    at file:///home/eli"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/aiVerdict.test.ts#install_failed says in words what went wrong and what to do; the service's own text is not the body (FC11)",
         "classification": "assertion",
-        "detail": "presentAiEngineVerdict (Design pass 3 — the presentation projection) install_failed says in words what went wrong and what to do; the service's own text is not the body (FC11):  AssertionError: expected 'disk full' to be 'The AI install stopped before it fini…' // Object.is equality\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/state/aiVerdict.test.ts:583:20\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activi"
+        "detail": "presentAiEngineVerdict (Design pass 3 — the presentation projection) install_failed says in words what went wrong and what to do; the service's own text is not the body (FC11):  AssertionError: expected 'disk full' to be 'The AI install stopped before it fini…' // Object.is equality\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/state/aiVerdict.test.ts:584:20\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activi"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts#the rows say what happened in the AI verdict's own words",
         "classification": "assertion",
-        "detail": "FA3c an AI install the person started that was interrupted or failed needs them the rows say what happened in the AI verdict's own words:  AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/8jrt7cf8/tmp/test-intent-before-y2xhYl/modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts:139:75\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-web/node_modules/@"
+        "detail": "FA3c an AI install the person started that was interrupted or failed needs them the rows say what happened in the AI verdict's own words:  AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/kplvoidg/tmp/test-intent-before-ap7cxd/modules/ui-web/src/shell-v0/state/unrequestedAi.test.ts:140:75\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-activity-c2/modules/ui-web/node_modules/@"
       }
     ]
   },
-  "digest": "sha256:8babf98be9617b1e54827cc5fc4973ab9e2d7998407dc677fdd39c942660b6d6"
+  "digest": "sha256:f23559a60501d9cacdaf432f17e8f32034f6d814425beeda1e737b6ba14139b4"
 }
