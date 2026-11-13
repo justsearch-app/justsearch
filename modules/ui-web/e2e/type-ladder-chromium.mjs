@@ -76,7 +76,8 @@ function auditSurface() {
     const parent = el.parentElement || el.getRootNode().host;
     return parent ? selector(parent) + (el.parentElement ? ' > ' : ' >>> ') + step : step;
   };
-  const add = (el, property, value, reason) => failures.push({ selector: selector(el), property, value, reason });
+  const add = (el, property, value, reason) => failures.push({ selector: selector(el), text: el.textContent.trim().slice(0, 120), property, value, reason });
+  const displayCut = value => value.split(',').some(axis => /^["']opsz["']\s+32(?:\.0+)?$/.test(axis.trim()));
   const sheets = new Set();
   function sheet(s) {
     if (!s || sheets.has(s)) return; sheets.add(s);
@@ -108,12 +109,16 @@ function auditSurface() {
       if (rendered && text) {
         textElements++;
         if (!sizes.includes(parseFloat(style.fontSize))) add(el, 'font-size', style.fontSize, 'text outside ladder');
-        if (['20px', '28px'].includes(style.fontSize) && style.fontOpticalSizing !== 'auto' && !/["']opsz["']\s+(20|28)/.test(style.fontVariationSettings)) add(el, 'font-optical-sizing', `${style.fontOpticalSizing}; ${style.fontVariationSettings}`, 'display text lacks optical sizing');
-        samples.push({ selector: selector(el), tag: el.localName, fontSize: style.fontSize, family: style.fontFamily, weight: style.fontWeight, style: style.fontStyle, optical: style.fontOpticalSizing, variation: style.fontVariationSettings });
+        if (parseFloat(style.fontSize) <= 15 && displayCut(style.fontVariationSettings)) add(el, 'font-variation-settings', style.fontVariationSettings, 'text tier inherits display opsz');
+        if (['20px', '28px'].includes(style.fontSize) && !displayCut(style.fontVariationSettings)) add(el, 'font-variation-settings', style.fontVariationSettings, 'display text lacks explicit opsz 32');
+        samples.push({ selector: selector(el), tag: el.localName, text: el.textContent.trim().slice(0, 120), fontSize: style.fontSize, family: style.fontFamily, weight: style.fontWeight, style: style.fontStyle, optical: style.fontOpticalSizing, variation: style.fontVariationSettings });
       }
       for (const pseudo of ['::before', '::after']) {
         const ps = getComputedStyle(el, pseudo);
-        if (rendered && !['none', 'normal', '""', "''"].includes(ps.content) && !sizes.includes(parseFloat(ps.fontSize))) add(el, `font-size${pseudo}`, ps.fontSize, 'generated text outside ladder');
+        if (rendered && !['none', 'normal', '""', "''"].includes(ps.content)) {
+          if (!sizes.includes(parseFloat(ps.fontSize))) add(el, `font-size${pseudo}`, ps.fontSize, 'generated text outside ladder');
+          if (['20px', '28px'].includes(ps.fontSize) && !displayCut(ps.fontVariationSettings)) add(el, `font-variation-settings${pseudo}`, ps.fontVariationSettings, 'generated display text lacks explicit opsz 32');
+        }
       }
       if (el.shadowRoot) walk(el.shadowRoot);
       walk(el);
@@ -142,8 +147,38 @@ async function capture(page, theme, surface, ready) {
   } catch (error) {
     failures.push({ surface: id, selector: 'surface', value: String(error), reason: 'surface not reached' });
     checks.push({ id, result: 'unverified', error: String(error) });
+    console.error(`${id}: ${String(error)}`);
     await page.screenshot({ path: path.join(evidence, `${theme}-${surface}-unverified.png`), fullPage: true }).catch(() => {});
     return null;
+  }
+}
+// Open only view controls: no save, install, delete or other action buttons.
+async function expandSubviews(page, theme, surface, scope) {
+  let index = 0;
+  await page.evaluate(() => { window.typeLadderOpenedViews = new WeakSet(); });
+  while (true) {
+    const controls = scope.locator('details:not([open]) > summary, button[aria-expanded="false"], [role="treeitem"][aria-expanded="false"]');
+    const control = await firstVisible(controls);
+    if (!control) break;
+    const label = (await control.textContent()).trim();
+    await control.evaluate(el => window.typeLadderOpenedViews.add(el));
+    await capture(page, theme, `${surface}-expanded-${++index}`, async () => {
+      await control.click();
+      await settle(page);
+      assert.ok(!await control.evaluate(el => el.matches('[aria-expanded="false"], details:not([open]) > summary')), `${label} did not expand`);
+    });
+    if (index > 40) throw new Error(`${surface}: disclosure navigation did not finish`);
+  }
+}
+async function firstVisible(controls) {
+  for (const control of await controls.elementHandles()) if (await control.isVisible() && await control.evaluate(el => !window.typeLadderOpenedViews.has(el))) return control;
+  return null;
+}
+async function visitTabs(page, theme, surface, scope) {
+  const tabs = await scope.locator('[role="tab"]').all();
+  for (let i = 0; i < tabs.length; i++) {
+    await capture(page, theme, `${surface}-tab-${i + 1}`, () => tabs[i].click());
+    await expandSubviews(page, theme, `${surface}-tab-${i + 1}`, scope);
   }
 }
 const fontResponses = [], fontRequests = [], interUrls = new Set();
@@ -241,6 +276,7 @@ try {
       const composer = await page.locator('jf-sv3-composer textarea[data-testid="sv3-composer-input"]').evaluate(el => getComputedStyle(el).fontSize);
       if (composer !== '15px') failures.push({ surface: `${theme}/search-idle`, selector: 'jf-sv3-composer >>> textarea[data-testid="sv3-composer-input"]', value: composer, reason: 'Search field must be 15px' });
     }
+    await expandSubviews(page, theme, 'search-idle', page.locator('jf-sv3-window'));
     await capture(page, theme, 'search-results', async () => {
       await page.locator('[data-testid="sv3-composer-input"]').fill('Typography');
       await page.locator('[data-testid="sv3-composer-input"]').press('Enter');
@@ -251,15 +287,44 @@ try {
       await page.locator('jf-sv3-pane jf-document-pane').waitFor();
       await page.locator('jf-document-pane').getByText('Typography fixture document text.', { exact: false }).first().waitFor();
     });
+    for (const mode of await page.locator('jf-document-pane [role="radio"]').all()) await capture(page, theme, `search-document-${await mode.textContent().then(t => t.trim().toLowerCase())}`, () => mode.click());
     await capture(page, theme, 'library', async () => { await click('Library'); await page.locator('jf-library-surface h2').first().waitFor(); });
+    await visitTabs(page, theme, 'library', page.locator('jf-library-surface'));
     await capture(page, theme, 'library-browse', async () => {
       await page.locator('jf-library-surface [data-tab-id="core.browse-surface"]').click();
       await page.locator('jf-browse-surface [role="treeitem"]').first().waitFor();
     });
+    await expandSubviews(page, theme, 'library-browse', page.locator('jf-browse-surface'));
     await capture(page, theme, 'ai-brain', async () => { await click('AI Brain'); await page.locator('jf-brain-surface .brain-headline').waitFor(); });
-    await capture(page, theme, 'settings', async () => { await click('Settings'); await page.locator('jf-settings-surface h2').first().waitFor(); });
+    await visitTabs(page, theme, 'ai-brain', page.locator('jf-brain-surface'));
+    await click('Settings');
+    // The view-tier sections are reachable from Advanced. Use the real controls so
+    // operator/developer sections are audited too, in this context's isolated storage.
+    await page.locator('jf-settings-nav [data-settings-category="advanced"]').click();
+    await page.locator('jf-settings-surface #show-developer-tools').check();
+    await page.locator('jf-settings-surface #settings-view-tier').getByRole('radio', { name: /Developer/ }).click();
+    const categories = await page.locator('jf-settings-nav [data-settings-category]').evaluateAll(els => els.map(el => el.dataset.settingsCategory));
+    assert.ok(categories.length >= 7, 'Settings navigation must expose every category');
+    for (const category of categories) {
+      await capture(page, theme, `settings-${category}`, async () => {
+        await page.locator(`jf-settings-nav [data-settings-category="${category}"]`).click();
+        await page.locator('jf-settings-surface .settings-content-inner').waitFor();
+        if (category === 'appearance') {
+          await page.locator('jf-presentation-gallery-surface h2').waitFor();
+          await page.locator('jf-presentation-editor-surface h2').waitFor();
+        }
+      });
+      const anchors = await page.locator('jf-settings-nav [data-settings-anchor]').evaluateAll(els => els.map(el => el.dataset.settingsAnchor));
+      for (const anchor of anchors) await capture(page, theme, `settings-${category}-${anchor}`, async () => {
+        await page.locator(`jf-settings-nav [data-settings-anchor="${anchor}"]`).click();
+        await page.locator(`jf-settings-surface .settings-content-inner > [data-settings-anchor="${anchor}"]`).waitFor();
+      });
+      await expandSubviews(page, theme, `settings-${category}`, page.locator('jf-settings-surface .settings-content-inner'));
+    }
     await capture(page, theme, 'system-health', async () => { await click('System/Health'); await page.locator('jf-health-surface h2').first().waitFor(); });
+    await visitTabs(page, theme, 'system', page.locator('jf-system-surface'));
     await capture(page, theme, 'status-panel', async () => { await click('Status panel'); await page.locator('jf-status-panel h2').waitFor(); });
+    await expandSubviews(page, theme, 'status-panel', page.locator('jf-status-panel'));
     await capture(page, theme, 'confirm-dialog', async () => { await click('Confirm dialog'); await page.locator('jf-confirm-dialog dialog[open]').waitFor(); });
     // Close the real modal before using fixture navigation again; no destructive confirmation.
     await page.locator('jf-confirm-dialog').evaluate(el => { el.open = false; });
@@ -295,7 +360,7 @@ try {
     } catch (error) { failures.push({ surface: 'fonts', selector: font.url, value: String(error), reason: 'font axes unverified (invalid WOFF2 or fvar table)' }); }
   }
   if (!fonts.some(f => interUrls.has(f.url))) failures.push({ surface: 'fonts', selector: 'network', value: 'no font responses', reason: 'no app font file loaded' });
-  for (const f of failures) console.error(`${f.surface}: ${f.selector}: ${JSON.stringify(f.value)} (${f.reason})`);
+  for (const f of failures) console.error(`${f.surface}: ${f.selector}: ${JSON.stringify(f.value)} ${JSON.stringify(f.text || '')} (${f.reason})`);
   console.log(JSON.stringify({ chromium: browser.version(), surfaces: checks.filter(c => c.textElements).length, violations: failures.length, breakdown: Object.fromEntries([...new Set(failures.map(f => f.reason))].map(r => [r, failures.filter(f => f.reason === r).length])) }, null, 2));
   process.exitCode = failures.length ? 1 : 0;
 } catch (error) {

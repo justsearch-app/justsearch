@@ -27,7 +27,7 @@ class FactoryResetRecovery extends LitElement {
       color: var(--text-primary, CanvasText); background: var(--surface-1, Canvas);
       font-family: var(--font-native); font-size: var(--font-size-md); overflow-wrap: anywhere; }
     section { max-width: 38rem; margin: 2rem auto; min-width: 0; }
-    h1 { font-size: var(--font-size-headline); }
+    h1 { font-size: var(--font-size-headline); font-variation-settings: "opsz" 32; }
     p, li { line-height: 1.6; }
     ul { padding-inline-start: 1.25rem; }
     .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }

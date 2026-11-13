@@ -59,7 +59,13 @@ export function extract(source, file = 'fixture.ts', exports = new Map()) {
   if (/\.(css|html)$/.test(file)) return declarations(source, file, source);
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   const bindings = new Map();
+  function shadow(name) {
+    if (ts.isIdentifier(name)) bindings.set(name.text, null);
+    else for (const element of name.elements) if (ts.isBindingElement(element)) shadow(element.name);
+  }
   function collect(n) {
+    if (ts.isImportClause(n) && n.name) shadow(n.name);
+    if (ts.isNamespaceImport(n)) shadow(n.name);
     if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier) && n.importClause?.namedBindings && ts.isNamedImports(n.importClause.namedBindings)) {
       const module = path.posix.normalize(path.posix.join(path.posix.dirname(file), n.moduleSpecifier.text)).replace(/\.js$/, '.ts');
       for (const spec of n.importClause.namedBindings.elements) {
@@ -72,6 +78,8 @@ export function extract(source, file = 'fixture.ts', exports = new Map()) {
       const constant = n.parent.flags & ts.NodeFlags.Const;
       bindings.set(n.name.text, !bindings.has(n.name.text) && constant ? n.initializer : null);
     }
+    if (ts.isParameter(n) || ts.isVariableDeclaration(n) && !ts.isIdentifier(n.name)) shadow(n.name);
+    if ((ts.isFunctionDeclaration(n) || ts.isFunctionExpression(n) || ts.isClassDeclaration(n) || ts.isClassExpression(n)) && n.name) shadow(n.name);
     ts.forEachChild(n, collect);
   }
   collect(ast);
@@ -91,6 +99,14 @@ export function extract(source, file = 'fixture.ts', exports = new Map()) {
     const p = name.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`);
     return name === 'cssText' ? name : target.test(p) ? p : '';
   };
+  // Canvas fonts draw OS overlay pixels, not UI text. Follow only unambiguous const
+  // bindings in this file; the receiver of getContext may itself be a property (ctx.canvas).
+  function canvas2D(n, seen = new Set()) {
+    if (!n) return false;
+    if (ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isNonNullExpression(n)) return canvas2D(n.expression, seen);
+    if (ts.isIdentifier(n) && bindings.has(n.text) && !seen.has(n.text)) return canvas2D(bindings.get(n.text), new Set([...seen, n.text]));
+    return ts.isCallExpression(n) && name(n.expression) === 'getContext' && value(n.arguments[0]) === '2d';
+  }
   function addStyle(n, p, expression, simple = true) {
     const v = simple ? value(expression) : unknown;
     if (p === 'cssText') {
@@ -107,6 +123,7 @@ export function extract(source, file = 'fixture.ts', exports = new Map()) {
     if (ts.isBinaryExpression(n) && n.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && n.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
       const p = styleProperty(name(n.left));
       if (p) {
+        if (p === 'font' && canvas2D(n.left.expression)) return;
         addStyle(n, p, n.right, n.operatorToken.kind === ts.SyntaxKind.EqualsToken);
         return;
       }

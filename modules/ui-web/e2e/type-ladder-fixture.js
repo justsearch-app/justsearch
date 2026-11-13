@@ -3,6 +3,9 @@ import { host, nav, mount, bootFrame } from './csp-fixture.js';
 import '/src/shell-v0/views/search-v3/SearchV3View.ts';
 import '/src/shell-v0/views/SystemSurface.ts';
 import '/src/shell-v0/views/HealthSurface.ts';
+import '/src/shell-v0/views/PresentationGallerySurface.ts';
+import '/src/shell-v0/views/PresentationEditorSurface.ts';
+import '/src/shell-v0/views/SecuritySurface.ts';
 import '/src/shell-v0/components/StatusPanel.ts';
 import '/src/shell-v0/components/ConfirmDialog.ts';
 import '/src/shell-v0/components/EngineRecovery.ts';
@@ -11,7 +14,7 @@ import '/src/boot/factoryReset.ts';
 import { resolveBootWithRecovery } from '/src/boot/desktopRecovery.ts';
 import { __seedForTest } from '/src/api/registry/SurfaceCatalogClient.ts';
 
-const entries = ['library', 'browse', 'system', 'health'].map(name => ({
+const entries = ['library', 'browse', 'system', 'health', 'presentation-gallery', 'presentation-editor', 'security'].map(name => ({
   id: `core.${name}-surface`, mountTag: `jf-${name}-surface`,
   presentation: { labelKey: name, descriptionKey: '', iconHint: null, category: null },
   audience: 'USER', placement: 'DEEPLINK', altitude: 'PRODUCT',
@@ -21,7 +24,7 @@ const entries = ['library', 'browse', 'system', 'health'].map(name => ({
   ...(name === 'system' ? { members: ['core.health-surface'] } : {}),
 }));
 __seedForTest({ schemaVersion: '1.0', catalogVersion: 1, namespace: 'core', primitive: 'Surface', entries });
-const markdown = '# Heading one\n\n## Heading two\n\n### Heading three\n\n#### Heading four\n\n##### Heading five\n\n###### Heading six\n\nA cited sentence.\n\nRoman **strong** and *emphasis* with `inline code`.\n\n```js\nconst answer = 42;\n```\n\n| Name | Value |\n| --- | --- |\n| Example | 42 |';
+const markdown = '# Heading one with `code`\n\n## Heading two\n\n### Heading three\n\n#### Heading four\n\n##### Heading five\n\n###### Heading six\n\nA cited sentence.\n\nRoman **strong** and *emphasis* with `inline code`.\n\n```js\nconst answer = 42;\n```\n\n| Name | Value |\n| --- | --- |\n| Example | 42 |';
 for (const [name, tag] of [['Search', 'jf-sv3-window'], ['System/Health', 'jf-system-surface'],
   ['Status panel', 'jf-status-panel'], ['Confirm dialog', 'jf-confirm-dialog'],
   ['Factory reset', 'jf-factory-reset-recovery'], ['Engine recovery', 'jf-engine-recovery'],

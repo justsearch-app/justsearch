@@ -47,7 +47,7 @@ export class GettingStarted extends JfElement {
   static styles = css`
     :host { display: block; min-inline-size: 0; color: var(--text-primary); font-size: var(--font-size-sm); }
     .intro { text-align: center; padding-block: var(--jf-space-6); }
-    h1 { font: inherit; font-size: var(--font-size-sv3-display, var(--font-size-headline)); margin: 0 0 var(--jf-space-3); }
+    h1 { font: inherit; font-size: var(--font-size-sv3-display, var(--font-size-headline)); font-variation-settings: "opsz" 32; margin: 0 0 var(--jf-space-3); }
     p { margin: var(--jf-space-2) 0; color: var(--text-secondary); }
     .intro > jf-button { margin-block: var(--jf-space-4); }
     .suggestions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--jf-space-2); }

@@ -8,6 +8,7 @@ const scan = (source, file = 'fixture.css') => scanSources([{ file, source }]);
 const forbidden = [
   ['uppercase property', 'p { FONT-SIZE: 14PX; }'],
   ['literal size', 'p { font-size: 14px; }'],
+  ['relative heading size', 'h2 { font-size: 1.5em; }'],
   ['literal radius', 'p { border-radius: 6px; }'],
   ['token definition', ':root { --font-size-body: 14px; }'],
   ['scoped override', ':root { --s: 13px; } :host { --s: 14px; } p { font-size: var(--s); }'],
@@ -122,6 +123,25 @@ st.setProperty('width', '17px');
 Object.assign(st, { width: '17px' });
 const settings = { fontSize: '17px', borderRadius: '6px' };
 `, 'fixture.ts'), []));
+test('allows canvas 2D font assignments, including property receivers and aliases', () => assert.deepEqual(scan(`
+const context = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+context.font = \`600 \${overlaySize * 0.625}px sans-serif\`;
+const other = context.canvas.getContext('2d');
+const alias = other;
+alias['font'] = '17px sans-serif';
+`, 'fixture.ts'), []));
+test('still checks font assignments on unrelated or unproven objects', () => {
+  for (const source of [
+    "const context = canvas.getContext('2d'); unrelated.font = '17px sans-serif';",
+    "const context = canvas.getContext('webgl'); context.font = '17px sans-serif';",
+    "let context = canvas.getContext('2d'); context = unrelated; context.font = '17px sans-serif';",
+    "const context = canvas.getContext('2d'); function f(context) { context.font = '17px sans-serif'; }",
+    "const context = canvas.getContext('2d'); function f({ context }) { context.font = '17px sans-serif'; }",
+    "const context = canvas.getContext('2d'); function f() { const { context } = unrelated; context.font = '17px sans-serif'; }",
+    "const context = canvas.getContext('2d'); context.canvas.style.font = '17px sans-serif';",
+    "import context from './other'; function f() { const context = canvas.getContext('2d'); } context.font = '17px sans-serif';",
+  ]) assert.ok(scan(source, 'fixture.ts').length, source);
+});
 test('does not scan comments or ordinary numeric properties', () => assert.deepEqual(scan(`
 // font-size: 14px;
 /* css\`p { font-size: 14px; }\` */

@@ -51,7 +51,7 @@ export class EngineRecovery extends JfElement {
       font-family: var(--font-native);
     }
     section { max-width: 36rem; margin: 4rem auto; }
-    h1 { font-size: var(--font-size-headline); }
+    h1 { font-size: var(--font-size-headline); font-variation-settings: "opsz" 32; }
     p { line-height: 1.6; overflow-wrap: anywhere; }
     .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }
     /* Desktop: the page's top moves the window and keeps the window layer's controls clear of the page. */

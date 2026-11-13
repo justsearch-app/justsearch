@@ -30,6 +30,7 @@ export class ArrayControl extends JsonFormsRendererBase {
     }
     .array-title {
       font-size: var(--justsearch-shell-form-section-title-size, 20px);
+      font-variation-settings: "opsz" 32;
       font-weight: var(--justsearch-shell-form-section-title-weight, 600);
       margin-block-end: 0.5rem;
     }

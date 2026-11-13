@@ -326,6 +326,7 @@ export class Sv3Composer extends JfElement {
         margin: 0;
         color: var(--foreground);
         font-size: var(--font-size-sv3-display);
+        font-variation-settings: "opsz" 32;
         font-weight: 400;
         letter-spacing: -0.025em;
         text-align: center;

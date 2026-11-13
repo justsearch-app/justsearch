@@ -414,8 +414,8 @@ export class HealthSurface extends JfElement {
       max-width: 100%;
     }
     .health-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(8rem, 100%), 1fr)); gap: .75rem; margin: 0; }
-    .health-metrics dd { margin: .25rem 0 0; font-size: var(--font-size-lg); overflow-wrap: anywhere; }
-    .health-metrics .last-known { font-size: var(--font-size-xs); color: var(--text-secondary); }
+    .health-metrics dd { margin: .25rem 0 0; font-size: var(--font-size-lg); font-variation-settings: "opsz" 32; overflow-wrap: anywhere; }
+    .health-metrics .last-known { font-size: var(--font-size-xs); font-variation-settings: normal; color: var(--text-secondary); }
     .health-rows { margin: 0; }
     .health-row { display: grid; grid-template-columns: minmax(8rem, 1fr) minmax(0, 3fr); gap: 1rem; padding: .8rem 0; border-bottom: 1px solid var(--border-subtle); }
     .health-row dt { font-weight: 600; }
@@ -453,6 +453,7 @@ export class HealthSurface extends JfElement {
     .header h2 {
       margin: 0;
       font-size: var(--font-size-headline);
+      font-variation-settings: "opsz" 32;
       font-weight: 500;
     }
     /* 574 B2 — the health status pill is the jf-status-badge atom now; the per-surface
@@ -537,6 +538,7 @@ export class HealthSurface extends JfElement {
     }
     .card-value {
       font-size: var(--font-size-xl);
+      font-variation-settings: "opsz" 32;
       font-weight: 600;
       font-variant-numeric: tabular-nums;
     }

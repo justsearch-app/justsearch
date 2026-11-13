@@ -97,6 +97,7 @@ export const markdownTypography = css`
     border-radius: var(--md-code-radius);
     font-family: var(--md-code-font);
     font-size: var(--md-code-size);
+    font-variation-settings: normal;
   }
   .md-content pre {
     background: var(--surface-tertiary);
@@ -202,6 +203,7 @@ export const markdownTypography = css`
      this stylesheet reads xl/lg/md, so "the ramp step" and "the heading size" are the same knob. */
   :host([prose]) .md-content h1 {
     font-size: var(--font-size-xl);
+    font-variation-settings: "opsz" 32;
   }
   :host([prose]) .md-content h2 {
     font-size: var(--font-size-md);

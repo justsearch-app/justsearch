@@ -160,6 +160,7 @@ export class PresentationGallerySurface extends JfElement {
   static styles = [
     surfaceScrollLayoutStyles,
     css`
+      h2 { font-size: var(--font-size-lg); font-variation-settings: "opsz" 32; }
       .grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));

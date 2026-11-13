@@ -106,6 +106,7 @@ export class Sv3Empty extends JfElement {
 
       .title {
         font-size: var(--font-size-sv3-xl);
+        font-variation-settings: "opsz" 32;
         font-weight: 600;
       }
       /* Only ever the gap AFTER a title — a description standing alone owns its own position. */

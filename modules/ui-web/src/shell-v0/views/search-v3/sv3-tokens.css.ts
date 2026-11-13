@@ -346,7 +346,7 @@ export const sv3Tokens = css`
     --control-pad-3: calc(0.75rem - 1px);
 
     /* ── Type ──────────────────────────────────────────────────────────────
-       Shipped variable Inter; six sizes, with automatic optical sizing at display sizes. */
+       Shipped variable Inter; six sizes, with explicit opsz 32 on rules selecting the 20/28px display rungs. */
     --font-sans: var(--font-native);
     --font-mono: ui-monospace, 'SF Mono', 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono',
       monospace;

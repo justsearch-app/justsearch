@@ -756,6 +756,7 @@ export class BrainSurface extends JfElement {
     .header h2 {
       margin: 0;
       font-size: var(--font-size-lg);
+      font-variation-settings: "opsz" 32;
       font-weight: 600;
       display: flex;
       align-items: center;
@@ -1171,8 +1172,8 @@ export class BrainSurface extends JfElement {
       color: var(--text-primary);
     }
     .body { padding: 1.75rem 2.5rem; gap: 1.5rem; min-width: 0; overflow-wrap: anywhere; }
-    .brain-headline { margin: 0 0 0.75rem; font-size: var(--font-size-headline); font-weight: 400; }
-    .brain-sentence { font-size: var(--font-size-lg); color: var(--text-secondary); line-height: 1.8; margin: 0 0 1rem; max-width: 65rem; }
+    .brain-headline { margin: 0 0 0.75rem; font-size: var(--font-size-headline); font-variation-settings: "opsz" 32; font-weight: 400; }
+    .brain-sentence { font-size: var(--font-size-lg); font-variation-settings: "opsz" 32; color: var(--text-secondary); line-height: 1.8; margin: 0 0 1rem; max-width: 65rem; }
     .brain-status-detail, .step-meta { font-size: var(--font-size-xs); color: var(--text-secondary); line-height: 1.5; }
     .brain-status-detail { margin-bottom: 0.5rem; }
     button.feature-phrase, button.step-info, .brain-links button, .feature-panel button {

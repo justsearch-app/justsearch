@@ -464,7 +464,7 @@ export class SettingsSurface extends JfElement {
     dialog.delete-dialog::backdrop { background: var(--frame-dialog-dim); }
     .delete-dialog .who { display: flex; align-items: center; gap: var(--jf-space-2); margin: 0; color: var(--text-secondary);
       font-size: var(--font-size-sm); }
-    .delete-dialog .title { margin: var(--jf-space-3) 0; color: var(--text-danger); font-size: var(--font-size-lg);
+    .delete-dialog .title { margin: var(--jf-space-3) 0; color: var(--text-danger); font-size: var(--font-size-lg); font-variation-settings: "opsz" 32;
       font-weight: var(--jf-weight-medium); }
     .delete-dialog .consequences { margin: 0; padding: 0; list-style: none; }
     .delete-dialog .consequences li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--jf-space-3);
@@ -548,6 +548,7 @@ export class SettingsSurface extends JfElement {
     .header h2 {
       margin: 0;
       font-size: var(--font-size-headline);
+      font-variation-settings: "opsz" 32;
       font-weight: 600;
     }
     .header .subtitle {

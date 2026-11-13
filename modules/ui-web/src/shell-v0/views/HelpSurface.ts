@@ -214,6 +214,7 @@ export class HelpSurface extends JfElement {
     .header h2 {
       margin: 0;
       font-size: var(--font-size-lg);
+      font-variation-settings: "opsz" 32;
       font-weight: 600;
       display: flex;
       align-items: center;

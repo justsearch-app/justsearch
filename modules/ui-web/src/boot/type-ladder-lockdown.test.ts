@@ -21,7 +21,7 @@ it('text, corners and bundled variable Inter follow the type ladder under the de
       });
     const summary = JSON.parse(stdout.slice(stdout.lastIndexOf('\n{') + 1)) as { violations: number; surfaces: number };
     expect(summary.violations).toBe(0);
-    expect(summary.surfaces).toBe(38);
+    expect(summary.surfaces).toBe(164);
     passed = true;
   } finally {
     if (passed) await rm(evidence, { recursive: true, force: true });

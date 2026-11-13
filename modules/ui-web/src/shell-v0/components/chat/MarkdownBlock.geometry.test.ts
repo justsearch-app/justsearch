@@ -320,9 +320,11 @@ const BEFORE: ReadonlyArray<readonly [string, Readonly<Record<string, string>>]>
  *  - `border: none` on the block's inner code — the rule whose existing job is shedding the chip's
  *    clothes; the chip's own default is already `none`, so this moves nothing shipped, and it keeps
  *    a consumer that gives the CHIP an edge from drawing a second frame inside the code block.
+ *  - `font-variation-settings: normal` on inline code preserves its default text cut; within a
+ *    display heading it now prevents the smaller code from inheriting the heading's opsz 32.
  */
 const COMPUTED_NOOP_ADDITIONS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
-  '.md-content code': { border: 'none' },
+  '.md-content code': { border: 'none', 'font-variation-settings': 'normal' },
   '.md-content pre code': { border: 'none' },
 };
 

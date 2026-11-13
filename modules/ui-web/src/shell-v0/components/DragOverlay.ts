@@ -67,6 +67,7 @@ export class DragOverlay extends JfElement {
     h3 {
       margin: 0 0 0.25rem 0;
       font-size: var(--font-size-lg);
+      font-variation-settings: "opsz" 32;
       font-weight: 600;
     }
     .sub {
