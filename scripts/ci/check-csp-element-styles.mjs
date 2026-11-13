@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The desktop window refuses style attributes set from script and <style> elements made at runtime (Tauri adds a nonce to style-src). Values go through Lit styleMap or the CSSOM; runtime sheets through adoptedStyleSheets.
+// The desktop window refuses style attributes set from script and <style> elements made at runtime (Tauri adds a nonce to style-src). Values go through .style=${...} property bindings or the CSSOM; runtime sheets through adoptedStyleSheets.
 // No baseline: no style attribute in Lit templates; runtime styles and sheets must use CSP-safe APIs.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,6 +10,18 @@ const require = createRequire(path.join(root, 'modules/ui-web/package.json'));
 const ts = require(process.env.CSP_CHECK_TYPESCRIPT || 'typescript');
 export function scanSource(source, filename = 'fixture.ts') {
   const ast = ts.createSourceFile(filename, source, ts.ScriptTarget.Latest, true);
+  const templateTags = new Set(['html', 'svg']);
+  for (const statement of ast.statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier) ||
+        !/^(?:lit|lit-html|@lit\/[^/]+)(?:\/|$)/.test(statement.moduleSpecifier.text)) continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (bindings && ts.isNamedImports(bindings)) {
+      for (const binding of bindings.elements) {
+        const imported = (binding.propertyName ?? binding.name).text;
+        if (imported === 'html' || imported === 'svg') templateTags.add(binding.name.text);
+      }
+    }
+  }
   const hits = [];
   const report = (node, kind, offset = node.getStart(ast)) => {
     const { line, character } = ast.getLineAndCharacterOfPosition(offset);
@@ -19,8 +31,10 @@ export function scanSource(source, filename = 'fixture.ts') {
     : ts.isElementAccessExpression(n) && ts.isStringLiteralLike(n.argumentExpression) ? n.argumentExpression.text : '';
   const str = n => n && ts.isStringLiteralLike(n) ? n.text.toLowerCase() : null;
   function visit(node) {
-    const tagName = ts.isTaggedTemplateExpression(node) ? (ts.isIdentifier(node.tag) ? node.tag.text : name(node.tag)) : '';
-    if (tagName === 'html' || tagName === 'svg') {
+    // Property tags already cover namespace imports such as L.html and L.svg.
+    const tagName = ts.isTaggedTemplateExpression(node) ? name(node.tag) : '';
+    if (ts.isTaggedTemplateExpression(node) && (ts.isIdentifier(node.tag) ? templateTags.has(node.tag.text)
+      : tagName === 'html' || tagName === 'svg')) {
       // Replace expressions with a sentinel so quotes and > inside JS do not affect HTML parsing.
       const t = node.template;
       const parts = ts.isNoSubstitutionTemplateLiteral(t) ? [t.text] : [t.head.text];
