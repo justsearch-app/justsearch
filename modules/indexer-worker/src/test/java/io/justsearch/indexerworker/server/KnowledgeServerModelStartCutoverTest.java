@@ -550,6 +550,46 @@ final class KnowledgeServerModelStartCutoverTest {
     }
   }
 
+  /**
+   * A migration requested right after boot, before a boot-time cutover monitor first reads the
+   * generation pointer (an order a loaded machine produces), still opens Green live and switches
+   * without an Engine restart. The pointer lock is held from boot until the request has created
+   * the candidate, so any boot-time monitor reads the pointer only after that.
+   */
+  @Test
+  void aMigrationRequestedBeforeTheBootMonitorFirstReadsStillOpensGreenLive() throws Exception {
+    var field = IndexGenerationManager.class.getDeclaredField("STATE_CONTROL");
+    field.setAccessible(true);
+    var stateControl = (java.util.concurrent.locks.ReentrantLock) field.get(null);
+    try (var forced = new Forced(false)) {
+      KnowledgeServer server;
+      stateControl.lock();
+      try {
+        server = forced.boot(plainServer(tempDir));
+        var started = server.appServices().ingestService().startMigration(
+            MigrationStartRequest.newBuilder().setReason("manual")
+                .setProjectionSourceIdsPresent(true).addProjectionSourceIds("memory").build(),
+            CallContext.none());
+        assertTrue(started.getAccepted(), started::getError);
+        forced.successorGeneration = started.getBuildingGenerationId();
+        var bootMonitor = (Thread) getField(server, "migrationCutoverThread");
+        if (bootMonitor != null) {
+          assertTrue(QueryPrewarmFixture.waitFor(java.time.Duration.ofSeconds(30),
+                  () -> stateControl.hasQueuedThread(bootMonitor) || !bootMonitor.isAlive()),
+              "the boot monitor waits for the pointer or has ended");
+        }
+      } finally {
+        stateControl.unlock();
+      }
+      assertTrue(server.beginUnrecordedBuildingLiveAsync(forced.successorGeneration,
+          forced.restarts::incrementAndGet).get(30, TimeUnit.SECONDS), "Green opens live");
+      assertTrue(server.awaitMigrationCutoverExitForTests(60, TimeUnit.SECONDS), "the switch ends");
+      assertEquals(forced.successorGeneration,
+          forced.manager.readStateBestEffort().active_generation(), "Green is promoted");
+      assertEquals(0, forced.restarts.get(), "no Engine restart");
+    }
+  }
+
   // --- harness ---------------------------------------------------------------------------------
 
   /** The forced order, the migration it switches, and the Engine log it observes. */
