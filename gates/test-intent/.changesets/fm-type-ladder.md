@@ -290,3 +290,13 @@ The new src/boot/type-ladder-lockdown.test.ts and src/boot/woff2-axes.test.ts ar
   "digest": "sha256:419aeee66ab037db81f0ae7078b4a6a47eaf2cfa246bd5390a47dbec735c811e"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-a9lrev5k-test-intent",
+  "verdict": "accept",
+  "digest": "sha256:59d5c40e27f752c96318aad5f7b4a4437861fb42751ac30eb062c30fe47b25e5"
+}
+```
