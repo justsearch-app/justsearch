@@ -30,7 +30,7 @@ Per-element styles and runtime stylesheets moved to mechanisms the desktop windo
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Palette themes, token previews and role foregrounds are now constructed stylesheets in document.adoptedStyleSheets instead of <style> elements in <head> (the desktop window's policy refuses <style> made at runtime). The observation moved from the attached element's text (getElementById(...).textContent, a style[data-theme-id] selector, or element presence) to the current text of each sheet in document.adoptedStyleSheets: a per-test wrapper of CSSStyleSheet replaceSync/replace records each sheet's latest text (happy-dom drops @layer rules from cssRules), and assertions read only adopted sheets, so a later overwrite, a detached sheet or a second palette sheet is seen. Exactly-one-element assertions became exactly-one-adopted-palette-sheet; removed-element became no adopted sheet carrying it. Inputs, preconditions, expected CSS content, sanitisation, validate-before-write, clearing, palette identity and the contrast and storage assertions are unchanged. bootAppearanceRestore changes only its cleanup."
+      "whatMoved": "Palette themes, token previews and role foregrounds are now constructed stylesheets in document.adoptedStyleSheets instead of <style> elements in <head> (the desktop window's policy refuses <style> made at runtime). The observation moved from the attached element's text (getElementById(...).textContent, a style[data-theme-id] selector, or element presence) to the current text of each sheet in document.adoptedStyleSheets: a per-test wrapper of CSSStyleSheet replaceSync/replace records each sheet's latest text (happy-dom drops @layer rules from cssRules), and assertions read only adopted sheets, so a later overwrite, a detached sheet or a second palette sheet is seen. A sheet counts as a palette (or role-foreground) sheet from its first write with that @layer on, whatever its later text, so a retained sheet is never counted as absent: exactly-one-element assertions became exactly-one-adopted-palette-sheet, removed-element became no adopted palette sheet. Edits through the sheet's CSSOM rules (insertRule, rule.style.setProperty) are not observed; the base observation did not see them either (a <style> element's textContent does not follow CSSOM edits), and the product writes these sheets only with replaceSync. Inputs, preconditions, expected CSS content, sanitisation, validate-before-write, clearing, palette identity and the contrast and storage assertions are unchanged. bootAppearanceRestore changes only its cleanup."
     },
     {
       "items": [
@@ -93,5 +93,16 @@ Per-element styles and runtime stylesheets moved to mechanisms the desktop windo
   "verdict": "reject",
   "digest": "sha256:f528129397610f91419ce553ff6fc18065c6ddd6a25dc83e04df646acd2998b9",
   "note": "Entries 1 and 3 weaken final-state oracles: presentationState, themeState and LibrarySurface.themeContrast can accept earlier layer writes after a later overwrite; builtinPaletteLoading checks adoption and expected CSS on different sheets; PresentationGallerySurface misses later CSSOM background writes. Entry 2 preserves its oracle."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "test-intent-c4743e6bf6-verifier-slot4",
+  "verdict": "reject",
+  "digest": "sha256:757a6e1406af014834d957ed9c36430462a7b80521f0092ba6fa297f3bf8519f",
+  "note": "Entry 1 weakens the oracle: sheetText records replace/replaceSync input, not current CSSOM text; paletteCss/roleCss exclude retained adopted sheets once their text loses the layer prefix, so clear/no-write checks can pass with CSS still adopted. Native Chromium probe reproduced stale colour after CSSOM setProperty and false absence for an adopted non-layer rule. Entries 2 and 3 preserve their assertions. See oracle-probe.mjs and oracle-probe.txt."
 }
 ```

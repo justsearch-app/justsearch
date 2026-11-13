@@ -30,21 +30,32 @@ import { __resetUserStateForTest } from './UserStateDocument.js';
 // happy-dom drops @layer rules from cssRules. Record each sheet's current text,
 // then inspect only sheets adopted by this document (including later overwrites).
 let sheetText: WeakMap<CSSStyleSheet, string>;
+// The @layer a sheet was first written with stays its owner mark, even if later text drops it.
+let sheetLayer: WeakMap<CSSStyleSheet, string>;
 beforeEach(() => {
   sheetText = new WeakMap();
+  sheetLayer = new WeakMap();
   const { replaceSync, replace } = CSSStyleSheet.prototype;
   vi.spyOn(CSSStyleSheet.prototype, 'replaceSync').mockImplementation(function (this: CSSStyleSheet, text) {
     sheetText.set(this, text);
+    markLayer(this, text);
     return replaceSync.call(this, text);
   });
   vi.spyOn(CSSStyleSheet.prototype, 'replace').mockImplementation(function (this: CSSStyleSheet, text) {
     sheetText.set(this, text);
+    markLayer(this, text);
     return replace.call(this, text);
   });
 });
 afterEach(() => vi.restoreAllMocks());
-const adoptedCss = () => document.adoptedStyleSheets.map((sheet) => sheetText.get(sheet) ?? '');
-const paletteCss = () => adoptedCss().filter((css) => css.startsWith('@layer user-theme'));
+const markLayer = (sheet: CSSStyleSheet, text: string) => {
+  const layer = /^@layer\s+([\w-]+)/.exec(text)?.[1];
+  if (layer && !sheetLayer.has(sheet)) sheetLayer.set(sheet, layer);
+};
+// Current text of every adopted sheet first written with the given layer.
+const layerCss = (layer: string) => document.adoptedStyleSheets
+  .filter((sheet) => sheetLayer.get(sheet) === layer).map((sheet) => sheetText.get(sheet) ?? '');
+const paletteCss = () => layerCss('user-theme');
 
 describe('themeState (slice 474 alpha)', () => {
   beforeEach(() => {
