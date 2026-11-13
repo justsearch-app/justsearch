@@ -13,7 +13,7 @@ export function scanSource(source, filename = 'fixture.ts') {
   const templateTags = new Set(['html', 'svg']);
   for (const statement of ast.statements) {
     if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier) ||
-        !statement.moduleSpecifier.text.startsWith('lit')) continue;
+        !/^(?:lit|lit-html|@lit\/[^/]+)(?:\/|$)/.test(statement.moduleSpecifier.text)) continue;
     const bindings = statement.importClause?.namedBindings;
     if (bindings && ts.isNamedImports(bindings)) {
       for (const binding of bindings.elements) {
