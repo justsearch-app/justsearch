@@ -78,6 +78,14 @@ The new src/boot/type-ladder-lockdown.test.ts and src/boot/woff2-axes.test.ts ar
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Use the 8px tier for Markdown preformatted code blocks; use --font-native for the renderer host so it receives the shipped Inter family.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Headline text at 20 and 28 px sets font-variation-settings 'opsz' 32 explicitly (rule 8: headlines use the display cut; WebKitGTK, the Linux desktop window, ignores font-optical-sizing:auto). Inline code inside a heading resets font-variation-settings to normal so the smaller code keeps the text cut.",
+          "label": "agent choice"
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none. Searched docs/decisions for font, typeface, Markdown, radius, heading, corner and type size; no record prescribes the superseded type or radius ladder. The previous tests and their historical design comments are the old contract being superseded by owner-adopted rule 1 and rule 8, not a stronger source against those adopted rules.",
@@ -101,6 +109,11 @@ The new src/boot/type-ladder-lockdown.test.ts and src/boot/woff2-axes.test.ts ar
           "oldAssertion": "The prose ramp expects h1 --font-size-xl, h2 --font-size-lg and h3 --font-size-md; h4-h6 already read --font-size-sm.",
           "newAssertion": "h1 still reads --font-size-xl (now 20px); h2 reads --font-size-md (15px), and h3 reads --font-size-sm (13px), matching h4-h6.",
           "reason": "Rule 1 supplies the allowed sizes; the delegated document-heading choice assigns the precise h1/h2/h3-h6 hierarchy. Other geometry, margins, inputs and prose gating stay guarded."
+        },
+        {
+          "oldAssertion": "COMPUTED_NOOP_ADDITIONS for '.md-content code' lists only border: none.",
+          "newAssertion": "It also lists font-variation-settings: normal, which must compute as a no-op on inline code outside a heading (its default text cut).",
+          "reason": "Rule 8 and the delegated explicit-opsz choice: headings carry opsz 32, so inline code resets it; the existing no-op guard is extended to that new declaration, so the test now requires more, not less."
         }
       ]
     },
