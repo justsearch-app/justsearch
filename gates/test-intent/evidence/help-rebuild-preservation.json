@@ -1,0 +1,117 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T18:38:50.050Z",
+  "revision": "809a97389032cec4b5ebb0629137436be9d19078",
+  "tree": "d198d2344a52e867452a2cea6a851ae9fbc684b3",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerRebuildHelpTest.resumedBuildingGenerationWithAdmittedHelpHasNoDuplicates\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 11046
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerRebuildHelpTest.refusedRebuildKeepsServingHelp\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 15106
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerRebuildHelpTest.rebuildWithoutHelpSourceStillCompletes\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 14057
+    },
+    {
+      "command": "./gradlew :modules:indexer-worker:test --tests \"io.justsearch.indexerworker.server.KnowledgeServerRebuildHelpTest.capturedWatchedRootKeepsItsHelpBinding\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 13757
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#resumedBuildingGenerationWithAdmittedHelpHasNoDuplicates",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c1b16c44ae27b9fdad125bcadc89c62bc1be68718e134a1060e2cd4c4efc696",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "resumedBuildingGenerationWithAdmittedHelpHasNoDuplicates(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#refusedRebuildKeepsServingHelp",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c1b16c44ae27b9fdad125bcadc89c62bc1be68718e134a1060e2cd4c4efc696",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "refusedRebuildKeepsServingHelp(Path)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#rebuildWithoutHelpSourceStillCompletes",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c1b16c44ae27b9fdad125bcadc89c62bc1be68718e134a1060e2cd4c4efc696",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] absent",
+          "status": "passed"
+        },
+        {
+          "name": "[2] empty",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java#capturedWatchedRootKeepsItsHelpBinding",
+      "file": "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerRebuildHelpTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:0c1b16c44ae27b9fdad125bcadc89c62bc1be68718e134a1060e2cd4c4efc696",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] ancestor",
+          "status": "passed"
+        },
+        {
+          "name": "[2] coincide",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:71e98bc1c3fe85c3ccd573187ca6f5353138e70785060127f4e8ad06af38dca1"
+}

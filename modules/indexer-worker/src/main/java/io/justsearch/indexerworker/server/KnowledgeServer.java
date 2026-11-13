@@ -1636,9 +1636,12 @@ public final class KnowledgeServer implements Closeable {
             this.buildingIndexPath = genManager.resolveGenerationPathStrict(buildingGenId);
             publishIngestLifecycle(buildIndexRuntime(buildingIndexPath).withoutRecovery()
                 .withBuildState(LuceneRuntimeTypes.BuildState.BUILDING).open());
-            // File work was already enumerated for this candidate. Registered no-file sources
-            // must be enumerated again from their authority before a resumed promotion.
-            this.migrationEnumeratorDone = recordedCandidate == null && expectedProjectionSourceIds().isEmpty();
+            // The captured walk already enumerated user file work for this candidate. Bundled
+            // help and registered no-file sources must be enumerated again from their authority
+            // before a resumed promotion. A bulk candidate whose recorded source set differs
+            // from its preparation still refuses this boot.
+            if (recordedCandidate == null) expectedProjectionSourceIds();
+            this.migrationEnumeratorDone = false;
           } else {
             boolean fencedSourceRecovery = generationBootDisposition
                 == IndexGenerationManager.BootDisposition.FENCED
@@ -2060,8 +2063,7 @@ public final class KnowledgeServer implements Closeable {
       // Recorded recovery cannot run until the actual serving generation and owner are attached.
       if (!frozenEval) attachRecordedIngestion();
       if (generationBootDisposition == IndexGenerationManager.BootDisposition.BUILDING) {
-        if (recordedCandidate != null || !expectedProjectionSourceIds().isEmpty())
-          startMigrationEnumeratorBestEffort(rc, false);
+        startMigrationEnumeratorBestEffort(rc, false);
         startMigrationCutoverMonitorBestEffort();
       }
       if (!frozenEval) {
@@ -9730,7 +9732,6 @@ public final class KnowledgeServer implements Closeable {
     boolean quiesced = false;
     boolean irreversible = false;
     boolean published = false;
-    boolean enumerateSources;
     runtimeSwapLock.lock();
     try {
       for (;;) {
@@ -9821,8 +9822,9 @@ public final class KnowledgeServer implements Closeable {
       }
       Path greenPath = indexGenerationManager.resolveGenerationPathStrict(
           boot.layout().state().building_generation());
-      enumerateSources = operationKey == null || accepted.isPresent()
-          || !expectedProjectionSourceIds(greenPath, ownership).isEmpty();
+      // Every candidate enumerates bundled help and its registered projection sources. This
+      // check only refuses a bulk candidate whose recorded source set differs from preparation.
+      if (operationKey != null && accepted.isEmpty()) expectedProjectionSourceIds(greenPath, ownership);
       WorkerServiceConfiguration candidateConfiguration = accepted.isEmpty() ? null
           : WorkerServiceConfiguration.capture(accepted.orElseThrow().configuration(),
               workerExecutors.pdfOcr().spec().threadCount());
@@ -9881,7 +9883,7 @@ public final class KnowledgeServer implements Closeable {
             recordedCandidateFingerprint = captured;
             candidateServiceConfiguration = candidateConfiguration;
             buildingIndexPath = greenPath;
-            migrationEnumeratorDone = !enumerateSources;
+            migrationEnumeratorDone = false;
             migrationEnumeratorFailure = null;
             ingestLifecycle = green;
             appServices = prepared;
@@ -9931,8 +9933,7 @@ public final class KnowledgeServer implements Closeable {
       candidateModels = selected;
       wireRecordedCandidateProducer(selected);
     }
-    if (enumerateSources) startMigrationEnumeratorBestEffort(startupConfiguration,
-        operationKey == null);
+    startMigrationEnumeratorBestEffort(startupConfiguration, operationKey == null);
     startMigrationCutoverMonitorBestEffort();
     return true;
   }
@@ -10934,10 +10935,19 @@ public final class KnowledgeServer implements Closeable {
     return rc != null && rc.rag() != null && rc.rag().chunkSpladeEnabled();
   }
 
-  private static List<ResolvedConfig.FileSource> installerHelpRoots(ResolvedConfig configuration) {
+  /**
+   * The bundled help source a recorded candidate replays. A captured watched root that contains or
+   * is the help folder already owns those files, and its binding wins, as in live ingestion.
+   */
+  private static List<ResolvedConfig.FileSource> bundledHelpRoots(ResolvedConfig configuration,
+      List<RootBinding> capturedRoots) {
     var help = configuration.collections().bundledHelp();
-    return !EnvRegistry.EVAL_MODE.getBoolean(false) && help != null && Files.isDirectory(help.path())
-        ? List.of(help) : List.of();
+    if (EnvRegistry.EVAL_MODE.getBoolean(false) || help == null || !Files.isDirectory(help.path())) {
+      return List.of();
+    }
+    Path folder = help.path().toAbsolutePath().normalize();
+    return capturedRoots.stream().anyMatch(root -> root.path() != null
+        && folder.startsWith(root.path().toAbsolutePath().normalize())) ? List.of() : List.of(help);
   }
 
   private void startMigrationEnumeratorBestEffort(ResolvedConfig rc) {
@@ -10978,10 +10988,11 @@ public final class KnowledgeServer implements Closeable {
                       "Migration enumerator: models not ready after 120s, "
                           + "proceeding without inline embedding/SPLADE");
                 }
-                // Captured walks own user roots. Installer candidates must also replay the
-                // app-owned bundled help source, regardless of its startup version marker.
+                // Captured walks own user roots. Every recorded candidate (installer activation
+                // and user rebuilds alike) must also replay the app-owned bundled help source,
+                // regardless of its startup version marker.
                 List<ResolvedConfig.FileSource> roots = enumerateFiles ? loadMigrationRoots(rc)
-                    : recordedCandidate == null ? List.of() : installerHelpRoots(rc);
+                    : bundledHelpRoots(rc, frozenCollectionRoots);
                 if (enumerateFiles) {
                   requireMigrationRootsOnRecordedVolume(roots, rc.collections());
                 }
