@@ -78,3 +78,13 @@ preservation checks pass there and on the candidate.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "cb931fec-4aa3-4c83-8112-969f6334cf08:verifier-help",
+  "verdict": "accept",
+  "digest": "sha256:45c77bca92c48bcc9dbdd2235101c5446a3b0e88b9eac5e90e3995f1651e9ba4"
+}
+```
