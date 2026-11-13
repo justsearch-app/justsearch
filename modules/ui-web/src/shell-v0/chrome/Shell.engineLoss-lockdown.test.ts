@@ -277,6 +277,79 @@ describe('SC9 SC6 focus and leaving in a real browser', { timeout: 120_000 }, ()
     expect(sent.filter(u => !/\/api\/(ui\/activity|action-ledger\/events)/.test(u)), 'nothing resubmitted').toEqual([]);
   });
 
+  it('FD2 focus on an action of the treatment returns to the text box when the engine is back, never the page', async () => {
+    const page = await open();
+    const box = page.getByRole('textbox', { name: 'Ask or search' });
+    await box.focus();
+    await outage(page);
+    await shown(page);
+    await page.getByRole('button', { name: 'Try again', exact: true }).focus();
+    expect(await focused(page)).toMatchObject({ text: 'Try again' });
+    await restore(page);
+    expect(await section(page).count()).toBe(0);
+    expect(await focused(page), 'back where it was before the treatment').toMatchObject({ label: 'Ask or search' });
+  });
+
+  it('FD2 after Open Health focus is on the main content that shows Health, not the page', async () => {
+    const page = await open();
+    const box = page.getByRole('textbox', { name: 'Ask or search' });
+    await box.focus();
+    await outage(page);
+    await shown(page);
+    await page.getByRole('button', { name: 'Open Health', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await page.clock.runFor(1_000);
+    await settle(page);
+    await page.locator('[data-testid="health-last-known"]').waitFor({ state: 'visible' });
+    expect(await page.locator('jf-engine-loss').getAttribute('mode')).toBe('band');
+    // Health replaced Search: the text box is gone, so focus is on the main content that shows Health.
+    expect(await box.count()).toBe(0);
+    expect(await focused(page), 'the main content').toMatchObject({ label: 'Main content' });
+  });
+
+  it('FD2 the recovery is announced once, by a live region that stays in the page; each outage again', async () => {
+    const page = await open();
+    await page.getByRole('textbox', { name: 'Ask or search' }).focus();
+    for (const round of [1, 2]) {
+      await outage(page);
+      await shown(page);
+      await page.evaluate(() => {
+        const host = document.querySelector('jf-shell')!.shadowRoot!.querySelector('jf-engine-loss')!.shadowRoot!;
+        const said: string[] = [];
+        (window as unknown as { said: string[] }).said = said;
+        const watch = () => {
+          for (const region of host.querySelectorAll('[role="status"]:not(.progress)')) {
+            new MutationObserver(() => { const text = region.textContent!.trim(); if (text) said.push(text); })
+              .observe(region, { childList: true, characterData: true, subtree: true });
+          }
+        };
+        watch();
+      });
+      await restore(page);
+      await page.clock.runFor(5_000);
+      await settle(page);
+      const said = await page.evaluate(() => (window as unknown as { said: string[] }).said);
+      expect(said, `round ${round}: one announcement`).toEqual(['JustSearch can reach its engine again.']);
+      const region = page.locator('jf-engine-loss [role="status"]:not(.progress)');
+      expect(await region.count()).toBe(1);
+      expect(await region.evaluate(el => el.checkVisibility()), `round ${round}: the region is rendered, so it is spoken`).toBe(true);
+    }
+  });
+
+  it('FD4 “Report copied.” does not stay on the progress line after Try again', async () => {
+    const page = await open();
+    await page.evaluate(() => Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => {} }, configurable: true }));
+    await outage(page);
+    await shown(page);
+    const progress = page.locator('jf-engine-loss .progress');
+    await page.getByRole('button', { name: 'Copy report', exact: true }).click();
+    await expect.poll(() => progress.textContent().then(t => t?.trim())).toBe('Report copied.');
+    await page.getByRole('button', { name: 'Try again', exact: true }).click();
+    await page.clock.runFor(2_000);
+    await settle(page);
+    expect((await progress.textContent())?.trim()).toBe('Still can’t reach the engine. JustSearch keeps trying every few seconds.');
+  });
+
   it('Open Health at 600x400 steps aside to a band; Health is readable and takes input', async () => {
     const page = await open({ width: 600, height: 400 });
     await outage(page);

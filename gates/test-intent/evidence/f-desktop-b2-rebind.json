@@ -1,0 +1,160 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-13T01:33:56.672Z",
+  "revision": "4421fa3a1959379b2adf3bbe04649a78370a4168",
+  "tree": "3e25ef3bb6406a61a9c9318c632ece3cee56327b",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopEngineLossStart.test.ts\" \"src/boot/desktopEngineLoss.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/nsmake73/tmp/test-intent-vitest-32088-1794533567046.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 11942
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopChrome-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/nsmake73/tmp/test-intent-vitest-32088-1794533578993.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 20380
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#a crash-looping engine: restart events between kills, then exhaustion, never reload the window; the app says it could not restart",
+      "file": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f316aec8724ff2082030897f99f60582758880c93bbad23bbedd1144b8d4364b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FD1a a usable app re-binds to a restarted engine only once it has proven alive a crash-looping engine: restart events between kills, then exhaustion, never reload the window; the app says it could not restart",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#a restarted engine that stays up and answers re-binds the app by one reload, after the stability window",
+      "file": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f316aec8724ff2082030897f99f60582758880c93bbad23bbedd1144b8d4364b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FD1a a usable app re-binds to a restarted engine only once it has proven alive a restarted engine that stays up and answers re-binds the app by one reload, after the stability window",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a new engine identity after the restart rebinds by reloading the window, with the restart still shown until then",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8543336c7a0e01d26a01b5d7335666de4057eae2374082deaed94f1db6303f4f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC3 Restart the engine a new engine identity after the restart rebinds by reloading the window, with the restart still shown until then",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#rebinds as today: the session is dropped and the window reloads",
+      "file": "modules/ui-web/src/boot/desktopEngineLoss.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8543336c7a0e01d26a01b5d7335666de4057eae2374082deaed94f1db6303f4f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC6 a new engine identity rebinds as today: the session is dropped and the window reloads",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopChrome-lockdown.test.ts#FD1a a crash-looping engine on the running app: restart events between kills, then exhaustion; no reload, the app says it could not restart",
+      "file": "modules/ui-web/src/boot/desktopChrome-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8eb33ca9890e212175100046fdf2faa5a8b2ab2bf48335719b8b8d232c36cf69",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FD1a a crash-looping engine on the running app: restart events between kills, then exhaustion; no reload, the app says it could not restart",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4421fa3a19",
+    "revision": "4421fa3a1959379b2adf3bbe04649a78370a4168",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopEngineLossStart.test.ts\" \"src/boot/desktopEngineLoss.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/nsmake73/tmp/test-intent-vitest-32088-1794533603912.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 10318,
+        "output": "JSON report written to /home/elias/.cache/am/nsmake73/tmp/test-intent-vitest-32088-1794533603912.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopChrome-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/nsmake73/tmp/test-intent-vitest-32088-1794533614230.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 21886,
+        "output": "JSON report written to /home/elias/.cache/am/nsmake73/tmp/test-intent-vitest-32088-1794533614230.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#a crash-looping engine: restart events between kills, then exhaustion, never reload the window; the app says it could not restart",
+        "classification": "assertion",
+        "detail": "FD1a a usable app re-binds to a restarted engine only once it has proven alive a crash-looping engine: restart events between kills, then exhaustion, never reload the window; the app says it could not restart:  AssertionError: no reload lands while the engine flaps: expected \"reload\" to not be called at all, but actually been called 2 times\n\nReceived:\n\n  1st reload call:\n\n    Array []\n\n  2nd reload call:\n\n    Array []\n\n\nNumber of calls: 2\n\n    at Proxy.<anonymous> (file:///home/elias/dev/justsea"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#a restarted engine that stays up and answers re-binds the app by one reload, after the stability window",
+        "classification": "assertion",
+        "detail": "FD1a a usable app re-binds to a restarted engine only once it has proven alive a restarted engine that stays up and answers re-binds the app by one reload, after the stability window:  AssertionError: not while the supervisor still starts it: expected \"reload\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st reload call:\n\n    Array []\n\n\nNumber of calls: 1\n\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/f-desktop-b2/modules/"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a new engine identity after the restart rebinds by reloading the window, with the restart still shown until then",
+        "classification": "assertion",
+        "detail": "SC3 Restart the engine a new engine identity after the restart rebinds by reloading the window, with the restart still shown until then:  AssertionError: expected \"reload\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st reload call:\n\n    Array []\n\n\nNumber of calls: 1\n\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/f-desktop-b2/modules/ui-web/node_modules/@vitest/expect/dist/in"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLoss.test.ts#rebinds as today: the session is dropped and the window reloads",
+        "classification": "assertion",
+        "detail": "SC6 a new engine identity rebinds as today: the session is dropped and the window reloads:  AssertionError: not before the new engine has proven alive: expected \"reload\" to not be called at all, but actually been called 1 times\n\nReceived:\n\n  1st reload call:\n\n    Array []\n\n\nNumber of calls: 1\n\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/f-desktop-b2/module"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopChrome-lockdown.test.ts#FD1a a crash-looping engine on the running app: restart events between kills, then exhaustion; no reload, the app says it could not restart",
+        "classification": "assertion",
+        "detail": "FD1a a crash-looping engine on the running app: restart events between kills, then exhaustion; no reload, the app says it could not restart:  AssertionError: no reload lands while the engine flaps: expected [ Array(1) ] to deeply equal []\n    at /home/elias/.cache/am/nsmake73/tmp/test-intent-before-bzDjbs/modules/ui-web/src/boot/desktopChrome-lockdown.test.ts:175:61\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-desktop-b2/m"
+      }
+    ]
+  },
+  "digest": "sha256:041e89e5939610e201ca76f58e7a2b016749f71ad467630586a745f9b45535e0"
+}

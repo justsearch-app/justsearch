@@ -1,0 +1,211 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T22:43:16.837Z",
+  "revision": "d26ae821f92f264829a5eede2e182303a0676aab",
+  "tree": "2abd0828d8d428d2d3e18b65660322242f728e27",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopWindow.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5ocpysqv/tmp/test-intent-vitest-1413-1794523395760.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1074
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Minimize on the running app returns focus to the control that had it before, across shadow roots",
+      "file": "modules/ui-web/src/boot/desktopWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d190482dc4ab4d142f09b29dad54c96354671083d8a57a68feb5e2e3f5bea0f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FW1 Minimize on the running app returns focus to the control that had it before, across shadow roots",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Minimize on a page whose remembered control is gone puts focus on the main content",
+      "file": "modules/ui-web/src/boot/desktopWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d190482dc4ab4d142f09b29dad54c96354671083d8a57a68feb5e2e3f5bea0f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FW1 Minimize on a page whose remembered control is gone puts focus on the main content",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Minimize on the start-up frame over an inert app leaves focus off the app: nothing beneath the frame takes it",
+      "file": "modules/ui-web/src/boot/desktopWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d190482dc4ab4d142f09b29dad54c96354671083d8a57a68feb5e2e3f5bea0f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FW1 Minimize on the start-up frame over an inert app leaves focus off the app: nothing beneath the frame takes it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Minimize used through an inner element of the control returns focus too",
+      "file": "modules/ui-web/src/boot/desktopWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d190482dc4ab4d142f09b29dad54c96354671083d8a57a68feb5e2e3f5bea0f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FW1 Minimize used through an inner element of the control returns focus too",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Close on the running app returns focus to the control that had it before, across shadow roots",
+      "file": "modules/ui-web/src/boot/desktopWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d190482dc4ab4d142f09b29dad54c96354671083d8a57a68feb5e2e3f5bea0f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FW1 Close on the running app returns focus to the control that had it before, across shadow roots",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Close on a page whose remembered control is gone puts focus on the main content",
+      "file": "modules/ui-web/src/boot/desktopWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d190482dc4ab4d142f09b29dad54c96354671083d8a57a68feb5e2e3f5bea0f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FW1 Close on a page whose remembered control is gone puts focus on the main content",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Close on the start-up frame over an inert app leaves focus off the app: nothing beneath the frame takes it",
+      "file": "modules/ui-web/src/boot/desktopWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d190482dc4ab4d142f09b29dad54c96354671083d8a57a68feb5e2e3f5bea0f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FW1 Close on the start-up frame over an inert app leaves focus off the app: nothing beneath the frame takes it",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Close used through an inner element of the control returns focus too",
+      "file": "modules/ui-web/src/boot/desktopWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d190482dc4ab4d142f09b29dad54c96354671083d8a57a68feb5e2e3f5bea0f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FW1 Close used through an inner element of the control returns focus too",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopWindow.test.ts#FW1 Maximize keeps its focus, and a click outside the window controls moves nothing",
+      "file": "modules/ui-web/src/boot/desktopWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d190482dc4ab4d142f09b29dad54c96354671083d8a57a68feb5e2e3f5bea0f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FW1 Maximize keeps its focus, and a click outside the window controls moves nothing",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopWindow.test.ts#focus returns to the remembered element when it can still take focus",
+      "file": "modules/ui-web/src/boot/desktopWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d190482dc4ab4d142f09b29dad54c96354671083d8a57a68feb5e2e3f5bea0f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "focus returns to the remembered element when it can still take focus",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopWindow.test.ts#an element that is gone or inert is not returned to: the main content takes focus for one visit",
+      "file": "modules/ui-web/src/boot/desktopWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d190482dc4ab4d142f09b29dad54c96354671083d8a57a68feb5e2e3f5bea0f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "an element that is gone or inert is not returned to: the main content takes focus for one visit",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopWindow.test.ts#the main content keeps its own tabindex, and with no main content nothing takes focus",
+      "file": "modules/ui-web/src/boot/desktopWindow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d190482dc4ab4d142f09b29dad54c96354671083d8a57a68feb5e2e3f5bea0f6",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the main content keeps its own tabindex, and with no main content nothing takes focus",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:2a4c9963f8e9aef0a128ae0f499c4b1d9ece43ac98ea5236a83af6991f2216ba"
+}

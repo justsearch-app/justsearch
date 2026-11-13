@@ -9,13 +9,15 @@
  * known facts stay readable. Security dialogs live in the overlay host and stay above it; nothing
  * here grants, answers or restores an approval.
  *
- * Focus moves to the treatment once per outage and returns when it leaves, to where it was or, if
- * that is gone, to the window area. It never takes focus from an open modal.
+ * Focus moves to the treatment once per outage. When the treatment leaves, or an action inside it
+ * (Open Health) removes the control that had focus, focus follows the one focus-return rule
+ * (`utils/focusReturn.ts`): to where it was before the treatment, or, if that is gone, to the main
+ * content. It never takes focus from an open modal. The recovery is announced once.
  */
 import { css, html, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { modalOwnsFocus } from '../primitives/modality.js';
-import { deepActiveElement } from '../utils/keyboardHandler.js';
+import { composedContains, focusedElement, returnFocus } from '../../utils/focusReturn.js';
 import { icon } from './Icon.js';
 import { isTauriRuntime } from '../../utils/tauriRuntime.js';
 import { getAiState, getLastContactAttemptMs } from '../state/aiStateStore.js';
@@ -45,19 +47,24 @@ export class EngineLossTreatment extends JfElement {
     now: { state: true },
     copied: { state: true },
     report: { state: true },
+    recovered: { state: true },
   };
 
-  static transientState = { copied: '', report: '' };
+  static transientState = { copied: '', report: '', recovered: '' };
   declare loss: EngineLoss | null;
   declare now: number;
   /** The result of Copy report, said once in the status line. */
   declare copied: string;
   /** The report, shown ready to select when the clipboard refused it. */
   declare report: string;
+  /** Said once, by a live region that outlives the treatment, when the engine is back. */
+  declare recovered: string;
   private unsubscribe: (() => void) | null = null;
   private clock: ReturnType<typeof setInterval> | undefined;
   private shownEpisode = 0;
   private returnFocus: Element | null = null;
+  /** Focus was inside the treatment when this render started. */
+  private focusWasInside = false;
 
   constructor() {
     super();
@@ -65,19 +72,25 @@ export class EngineLossTreatment extends JfElement {
     this.now = Date.now();
     this.copied = '';
     this.report = '';
+    this.recovered = '';
   }
 
   static styles = css`
-    :host { display: none; min-width: 0; min-height: 0; }
+    /* Hidden: no box, but the recovery announcement's live region stays in the page. */
+    :host { display: contents; }
+    .announcement { position: absolute; inline-size: var(--frame-hairline); block-size: var(--frame-hairline);
+      margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     :host([mode='overlay']) {
       display: grid;
+      min-width: 0;
+      min-height: 0;
       place-items: center;
       overflow: auto;
       padding: var(--jf-space-4);
       box-sizing: border-box;
       background: var(--frame-dialog-dim);
     }
-    :host([mode='band']) { display: block; border-block-end: var(--frame-hairline) solid var(--border-subtle); background: var(--surface-1); }
+    :host([mode='band']) { display: block; min-width: 0; min-height: 0; border-block-end: var(--frame-hairline) solid var(--border-subtle); background: var(--surface-1); }
     section {
       box-sizing: border-box;
       max-inline-size: min(100%, calc(var(--frame-dialog-width) * 1.25));
@@ -154,23 +167,25 @@ export class EngineLossTreatment extends JfElement {
 
   private onLoss(loss: EngineLoss): void {
     const was = this.loss?.lost ?? false;
+    // A new action starts a new story on the progress line; an earlier "Report copied." is not part of it.
+    if (this.loss && loss.action !== this.loss.action && loss.action.kind !== 'idle') this.copied = '';
     this.loss = loss;
     this.now = Date.now();
     this.setAttribute('mode', !loss.lost ? 'hidden' : loss.healthOpen ? 'band' : 'overlay');
     if (loss.lost && !was) {
-      this.copied = ''; this.report = '';
+      this.copied = ''; this.report = ''; this.recovered = '';
       this.clock = setInterval(() => { this.now = Date.now(); }, 1_000);
     }
     if (!loss.lost && was) {
       clearInterval(this.clock);
       this.clock = undefined;
+      this.recovered = 'JustSearch can reach its engine again.';
       void this.leave();
     }
     if (loss.lost && loss.episode !== this.shownEpisode) {
       this.shownEpisode = loss.episode;
       // Remember where the person was before the window area goes inert, then move in once.
-      const active = deepActiveElement();
-      this.returnFocus = active && active !== document.body ? active : null;
+      this.returnFocus = focusedElement();
       void this.enter();
     }
   }
@@ -185,31 +200,46 @@ export class EngineLossTreatment extends JfElement {
     this.section()?.focus();
   }
 
-  /** Focus back where it was, or to the window area, when it was in the treatment or nowhere. */
-  private async leave(): Promise<void> {
-    const active = deepActiveElement();
-    const inTreatment = !!active && (active === this || this.shadowRoot?.contains(active) === true);
-    const lostFocus = !active || active === document.body;
+  /** The Shell drops `inert` from the window area in its own update for the same change. */
+  private async shellSettled(): Promise<void> {
     await this.updateComplete;
+    const host = (this.getRootNode() as ShadowRoot).host as (Element & { updateComplete?: Promise<unknown> }) | undefined;
+    await host?.updateComplete;
+  }
+
+  /** Focus is in the treatment, or nowhere (it was in a control the treatment no longer shows). */
+  private holdsFocus(): boolean {
+    const now = focusedElement();
+    return now === null || composedContains(this, now);
+  }
+
+  /** Focus back where it was, or to the main content, when it was in the treatment or nowhere. */
+  private async leave(): Promise<void> {
     const target = this.returnFocus;
     this.returnFocus = null;
-    if (!inTreatment && !lostFocus) return;
-    // The Shell drops `inert` from the window area in the same update.
-    await Promise.resolve();
+    if (!this.holdsFocus()) return;
+    await this.shellSettled();
     // A window that placed focus while the engine came back (a section it was asked to show) keeps it.
-    const now = deepActiveElement();
-    if (now && now !== document.body && now !== this && this.shadowRoot?.contains(now) !== true) return;
-    if (target instanceof HTMLElement && target.isConnected && !target.closest('[inert]')) {
-      target.focus();
-      if (deepActiveElement() === target) return;
-    }
-    const stage = (this.getRootNode() as ShadowRoot | Document).querySelector<HTMLElement>('.stage');
-    if (!stage) return;
-    if (!stage.hasAttribute('tabindex')) {
-      stage.setAttribute('tabindex', '-1');
-      stage.addEventListener('blur', () => stage.removeAttribute('tabindex'), { once: true });
-    }
-    stage.focus();
+    if (!this.holdsFocus() || this.loss?.lost) return;
+    returnFocus(target);
+  }
+
+  override willUpdate(): void {
+    const now = focusedElement();
+    this.focusWasInside = now !== null && composedContains(this, now);
+  }
+
+  override updated(): void {
+    // An action removed the control that had focus (Open Health turns the treatment into a band
+    // without it): focus follows the rule instead of dropping to the page.
+    if (this.focusWasInside && this.loss?.lost && focusedElement() === null) void this.refocus();
+  }
+
+  private async refocus(): Promise<void> {
+    await this.shellSettled();
+    if (focusedElement() !== null || !this.loss?.lost) return;
+    // While the window area is inert the treatment itself keeps focus.
+    if (!returnFocus(this.returnFocus)) this.section()?.focus();
   }
 
   private async copyReport(): Promise<void> {
@@ -240,9 +270,12 @@ export class EngineLossTreatment extends JfElement {
     }
   }
 
-  override render(): TemplateResult | typeof nothing {
-    const loss = this.loss;
-    if (!loss?.lost) return nothing;
+  override render(): TemplateResult {
+    // One live region for the whole life of the treatment, so the recovery it says is announced.
+    return html`${this.loss?.lost ? this.treatment(this.loss) : nothing}<p class="announcement" role="status">${this.recovered}</p>`;
+  }
+
+  private treatment(loss: EngineLoss): TemplateResult {
     const desktop = isTauriRuntime();
     const band = loss.healthOpen;
     const restarting = loss.action.kind === 'restarting';

@@ -1,0 +1,127 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-12T20:51:59.605Z",
+  "revision": "e37331ba843940f05a91df6bc27743c1278e97e2",
+  "tree": "1041bdd2cf31eefc7c6f268da1be66d284cb3d82",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/61v71zt5/tmp/test-intent-vitest-7314-1794516614403.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 43606
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#FD2 focus on an action of the treatment returns to the text box when the engine is back, never the page",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a83f6582e6ec398137f0594d1c7b04357b54be3984ccb0a05425f91decadba80",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC9 SC6 focus and leaving in a real browser FD2 focus on an action of the treatment returns to the text box when the engine is back, never the page",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#FD2 after Open Health focus is on the main content that shows Health, not the page",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a83f6582e6ec398137f0594d1c7b04357b54be3984ccb0a05425f91decadba80",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC9 SC6 focus and leaving in a real browser FD2 after Open Health focus is on the main content that shows Health, not the page",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#FD2 the recovery is announced once, by a live region that stays in the page; each outage again",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a83f6582e6ec398137f0594d1c7b04357b54be3984ccb0a05425f91decadba80",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC9 SC6 focus and leaving in a real browser FD2 the recovery is announced once, by a live region that stays in the page; each outage again",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#FD4 “Report copied.” does not stay on the progress line after Try again",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a83f6582e6ec398137f0594d1c7b04357b54be3984ccb0a05425f91decadba80",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SC9 SC6 focus and leaving in a real browser FD4 “Report copied.” does not stay on the progress line after Try again",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "HEAD",
+    "revision": "e37331ba843940f05a91df6bc27743c1278e97e2",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/61v71zt5/tmp/test-intent-vitest-7314-1794516665762.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 53329,
+        "output": "JSON report written to /home/elias/.cache/am/61v71zt5/tmp/test-intent-vitest-7314-1794516665762.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#FD2 focus on an action of the treatment returns to the text box when the engine is back, never the page",
+        "classification": "assertion",
+        "detail": "SC9 SC6 focus and leaving in a real browser FD2 focus on an action of the treatment returns to the text box when the engine is back, never the page:  AssertionError: back where it was before the treatment: expected { tag: 'body', testid: '', …(5) } to match object { label: 'Ask or search' }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/f-desktop-b2/modules/ui-web/node_mod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#FD2 after Open Health focus is on the main content that shows Health, not the page",
+        "classification": "assertion",
+        "detail": "SC9 SC6 focus and leaving in a real browser FD2 after Open Health focus is on the main content that shows Health, not the page:  AssertionError: the main content: expected { tag: 'body', testid: '', …(5) } to match object { label: 'Main content' }\n(6 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/f-desktop-b2/modules/ui-web/node_modules/@vitest/expect/dis"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#FD2 the recovery is announced once, by a live region that stays in the page; each outage again",
+        "classification": "assertion",
+        "detail": "SC9 SC6 focus and leaving in a real browser FD2 the recovery is announced once, by a live region that stays in the page; each outage again:  AssertionError: round 1: one announcement: expected [] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/61v71zt5/tmp/test-intent-before-PFsSzO/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:332:56\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f-desktop-b2/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts#FD4 “Report copied.” does not stay on the progress line after Try again",
+        "classification": "assertion",
+        "detail": "SC9 SC6 focus and leaving in a real browser FD4 “Report copied.” does not stay on the progress line after Try again:  AssertionError: expected 'Still can’t reach the engine. JustSea…' to be 'Still can’t reach the engine. JustSea…' // Object.is equality\n    at /home/elias/.cache/am/61v71zt5/tmp/test-intent-before-PFsSzO/modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts:350:52\n    at file:///home/e"
+      }
+    ]
+  },
+  "digest": "sha256:9555f91d1e07235fad7ddff3c3a5e28337b393bd737318930e9c6358b3210fc2"
+}

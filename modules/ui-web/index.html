@@ -197,7 +197,23 @@
           // guard: the controls and the frame's top strip work while the app beneath stays blocked.
           window.addEventListener('click', function (event) {
             var button = event.target instanceof Element && element.contains(event.target) ? event.target.closest('[data-window-command]') : null;
-            if (button) run(button.getAttribute('data-window-command')).then(changed);
+            if (!button) return;
+            var command = button.getAttribute('data-window-command');
+            run(command).then(changed);
+            // A control that sends the window away lets go of focus, so the window never comes back
+            // with one Space or Enter from sending it away again. The app returns focus to where it
+            // was (boot/desktopWindow.ts); Maximize keeps it, the window stays.
+            if (command !== 'toggle_maximize' && element.contains(document.activeElement)) document.activeElement.blur();
+          }, true);
+          // The context-menu policy, in one place: production builds never show the web view's own
+          // menu (Back, Refresh, Print, Inspect), on the top area, its drag region or the content, on
+          // every page. A field the person types into keeps the platform's edit menu; the app's own
+          // menus still receive the event. Development builds keep the web view menu for Inspect.
+          if ('%PROD%' === 'true') window.addEventListener('contextmenu', function (event) {
+            var target = event.composedPath()[0];
+            var typed = target instanceof HTMLTextAreaElement
+              || (target instanceof HTMLInputElement && /^(text|search|url|tel|email|password|number|date|datetime-local|month|time|week)$/.test(target.type));
+            if (!(target instanceof HTMLElement && (target.isContentEditable || (typed && !target.disabled)))) event.preventDefault();
           }, true);
           window.addEventListener('mousedown', function (event) {
             if (event.button !== 0 || (event.detail !== 1 && event.detail !== 2) || frame.parentElement !== root

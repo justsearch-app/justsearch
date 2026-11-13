@@ -62,7 +62,7 @@ afterAll(async () => {
   if (output) await rm(output, { recursive: true, force: true });
 });
 type Options = { saved?: unknown; os?: 'light' | 'dark'; storageThrows?: boolean; desktop?: boolean; phase?: string; hold?: boolean; renderHold?: boolean; future?: string; settingsFail?: boolean; discoveryHold?: boolean;
-  supervisor?: Record<string, unknown>; resetThrows?: boolean; maximized?: boolean; windowRejects?: boolean; theme?: 'light' | 'dark'; storage?: Record<string, string> };
+  supervisor?: Record<string, unknown>; noEngine?: boolean; resetThrows?: boolean; maximized?: boolean; windowRejects?: boolean; theme?: 'light' | 'dark'; storage?: Record<string, string> };
 async function create(options: Options = {}): Promise<Page> {
   const context = await browser.newContext({ colorScheme: options.os ?? 'dark' });
   contexts.add(context);
@@ -131,6 +131,8 @@ async function create(options: Options = {}): Promise<Page> {
         if (command === 'plugin:event|listen') { listeners.set(args.event, args.handler); return args.handler; }
         if (command === 'supervisor_state') return { schemaVersion: 1, kind: 'engine-supervisor-state.v1', supervisor: 'tauri', state: 'running', incarnation: 1, restartCount: 0, maxRestartAttempts: 3, ...options.supervisor };
         if (command === 'api_port') {
+          // The host's bounded wait found no engine to connect to.
+          if (options.noEngine) return null;
           while (h.discoveryHold) await new Promise(resolve => setTimeout(resolve, 10));
           return Number(location.port);
         }
@@ -729,25 +731,6 @@ for (const os of ['light', 'dark'] as const) it(`X1 X2 ${os} frame colours and b
   } finally { await page.close(); }
 });
 
-it('SA7 SA10 deadline survives a long connecting interval before the frame returns', async () => {
-  const page = await create({ discoveryHold: true });
-  let release!: () => void;
-  const waiting = new Promise<void>(resolve => { release = resolve; });
-  try {
-    await page.route('**/api/registry/surfaces', async route => { await waiting; await route.fulfill({ json: catalog }); });
-    await pauseClockBeforeNavigation(page); await page.goto(url); await page.waitForSelector('jf-engine-recovery');
-    await page.clock.fastForward(60_001);
-    expect(await page.locator('#boot-failure').count()).toBe(0);
-    expect(await page.locator('#root > jf-engine-recovery').count()).toBe(1);
-    const request = page.waitForRequest('**/api/registry/surfaces');
-    await page.evaluate(() => { window.frameHarness.discoveryHold = false; });
-    await page.clock.runFor(20); await request;
-    await failure(page, 'stalled');
-    release(); await page.clock.resume(); await page.waitForSelector('jf-top-bar');
-    await expect.poll(() => page.locator('#boot-frame, #boot-failure').count()).toBe(0);
-  } finally { release(); await page.close(); }
-}, 15_000);
-
 // Window layer (SW1-SW9). The native double answers window commands; Tauri's real drag script serves drag regions.
 const exhausted = { state: 'exhausted', restartCount: 3 };
 type Surface = { name: string; open: () => Promise<Page>; handOff?: boolean };
@@ -762,7 +745,7 @@ const surfaces: Surface[] = [
     await page.goto(url); return loaded('#boot-failure')(page);
   } },
   { name: 'stalled failure', open: async () => { const page = await create({ hold: true }); await pauseClockBeforeNavigation(page); await page.goto(url); await page.waitForSelector('jf-shell', { state: 'attached' }); await page.clock.fastForward(60_001); return loaded('#boot-failure')(page); } },
-  { name: 'connecting', open: async () => { const page = await create({ discoveryHold: true }); await page.goto(url); return loaded('#root > jf-engine-recovery')(page); } },
+  { name: 'connecting', open: async () => { const page = await create({ noEngine: true }); await page.goto(url); return loaded('#root > jf-engine-recovery')(page); } },
   { name: 'engine terminal', open: async () => { const page = await create({ supervisor: exhausted }); await page.goto(url); return loaded('#root > jf-engine-recovery')(page); } },
   { name: 'engine not ready', open: async () => { const page = await create({ supervisor: { notReady: 'The index is being checked.' } }); await page.goto(url); return loaded('#root > jf-engine-recovery')(page); } },
   { name: 'Linux update hold', open: async () => { const page = await create({ supervisor: { state: 'stopped', reason: 'upgrade' } }); await page.goto(url); return loaded('#root > jf-engine-recovery')(page); } },
@@ -1324,7 +1307,7 @@ legibilityCases.forEach(({ palette, mode }, caseIndex) => it(`SW5 X1 window cont
     ['hand-off', () => handOff({ storage })],
     ['hand-off without a saved copy', () => handOff({ storage: noCopy })],
     // Each boots with this palette's storage as a start would.
-    ['connecting', () => opened({ storage, discoveryHold: true }, '#root > jf-engine-recovery')],
+    ['connecting', () => opened({ storage, noEngine: true }, '#root > jf-engine-recovery')],
     ['engine recovery', () => opened({ storage, supervisor: exhausted }, '#root > jf-engine-recovery')],
     ['factory reset', () => opened({ storage, phase: 'complete' }, '#root > jf-factory-reset-recovery')],
   ];
