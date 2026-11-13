@@ -550,6 +550,46 @@ final class KnowledgeServerModelStartCutoverTest {
     }
   }
 
+  /**
+   * A migration requested right after boot, before a boot-time cutover monitor first reads the
+   * generation pointer (an order a loaded machine produces), still opens Green live and switches
+   * without an Engine restart. The pointer lock is held from boot until the request has created
+   * the candidate, so any boot-time monitor reads the pointer only after that.
+   */
+  @Test
+  void aMigrationRequestedBeforeTheBootMonitorFirstReadsStillOpensGreenLive() throws Exception {
+    var field = IndexGenerationManager.class.getDeclaredField("STATE_CONTROL");
+    field.setAccessible(true);
+    var stateControl = (java.util.concurrent.locks.ReentrantLock) field.get(null);
+    try (var forced = new Forced(false)) {
+      KnowledgeServer server;
+      stateControl.lock();
+      try {
+        server = forced.boot(plainServer(tempDir));
+        var started = server.appServices().ingestService().startMigration(
+            MigrationStartRequest.newBuilder().setReason("manual")
+                .setProjectionSourceIdsPresent(true).addProjectionSourceIds("memory").build(),
+            CallContext.none());
+        assertTrue(started.getAccepted(), started::getError);
+        forced.successorGeneration = started.getBuildingGenerationId();
+        var bootMonitor = (Thread) getField(server, "migrationCutoverThread");
+        if (bootMonitor != null) {
+          assertTrue(QueryPrewarmFixture.waitFor(java.time.Duration.ofSeconds(30),
+                  () -> stateControl.hasQueuedThread(bootMonitor) || !bootMonitor.isAlive()),
+              "the boot monitor waits for the pointer or has ended");
+        }
+      } finally {
+        stateControl.unlock();
+      }
+      assertTrue(server.beginUnrecordedBuildingLiveAsync(forced.successorGeneration,
+          forced.restarts::incrementAndGet).get(30, TimeUnit.SECONDS), "Green opens live");
+      assertTrue(server.awaitMigrationCutoverExitForTests(60, TimeUnit.SECONDS), "the switch ends");
+      assertEquals(forced.successorGeneration,
+          forced.manager.readStateBestEffort().active_generation(), "Green is promoted");
+      assertEquals(0, forced.restarts.get(), "no Engine restart");
+    }
+  }
+
   // --- harness ---------------------------------------------------------------------------------
 
   /** The forced order, the migration it switches, and the Engine log it observes. */
@@ -807,7 +847,7 @@ final class KnowledgeServerModelStartCutoverTest {
       releaseHeld.countDown();
       promoted.countDown();
       try {
-        if (server != null && !server.awaitClosed(0)) server.close();
+        if (server != null && !server.awaitClosed(0)) closeServer(server);
       } finally {
         serverLog.detachAppender(appender);
         prewarmLog.detachAppender(appender);
@@ -998,10 +1038,31 @@ final class KnowledgeServerModelStartCutoverTest {
     return new EmbeddingAssembly(sessions, shape, tokenizer, capabilities);
   }
 
+  private static void closeServer(KnowledgeServer server) throws java.io.IOException {
+    for (int attempt = 1; ; attempt++) {
+      try {
+        server.close();
+        return;
+      } catch (java.io.IOException failure) {
+        // A loaded loop may outlive the product's 5 s join. Retry only its retained shutdown;
+        // any other failure (including an additional suppressed failure) must still fail the test.
+        if (attempt >= 6
+            || !"Application services still own resources".equals(failure.getMessage())
+            || failure.getSuppressed().length != 0
+            || !(failure.getCause() instanceof java.io.IOException retained)
+            || !"Indexing loop still running; resources retained for shutdown retry"
+                .equals(retained.getMessage())
+            || retained.getCause() != null || retained.getSuppressed().length != 0) {
+          throw failure;
+        }
+      }
+    }
+  }
+
   private static CompletableFuture<Void> closeInBackground(KnowledgeServer server) {
     var result = new CompletableFuture<Void>();
     Thread.ofVirtual().start(() -> {
-      try { server.close(); result.complete(null); }
+      try { closeServer(server); result.complete(null); }
       catch (Throwable failure) { result.completeExceptionally(failure); }
     });
     return result;

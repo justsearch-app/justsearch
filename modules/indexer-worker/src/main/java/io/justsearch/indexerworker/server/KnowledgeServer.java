@@ -2041,7 +2041,11 @@ public final class KnowledgeServer implements Closeable {
           // exhausted debt. Reuse it; certification, failure limits and publication fences stay.
           indexGenerationManager.updateMigrationState(IndexGenerationManager.MigrationState.MIGRATING);
         }
-        startMigrationCutoverMonitorBestEffort();
+        // Only a boot that owns a candidate has a switch to monitor. Without one, a monitor that
+        // first reads the pointer after a request created a candidate adopted it, though it can
+        // never switch it: the live start that opens that candidate waits for this monitor to
+        // exit, gave up after 10 s and restarted the Engine. The live start starts its own.
+        if (buildingIndexPath != null) startMigrationCutoverMonitorBestEffort();
       }
 
       // 3.6 Embedding compatibility — MUST resolve BEFORE anything can commit (tempdoc 819 A).
