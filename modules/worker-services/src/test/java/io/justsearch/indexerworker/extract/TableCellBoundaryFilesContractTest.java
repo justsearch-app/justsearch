@@ -1,6 +1,7 @@
 package io.justsearch.indexerworker.extract;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import io.justsearch.adapters.lucene.runtime.*;
 import io.justsearch.configuration.JustSearchConfigurationLoader;
@@ -181,6 +182,8 @@ class TableCellBoundaryFilesContractTest extends LuceneExecutorTestBase {
   }
 
   @Test
+  // Six policies need six extraction children (~5 s each): above the default 30 s budget.
+  @org.junit.jupiter.api.Timeout(value = 120, unit = TimeUnit.SECONDS)
   void p3ProductionChildCapsAndTruncationWithSeparators() throws Exception {
     Path file = fixture("docx", "<table><tr><td>" + "<p>ab😀cd</p>".repeat(50)
         + "</td></tr></table>");
@@ -247,6 +250,8 @@ class TableCellBoundaryFilesContractTest extends LuceneExecutorTestBase {
         "word/document.xml", "<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">"
             + "<w:body>" + render(xml.getDocumentElement(), true) + "<w:sectPr/></w:body></w:document>"));
     if (!format.equals("doc")) return docx;
+    assumeTrue(executableOnPath("libreoffice"),
+        "Legacy DOC fixtures require LibreOffice, but libreoffice is not executable on PATH");
     var builder = new ProcessBuilder("libreoffice", "--headless",
         "-env:UserInstallation=" + temp.resolve("lo-profile").toUri(), "--convert-to", "doc:MS Word 97",
         "--outdir", temp.toString(), docx.toString()).redirectErrorStream(true);
@@ -263,6 +268,14 @@ class TableCellBoundaryFilesContractTest extends LuceneExecutorTestBase {
     assertEquals(0, process.exitValue(), Files.readString(log));
     assertTrue(Files.isRegularFile(output), "LibreOffice did not generate a binary DOC: " + Files.readString(log));
     return output;
+  }
+
+  private static boolean executableOnPath(String executable) {
+    String path = System.getenv("PATH");
+    String name = io.justsearch.configuration.PlatformPaths.isWindows() ? executable + ".exe" : executable;
+    return path != null && Arrays.stream(path.split(java.io.File.pathSeparator))
+        .map(directory -> Path.of(directory, name))
+        .anyMatch(file -> Files.isRegularFile(file) && Files.isExecutable(file));
   }
 
   private static String render(Node node, boolean word) {
