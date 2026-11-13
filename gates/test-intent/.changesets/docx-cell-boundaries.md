@@ -53,3 +53,13 @@ stay as they were (preserved).
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1d5bd-f46a-7cf0-9efb-d14f8ceea566",
+  "verdict": "accept",
+  "digest": "sha256:029fa2ddfbbb999bd035842c5b428c288734cd629a6c620936ae1d3bcbade901"
+}
+```
