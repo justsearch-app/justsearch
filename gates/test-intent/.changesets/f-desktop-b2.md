@@ -402,3 +402,15 @@ returns" is removed there; its rewrite, "... which a running engine ends by relo
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1d29c-866f-7090-b389-a3dcb7199de2",
+  "verdict": "accept",
+  "digest": "sha256:c8c48e080250b4b5c11929bff09b3ed1fa375143ff2ba66ef695100b98a2f3f1"
+}
+```
