@@ -22,7 +22,7 @@ stay as they were (preserved).
       "change": "modified",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "Repaired: in a table cell (td or th, including the first row reused as labels and a single-row table) or a list item, a paragraph end, a line break or a nested-table cell/row end leaves one space between words, so 'repercussive'/'All' and 'Jason Adams'/'Avneet Nahal' are stored apart; a list inside a cell keeps all its text without a duplicate standalone list; empty or whitespace-only paragraphs add no extra separator; in PDF mode a hyphen at a paragraph end inside a cell is not joined with the next paragraph. PdfWordBoundaryTest: for td and li, the non-PDF case now expects 'nur unzureichend Rech-\\nnung' (boundary kept, no hyphen joining outside PDF); its old expectation 'nurunzureichend ...' for td and li pinned the run-together defect and is replaced, while p and h2 keep the old expectation unchanged. Preserved (pass before and after): single-paragraph cells with inline runs and the row/column/value layout; empty paragraphs make no content; body paragraphs, headings and text after a table; PDF physical-line hyphen joining; the content limit counts separators and never splits a surrogate pair.",
+      "behaviour": "Repaired: in a table cell (td or th, including the first row reused as labels and a single-row table) or a list item, a paragraph end, a line break or a nested-table cell/row end leaves one space between words, so 'repercussive'/'All' and 'Jason Adams'/'Avneet Nahal' are stored apart; a list inside a cell keeps all its text without a duplicate standalone list; empty or whitespace-only paragraphs add no extra separator; in PDF mode a hyphen at a paragraph end inside a cell is not joined with the next paragraph. PdfWordBoundaryTest: for td and li, the non-PDF case now expects 'nur unzureichend Rech-\\nnung' (boundary kept, no hyphen joining outside PDF); its old expectation 'nurunzureichend ...' for td and li pinned the run-together defect and is replaced, while p and h2 keep the old expectation unchanged. Preserved (pass before and after; checked by the change's verifier, not listed as new checks): single-paragraph cells with inline runs and the row/column/value layout; empty paragraphs make no content; body paragraphs, headings and text after a table; PDF physical-line hyphen joining; the content limit counts separators and never splits a surrogate pair.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -33,10 +33,7 @@ stay as they were (preserved).
           "label": "agent choice"
         }
       ],
-      "evidence": [
-        "gates/test-intent/evidence/docx-cell-boundaries-repair.json",
-        "gates/test-intent/evidence/docx-cell-boundaries-preservation.json"
-      ],
+      "evidence": "gates/test-intent/evidence/docx-cell-boundaries-repair.json",
       "newChecks": [
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TableCellBoundaryContractTest.java#s1ParagraphsInCellAndReusedLabels",
         "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TableCellBoundaryContractTest.java#s1SingleRowTable",
