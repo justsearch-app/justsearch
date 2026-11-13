@@ -267,3 +267,13 @@ The new src/boot/type-ladder-lockdown.test.ts and src/boot/woff2-axes.test.ts ar
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-cdyw_35n-test-intent",
+  "verdict": "accept",
+  "digest": "sha256:419aeee66ab037db81f0ae7078b4a6a47eaf2cfa246bd5390a47dbec735c811e"
+}
+```
