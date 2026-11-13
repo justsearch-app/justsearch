@@ -9,4 +9,12 @@ package io.justsearch.app.api.chat;
 public interface VduHold extends Hold {
   /** True when the controller needs the GPU back and asks the holder to finish early. */
   boolean interruptRequested();
+
+  /**
+   * After a failed request: whether the server this hold runs in VDU mode exited or failed, so the
+   * failure is the engine's and not the document's. May wait briefly for the exit to be observed.
+   */
+  default boolean serverLost() throws InterruptedException {
+    return false;
+  }
 }

@@ -251,6 +251,15 @@ public class VduProcessor {
         return hold != null && hold.interruptRequested();
     }
 
+    /**
+     * After a failed request: whether the server the batch's VDU hold runs exited or failed (an
+     * engine failure, not the document's). Waits briefly for the exit to be observed.
+     */
+    public boolean visionServerLost() throws InterruptedException {
+        VduHold hold = vduHold.get();
+        return hold != null && hold.serverLost();
+    }
+
     public boolean hasVisionCapability() {
         return introspection.hasVisionCapability();
     }
@@ -750,6 +759,25 @@ public class VduProcessor {
     public static final class DocumentFailure extends VduException {
         public DocumentFailure(String message, Throwable cause) {
             super(message, cause);
+        }
+    }
+
+    /**
+     * The picture-reading server exited or failed while a document was being read. The pass ends
+     * as an engine failure; the document returns to PENDING with its attempt refunded.
+     */
+    public static final class VisionServerLost extends IllegalStateException {
+        private final int finished;
+
+        /** @param finished documents this pass completed or failed before the server stopped */
+        public VisionServerLost(String message, int finished, Throwable cause) {
+            super(message, cause);
+            this.finished = finished;
+        }
+
+        /** Documents the pass completed or failed before the server stopped. */
+        public int finished() {
+            return finished;
         }
     }
 

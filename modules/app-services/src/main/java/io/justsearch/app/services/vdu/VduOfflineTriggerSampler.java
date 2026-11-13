@@ -183,6 +183,15 @@ public final class VduOfflineTriggerSampler {
             breaker.passEnded(failure != null ? AutomaticVduBreaker.classify(failure, detail)
                 : AutomaticVduBreaker.classify(outcome, detail));
           }
+          if (loadedPass && retryWithoutActivity(outcome, failure, now)) {
+            // Stopped by an energy drop, a bulk or indexing hold, or an engine failure, with no
+            // user input since the pass started: a later eligible tick retries it after one idle
+            // window (the breaker paces engine failures) instead of waiting for user activity.
+            synchronized (VduOfflineTriggerSampler.this) {
+              loadedAttemptAt = Long.MIN_VALUE;
+              retryAfter = System.currentTimeMillis() + VduPacingPolicy.DEFAULT_IDLE_THRESHOLD_MS;
+            }
+          }
           if (failure != null) {
             if (loadedPass) retryAfter = System.currentTimeMillis()
                 + VduPacingPolicy.DEFAULT_IDLE_THRESHOLD_MS;
@@ -219,6 +228,31 @@ public final class VduOfflineTriggerSampler {
       }
       log.debug("VduOfflineTriggerSampler: check failed: {}", e.getMessage());
     }
+  }
+
+  /**
+   * Whether a finished loaded-chat pass is retried without new user activity: it ended in an
+   * engine failure, was deferred by energy or a hold, or selected nothing (a hold met at its
+   * lease), and no user input was recorded since it started at {@code startedAt}.
+   */
+  private boolean retryWithoutActivity(io.justsearch.app.api.OfflineProcessingOutcome outcome,
+      Throwable failure, long startedAt) {
+    boolean retryable;
+    if (failure != null) {
+      // Engine failures only (a failed vision entry, a picture-reading server that stopped): the
+      // breaker paces them. Cancellations and other failures keep waiting for user activity.
+      retryable = !(AutomaticVduBreaker.classify(failure, null)
+          instanceof AutomaticVduBreaker.Result.Neutral);
+    } else {
+      var blocked = outcome.blockedReason();
+      retryable = blocked == io.justsearch.app.api.OfflineProcessingOutcome.BlockReason.ACTIVITY_OR_ENERGY
+          || blocked == io.justsearch.app.api.OfflineProcessingOutcome.BlockReason.NONE
+              && outcome.selected() == 0;
+    }
+    if (!retryable) return false;
+    KnowledgeServerBootstrap ks = knowledgeServerSupplier.get();
+    long now = System.currentTimeMillis();
+    return ks != null && idleMillis(ks) >= now - startedAt;
   }
 
   private long idleMillis(KnowledgeServerBootstrap ks) {

@@ -128,6 +128,13 @@ public interface ChatActuator {
   /** A serving managed chat with open admission, no exchange leases and no queued requests. */
   default boolean idleForAutomaticVdu() { return false; }
 
+  /**
+   * After a failed picture-reading request: whether the server running the VDU configuration has
+   * exited or failed (an engine failure, not the document's). May wait briefly for the exit to be
+   * observed; must not take locks.
+   */
+  default boolean vduServerLost() throws InterruptedException { return false; }
+
   /** A prepared configuration still owns the server until commit or abort; must not take locks. */
   default boolean configurationPrepared() {
     return false;

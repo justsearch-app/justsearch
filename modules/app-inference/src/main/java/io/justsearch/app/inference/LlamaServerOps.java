@@ -2441,6 +2441,14 @@ final class LlamaServerOps {
     return owner == null ? Optional.empty() : Optional.of(owner.start());
   }
 
+  /** A managed server is active, alive and not signalled as failed. */
+  boolean activeManagedServerServing() {
+    ActiveServer owner = activeServer;
+    return owner != null && failureSignalledOwner != owner
+        && owner.start().disposition() != StartDisposition.ADOPTED_EXTERNAL
+        && alive(owner.child());
+  }
+
   boolean activeManagedCandidateAlive(StartResult expected) {
     ActiveServer owner = activeServer;
     return owner != null && owner.start() == expected && ownedPhysicalServerAlive(owner);
