@@ -52,7 +52,7 @@ class PdfWordBoundaryTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"p", "h2", "td", "li"})
+  @ValueSource(strings = {"p", "h2"})
   void otherFormatsKeepTheirExistingWhitespaceAndHyphens(String element) throws Exception {
     var handler = handler(1000, false);
     startContainer(handler, element);
@@ -63,6 +63,21 @@ class PdfWordBoundaryTest {
     end(handler, element);
     endContainer(handler, element);
     assertEquals("nurunzureichend Rech-\nnung", elementText(handler));
+  }
+
+  // Cells and list items separate block boundaries (S2/S4); PDF line handling is separate.
+  @ParameterizedTest
+  @ValueSource(strings = {"td", "li"})
+  void otherFormatsSeparateCellAndListBoundariesWithoutJoiningHyphens(String element) throws Exception {
+    var handler = handler(1000, false);
+    startContainer(handler, element);
+    start(handler, element);
+    chars(handler, "nur");
+    whitespace(handler, "\n");
+    chars(handler, "unzureichend Rech-\nnung");
+    end(handler, element);
+    endContainer(handler, element);
+    assertEquals("nur unzureichend Rech-\nnung", elementText(handler));
   }
 
   @ParameterizedTest
