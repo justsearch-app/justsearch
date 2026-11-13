@@ -3,7 +3,7 @@
 /**
  * Tempdoc 560 §24 — tokenIntrospection: value sanitization (Fix 1) + value-aware widget (Fix 5).
  */
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyTokenPreview,
   clearTokenPreview,
@@ -12,10 +12,24 @@ import {
 } from './tokenIntrospection.js';
 import { KNOWN_TOKEN_NAMES } from './designTokenTree.js';
 
-// happy-dom drops @layer rules from cssRules, so inspect the real replaceSync input.
-let replaceSync: MockInstance<CSSStyleSheet['replaceSync']>;
-beforeEach(() => { replaceSync = vi.spyOn(CSSStyleSheet.prototype, 'replaceSync'); });
+// happy-dom drops @layer rules from cssRules. Record each sheet's current text,
+// then inspect only sheets adopted by this document (including later overwrites).
+let sheetText: WeakMap<CSSStyleSheet, string>;
+beforeEach(() => {
+  sheetText = new WeakMap();
+  const { replaceSync, replace } = CSSStyleSheet.prototype;
+  vi.spyOn(CSSStyleSheet.prototype, 'replaceSync').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    return replaceSync.call(this, text);
+  });
+  vi.spyOn(CSSStyleSheet.prototype, 'replace').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    return replace.call(this, text);
+  });
+});
 afterEach(() => vi.restoreAllMocks());
+const adoptedCss = () => document.adoptedStyleSheets.map((sheet) => sheetText.get(sheet) ?? '');
+const paletteCss = () => adoptedCss().filter((css) => css.startsWith('@layer user-theme'));
 
 const STYLE_ID = 'jf-test-token-preview';
 const known = () => [...KNOWN_TOKEN_NAMES][0]!;
@@ -43,9 +57,8 @@ describe('isColorLiteral — value-aware widget rule (Fix 5)', () => {
 describe('applyTokenPreview — sanitization (Fix 1)', () => {
   it('injects a scoped @layer style for a known token + safe value', () => {
     applyTokenPreview(new Map([[known(), '#abcdef']]), STYLE_ID);
-    const sheet = replaceSync.mock.contexts.at(-1);
-    const css = replaceSync.mock.lastCall?.[0];
-    expect(document.adoptedStyleSheets).toContain(sheet);
+    expect(paletteCss()).toHaveLength(1);
+    const css = paletteCss()[0];
     expect(css).toContain('@layer user-theme');
     expect(css).toContain(`--${known()}: #abcdef;`);
   });
@@ -54,21 +67,21 @@ describe('applyTokenPreview — sanitization (Fix 1)', () => {
     expect(() => applyTokenPreview(new Map([['nope-not-a-token', 'red']]), STYLE_ID)).toThrow(
       /unknown token/,
     );
-    expect(document.adoptedStyleSheets).toHaveLength(0);
+    expect(paletteCss()).toHaveLength(0);
   });
 
   it('throws on a brace/angle-bracket value and writes nothing (no rule injection)', () => {
     expect(() =>
       applyTokenPreview(new Map([[known(), 'red} html{display:none']]), STYLE_ID),
     ).toThrow(/break out of the :root rule|brace/);
-    expect(document.adoptedStyleSheets).toHaveLength(0);
+    expect(paletteCss()).toHaveLength(0);
   });
 
   it('clears the preview on an empty map', () => {
     applyTokenPreview(new Map([[known(), 'blue']]), STYLE_ID);
-    expect(document.adoptedStyleSheets).toContain(replaceSync.mock.contexts.at(-1));
+    expect(paletteCss()).toHaveLength(1);
     applyTokenPreview(new Map(), STYLE_ID);
-    expect(document.adoptedStyleSheets).toHaveLength(0);
+    expect(paletteCss()).toHaveLength(0);
   });
 });
 

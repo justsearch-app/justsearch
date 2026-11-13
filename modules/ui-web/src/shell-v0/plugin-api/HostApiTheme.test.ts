@@ -10,7 +10,7 @@
  * allowlisted against KNOWN_TOKEN_NAMES AND every value is sanitized (rejecting brace/angle-bracket
  * breakout characters) — the plugin can never inject a raw CSS rule.
  */
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHostApi } from './HostApiImpl.js';
 import type { PluginTrustTier } from './plugin-types.js';
 import { KNOWN_TOKEN_NAMES } from '../themes/designTokenTree.js';
@@ -19,10 +19,24 @@ import { __resetUserStateForTest } from '../state/UserStateDocument.js';
 
 import { clearTokenPreview } from '../themes/tokenIntrospection.js';
 
-// happy-dom drops @layer rules from cssRules, so inspect the real replaceSync input.
-let replaceSync: MockInstance<CSSStyleSheet['replaceSync']>;
-beforeEach(() => { replaceSync = vi.spyOn(CSSStyleSheet.prototype, 'replaceSync'); });
+// happy-dom drops @layer rules from cssRules. Record each sheet's current text,
+// then inspect only sheets adopted by this document (including later overwrites).
+let sheetText: WeakMap<CSSStyleSheet, string>;
+beforeEach(() => {
+  sheetText = new WeakMap();
+  const { replaceSync, replace } = CSSStyleSheet.prototype;
+  vi.spyOn(CSSStyleSheet.prototype, 'replaceSync').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    return replaceSync.call(this, text);
+  });
+  vi.spyOn(CSSStyleSheet.prototype, 'replace').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    return replace.call(this, text);
+  });
+});
 afterEach(() => vi.restoreAllMocks());
+const adoptedCss = () => document.adoptedStyleSheets.map((sheet) => sheetText.get(sheet) ?? '');
+const paletteCss = () => adoptedCss().filter((css) => css.startsWith('@layer user-theme'));
 
 const PLUGIN_ID = 'token-editor';
 const PREVIEW_ID = `jf-plugin-token-preview--${PLUGIN_ID}`;
@@ -76,9 +90,8 @@ describe('host.theme.previewTokens — value-only, sanitized (560 §23/§24)', (
   it('injects a host-generated @layer user-theme sheet (per-plugin owner) for a known token', () => {
     const name = knownToken();
     theme().previewTokens!(new Map([[name, 'rgb(1, 2, 3)']]));
-    const sheet = replaceSync.mock.contexts.at(-1);
-    const css = replaceSync.mock.lastCall?.[0];
-    expect(document.adoptedStyleSheets).toContain(sheet);
+    expect(paletteCss()).toHaveLength(1);
+    const css = paletteCss()[0];
     expect(css).toContain('@layer user-theme');
     expect(css).toContain(`--${name}: rgb(1, 2, 3);`);
   });
@@ -87,7 +100,7 @@ describe('host.theme.previewTokens — value-only, sanitized (560 §23/§24)', (
     expect(() => theme().previewTokens!(new Map([['definitely-not-a-token', 'red']]))).toThrow(
       /unknown token/,
     );
-    expect(document.adoptedStyleSheets).toHaveLength(0);
+    expect(paletteCss()).toHaveLength(0);
   });
 
   it('throws on a brace/angle-bracket value and writes NOTHING — no CSS-rule injection', () => {
@@ -96,7 +109,7 @@ describe('host.theme.previewTokens — value-only, sanitized (560 §23/§24)', (
       theme().previewTokens!(new Map([[name, 'red} html{display:none']])),
     ).toThrow(/break out of the :root rule|brace/);
     // the malicious value never reached the DOM
-    expect(document.adoptedStyleSheets).toHaveLength(0);
+    expect(paletteCss()).toHaveLength(0);
   });
 
   it('writes nothing if ANY value is unsafe (validate-before-write)', () => {
@@ -109,15 +122,15 @@ describe('host.theme.previewTokens — value-only, sanitized (560 §23/§24)', (
         ]),
       ),
     ).toThrow();
-    expect(document.adoptedStyleSheets).toHaveLength(0);
+    expect(paletteCss()).toHaveLength(0);
   });
 
   it('clears the preview on an empty map', () => {
     const name = knownToken();
     theme().previewTokens!(new Map([[name, 'green']]));
-    expect(document.adoptedStyleSheets).toContain(replaceSync.mock.contexts.at(-1));
+    expect(paletteCss()).toHaveLength(1);
     theme().previewTokens!(new Map());
-    expect(document.adoptedStyleSheets).toHaveLength(0);
+    expect(paletteCss()).toHaveLength(0);
   });
 });
 

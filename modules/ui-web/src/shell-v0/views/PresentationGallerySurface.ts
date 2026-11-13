@@ -178,9 +178,9 @@ export class PresentationGallerySurface extends JfElement {
       .card.active {
         border-color: var(--accent-primary);
       }
-      /* No background declaration here: the fill is per-card (each card previews its OWN accent),
-         bound inline from the declaration by swatchTint(). A rule here would be dead authority. */
+      /* Each card supplies its own --swatch-tint from the declaration via swatchTint(). */
       .swatch {
+        background: var(--swatch-tint);
         block-size: 1.6rem;
         border-radius: 0.3rem;
         border: 1px solid var(--border-subtle);
@@ -250,7 +250,7 @@ export class PresentationGallerySurface extends JfElement {
                 <div
                   class="swatch"
                   data-testid="gallery-swatch"
-                  .style=${`background: ${this.swatchTint(decl)}`}
+                  .style=${`--swatch-tint: ${this.swatchTint(decl)}`}
                 ></div>
                 <div class="card-name">${decl.displayName}</div>
                 <div class="origin-label">${this.originLabel(decl.origin)}</div>

@@ -3,7 +3,7 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __resetThemeStateForTest,
   applyAppearance,
@@ -12,11 +12,24 @@ import {
 import { __resetUserStateForTest } from '../state/UserStateDocument.js';
 import { __resetCatalogForTest } from './themesCatalog.js';
 
-// happy-dom does not retain @layer rules in cssRules; inspect what the real sheet receives.
-let replaceSync: MockInstance<CSSStyleSheet['replaceSync']>;
-beforeEach(() => { replaceSync = vi.spyOn(CSSStyleSheet.prototype, 'replaceSync'); });
+// happy-dom drops @layer rules from cssRules. Record each sheet's current text,
+// then inspect only sheets adopted by this document (including later overwrites).
+let sheetText: WeakMap<CSSStyleSheet, string>;
+beforeEach(() => {
+  sheetText = new WeakMap();
+  const { replaceSync, replace } = CSSStyleSheet.prototype;
+  vi.spyOn(CSSStyleSheet.prototype, 'replaceSync').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    return replaceSync.call(this, text);
+  });
+  vi.spyOn(CSSStyleSheet.prototype, 'replace').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    return replace.call(this, text);
+  });
+});
 afterEach(() => vi.restoreAllMocks());
-const paletteCss = () => replaceSync.mock.calls.filter(([css]) => css.startsWith('@layer user-theme')).at(-1)?.[0];
+const adoptedCss = () => document.adoptedStyleSheets.map((sheet) => sheetText.get(sheet) ?? '');
+const paletteCss = () => adoptedCss().filter((css) => css.startsWith('@layer user-theme'));
 
 const themesDir = join(__dirname, '../../../public/themes');
 const paletteFiles = readdirSync(themesDir)
@@ -66,14 +79,13 @@ describe('built-in palettes through the production appearance writer', () => {
           .toEqual([]);
         expect(document.documentElement.getAttribute('data-theme')).toBe(mode);
         expect(getActiveThemeId()).toBe(id);
-        const paletteCall = replaceSync.mock.calls.findIndex(([css]) => css.startsWith('@layer user-theme'));
-        expect(document.adoptedStyleSheets).toContain(replaceSync.mock.contexts[paletteCall]);
-        expect(paletteCss()).toContain('@layer user-theme');
-        expect(paletteCss()).toContain(':root');
+        expect(paletteCss()).toHaveLength(1);
+        expect(paletteCss()[0]).toContain('@layer user-theme');
+        expect(paletteCss()[0]).toContain(':root');
         const css = assets.get(`/themes/${id}.css`);
-        if (css !== undefined) expect(paletteCss()).toContain(css);
+        if (css !== undefined) expect(paletteCss()[0]).toContain(css);
         if (id === 'core.high-vis') {
-          expect(paletteCss()).toContain('--focus-ring-color: #008890;');
+          expect(paletteCss()[0]).toContain('--focus-ring-color: #008890;');
         }
       });
     }

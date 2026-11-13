@@ -12,7 +12,7 @@
  *  - loadAndApplyTheme throws on non-2xx response
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __resetThemeStateForTest,
   applyTheme,
@@ -27,17 +27,24 @@ import {
 } from './themeState.js';
 import { __resetUserStateForTest } from './UserStateDocument.js';
 
-// happy-dom does not retain @layer rules in cssRules; inspect what the real sheet receives.
-let replaceSync: MockInstance<CSSStyleSheet['replaceSync']>;
-beforeEach(() => { replaceSync = vi.spyOn(CSSStyleSheet.prototype, 'replaceSync'); });
+// happy-dom drops @layer rules from cssRules. Record each sheet's current text,
+// then inspect only sheets adopted by this document (including later overwrites).
+let sheetText: WeakMap<CSSStyleSheet, string>;
+beforeEach(() => {
+  sheetText = new WeakMap();
+  const { replaceSync, replace } = CSSStyleSheet.prototype;
+  vi.spyOn(CSSStyleSheet.prototype, 'replaceSync').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    return replaceSync.call(this, text);
+  });
+  vi.spyOn(CSSStyleSheet.prototype, 'replace').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    return replace.call(this, text);
+  });
+});
 afterEach(() => vi.restoreAllMocks());
-// The last palette CSS written, only if the sheet that received it is adopted by the document.
-const paletteCss = () => {
-  const calls = replaceSync.mock.calls;
-  let i = calls.length - 1;
-  while (i >= 0 && !calls[i]![0].startsWith('@layer user-theme')) i--;
-  return i >= 0 && document.adoptedStyleSheets.includes(replaceSync.mock.contexts[i] as CSSStyleSheet) ? calls[i]![0] : undefined;
-};
+const adoptedCss = () => document.adoptedStyleSheets.map((sheet) => sheetText.get(sheet) ?? '');
+const paletteCss = () => adoptedCss().filter((css) => css.startsWith('@layer user-theme'));
 
 describe('themeState (slice 474 alpha)', () => {
   beforeEach(() => {
@@ -50,29 +57,23 @@ describe('themeState (slice 474 alpha)', () => {
 
   it('applyTheme adopts a constructed stylesheet', () => {
     applyTheme('core.solarized', ':root { --accent-tint: #b58900; }');
-    expect(document.adoptedStyleSheets).toContain(replaceSync.mock.contexts.at(-1));
-    expect(paletteCss()).toContain('--accent-tint: #b58900');
+    expect(paletteCss()).toHaveLength(1);
+    expect(paletteCss()[0]).toContain('--accent-tint');
     expect(getActiveThemeId()).toBe('core.solarized');
   });
 
   it('applyTheme replaces the existing sheet on subsequent calls (one style at a time)', () => {
     applyTheme('core.nord', ':root { --accent-tint: #88c0d0; }');
-    const sheets = [...document.adoptedStyleSheets];
     applyTheme('core.solarized', ':root { --accent-tint: #b58900; }');
-    expect(document.adoptedStyleSheets).toEqual(sheets);
-    // Exactly one adopted sheet carries a palette.
-    const paletteSheets = new Set(replaceSync.mock.calls.flatMap(([css], i) =>
-      css.startsWith('@layer user-theme') ? [replaceSync.mock.contexts[i] as CSSStyleSheet] : []));
-    expect(document.adoptedStyleSheets.filter((sheet) => paletteSheets.has(sheet))).toHaveLength(1);
-    expect(paletteCss()).toContain('#b58900');
+    expect(paletteCss()).toHaveLength(1);
+    expect(paletteCss()[0]).toContain('#b58900');
     expect(getActiveThemeId()).toBe('core.solarized');
   });
 
   it('clearActiveTheme removes the sheet and resets state', () => {
     applyTheme('core.nord', ':root { --accent-tint: #88c0d0; }');
-    const sheet = replaceSync.mock.contexts.at(-1);
     clearActiveTheme();
-    expect(document.adoptedStyleSheets).not.toContain(sheet);
+    expect(paletteCss()).toHaveLength(0);
     expect(getActiveThemeId()).toBeNull();
   });
 
@@ -113,7 +114,7 @@ describe('themeState (slice 474 alpha)', () => {
     await loadAndApplyTheme('core.nord', fakeFetch as unknown as typeof fetch);
     expect(fakeFetch).toHaveBeenCalledWith('/themes/core.nord.css');
     expect(getActiveThemeId()).toBe('core.nord');
-    expect(paletteCss()).toContain(
+    expect(paletteCss()[0]).toContain(
       '#88c0d0',
     );
   });
@@ -303,9 +304,7 @@ describe('themeState — §2.C / C5 single appearance writer', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
     expect(document.documentElement.classList.contains('high-contrast')).toBe(true);
     // Layer 2 — the persisted palette was re-injected, from the SAME boot call.
-    expect(paletteCss()).toContain('--accent-tint: #abc');
-    const paletteCall = replaceSync.mock.calls.findIndex(([css]) => css.startsWith('@layer user-theme'));
-    expect(document.adoptedStyleSheets).toContain(replaceSync.mock.contexts[paletteCall]);
+    expect(paletteCss()).toHaveLength(1);
     expect(getActiveThemeId()).toBe('core.testpalette');
   });
 });

@@ -30,11 +30,7 @@ Per-element styles and runtime stylesheets moved to mechanisms the desktop windo
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Palette themes, token previews and role foregrounds are now constructed stylesheets in document.adoptedStyleSheets instead of <style> elements in <head> (the desktop window's policy refuses <style> made at runtime). The observation moved from document.getElementById('jf-active-theme' / preview id).textContent, or a style[data-theme-id] selector, to the adopted sheet and its CSS: the CSS a sheet received (replaceSync input, since happy-dom drops @layer rules from cssRules) counts only when that same sheet is in document.adoptedStyleSheets. Inputs, preconditions, expected CSS content, sanitisation, validate-before-write, clearing, palette identity and the contrast and storage assertions are unchanged. bootAppearanceRestore changes only its cleanup."
-    },
-    {
-      "items": [
-        "modules/ui-web/src/shell-v0/renderers/controls/OptionButtonGroupRenderer.test.ts",
+      "whatMoved": "Palette themes, token previews and role foregrounds are now constructed stylesheets in document.adoptedStyleSheets instead of <style> elements in <head> (the desktop window's policy refuses <style> made at runtime). The observation moved from the attached element's text (getElementById(...).textContent, a style[data-theme-id] selector, or element presence) to the current text of each sheet in document.adoptedStyleSheets: a per-test wrapper of CSSStyleSheet replaceSync/replace records each sheet's latest text (happy-dom drops @layer rules from cssRules), and assertions read only adopted sheets, so a later overwrite, a detached sheet or a second palette sheet is seen. Exactly-one-element assertions became exactly-one-adopted-palette-sheet; removed-element became no adopted sheet carrying it. Inputs, preconditions, expected CSS content, sanitisation, validate-before-write, clearing, palette identity and the contrast and storage assertions are unchanged. bootAppearanceRestore changes only its cleanup.",
         "modules/ui-web/src/shell-v0/views/SettingsSurface.highContrast.test.ts"
       ],
       "change": "modified",
@@ -55,7 +51,7 @@ Per-element styles and runtime stylesheets moved to mechanisms the desktop windo
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Swatch colours are now assigned through the element's style object instead of a style attribute. The test reads the last value assigned to each swatch's style instead of the raw attribute, because happy-dom's CSS parser rewrites colour values; the expected colours are unchanged."
+      "whatMoved": "Each swatch's colour is now set as the custom property --swatch-tint through the element's style object (the .swatch rule reads background: var(--swatch-tint)) instead of a background in a style attribute. The test reads the final value with swatch.style.getPropertyValue('--swatch-tint') per card (happy-dom keeps custom property values verbatim; it rewrote oklch backgrounds). The expected colours and their per-card association are unchanged."
     }
   ]
 }
