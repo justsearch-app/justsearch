@@ -282,7 +282,7 @@ final class VerifierVduRecoveryContractTest {
     VduProcessor.VduException failure = new VduProcessor.EligibilityDeferred();
     if (generationUnavailable) {
       var gate = new GenerationTracker(work -> () -> {}, Runnable::run);
-      try (var drain = gate.closeNow()) {
+      try (var ignored = gate.closeNow()) {
         failure = new VduProcessor.VduException("vision refused", assertThrows(IllegalStateException.class, gate::requireOpen));
       }
     }
