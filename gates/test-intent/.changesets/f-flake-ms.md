@@ -41,7 +41,7 @@ preference behind fixing recurring CI flakes without asking.
         {
           "kind": "delegated-choice",
           "delegationQuote": "you really shouldnt have needed to ask me for this",
-          "delegationLocation": "owner's preferences, recorded 2026-10-24, about a red main CI test",
+          "delegationLocation": "task t-20261103-shell agreement (the owner's standing preference, 2026-10-24, about a red main CI test)",
           "delegationScope": "fixing a recurring CI flake, including a product race the flaky check exposes",
           "choice": "Fix the race in the product rather than relaxing the check: a NATIVE boot starts the migration cutover monitor only when it owns a candidate, and a new check forces the order CI hit and keeps the file's existing oracle that a requested migration opens Green live with no Engine restart (migrateLive's 'Green opens live' and the class's 'no Engine restart'). Its product basis predates the PR: docs/design/lane-f-engine-jvm/design.md (stage D1, mechanisms built new) names 'live activation without the Worker restart'.",
           "label": "agent choice"
