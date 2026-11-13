@@ -60,6 +60,10 @@ describe('themeState (slice 474 alpha)', () => {
     const sheets = [...document.adoptedStyleSheets];
     applyTheme('core.solarized', ':root { --accent-tint: #b58900; }');
     expect(document.adoptedStyleSheets).toEqual(sheets);
+    // Exactly one adopted sheet carries a palette.
+    const paletteSheets = new Set(replaceSync.mock.calls.flatMap(([css], i) =>
+      css.startsWith('@layer user-theme') ? [replaceSync.mock.contexts[i] as CSSStyleSheet] : []));
+    expect(document.adoptedStyleSheets.filter((sheet) => paletteSheets.has(sheet))).toHaveLength(1);
     expect(paletteCss()).toContain('#b58900');
     expect(getActiveThemeId()).toBe('core.solarized');
   });

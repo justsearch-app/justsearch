@@ -73,3 +73,14 @@ Per-element styles and runtime stylesheets moved to mechanisms the desktop windo
   "note": "Entry 1 weakens themeState.test.ts loader attachment: replaceSync input no longer proves adoption. Entry 3 reads the first swatch style write instead of the final state and misses later incorrect overwrites."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-85a33e0467-intent-20261113",
+  "verdict": "reject",
+  "digest": "sha256:7d3c5f4e5c413b4d6eb4ad30e25331ea17637c5c765a387635b243f4db5021ab",
+  "note": "Entry 1 weakens two oracles: presentationState.test.ts checks the first palette replaceSync write, so a later incorrect overwrite of that adopted sheet passes; themeState.test.ts replaces the exact-one stylesheet assertion with equality to the previous adopted list, so two retained palette sheets pass. Entries 2 and 3 preserve their expected values."
+}
+```

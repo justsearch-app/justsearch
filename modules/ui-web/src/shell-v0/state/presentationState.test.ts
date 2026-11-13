@@ -90,7 +90,8 @@ describe('applyPresentation (the one writer)', () => {
     // body tier applied
     expect(activeBodyFor(SETTINGS_INTERFACE_REGION)).toBeDefined();
     // theme tier applied through the one appearance writer (adopted @layer user-theme sheet)
-    const paletteCall = replaceSync.mock.calls.findIndex(([css]) => css.startsWith('@layer user-theme'));
+    // The last palette write (a later overwrite of the same sheet must be seen).
+    const paletteCall = replaceSync.mock.calls.map(([css]) => css.startsWith('@layer user-theme')).lastIndexOf(true);
     expect(document.adoptedStyleSheets).toContain(replaceSync.mock.contexts[paletteCall]);
     expect(replaceSync.mock.calls[paletteCall]?.[0]).toContain('--accent-tint: #3366cc');
   });
