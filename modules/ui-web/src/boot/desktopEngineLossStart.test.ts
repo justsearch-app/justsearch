@@ -182,6 +182,91 @@ describe('FD1 the app counts as usable once it has painted and booted', () => {
   });
 });
 
+describe('FD1a a usable app re-binds to a restarted engine only once it has proven alive', () => {
+  function backendRestartEvent(): void {
+    const onRestart = mocks.listen.mock.calls.find(([name]) => name === 'justsearch://backend-restart')![1];
+    onRestart({ payload: 4101 });
+  }
+  /** The new incarnation at its new address, and whether it answers its manifest read. */
+  function newEngine(answers: () => boolean): void {
+    const base = mocks.invoke.getMockImplementation()!;
+    mocks.invoke.mockImplementation(async (command: string, args?: unknown) => command === 'api_port' ? 4101 : base(command, args));
+    const fetch = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+      String(input) === 'http://127.0.0.1:4101/api/runtime/manifest'
+        ? answers() ? new Response(JSON.stringify({ instanceId: 'incarnation-new' }), { status: 200 }) : new Response('', { status: 503 })
+        : fetch(input, init)));
+  }
+  async function usableApp() {
+    const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => {});
+    const app = await bootApp();
+    expect(app.root.querySelector('#boot-frame'), 'the app is usable: its start-up cover has left').toBeNull();
+    expect(app.shell.inert).toBe(false);
+    return { ...app, reload };
+  }
+
+  it('a crash-looping engine: restart events between kills, then exhaustion, never reload the window; the app says it could not restart', async () => {
+    const { root, shell, teardown, reload } = await usableApp();
+    newEngine(() => true);
+    const killed = (incarnation: number, restartCount: number) => supervisorEvent({ state: 'restarting', incarnation, restartCount,
+      lastExit: { code: -9, reason: 'unknown(-9)', class: 'TRANSIENT', incarnation } });
+    // As on the desktop: one kill every 2 s; a new incarnation answers its manifest (the host's
+    // restart event) and dies again within seconds, sometimes after the supervisor called it running.
+    killed(1, 1); await pass(1_000);
+    supervisorEvent({ state: 'starting', incarnation: 2, restartCount: 1 }); await pass(1_000);
+    killed(2, 2); await pass(1_000);
+    supervisorEvent({ state: 'starting', incarnation: 3, restartCount: 2 });
+    backendRestartEvent();
+    supervisorEvent({ state: 'running', incarnation: 3, restartCount: 2 });
+    await pass(2_000);
+    killed(3, 3); await pass(1_000);
+    supervisorEvent({ state: 'starting', incarnation: 4, restartCount: 3 });
+    backendRestartEvent();
+    await pass(2_000);
+    supervisorEvent({ state: 'exhausted', incarnation: 4, restartCount: 3, reason: 'ENGINE_RESTART_EXHAUSTED:unknown(-9)',
+      lastExit: { code: -9, reason: 'unknown(-9)', class: 'TRANSIENT', incarnation: 4 }, recentExits: { count: 4, codes: { SIGKILL: 4 } } });
+    await pass(10_000);
+    await settle(shell);
+    expect(reload, 'no reload lands while the engine flaps').not.toHaveBeenCalled();
+    expect(root.querySelector('jf-engine-recovery'), 'no full-page recovery').toBeNull();
+    expect(root.firstElementChild, 'the same app stays').toBe(shell);
+    expect(teardown).not.toHaveBeenCalled();
+    expect(treatment(shell)?.textContent?.replace(/\s+/g, ' '), 'the in-app treatment says the engine could not be restarted')
+      .toContain('The engine stopped 4 times, so JustSearch stopped restarting it.');
+  });
+
+  it('a restarted engine that stays up and answers re-binds the app by one reload, after the stability window', async () => {
+    const { root, shell, reload } = await usableApp();
+    let answers = false;
+    newEngine(() => answers);
+    supervisorEvent({ state: 'restarting', incarnation: 1, restartCount: 1 });
+    supervisorEvent({ state: 'starting', incarnation: 2, restartCount: 1 });
+    backendRestartEvent();
+    await pass(3_000);
+    expect(reload, 'not while the supervisor still starts it').not.toHaveBeenCalled();
+    supervisorEvent({ state: 'running', incarnation: 2, restartCount: 1 });
+    await pass(4_000);
+    expect(reload, 'not before it has stayed up for the stability window').not.toHaveBeenCalled();
+    await pass(2_000);
+    expect(reload, 'not while it does not answer its manifest read').not.toHaveBeenCalled();
+    expect(root.firstElementChild, 'the app stays meanwhile').toBe(shell);
+    answers = true;
+    await pass(6_000);
+    expect(reload, 'the window rebinds once').toHaveBeenCalledOnce();
+    await pass(20_000);
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
+  it('before the app is usable a restart event still reloads at once (preserved)', async () => {
+    const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => {});
+    vi.stubGlobal('requestAnimationFrame', vi.fn(() => 0));
+    const { shell } = await bootApp();
+    expect(shell.inert, 'the start-up frame still covers the app').toBe(true);
+    backendRestartEvent();
+    expect(reload).toHaveBeenCalledOnce();
+  });
+});
+
 describe('FD3 FD4 the report and the progress line', () => {
   it('the report counts recent exits as the supervisor recorded them, signals included', async () => {
     const writes: string[] = [];

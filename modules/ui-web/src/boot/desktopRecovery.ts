@@ -3,6 +3,7 @@ import { isTauriRuntime } from '../utils/tauriRuntime.js';
 import { installSupervisorStateBridge, isTerminal, type SupervisorState } from '../api/supervisorState.js';
 import type { EngineRecovery } from '../shell-v0/components/EngineRecovery.js';
 import { installBackendRestartBridge } from '../api/backendRestart.js';
+import { resolveApiEndpoint } from '../api/http.js';
 import { resolveBootApiBase } from './apiBase.js';
 import { gateFactoryReset } from './factoryReset.js';
 import { reportSupervisorState } from '../shell-v0/state/engineLoss.js';
@@ -114,6 +115,56 @@ export function mountBootApplication(root: HTMLElement, application: HTMLElement
   })();
 }
 
+/** How long a restarted engine stays up, by the supervisor's account, before a usable app re-binds to it. */
+const REBIND_STABLE_MS = 5_000;
+
+/**
+ * When a usable app re-binds to a restarted engine (F-desktop B2 FD1a). A new incarnation has a new
+ * port and session token, so re-binding means reloading the window, and a reloaded page is not usable
+ * until it has booted again: a reload that lands while a crash-looping engine dies again leaves the
+ * person a start-up page, and the supervisor giving up then shows the full recovery page. So a usable
+ * app reloads only for an engine that has proven alive: the supervisor reports it running and ready
+ * for the stability window with no other state in between, and it then answers its manifest read
+ * (discovery's own identity read, at its new address). Until then the app stays, with its in-app
+ * engine-loss treatment, which also says when the supervisor gives up; a later restart (the person's
+ * or the supervisor's) is proven the same way. Before the app is usable a restart reloads at once.
+ */
+function rebindWhenAlive(reload: () => void): { restarted: () => void; observe: (state: SupervisorState) => void } {
+  let pending = false;
+  let state: SupervisorState | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  /** Bumped by every state that interrupts a proof, so a read in flight across one is not believed. */
+  let proof = 0;
+  const healthy = (): boolean => !state || (state.state === 'running' && !state.notReady);
+  const arm = (): void => {
+    if (timer !== null || !healthy()) return;
+    const armed = ++proof;
+    timer = setTimeout(() => {
+      timer = null;
+      void resolveApiEndpoint().then((endpoint) => {
+        if (armed !== proof || !pending) return;
+        if (endpoint.instanceId && healthy()) { pending = false; reload(); } else arm();
+      }, () => { if (armed === proof) arm(); });
+    }, REBIND_STABLE_MS);
+  };
+  const interrupt = (): void => {
+    proof++;
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+  };
+  return {
+    restarted: () => { pending = true; interrupt(); arm(); },
+    observe: (next) => {
+      const sameIncarnation = state?.incarnation === next.incarnation;
+      state = next;
+      if (!pending) return;
+      // The window counts from the first healthy report of one incarnation; anything else restarts it.
+      if (!healthy() || !sameIncarnation) interrupt();
+      arm();
+    },
+  };
+}
+
 /** Resolve the API only after desktop recovery events can reach the boot surface. */
 export async function resolveBootWithRecovery(
   root: HTMLElement,
@@ -141,9 +192,11 @@ export async function resolveBootWithRecovery(
     if (recovery.parentElement !== root) root.replaceChildren(recovery);
   };
   let waitingForApi = false;
+  const rebind = rebindWhenAlive(() => window.location.reload());
   await installSupervisorStateBridge((state) => {
     recovery.supervisor = state;
     reportSupervisorState(state);
+    rebind.observe(state);
     if (needsRecovery(state) && !(appIsUsable(root) && !holdsLinuxUpdate(state))) {
       present();
       waitingForApi = true;
@@ -152,7 +205,10 @@ export async function resolveBootWithRecovery(
     // retry discovery through the normal entry point when the host announces it is running.
     if (waitingForApi && state.state === 'running' && !state.notReady) window.location.reload();
   });
-  await installBackendRestartBridge(() => window.location.reload());
+  await installBackendRestartBridge(() => {
+    if (appIsUsable(root)) rebind.restarted();
+    else window.location.reload();
+  });
   // While discovery runs the start-up frame stays ("Starting"); a reload that rebinds to a restarted
   // engine looks like the app it replaces. The recovery page shows only when there is something to
   // recover from: a supervisor state that needs it, or no engine found ("Connecting to JustSearch",

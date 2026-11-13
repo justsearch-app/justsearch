@@ -18,7 +18,7 @@ let browser: Browser, server: PreviewServer, output: string, url: string, entry:
 const contexts = new Set<BrowserContext>();
 const dragFixture = path.resolve('src/boot/__fixtures__/tauri-drag.js.txt'), dragMarker = '// ---- upstream file below, byte-identical ----\n';
 const catalog = { schemaVersion: '1.0', catalogVersion: 1, namespace: 'registry-surface', primitive: 'Surface', entries: [{ id: 'core.library-surface', presentation: { labelKey: 'registry-surface.library-surface.label', descriptionKey: 'registry-surface.library-surface.description', iconHint: null, category: null }, audience: 'USER', placement: 'RAIL', altitude: 'PRODUCT', consumes: { resources: ['core.indexed-roots'], operations: [], prompts: [], diagnosticChannels: [], conversationShapes: [] }, mountTag: 'jf-library-surface', members: [], riskTier: 'LOW', stateSchema: null, provenance: { tier: 'CORE', contributorId: 'core', version: '1.0', identity: null } }] };
-type Harness = { discoveryHold: boolean; emit: (payload: unknown) => void; samples: string[]; calls: string[]; maximized: boolean; lastMenu?: Event; recoverySeen?: boolean };
+type Harness = { discoveryHold: boolean; emit: (payload: unknown) => void; emitEvent: (name: string, payload: unknown) => void; samples: string[]; calls: string[]; maximized: boolean; lastMenu?: Event; recoverySeen?: boolean };
 declare global { interface Window { chromeHarness: Harness } }
 
 beforeAll(async () => {
@@ -48,7 +48,7 @@ async function create(options: Options = {}): Promise<Page> {
   contexts.add(context);
   const page = await context.newPage();
   await page.addInitScript(options => {
-    const h: Harness = window.chromeHarness = { discoveryHold: !!options.discoveryHold, emit: () => {}, samples: [], calls: [], maximized: false };
+    const h: Harness = window.chromeHarness = { discoveryHold: !!options.discoveryHold, emit: () => {}, emitEvent: () => {}, samples: [], calls: [], maximized: false };
     // What the root shows at every frame: a cover (frame, failure, recovery, reset), the app, or nothing.
     const sample = () => {
       const root = document.getElementById('root');
@@ -61,6 +61,7 @@ async function create(options: Options = {}): Promise<Page> {
     const callbacks = new Map<number, (event: unknown) => void>(), listeners = new Map<string, number>();
     let next = 0;
     h.emit = payload => callbacks.get(listeners.get('justsearch://supervisor-state')!)?.({ payload });
+    h.emitEvent = (name, payload) => callbacks.get(listeners.get(name)!)?.({ payload });
     Object.assign(window, { __TAURI_INTERNALS__: {
       transformCallback: (callback: (event: unknown) => void) => { callbacks.set(++next, callback); return next; },
       invoke: async (command: string, args: { event: string; handler: number }) => {
@@ -142,6 +143,39 @@ it('FD1 a slow discovery keeps the start-up frame, never a Connecting page, unti
     await expect.poll(() => page.locator('#boot-frame').count(), { timeout: 5000 }).toBe(0);
     expect(await page.evaluate(() => window.chromeHarness.recoverySeen), 'no Connecting page at any moment').toBe(false);
     expect(await page.evaluate(() => window.chromeHarness.samples)).not.toContain('blank');
+  } finally { await page.close(); }
+}, 20_000);
+
+it('FD1a a crash-looping engine on the running app: restart events between kills, then exhaustion; no reload, the app says it could not restart', async () => {
+  const page = await runningApp();
+  try {
+    // A reload loads a new document; the router's own hash changes are no reload.
+    const loads: string[] = [];
+    page.on('load', () => loads.push(page.url()));
+    await page.evaluate(() => {
+      const h = window.chromeHarness;
+      h.recoverySeen = false;
+      new MutationObserver(() => { if (document.querySelector('#root > jf-engine-recovery')) h.recoverySeen = true; })
+        .observe(document, { childList: true, subtree: true });
+      const state = (patch: object) => h.emit({ schemaVersion: 1, kind: 'engine-supervisor-state.v1', supervisor: 'tauri', state: 'running', incarnation: 1, restartCount: 0, maxRestartAttempts: 3, ...patch });
+      const killed = (incarnation: number, restartCount: number) => state({ state: 'restarting', incarnation, restartCount, lastExit: { code: -9, reason: 'unknown(-9)', class: 'TRANSIENT', incarnation } });
+      // The desktop run's timeline, compressed: a new incarnation answers its manifest (the host's
+      // restart event), the supervisor may call it running, and it dies again within a second.
+      const steps: (() => void)[] = [
+        () => killed(1, 1), () => state({ state: 'starting', incarnation: 2, restartCount: 1 }),
+        () => { h.emitEvent('justsearch://backend-restart', Number(location.port)); state({ state: 'running', incarnation: 2, restartCount: 1 }); },
+        () => killed(2, 2), () => state({ state: 'starting', incarnation: 3, restartCount: 2 }),
+        () => h.emitEvent('justsearch://backend-restart', Number(location.port)),
+        () => state({ state: 'exhausted', incarnation: 3, restartCount: 3, reason: 'ENGINE_RESTART_EXHAUSTED:unknown(-9)',
+          lastExit: { code: -9, reason: 'unknown(-9)', class: 'TRANSIENT', incarnation: 3 }, recentExits: { count: 3, codes: { SIGKILL: 3 } } }),
+      ];
+      steps.forEach((step, i) => setTimeout(step, 400 * i));
+    });
+    await page.waitForTimeout(400 * 7 + 1500);
+    expect(loads, 'no reload lands while the engine flaps').toEqual([]);
+    expect(await page.evaluate(() => window.chromeHarness.recoverySeen), 'no full-page recovery at any moment').toBe(false);
+    await expect.poll(() => page.locator('jf-shell [data-testid="engine-loss"]').textContent(), { timeout: 5000 })
+      .toContain('The engine stopped 3 times, so JustSearch stopped restarting it.');
   } finally { await page.close(); }
 }, 20_000);
 

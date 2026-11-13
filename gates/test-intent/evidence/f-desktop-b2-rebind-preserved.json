@@ -1,0 +1,67 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-13T01:47:17.847Z",
+  "revision": "4421fa3a1959379b2adf3bbe04649a78370a4168",
+  "tree": "340149bc73b47fb9084f3f0f1978a845484d28ab",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopEngineLossStart.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/nsmake73/tmp/test-intent-vitest-57653-1794534428451.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3668
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#before the app is usable a restart event still reloads at once (preserved)",
+      "file": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f316aec8724ff2082030897f99f60582758880c93bbad23bbedd1144b8d4364b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FD1a a usable app re-binds to a restarted engine only once it has proven alive before the app is usable a restart event still reloads at once (preserved)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "4421fa3a19",
+    "revision": "4421fa3a1959379b2adf3bbe04649a78370a4168",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopEngineLossStart.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/nsmake73/tmp/test-intent-vitest-57653-1794534433658.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3861,
+        "output": "JSON report written to /home/elias/.cache/am/nsmake73/tmp/test-intent-vitest-57653-1794534433658.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#before the app is usable a restart event still reloads at once (preserved)",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:fac7dc7ee7628ba34dd5df20b537474a48cb3a9f7d6bbc900521ba1f541d1478"
+}

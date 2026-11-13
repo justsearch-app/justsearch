@@ -37,6 +37,20 @@ s5c live-1 and s5w windows-1. The changes, at the layer that owns each:
   SIGKILL by `SIGKILL`, with no exit code); nothing is inferred from `lastExit`. Before, the signal
   key failed the integer filter and the last exit (-9) was added with a count of 1.
 - **Progress line**: a new action in the treatment clears "Report copied.".
+- **Re-binding to a restarted engine** (FD1a, `boot/desktopRecovery.ts`, `rebindWhenAlive`): the one
+  place that decides when a usable app reloads for a new engine incarnation (the host's
+  backend-restart event; a new port and session token). Before the app is usable it reloads at once,
+  as before. A usable app reloads only once the new incarnation has proven alive: the supervisor
+  reports it running and ready for a stability window of 5 s with no other state in between (any
+  other state, or another incarnation, restarts the window), and then its manifest read at the new
+  address (discovery's own identity read, `resolveApiEndpoint`) answers; an unanswered read waits
+  another window. Until then the app stays with its in-app treatment, which says so when the
+  supervisor gives up. Before, the reload landed while a crash-looping engine died again, the
+  reloaded page was not usable yet, and the supervisor giving up showed the full-page 'JustSearch
+  could not restart' (real desktop: 1 of 12 runs on the base, 4 of 10 on the first candidate). The
+  hidden-window hand-off above keeps its reason: an autostarted window (`--minimized`) stays hidden
+  and runs no animation frame, so without it that app would stay covered, a restart would reload it
+  at once and any loss would replace it with the recovery page until the window is first shown.
 - **Context-menu policy in one place** (index.html's window layer, desktop only): in production
   builds (`%PROD%`) the web view's own menu never shows, on the top area, its drag region and the
   content of every page; text fields keep the platform edit menu; the app's own menus still receive
@@ -285,6 +299,105 @@ returns" is removed there; its rewrite, "... which a running engine ends by relo
       "conflictSearch": "decision records searched for a conflict: none (docs/decisions has no record on the desktop Connecting page; SA7/SA10 of shell-s5-startup pin the deadline, not when Connecting shows)",
       "whatChanged": "'SA7 SA10 deadline survives a long connecting interval before the frame returns' held discovery for over 60 s to keep the Connecting page in the root, then released it and expected the stalled failure page followed by the app. FD1 retires Connecting during discovery, so a held discovery now shows the frame and its own deadline (covered by the existing 'SA10 stalled catalog discovery...' and 'SA10 60-second deadline...' cases). The case is removed from this file; its rewrite, 'SA7 SA10 deadline survives a long connecting interval, which a running engine ends by reloading' (a discovery that finds no engine shows Connecting, 60 s pass with no failure page and Connecting still in the root, and a running supervisor state reloads the window), is in modules/ui-web/src/boot/desktopChrome-lockdown.test.ts (preservation entry above). The 'connecting' surface of the window-layer cases (SW1 SW2 SW3 SW7 commands, SW1 SW2 top area) and the 'connecting' state of the twelve 'SW5 X1 window controls are legible over every surface with <palette> <mode>, and in forced colours' cases open the same page by that no-engine discovery instead of a held one; their oracle is unchanged. The harness's added `noEngine` option changes no other case. All pass on the base and the candidate (gates/test-intent/evidence/f-desktop-b2-window-adapted.json).",
       "evidence": "gates/test-intent/evidence/f-desktop-b2-window-adapted.json"
+    },
+    {
+      "items": ["modules/ui-web/src/boot/desktopEngineLossStart.test.ts", "modules/ui-web/src/boot/desktopChrome-lockdown.test.ts"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Desktop runtime, the real boot listener and the real Shell, the native command and event channels as doubles (happy-dom, fake timers), and the production assets with the native IPC double in Chromium. The app is usable (its start-up cover has left). (1) A crash-looping engine as on the desktop: kills 2 s apart, restarting and starting states between them, the host's backend-restart event for a new incarnation, once followed by a 'running' report that a kill ends within 2 s, then exhaustion after 3 counted restarts with recentExits {SIGKILL}: the window never reloads, no recovery page is in the root (in Chromium: at no moment), the same app stays with its stores, and the in-app treatment says 'The engine stopped N times, so JustSearch stopped restarting it.'. (2) A restart event while the supervisor still reports starting: no reload; then 'running' for that incarnation: no reload within 4 s; after 6 s with the new address's manifest unanswered (503): no reload, the app stays; once the manifest answers: exactly one reload, and none later.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design. proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell request",
+          "delegationScope": "the UI between the main windows (start-up, engine loss and recovery, window chrome), its design choices",
+          "choice": "FD1a (orchestrator, 2026-11-13, reversible, after the real desktop check): a usable app re-binds by reload only after the new incarnation has proven alive (it answers its health/status read, and stays up for a short stability window); while the engine flaps, the usable app keeps showing the in-app engine-loss treatment; if the supervisor gives up, that same app shows the in-app 'could not restart' state, never the full page. Before the app is usable the existing start-up behaviour stays.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "SC6",
+          "quote": "When the same engine comes back, the treatment leaves without a reload. A new engine identity (after a restart) rebinds as today, by reloading the window with drafts kept (clarified 2026-11-10 by the orchestrator after acceptor 1 read the first wording as forbidding that reload); late answers from the old one are ignored. Status pill, Search, Health and the treatment tell one consistent story throughout, and returning never announces old approvals or completions as new.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-desktop-b2-rebind.json",
+      "newChecks": [
+        "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#a crash-looping engine: restart events between kills, then exhaustion, never reload the window; the app says it could not restart",
+        "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#a restarted engine that stays up and answers re-binds the app by one reload, after the stability window",
+        "modules/ui-web/src/boot/desktopChrome-lockdown.test.ts#FD1a a crash-looping engine on the running app: restart events between kills, then exhaustion; no reload, the app says it could not restart"
+      ]
+    },
+    {
+      "items": ["modules/ui-web/src/boot/desktopEngineLossStart.test.ts"],
+      "class": "New",
+      "behaviour": "Preservation, passing on the base and the candidate: while the start-up frame still covers the app (a visible window that has not painted), the host's backend-restart event reloads the window at once.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design. proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell request",
+          "delegationScope": "the UI between the main windows (start-up, engine loss and recovery, window chrome), its design choices",
+          "choice": "FD1a (orchestrator, 2026-11-13, reversible, after the real desktop check): a usable app re-binds by reload only after the new incarnation has proven alive (it answers its health/status read, and stays up for a short stability window); while the engine flaps, the usable app keeps showing the in-app engine-loss treatment; if the supervisor gives up, that same app shows the in-app 'could not restart' state, never the full page. Before the app is usable the existing start-up behaviour stays. Decision (FD1a): before the app is usable the existing start-up behaviour stays.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "SC6",
+          "quote": "When the same engine comes back, the treatment leaves without a reload. A new engine identity (after a restart) rebinds as today, by reloading the window with drafts kept (clarified 2026-11-10 by the orchestrator after acceptor 1 read the first wording as forbidding that reload); late answers from the old one are ignored. Status pill, Search, Health and the treatment tell one consistent story throughout, and returning never announces old approvals or completions as new.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-desktop-b2-rebind-preserved.json",
+      "newChecks": [
+        "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#before the app is usable a restart event still reloads at once (preserved)"
+      ]
+    },
+    {
+      "items": ["modules/ui-web/src/boot/desktopEngineLoss.test.ts"],
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design. proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell request",
+          "delegationScope": "the UI between the main windows (start-up, engine loss and recovery, window chrome), its design choices",
+          "choice": "FD1a (orchestrator, 2026-11-13, reversible, after the real desktop check): a usable app re-binds by reload only after the new incarnation has proven alive (it answers its health/status read, and stays up for a short stability window); while the engine flaps, the usable app keeps showing the in-app engine-loss treatment; if the supervisor gives up, that same app shows the in-app 'could not restart' state, never the full page. Before the app is usable the existing start-up behaviour stays.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none (docs/decisions has no record on when the desktop window reloads for a new engine identity; SC6 of shell-s5c-engine-loss pins that a new identity rebinds by reloading the window, not that the reload is immediate)",
+      "whatChanged": "Two checks of S5c pinned that the window reloads at the moment the host announces a new engine identity: 'a new engine identity after the restart rebinds by reloading the window, with the restart still shown until then' (after the person's accepted restart reported running) and 'rebinds as today: the session is dropped and the window reloads' (after exhausted restarts). FD1a retires the immediate reload for a usable app (both cases boot one): it now comes once the new incarnation has stayed up for the stability window and answered its manifest read. Both checks keep their names, inputs before the event and their final expectation (exactly one reload); the rewrite, entered as New below, adds the new incarnation's address and manifest answer, the supervisor's 'running' report for it in the SC6 case (the supervisor's later retry), 'no reload yet' right after the event (in SC3 with the restart still shown), and the stability window before the one reload."
+    },
+    {
+      "items": ["modules/ui-web/src/boot/desktopEngineLoss.test.ts"],
+      "class": "New",
+      "repaired": true,
+      "behaviour": "Desktop runtime, the real boot listener and the real Shell (happy-dom, fake timers), the app presented with no start-up frame. (1) After exhausted restarts and an accepted 'Restart the engine' whose engine reports running as incarnation 2 with no contact: when the host announces the new identity, whose address answers its manifest read, the window does not reload yet and the treatment still shows the restart under way; after the stability window it reloads exactly once. (2) After exhausted restarts with the treatment shown, the supervisor's retry: starting, the host's new identity, running for incarnation 2, its address answering: no reload at once, exactly one after the stability window.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "i think it would be to bring the aspects of the UI that are inbetween the main windows up to date, and remove bad practices and code that was implemented by necessity without an overarching design. proceed accordingly. tell me when you need me to juge, try to ask me sparely",
+          "delegationLocation": "task t-20261103-shell request",
+          "delegationScope": "the UI between the main windows (start-up, engine loss and recovery, window chrome), its design choices",
+          "choice": "FD1a (orchestrator, 2026-11-13, reversible, after the real desktop check): a usable app re-binds by reload only after the new incarnation has proven alive (it answers its health/status read, and stays up for a short stability window); while the engine flaps, the usable app keeps showing the in-app engine-loss treatment; if the supervisor gives up, that same app shows the in-app 'could not restart' state, never the full page. Before the app is usable the existing start-up behaviour stays.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261103-shell",
+          "scenario": "SC6",
+          "quote": "When the same engine comes back, the treatment leaves without a reload. A new engine identity (after a restart) rebinds as today, by reloading the window with drafts kept (clarified 2026-11-10 by the orchestrator after acceptor 1 read the first wording as forbidding that reload); late answers from the old one are ignored. Status pill, Search, Health and the treatment tell one consistent story throughout, and returning never announces old approvals or completions as new.",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/f-desktop-b2-rebind.json",
+      "newChecks": [
+        "modules/ui-web/src/boot/desktopEngineLoss.test.ts#a new engine identity after the restart rebinds by reloading the window, with the restart still shown until then",
+        "modules/ui-web/src/boot/desktopEngineLoss.test.ts#rebinds as today: the session is dropped and the window reloads"
+      ]
     }
   ]
 }

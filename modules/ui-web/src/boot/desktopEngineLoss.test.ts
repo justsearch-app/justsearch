@@ -36,6 +36,21 @@ function backendRestartEvent(): void {
   onRestart({ payload: {} });
 }
 
+/**
+ * The new incarnation, at its new address, answers its manifest read (F-desktop B2 FD1a: a usable app
+ * re-binds only to an engine that has proven alive); the old address stays as it was.
+ */
+function newEngineAnswers(): void {
+  const base = mocks.invoke.getMockImplementation()!;
+  mocks.invoke.mockImplementation(async (command: string, args?: unknown) => command === 'api_port' ? 4101 : base(command, args));
+  const fetch = globalThis.fetch;
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+    String(input) === 'http://127.0.0.1:4101/api/runtime/manifest'
+      ? new Response(JSON.stringify({ instanceId: 'incarnation-2' }), { status: 200 }) : fetch(input, init)));
+}
+/** How long the restarted engine must stay up before the app re-binds (FD1a's stability window). */
+const STABLE_MS = 5_000;
+
 /** The engine is gone: no request answers, so nothing counts as contact with it. */
 function engineGone(): void {
   vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
@@ -315,7 +330,12 @@ describe('SC3 Restart the engine', () => {
     await settle(shell);
     underWay(shell, 'before the rebind');
     expect(reload).not.toHaveBeenCalled();
+    newEngineAnswers();
     backendRestartEvent();
+    await settle(shell);
+    underWay(shell, 'while the new engine proves it stays up');
+    expect(reload).not.toHaveBeenCalled();
+    await pass(STABLE_MS);
     expect(reload, 'the window rebinds once').toHaveBeenCalledOnce();
   });
 
@@ -348,7 +368,13 @@ describe('SC6 a new engine identity', () => {
     supervisorEvent({ state: 'exhausted', restartCount: 3 });
     await settle(shell);
     expect(treatment(shell)).not.toBeNull();
+    // The supervisor's later retry brings up a new incarnation that stays up and answers.
+    newEngineAnswers();
+    supervisorEvent({ state: 'starting', restartCount: 0, incarnation: 2 });
     backendRestartEvent();
+    supervisorEvent({ state: 'running', restartCount: 0, incarnation: 2 });
+    expect(reload, 'not before the new engine has proven alive').not.toHaveBeenCalled();
+    await pass(STABLE_MS);
     expect(reload).toHaveBeenCalledOnce();
   });
 });
