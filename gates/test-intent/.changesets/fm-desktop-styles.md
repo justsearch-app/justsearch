@@ -106,3 +106,13 @@ Per-element styles and runtime stylesheets moved to mechanisms the desktop windo
   "note": "Entry 1 weakens the oracle: sheetText records replace/replaceSync input, not current CSSOM text; paletteCss/roleCss exclude retained adopted sheets once their text loses the layer prefix, so clear/no-write checks can pass with CSS still adopted. Native Chromium probe reproduced stale colour after CSSOM setProperty and false absence for an adopted non-layer rule. Entries 2 and 3 preserve their assertions. See oracle-probe.mjs and oracle-probe.txt."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1d5fe-2917-7f32-9485-ba60dc90bb21",
+  "verdict": "accept",
+  "digest": "sha256:1e141facefdeddf43e7ce4ce0b814cf4d8f89787c2d5cca131b0e80b8d7e98aa"
+}
+```
