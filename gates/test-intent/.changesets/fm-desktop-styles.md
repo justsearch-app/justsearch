@@ -84,3 +84,14 @@ Per-element styles and runtime stylesheets moved to mechanisms the desktop windo
   "note": "Entry 1 weakens two oracles: presentationState.test.ts checks the first palette replaceSync write, so a later incorrect overwrite of that adopted sheet passes; themeState.test.ts replaces the exact-one stylesheet assertion with equality to the previous adopted list, so two retained palette sheets pass. Entries 2 and 3 preserve their expected values."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1d5e5-5b03-7873-8d90-9a8c9ba2a220",
+  "verdict": "reject",
+  "digest": "sha256:f528129397610f91419ce553ff6fc18065c6ddd6a25dc83e04df646acd2998b9",
+  "note": "Entries 1 and 3 weaken final-state oracles: presentationState, themeState and LibrarySurface.themeContrast can accept earlier layer writes after a later overwrite; builtinPaletteLoading checks adoption and expected CSS on different sheets; PresentationGallerySurface misses later CSSOM background writes. Entry 2 preserves its oracle."
+}
+```
