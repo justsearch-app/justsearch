@@ -85,3 +85,13 @@ preference behind fixing recurring CI flakes without asking.
   "digest": "sha256:a007faf2dd9a5a15a6d832f04521e8e0d9bdf5d07cffcb41b82a854a93ecccde"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "dac3dd20-1a95-4d11-8484-8455938902a1",
+  "verdict": "accept",
+  "digest": "sha256:228bd7f43b665abe6c812ac387811b0033dfb56e422e786a03212c8e6de88d71"
+}
+```
