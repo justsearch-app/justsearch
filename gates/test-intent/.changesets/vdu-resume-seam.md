@@ -33,3 +33,25 @@ checks are three isolated new test files (exempt); this entry covers their share
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1d740-ff3d-7340-9b94-16cea6ea701a",
+  "verdict": "accept",
+  "digest": "sha256:bd7e7c950cf0ac77a8ad1fa3d1652aecbef5efeefa7a54ce64bb69442813fab8",
+  "note": "Incidental fixture assessment matches its callers and state owners; fresh headless checks reproduce 16 assertion failures before and pass all 22 cases after."
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "reviewer",
+  "session": "01a1d741-839d-7a11-8f7a-4025269f7693",
+  "verdict": "accept",
+  "digest": "sha256:bd7e7c950cf0ac77a8ad1fa3d1652aecbef5efeefa7a54ce64bb69442813fab8",
+  "note": "Incidental fixture assessment matches code; scenario assertions detect the before-state crash and deferral defects."
+}
+```
