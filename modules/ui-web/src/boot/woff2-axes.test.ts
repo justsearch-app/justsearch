@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { brotliCompressSync } from 'node:zlib';
-import { test } from 'node:test';
-import { readWoff2Axes } from './woff2-axes.mjs';
+import { test } from 'vitest';
+import { readWoff2Axes } from '../../e2e/woff2-axes.mjs';
 
 for (const name of ['InterVariable.woff2', 'InterVariable-Italic.woff2']) {
   test(`${name} ships display optical size and variable weight axes`, () => {
-    const axes = readWoff2Axes(readFileSync(new URL(`../public/fonts/${name}`, import.meta.url)));
+    const axes = readWoff2Axes(readFileSync(new URL(`../../public/fonts/${name}`, import.meta.url)));
     assert.deepEqual(axes, { opsz: [14, 32], wght: [100, 900] });
   });
 }
@@ -28,12 +28,12 @@ function weightOnly() {
 test('a WOFF2 without opsz fails the same display-range assertion', () => {
   const axes = readWoff2Axes(weightOnly());
   assert.deepEqual(axes, { wght: [100, 900] });
-  assert.throws(() => assert.ok(axes.opsz?.[0] <= 20 && axes.opsz?.[1] >= 28
-    && axes.wght?.[0] <= 400 && axes.wght?.[1] >= 600));
+  assert.throws(() => assert.ok((axes.opsz?.[0] ?? NaN) <= 20 && (axes.opsz?.[1] ?? NaN) >= 28
+    && (axes.wght?.[0] ?? NaN) <= 400 && (axes.wght?.[1] ?? NaN) >= 600));
 });
 
 test('truncated and corrupt fonts fail rather than silently passing', () => {
   assert.throws(() => readWoff2Axes(weightOnly().subarray(0, 49)));
-  const corrupt = weightOnly(); corrupt[corrupt.length - 1] ^= 255;
+  const corrupt = weightOnly(); corrupt.writeUInt8(corrupt.readUInt8(corrupt.length - 1) ^ 255, corrupt.length - 1);
   assert.throws(() => readWoff2Axes(corrupt));
 });
