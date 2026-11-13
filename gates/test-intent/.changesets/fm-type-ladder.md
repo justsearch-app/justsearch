@@ -353,3 +353,14 @@ The new src/boot/type-ladder-lockdown.test.ts and src/boot/woff2-axes.test.ts ar
   "note": "FailedFilesList.buttons-lockdown.test.ts changes the ordinary default button expectation from 16px to 15px. Its sole cited source, adopted rule 1, assigns body and controls 13px and reserves 15px for the search field and lead sentences. No cited delegated choice supports a 15px default button. Membership in the six-size ladder alone does not support that role assignment."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-nfr0ebm3-test-intent",
+  "verdict": "reject",
+  "digest": "sha256:87e604c96dde04595fba0ca1e166dac594e607c56d33048a85036cb433baa6dd",
+  "note": "Rule 1 assigns controls 13px and headings 20px. FailedFilesList requires a default button at 15px; MarkdownBlock.geometry and Sv3Main.imports require h2 15px/h3 13px. The quoted delegation to implement the agreed design does not authorize overriding these roles or postponing them; labelling the choices does not supply authority."
+}
+```
