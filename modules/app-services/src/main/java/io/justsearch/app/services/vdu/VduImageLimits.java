@@ -45,6 +45,9 @@ final class VduImageLimits {
       } finally {
         reader.dispose();
       }
+    } catch (RuntimeException failure) {
+      io.justsearch.core.execution.EngineFutures.rethrowCancellation(failure);
+      throw new IOException("Cannot decode VDU image", failure);
     }
   }
 }
