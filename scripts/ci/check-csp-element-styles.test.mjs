@@ -7,6 +7,7 @@ const cases = [
   ['html`<div STYLE = ${value}></div>`', 'bound-style-attribute'],
   ['html`<div style="top: 0; ${styleMap(x)}"></div>`', 'bound-style-attribute'],
   ['html`<div style=${styleMap({ width: `${pct}%` })}></div>`', 'bound-style-attribute'],
+  ['html`<div style="color:red;width:45%">${value}</div>`', 'literal-style-attribute'],
   ["el.setAttribute('style', value)", 'set-style-attribute'],
   ['el["setAttribute"]("style", value)', 'set-style-attribute'],
   ['el.setAttributeNS(null, "style", value)', 'set-style-attribute'],
@@ -15,7 +16,6 @@ const cases = [
 ];
 for (const [source, kind] of cases) assert.deepEqual(scanSource(source).map(h => h.kind), [kind], source);
 for (const source of [
-  'html`<div style="color:red;width:45%">${value}</div>`',
   'html`<div data-style=${value} title="style=${value}"></div>`',
   'html`<div>${value}</div>`',
   'html`<div .style=${`width: ${pct}%`}></div>`',
@@ -25,4 +25,4 @@ for (const source of [
   'el.style.width = value; el.style.setProperty("--color", value)',
   'new CSSStyleSheet(); document.adoptedStyleSheets = sheets',
 ]) assert.equal(scanSource(source).length, 0, source);
-console.log(`PASS: ${cases.length} forbidden fixtures and 9 allowed counterexamples`);
+console.log(`PASS: ${cases.length} forbidden fixtures and 8 allowed counterexamples`);

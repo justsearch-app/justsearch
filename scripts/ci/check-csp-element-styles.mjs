@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // The desktop window refuses style attributes set from script and <style> elements made at runtime (Tauri adds a nonce to style-src). Values go through Lit styleMap or the CSSOM; runtime sheets through adoptedStyleSheets.
-// No baseline: literal attributes are allowed; runtime attributes/sheets must use CSP-safe APIs.
+// No baseline: no style attribute in Lit templates; runtime styles and sheets must use CSP-safe APIs.
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -30,10 +30,12 @@ export function scanSource(source, filename = 'fixture.ts') {
       for (const tag of html.matchAll(/<([A-Za-z][\w:-]*)\b((?:[^>"']|"[^"]*"|'[^']*')*)>/g)) {
         for (const attr of tag[2].matchAll(/(?:^|\s)([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g)) {
           const value = attr[2] ?? attr[3] ?? attr[4];
-          if (attr[1].toLowerCase() !== 'style' || !value.includes('\u0000')) continue;
+          if (attr[1].toLowerCase() !== 'style') continue;
           // Lit writes any style attribute binding with setAttribute, styleMap included (its first
-          // render returns a string). Bind the property instead: .style=${text} assigns through the CSSOM.
-          report(node, 'bound-style-attribute');
+          // render returns a string). Chromium (WebView2 on Windows) also refuses literal style
+          // attributes when Lit imports its template. Use the component's CSS, or bind the
+          // property: .style=${text} assigns through the CSSOM.
+          report(node, value.includes('\u0000') ? 'bound-style-attribute' : 'literal-style-attribute');
         }
       }
     }
