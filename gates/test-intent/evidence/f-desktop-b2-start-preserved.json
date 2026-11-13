@@ -1,0 +1,107 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-13T01:46:04.933Z",
+  "revision": "4421fa3a1959379b2adf3bbe04649a78370a4168",
+  "tree": "14f5d22511aa6e580bafd5a280be6406f233c434",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-42-generic",
+    "node": "v24.22.0",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopEngineLossStart.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/nsmake73/tmp/test-intent-vitest-55302-1794534355175.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3538
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#before the app has painted, loss still shows the recovery page (preserved)",
+      "file": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f316aec8724ff2082030897f99f60582758880c93bbad23bbedd1144b8d4364b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FD1 the app counts as usable once it has painted and booted before the app has painted, loss still shows the recovery page (preserved)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#when discovery finds no engine, the Connecting page waits and a running engine reloads (preserved)",
+      "file": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f316aec8724ff2082030897f99f60582758880c93bbad23bbedd1144b8d4364b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FD1 the app counts as usable once it has painted and booted when discovery finds no engine, the Connecting page waits and a running engine reloads (preserved)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#a terminal state during discovery shows the recovery page (preserved)",
+      "file": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f316aec8724ff2082030897f99f60582758880c93bbad23bbedd1144b8d4364b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FD1 the app counts as usable once it has painted and booted a terminal state during discovery shows the recovery page (preserved)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "e37331ba84",
+    "revision": "e37331ba843940f05a91df6bc27743c1278e97e2",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/boot/desktopEngineLossStart.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/nsmake73/tmp/test-intent-vitest-55302-1794534360295.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 4215,
+        "output": "JSON report written to /home/elias/.cache/am/nsmake73/tmp/test-intent-vitest-55302-1794534360295.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#before the app has painted, loss still shows the recovery page (preserved)",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#when discovery finds no engine, the Connecting page waits and a running engine reloads (preserved)",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      },
+      {
+        "id": "modules/ui-web/src/boot/desktopEngineLossStart.test.ts#a terminal state during discovery shows the recovery page (preserved)",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:55644622c03b8e59fb9357cdc2033d3e90333cabb78135d2b93baa8bdfca6b37"
+}

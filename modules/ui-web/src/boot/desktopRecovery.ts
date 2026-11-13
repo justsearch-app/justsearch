@@ -3,6 +3,7 @@ import { isTauriRuntime } from '../utils/tauriRuntime.js';
 import { installSupervisorStateBridge, isTerminal, type SupervisorState } from '../api/supervisorState.js';
 import type { EngineRecovery } from '../shell-v0/components/EngineRecovery.js';
 import { installBackendRestartBridge } from '../api/backendRestart.js';
+import { resolveApiEndpoint } from '../api/http.js';
 import { resolveBootApiBase } from './apiBase.js';
 import { gateFactoryReset } from './factoryReset.js';
 import { reportSupervisorState } from '../shell-v0/state/engineLoss.js';
@@ -13,8 +14,6 @@ const recoverySurfaces = new WeakMap<HTMLElement, {
   recovery: EngineRecovery;
   teardown: () => void;
 }>();
-/** The application `mountBootApplication` presented in each root. */
-const applications = new WeakMap<HTMLElement, HTMLElement>();
 
 /** Linux keeps this webview alive while apt runs, including its lock wait: the app gives way to it. */
 function holdsLinuxUpdate(state: SupervisorState | null): boolean {
@@ -27,13 +26,30 @@ function needsRecovery(state: SupervisorState | null): boolean {
 }
 
 /**
- * S5c — once the application is on screen and takes input, engine loss is shown inside it (the
- * engine-loss treatment keeps the top bar, Health and the report), except for the Linux update hold.
- * While the start-up frame still covers it, the recovery page owns loss, as before the app loaded.
+ * The one answer to "is the app usable?" (S5c, F-desktop B2 FD1): the application `mountBootApplication`
+ * attached after boot is still in the root and its start-up cover has left, because its first surface
+ * (the top bar) has rendered and painted, or could not paint because the window is hidden. From then on
+ * engine loss shows inside the app (the engine-loss treatment keeps the top bar, Health and the report),
+ * except for the Linux update hold; before, the recovery page owns loss.
  */
-function presentsApplication(root: HTMLElement): boolean {
-  const application = applications.get(root);
-  return !!application && application.parentElement === root && !application.inert;
+const usableApplications = new WeakMap<HTMLElement, HTMLElement>();
+function appIsUsable(root: HTMLElement): boolean {
+  return usableApplications.get(root)?.parentElement === root;
+}
+
+/**
+ * Two animation frames let the first rendered surface paint before its cover leaves. A hidden window
+ * (started to the tray, minimized) runs no animation frame and paints nothing, so there is nothing to
+ * wait for: the app paints directly when the window is shown.
+ */
+function firstPaint(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const done = (): void => { document.removeEventListener('visibilitychange', onVisibility); resolve(); };
+    const onVisibility = (): void => { if (document.visibilityState === 'hidden') done(); };
+    if (document.visibilityState === 'hidden') { resolve(); return; }
+    document.addEventListener('visibilitychange', onVisibility);
+    requestAnimationFrame(() => requestAnimationFrame(done));
+  });
 }
 
 /** Keep supervisor recovery presentation authoritative while asynchronous shell boot finishes. */
@@ -48,11 +64,11 @@ export function mountBootApplication(root: HTMLElement, application: HTMLElement
     if (root.firstChild !== presentation || root.childNodes.length !== 1) root.replaceChildren(presentation);
     return;
   }
-  applications.set(root, application);
   const frame = frames.get(root) ?? root.querySelector<HTMLElement>('#boot-frame');
   if (root.querySelector('#boot-failure') || frame?.parentElement !== root) {
     application.inert = false;
     root.replaceChildren(application);
+    usableApplications.set(root, application);
     return;
   }
   // Attach beneath the fixed paint. Lit's first render, including the top bar, owns hand-off.
@@ -84,8 +100,7 @@ export function mountBootApplication(root: HTMLElement, application: HTMLElement
       const bar = application.shadowRoot?.querySelector('jf-top-bar') as (HTMLElement & { updateComplete?: Promise<boolean> }) | null;
       if (!bar) return;
       if (bar.updateComplete) await bar.updateComplete;
-      // Two animation frames let the first rendered surface paint before its cover leaves.
-      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      await firstPaint();
       if (application.parentElement !== root || owner && needsRecovery(owner.recovery.supervisor)) return;
       // Recovery/reset may have replaced both nodes while Lit was pending. Never reclaim their root.
       if (frame.parentElement === root) {
@@ -94,9 +109,60 @@ export function mountBootApplication(root: HTMLElement, application: HTMLElement
         for (const node of [...root.childNodes]) if (node !== application) node.remove();
         releaseInput();
         application.inert = false;
+        usableApplications.set(root, application);
       }
     } catch { window.__justsearchBootFailure?.('bootstrap'); }
   })();
+}
+
+/** How long a restarted engine stays up, by the supervisor's account, before a usable app re-binds to it. */
+const REBIND_STABLE_MS = 5_000;
+
+/**
+ * When a usable app re-binds to a restarted engine (F-desktop B2 FD1a). A new incarnation has a new
+ * port and session token, so re-binding means reloading the window, and a reloaded page is not usable
+ * until it has booted again: a reload that lands while a crash-looping engine dies again leaves the
+ * person a start-up page, and the supervisor giving up then shows the full recovery page. So a usable
+ * app reloads only for an engine that has proven alive: the supervisor reports it running and ready
+ * for the stability window with no other state in between, and it then answers its manifest read
+ * (discovery's own identity read, at its new address). Until then the app stays, with its in-app
+ * engine-loss treatment, which also says when the supervisor gives up; a later restart (the person's
+ * or the supervisor's) is proven the same way. Before the app is usable a restart reloads at once.
+ */
+function rebindWhenAlive(reload: () => void): { restarted: () => void; observe: (state: SupervisorState) => void } {
+  let pending = false;
+  let state: SupervisorState | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  /** Bumped by every state that interrupts a proof, so a read in flight across one is not believed. */
+  let proof = 0;
+  const healthy = (): boolean => !state || (state.state === 'running' && !state.notReady);
+  const arm = (): void => {
+    if (timer !== null || !healthy()) return;
+    const armed = ++proof;
+    timer = setTimeout(() => {
+      timer = null;
+      void resolveApiEndpoint().then((endpoint) => {
+        if (armed !== proof || !pending) return;
+        if (endpoint.instanceId && healthy()) { pending = false; reload(); } else arm();
+      }, () => { if (armed === proof) arm(); });
+    }, REBIND_STABLE_MS);
+  };
+  const interrupt = (): void => {
+    proof++;
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+  };
+  return {
+    restarted: () => { pending = true; interrupt(); arm(); },
+    observe: (next) => {
+      const sameIncarnation = state?.incarnation === next.incarnation;
+      state = next;
+      if (!pending) return;
+      // The window counts from the first healthy report of one incarnation; anything else restarts it.
+      if (!healthy() || !sameIncarnation) interrupt();
+      arm();
+    },
+  };
 }
 
 /** Resolve the API only after desktop recovery events can reach the boot surface. */
@@ -119,22 +185,34 @@ export async function resolveBootWithRecovery(
   const { EngineRecovery } = await import('../shell-v0/components/EngineRecovery.js');
   const recovery = new EngineRecovery();
   recoverySurfaces.set(root, { recovery, teardown });
-  root.replaceChildren(recovery);
+  /** Show the recovery page in place of whatever the root presents (the frame, or the app before it is usable). */
+  const present = (): void => {
+    // Store-owned subscriptions outlive shell listeners, so release them explicitly.
+    teardown();
+    if (recovery.parentElement !== root) root.replaceChildren(recovery);
+  };
   let waitingForApi = false;
+  const rebind = rebindWhenAlive(() => window.location.reload());
   await installSupervisorStateBridge((state) => {
     recovery.supervisor = state;
     reportSupervisorState(state);
-    if (needsRecovery(state) && !(presentsApplication(root) && !holdsLinuxUpdate(state))) {
-      // Store-owned subscriptions outlive shell listeners, so release them explicitly.
-      teardown();
-      if (recovery.parentElement !== root) root.replaceChildren(recovery);
+    rebind.observe(state);
+    if (needsRecovery(state) && !(appIsUsable(root) && !holdsLinuxUpdate(state))) {
+      present();
       waitingForApi = true;
     }
     // Initial boot has no backend-restart event. If it finishes after API discovery gave up,
     // retry discovery through the normal entry point when the host announces it is running.
     if (waitingForApi && state.state === 'running' && !state.notReady) window.location.reload();
   });
-  await installBackendRestartBridge(() => window.location.reload());
+  await installBackendRestartBridge(() => {
+    if (appIsUsable(root)) rebind.restarted();
+    else window.location.reload();
+  });
+  // While discovery runs the start-up frame stays ("Starting"); a reload that rebinds to a restarted
+  // engine looks like the app it replaces. The recovery page shows only when there is something to
+  // recover from: a supervisor state that needs it, or no engine found ("Connecting to JustSearch",
+  // until the host reports the engine running).
   const base = await resolveBootApiBase();
   if (base && !needsRecovery(recovery.supervisor)) {
     if (recovery.parentElement === root) {
@@ -142,7 +220,9 @@ export async function resolveBootWithRecovery(
       const frame = frames.get(root);
       if (frame && !root.hasChildNodes()) root.appendChild(frame);
     }
+  } else {
+    present();
+    waitingForApi = true;
   }
-  else waitingForApi = true;
   return base;
 }
