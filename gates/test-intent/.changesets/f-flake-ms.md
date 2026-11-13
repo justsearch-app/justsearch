@@ -75,3 +75,13 @@ preference behind fixing recurring CI flakes without asking.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1d2dc-5fe7-7262-bbbc-7527a9291730",
+  "verdict": "accept",
+  "digest": "sha256:a007faf2dd9a5a15a6d832f04521e8e0d9bdf5d07cffcb41b82a854a93ecccde"
+}
+```
