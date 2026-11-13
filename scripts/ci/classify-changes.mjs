@@ -44,7 +44,7 @@ export const RULES = [
   [/^gates\//, ['services', 'platform', 'jseval']],
   [/^(?:package(?:-lock)?\.json$)/, ['build', 'license', 'jseval', 'ui', 'services']],
   [/(?:^|\/)(?:package(?:-lock)?\.json|Cargo\.(?:toml|lock)|[^/]*\.gradle\.kts|gradle\.lockfile|libs\.versions\.toml)$/, ['license']],
-  [/^(?:modules\/configuration\/src\/main\/resources\/ai\/model-registry\.v2\.json|scripts\/codegen\/(?:gen-notices\.mjs|.*license.*\.json)|packaging\/runtime\/(?:tesseract-.*\.json|NOTICE-MODELS\.txt)|THIRD_PARTY_NOTICES)$/, ['license']],
+  [/^(?:modules\/configuration\/src\/main\/resources\/ai\/model-registry\.v2\.json|scripts\/codegen\/(?:gen-notices\.mjs|.*license.*\.json)|packaging\/runtime\/(?:tesseract-.*\.json|NOTICE-MODELS\.txt)|modules\/ui-web\/public\/fonts\/OFL\.txt|THIRD_PARTY_NOTICES)$/, ['license']],
   // Runtime-open audit: the dev-runner fixtures copy/fingerprint the frontend
   // tree, read these source/config files, and invoke the native process helper.
   // Keep this separate from the Java closure: core Java and gates are not inputs.
