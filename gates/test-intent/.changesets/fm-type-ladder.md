@@ -291,6 +291,14 @@ The new src/boot/type-ladder-lockdown.test.ts and src/boot/woff2-axes.test.ts ar
           "quote": "Six text sizes and four corner radii, nothing in between. Text: 11 small labels · 12 secondary text · 13 body and controls · 15 the search field and lead sentences · 20 headings · 28 the page headline. Corners: 4 marks and bars · 8 controls and rows · 14 fields, cards, panels and dialogs · fully round. Weight 400 for text, 500 for names and actions, 600 only for the brand.",
           "location": "task t-20261113-uicritique user turn round 7",
           "label": "agent-drafted, owner-adopted"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "This PR brings every size onto the six-size ladder by value (10->11, 14->13, 16->15, 18->20, 22->20, 30->28), keeping each element's relative place; assigning each element its role size from rule 1 (for example ordinary buttons as controls at 13px) is done screen by screen in the later slices of the same design set. The default button's 16px therefore becomes 15px here; its role size is not settled by this PR.",
+          "label": "agent choice"
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none. The 16px value is the old shared --font-size-md rung, which rule 1 removes; no record prescribes 16px for default buttons.",
@@ -298,7 +306,7 @@ The new src/boot/type-ladder-lockdown.test.ts and src/boot/woff2-axes.test.ts ar
         {
           "oldAssertion": "A default ('Other action') button beside the failed-file actions computes font-size 16px with padding 8px 16px.",
           "newAssertion": "It computes font-size 15px with padding 8px 16px.",
-          "reason": "Rule 1 allows only 11/12/13/15/20/28 px text; the shared 16px rung maps to 15px. The assertion still guards that the failed-file actions keep their compact size while an ordinary button keeps the default size and padding."
+          "reason": "Rule 1 allows only 11/12/13/15/20/28 px text. Under the labelled agent choice, this PR maps by value (16px -> 15px) and leaves role assignment (controls at 13px) to the later per-screen slices. The assertion still guards that the failed-file actions stay compact while an ordinary button keeps the default size and padding."
         }
       ]
     }
@@ -325,5 +333,16 @@ The new src/boot/type-ladder-lockdown.test.ts and src/boot/woff2-axes.test.ts ar
   "session": "codex-verifier-a9lrev5k-test-intent",
   "verdict": "accept",
   "digest": "sha256:59d5c40e27f752c96318aad5f7b4a4437861fb42751ac30eb062c30fe47b25e5"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-17z74qgq-test-intent",
+  "verdict": "reject",
+  "digest": "sha256:e2ff0a9e7bcd9fbfa7988133b5b4c27f86ccc60287312037df015c934b3a402f",
+  "note": "FailedFilesList.buttons-lockdown.test.ts changes the ordinary default button expectation from 16px to 15px. Its sole cited source, adopted rule 1, assigns body and controls 13px and reserves 15px for the search field and lead sentences. No cited delegated choice supports a 15px default button. Membership in the six-size ladder alone does not support that role assignment."
 }
 ```
