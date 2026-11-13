@@ -1,0 +1,155 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-13T16:28:10.038Z",
+  "revision": "c379404a8852dda29c6d8acb7b0a59dbacd4e723",
+  "tree": "293e431dd4acecb0e4a8af5c26dfcbd444c2533f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.TableCellBoundaryContractTest.p1SingleParagraphInlineRunsAndTripletLayout\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1838
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.TableCellBoundaryContractTest.p1EmptyParagraphsMakeNoContent\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1834
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.TableCellBoundaryContractTest.p2OutsideBlocksAndPostTableText\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1876
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.TableCellBoundaryContractTest.p2PdfPhysicalLineHyphenJoinsButParagraphHyphenDoesNot\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1898
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.TableCellBoundaryContractTest.p3LimitsIncludeSeparatorsAndPreserveSurrogates\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1966
+    },
+    {
+      "command": "./gradlew :modules:worker-services:test --tests \"io.justsearch.indexerworker.extract.PdfWordBoundaryTest.otherFormatsKeepTheirExistingWhitespaceAndHyphens\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 1934
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TableCellBoundaryContractTest.java#p1SingleParagraphInlineRunsAndTripletLayout",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TableCellBoundaryContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4a356cf82ccba7c6cc6bc9738fd0220dc890a3a511f21ce3875244ec843e9a34",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "p1SingleParagraphInlineRunsAndTripletLayout()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TableCellBoundaryContractTest.java#p1EmptyParagraphsMakeNoContent",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TableCellBoundaryContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4a356cf82ccba7c6cc6bc9738fd0220dc890a3a511f21ce3875244ec843e9a34",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "p1EmptyParagraphsMakeNoContent()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TableCellBoundaryContractTest.java#p2OutsideBlocksAndPostTableText",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TableCellBoundaryContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4a356cf82ccba7c6cc6bc9738fd0220dc890a3a511f21ce3875244ec843e9a34",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "p2OutsideBlocksAndPostTableText()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TableCellBoundaryContractTest.java#p2PdfPhysicalLineHyphenJoinsButParagraphHyphenDoesNot",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TableCellBoundaryContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4a356cf82ccba7c6cc6bc9738fd0220dc890a3a511f21ce3875244ec843e9a34",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "p2PdfPhysicalLineHyphenJoinsButParagraphHyphenDoesNot()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TableCellBoundaryContractTest.java#p3LimitsIncludeSeparatorsAndPreserveSurrogates",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/TableCellBoundaryContractTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:4a356cf82ccba7c6cc6bc9738fd0220dc890a3a511f21ce3875244ec843e9a34",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "p3LimitsIncludeSeparatorsAndPreserveSurrogates()",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PdfWordBoundaryTest.java#otherFormatsKeepTheirExistingWhitespaceAndHyphens",
+      "file": "modules/worker-services/src/test/java/io/justsearch/indexerworker/extract/PdfWordBoundaryTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:34822ce67d7d813a96eb3ffd3e6b992b1158a013df9b8935d8d48661998ed706",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "[1] p",
+          "status": "passed"
+        },
+        {
+          "name": "[2] h2",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:5e92db18626146b7c1b6d104b47713d90e417955ba25f67d81be18204459f416"
+}
