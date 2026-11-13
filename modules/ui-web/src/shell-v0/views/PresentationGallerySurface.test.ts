@@ -31,7 +31,8 @@ async function swatchBackgroundsById(): Promise<Map<string, string>> {
     const id = card.getAttribute('data-presentation-id') ?? '';
     // happy-dom does not parse oklch in cssText. Observe the real property assignment.
     const swatch = card.querySelector('.swatch');
-    const write = styleWrite.mock.contexts.indexOf(swatch as HTMLElement);
+    // The final assignment to this swatch (a later overwrite must be seen).
+    const write = styleWrite.mock.contexts.lastIndexOf(swatch as HTMLElement);
     const style = String(styleWrite.mock.calls[write]?.[0] ?? '');
     out.set(id, style.replace(/^background:\s*/, '').trim());
   }

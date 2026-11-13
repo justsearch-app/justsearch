@@ -30,7 +30,7 @@ Per-element styles and runtime stylesheets moved to mechanisms the desktop windo
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Palette themes, token previews and role foregrounds are now constructed stylesheets in document.adoptedStyleSheets instead of <style> elements in <head> (the desktop window's policy refuses <style> made at runtime). The observation moved from document.getElementById('jf-active-theme' / preview id).textContent, or a style[data-theme-id] selector, to the adopted sheet and its CSS (replaceSync input or cssRules). Inputs, preconditions, expected CSS content, sanitisation, validate-before-write, clearing, palette identity and the contrast and storage assertions are unchanged. bootAppearanceRestore changes only its cleanup."
+      "whatMoved": "Palette themes, token previews and role foregrounds are now constructed stylesheets in document.adoptedStyleSheets instead of <style> elements in <head> (the desktop window's policy refuses <style> made at runtime). The observation moved from document.getElementById('jf-active-theme' / preview id).textContent, or a style[data-theme-id] selector, to the adopted sheet and its CSS: the CSS a sheet received (replaceSync input, since happy-dom drops @layer rules from cssRules) counts only when that same sheet is in document.adoptedStyleSheets. Inputs, preconditions, expected CSS content, sanitisation, validate-before-write, clearing, palette identity and the contrast and storage assertions are unchanged. bootAppearanceRestore changes only its cleanup."
     },
     {
       "items": [
@@ -55,10 +55,21 @@ Per-element styles and runtime stylesheets moved to mechanisms the desktop windo
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Swatch colours are now assigned through the element's style object instead of a style attribute. The test reads the value passed to the style setter instead of the raw attribute, because happy-dom's CSS parser rewrites colour values; the expected colours are unchanged."
+      "whatMoved": "Swatch colours are now assigned through the element's style object instead of a style attribute. The test reads the last value assigned to each swatch's style instead of the raw attribute, because happy-dom's CSS parser rewrites colour values; the expected colours are unchanged."
     }
   ]
 }
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1d5d8-f223-71e0-8642-9495621e1624",
+  "verdict": "reject",
+  "digest": "sha256:9343c84161c187821b09342ca82ef58990c0570ed9edf460eb628f02e82ef912",
+  "note": "Entry 1 weakens themeState.test.ts loader attachment: replaceSync input no longer proves adoption. Entry 3 reads the first swatch style write instead of the final state and misses later incorrect overwrites."
+}
+```

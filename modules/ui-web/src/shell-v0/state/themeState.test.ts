@@ -31,7 +31,13 @@ import { __resetUserStateForTest } from './UserStateDocument.js';
 let replaceSync: MockInstance<CSSStyleSheet['replaceSync']>;
 beforeEach(() => { replaceSync = vi.spyOn(CSSStyleSheet.prototype, 'replaceSync'); });
 afterEach(() => vi.restoreAllMocks());
-const paletteCss = () => replaceSync.mock.calls.filter(([css]) => css.startsWith('@layer user-theme')).at(-1)?.[0];
+// The last palette CSS written, only if the sheet that received it is adopted by the document.
+const paletteCss = () => {
+  const calls = replaceSync.mock.calls;
+  let i = calls.length - 1;
+  while (i >= 0 && !calls[i]![0].startsWith('@layer user-theme')) i--;
+  return i >= 0 && document.adoptedStyleSheets.includes(replaceSync.mock.contexts[i] as CSSStyleSheet) ? calls[i]![0] : undefined;
+};
 
 describe('themeState (slice 474 alpha)', () => {
   beforeEach(() => {
