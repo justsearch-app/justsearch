@@ -86,6 +86,11 @@ The new src/boot/type-ladder-lockdown.test.ts and src/boot/woff2-axes.test.ts ar
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Headline text at 20 and 28 px sets font-variation-settings 'opsz' 32 explicitly (rule 8: headlines use the display cut; WebKitGTK, the Linux desktop window, ignores font-optical-sizing:auto). Inline code inside a heading resets font-variation-settings to normal so the smaller code keeps the text cut.",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "h1 20, h2 15, h3+ 13 (Recommended)",
+          "location": "task t-20261113-fmimpl user turn 2026-11-14 (answer to: Markdown heading sizes)"
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none. Searched docs/decisions for font, typeface, Markdown, radius, heading, corner and type size; no record prescribes the superseded type or radius ladder. The previous tests and their historical design comments are the old contract being superseded by owner-adopted rule 1 and rule 8, not a stronger source against those adopted rules.",
@@ -177,6 +182,11 @@ The new src/boot/type-ladder-lockdown.test.ts and src/boot/woff2-axes.test.ts ar
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Keep Search radius tiers fixed: sm 4px, md/control 8px through --radius (default 8px), and lg/xl/2xl/3xl/4xl 14px. Remove additive offsets, including the tile hairline's minus-one radius. Zero means no corner; 50% counts as fully round. Zero and round interpretations are also exercised by the exempt type-ladder-lockdown.test.ts; they do not add an entry requirement for that file.",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "h1 20, h2 15, h3+ 13 (Recommended)",
+          "location": "task t-20261113-fmimpl user turn 2026-11-14 (answer to: Markdown heading sizes)"
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none. Searched docs/decisions for font, typeface, Markdown, radius, heading, corner and type size; no record prescribes the superseded type or radius ladder. The previous tests and their historical design comments are the old contract being superseded by owner-adopted rule 1 and rule 8, not a stronger source against those adopted rules.",
@@ -293,20 +303,17 @@ The new src/boot/type-ladder-lockdown.test.ts and src/boot/woff2-axes.test.ts ar
           "label": "agent-drafted, owner-adopted"
         },
         {
-          "kind": "delegated-choice",
-          "delegationQuote": "You are supposed to be the implementation session",
-          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
-          "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "This PR brings every size onto the six-size ladder by value (10->11, 14->13, 16->15, 18->20, 22->20, 30->28), keeping each element's relative place; assigning each element its role size from rule 1 (for example ordinary buttons as controls at 13px) is done screen by screen in the later slices of the same design set. The default button's 16px therefore becomes 15px here; its role size is not settled by this PR.",
-          "label": "agent choice"
+          "kind": "owner-words",
+          "quote": "Roles now",
+          "location": "task t-20261113-fmimpl user turn 2026-11-14 (answer to: set ordinary buttons to 13 px in this PR?)"
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none. The 16px value is the old shared --font-size-md rung, which rule 1 removes; no record prescribes 16px for default buttons.",
       "assertionChanges": [
         {
           "oldAssertion": "A default ('Other action') button beside the failed-file actions computes font-size 16px with padding 8px 16px.",
-          "newAssertion": "It computes font-size 15px with padding 8px 16px.",
-          "reason": "Rule 1 allows only 11/12/13/15/20/28 px text. Under the labelled agent choice, this PR maps by value (16px -> 15px) and leaves role assignment (controls at 13px) to the later per-screen slices. The assertion still guards that the failed-file actions stay compact while an ordinary button keeps the default size and padding."
+          "newAssertion": "It computes font-size 13px with padding 8px 16px.",
+          "reason": "The owner chose \"Roles now\": ordinary buttons take rule 1's 13px body and controls size in this PR. The old 16px default is superseded by that role assignment. The assertion preserves the default padding and the failed-file actions' existing compact size."
         }
       ]
     }

@@ -28,6 +28,9 @@ export const ambientStyles = css`
     font-family: inherit;
     font-size: inherit;
   }
+  button {
+    font-size: var(--font-size-sm);
+  }
 
   /* Scrollbar WIDTH is NOT an inherited property (only scrollbar-color is — CSS Scrollbars L1), so
      the :root \`scrollbar-width: thin\` in tokens.css reaches the light-DOM scrollers but leaves

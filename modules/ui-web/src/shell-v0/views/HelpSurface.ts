@@ -244,6 +244,7 @@ export class HelpSurface extends JfElement {
       background: var(--justsearch-shell-form-button-bg, transparent);
       cursor: pointer;
       font: inherit;
+      font-size: var(--font-size-sm);
       color: inherit;
     }
     @media (max-width: 48rem) {

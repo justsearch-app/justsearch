@@ -53,6 +53,7 @@ export class ArrayControl extends JsonFormsRendererBase {
     button {
       padding: var(--justsearch-shell-form-button-padding, 0.25rem 0.5rem);
       font: inherit;
+      font-size: var(--font-size-sm);
       border: 1px solid var(--justsearch-shell-form-button-border, #ccc);
       border-radius: 4px;
       background: var(--justsearch-shell-form-button-bg, transparent);

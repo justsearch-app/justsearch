@@ -79,6 +79,7 @@ export const composerStyles: CSSResult = css`
     border: none;
     border-radius: 0.25rem;
     font: inherit;
+    font-size: var(--font-size-sm);
     font-weight: 600;
     cursor: pointer;
   }

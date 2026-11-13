@@ -33,7 +33,7 @@ class FactoryResetRecovery extends LitElement {
     .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }
     button { padding: 0.65rem 1rem; border: 1px solid var(--border-subtle, ButtonText);
       border-radius: 8px; color: var(--text-primary, ButtonText);
-      background: var(--surface-2, ButtonFace); font: inherit; cursor: pointer; }
+      background: var(--surface-2, ButtonFace); font: inherit; font-size: var(--font-size-sm); cursor: pointer; }
     button:focus-visible { outline: 2px solid var(--focus-ring-color, Highlight); outline-offset: 3px; }
     button:disabled { cursor: wait; }
     [role='alert'] { border-inline-start: 3px solid currentColor; padding-inline-start: 0.75rem; }
