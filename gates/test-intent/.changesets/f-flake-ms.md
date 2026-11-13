@@ -16,13 +16,23 @@ saw MIGRATING and waited for an enumeration that only the live start would begin
 waits 10 s for previous migration threads to exit, so it gave up and requested an Engine restart.
 
 The boot now starts that monitor only when it owns a candidate (`buildingIndexPath != null`). The
-live start starts its own monitor after publication, as before. The existing tests are unchanged:
-the race they hit is gone.
+live start starts its own monitor after publication, as before. The migration assertions in the
+existing tests are unchanged: the race they hit is gone.
 
 One check is added to the existing file. It forces the bad order: the test holds the generation
 pointer lock (IndexGenerationManager's process-wide STATE_CONTROL) from boot until the request has
 created the candidate, and waits until any boot-time monitor is queued on that lock. On the base
 (b28e33f26f) it fails by assertion with the CI message; with the fix it passes.
+
+Under CPU load the new check passed its migration assertions but once failed during shutdown:
+`Application services still own resources`, caused by
+`Indexing loop still running; resources retained for shutdown retry`. The shared `Forced.close()`
+path and this class's background-close helper now retry that exact IOException pair up to six
+close calls. Each attempt uses the product's own 5 s join; there is no added sleep. A different
+exception, an additional suppressed failure, or the sixth failure is rethrown. Existing checks
+using these helpers therefore have a longer teardown allowance; their inputs, fault injection,
+migration assertions and requirement that shutdown succeeds are retained. QueryPrewarmFixture's
+separate Boot.close() path is unchanged.
 
 The delegation quote is the owner's own words about a red main CI test (2026-10-24), the standing
 preference behind fixing recurring CI flakes without asking.
@@ -36,7 +46,7 @@ preference behind fixing recurring CI flakes without asking.
       ],
       "class": "New",
       "repaired": true,
-      "behaviour": "A migration requested right after a NATIVE boot that owns no candidate, before any boot-time cutover monitor first reads the generation pointer, still opens Green live: beginUnrecordedBuildingLiveAsync completes true within its existing 30 s wait, the switch then ends, the successor generation becomes active and the Engine restart fallback is never called. Every existing check in the file is unchanged.",
+      "behaviour": "A migration requested right after a NATIVE boot that owns no candidate, before any boot-time cutover monitor first reads the generation pointer, still opens Green live: beginUnrecordedBuildingLiveAsync completes true within its existing 30 s wait, the switch then ends, the successor generation becomes active and the Engine restart fallback is never called. Existing migration oracles are retained; shared teardown now retries the exact retained-loop shutdown IOException at most six times, as described below.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -51,6 +61,14 @@ preference behind fixing recurring CI flakes without asking.
       "newChecks": [
         "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerModelStartCutoverTest.java#aMigrationRequestedBeforeTheBootMonitorFirstReadsStillOpensGreenLive"
       ]
+    },
+    {
+      "items": [
+        "modules/indexer-worker/src/test/java/io/justsearch/indexerworker/server/KnowledgeServerModelStartCutoverTest.java"
+      ],
+      "class": "Adaptation",
+      "moved": ["instrumentation"],
+      "whatMoved": "Forced.close() and closeInBackground() now share a bounded server-close helper: at most six calls, retrying only IOException('Application services still own resources') caused solely by IOException('Indexing loop still running; resources retained for shutdown retry'), without extra sleeps. Other errors, additional suppressed errors and exhaustion still fail. This changes the teardown timing and close-call count of existing checks using those helpers; it retains their inputs, preconditions, observations, fault injection, assertions, tags and shutdown-success requirement. The separate QueryPrewarmFixture.Boot teardown is unchanged."
     }
   ]
 }

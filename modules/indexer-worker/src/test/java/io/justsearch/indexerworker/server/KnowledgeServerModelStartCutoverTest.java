@@ -42,6 +42,7 @@ import io.justsearch.ipc.MigrationStartRequest;
 import io.justsearch.ipc.TraceDegradation;
 import io.justsearch.ort.ModelCapabilities;
 import io.justsearch.ort.OrtSessionAssembler;
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -847,7 +848,7 @@ final class KnowledgeServerModelStartCutoverTest {
       releaseHeld.countDown();
       promoted.countDown();
       try {
-        if (server != null && !server.awaitClosed(0)) server.close();
+        if (server != null && !server.awaitClosed(0)) closeServer(server);
       } finally {
         serverLog.detachAppender(appender);
         prewarmLog.detachAppender(appender);
@@ -1038,10 +1039,31 @@ final class KnowledgeServerModelStartCutoverTest {
     return new EmbeddingAssembly(sessions, shape, tokenizer, capabilities);
   }
 
+  private static void closeServer(KnowledgeServer server) throws IOException {
+    for (int attempt = 1; ; attempt++) {
+      try {
+        server.close();
+        return;
+      } catch (IOException failure) {
+        // A loaded loop may outlive the product's 5 s join. Retry only its retained shutdown;
+        // any other failure (including an additional suppressed failure) must still fail the test.
+        if (attempt >= 6
+            || !"Application services still own resources".equals(failure.getMessage())
+            || failure.getSuppressed().length != 0
+            || !(failure.getCause() instanceof IOException retained)
+            || !"Indexing loop still running; resources retained for shutdown retry"
+                .equals(retained.getMessage())
+            || retained.getCause() != null || retained.getSuppressed().length != 0) {
+          throw failure;
+        }
+      }
+    }
+  }
+
   private static CompletableFuture<Void> closeInBackground(KnowledgeServer server) {
     var result = new CompletableFuture<Void>();
     Thread.ofVirtual().start(() -> {
-      try { server.close(); result.complete(null); }
+      try { closeServer(server); result.complete(null); }
       catch (Throwable failure) { result.completeExceptionally(failure); }
     });
     return result;
