@@ -23,20 +23,16 @@ export function scanSource(source, filename = 'fixture.ts') {
         (ts.isIdentifier(node.tag) && node.tag.text === 'html' || name(node.tag) === 'html') &&
         ts.isTemplateExpression(node.template)) {
       // Replace expressions with a sentinel so quotes and > inside JS do not affect HTML parsing.
-      // Each expression becomes \u0000<index>\u0001 so an attribute can be traced to its expression.
-      const spans = node.template.templateSpans;
       const parts = [node.template.head.text];
-      spans.forEach((span, i) => parts.push(`\u0000${i}\u0001`, span.literal.text));
+      for (const span of node.template.templateSpans) parts.push('\u0000', span.literal.text);
       const html = parts.join('').replace(/<!--[\s\S]*?-->/g, '');
       // Scan attribute values only, ignoring text, comments and similarly named attributes.
       for (const tag of html.matchAll(/<([A-Za-z][\w:-]*)\b((?:[^>"']|"[^"]*"|'[^']*')*)>/g)) {
         for (const attr of tag[2].matchAll(/(?:^|\s)([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g)) {
           const value = attr[2] ?? attr[3] ?? attr[4];
           if (attr[1].toLowerCase() !== 'style' || !value.includes('\u0000')) continue;
-          // Allowed: the whole value is one Lit styleMap(...) directive, which writes through the CSSOM.
-          const only = value.trim().match(/^\u0000(\d+)\u0001$/);
-          const expr = only && spans[Number(only[1])].expression;
-          if (expr && ts.isCallExpression(expr) && ts.isIdentifier(expr.expression) && expr.expression.text === 'styleMap') continue;
+          // Lit writes any style attribute binding with setAttribute, styleMap included (its first
+          // render returns a string). Bind the property instead: .style=${text} assigns through the CSSOM.
           report(node, 'bound-style-attribute');
         }
       }
