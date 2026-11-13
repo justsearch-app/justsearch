@@ -30,7 +30,11 @@ Per-element styles and runtime stylesheets moved to mechanisms the desktop windo
       "moved": [
         "instrumentation"
       ],
-      "whatMoved": "Palette themes, token previews and role foregrounds are now constructed stylesheets in document.adoptedStyleSheets instead of <style> elements in <head> (the desktop window's policy refuses <style> made at runtime). The observation moved from the attached element's text (getElementById(...).textContent, a style[data-theme-id] selector, or element presence) to the current text of each sheet in document.adoptedStyleSheets: a per-test wrapper of CSSStyleSheet replaceSync/replace records each sheet's latest text (happy-dom drops @layer rules from cssRules), and assertions read only adopted sheets, so a later overwrite, a detached sheet or a second palette sheet is seen. Exactly-one-element assertions became exactly-one-adopted-palette-sheet; removed-element became no adopted sheet carrying it. Inputs, preconditions, expected CSS content, sanitisation, validate-before-write, clearing, palette identity and the contrast and storage assertions are unchanged. bootAppearanceRestore changes only its cleanup.",
+      "whatMoved": "Palette themes, token previews and role foregrounds are now constructed stylesheets in document.adoptedStyleSheets instead of <style> elements in <head> (the desktop window's policy refuses <style> made at runtime). The observation moved from the attached element's text (getElementById(...).textContent, a style[data-theme-id] selector, or element presence) to the current text of each sheet in document.adoptedStyleSheets: a per-test wrapper of CSSStyleSheet replaceSync/replace records each sheet's latest text (happy-dom drops @layer rules from cssRules), and assertions read only adopted sheets, so a later overwrite, a detached sheet or a second palette sheet is seen. Exactly-one-element assertions became exactly-one-adopted-palette-sheet; removed-element became no adopted sheet carrying it. Inputs, preconditions, expected CSS content, sanitisation, validate-before-write, clearing, palette identity and the contrast and storage assertions are unchanged. bootAppearanceRestore changes only its cleanup."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/renderers/controls/OptionButtonGroupRenderer.test.ts",
         "modules/ui-web/src/shell-v0/views/SettingsSurface.highContrast.test.ts"
       ],
       "change": "modified",
