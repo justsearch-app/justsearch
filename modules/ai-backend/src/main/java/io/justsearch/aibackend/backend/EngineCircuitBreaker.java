@@ -24,7 +24,7 @@ import org.slf4j.LoggerFactory;
  *   <li>CLOSED → OPEN: After {@code failureThreshold} consecutive failures OR any fatal error</li>
  *   <li>OPEN → HALF_OPEN: After {@code recoveryTimeout} has passed</li>
  *   <li>HALF_OPEN → CLOSED: After a successful request</li>
- *   <li>HALF_OPEN → OPEN: After a failed request</li>
+ *   <li>HALF_OPEN → OPEN: After any failed recovery request, regardless of the failure count</li>
  * </ul>
  *
  * <h2>Usage</h2>
@@ -145,7 +145,9 @@ public final class EngineCircuitBreaker {
 
     // Non-fatal errors increment counter
     int failures = consecutiveFailures.incrementAndGet();
-    if (failureThreshold > 0 && failures >= failureThreshold) {
+    if (state.get() == State.HALF_OPEN) {
+      tripCircuit("recovery request failed: " + summarize(failure));
+    } else if (failureThreshold > 0 && failures >= failureThreshold) {
       tripCircuit("consecutive failures: " + failures);
     }
   }
