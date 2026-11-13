@@ -9,6 +9,8 @@ const cases = [
   ['html`<div style=${styleMap({ width: `${pct}%` })}></div>`', 'bound-style-attribute'],
   ['html`<div style="color:red;width:45%">${value}</div>`', 'literal-style-attribute'],
   ["el.setAttribute('style', value)", 'set-style-attribute'],
+  ['root.innerHTML = `<style>:host{display:block}</style><div>${x}</div>`', 'markup-style-element'],
+  ["root.innerHTML = '<style>p{}</style>'", 'markup-style-element'],
   ['el["setAttribute"]("style", value)', 'set-style-attribute'],
   ['el.setAttributeNS(null, "style", value)', 'set-style-attribute'],
   ["document.createElement('style')", 'runtime-style-element'],

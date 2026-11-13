@@ -39,6 +39,9 @@ export function scanSource(source, filename = 'fixture.ts') {
         }
       }
     }
+    // A <style> element written as markup (innerHTML, a Lit template) has no nonce and is refused too.
+    if ((ts.isStringLiteralLike(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) &&
+        /<style[\s>]/i.test(node.text)) report(node, 'markup-style-element');
     if (ts.isCallExpression(node)) {
       const method = name(node.expression);
       if ((method === 'setAttribute' && str(node.arguments[0]) === 'style') ||
