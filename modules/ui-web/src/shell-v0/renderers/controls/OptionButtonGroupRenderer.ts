@@ -70,7 +70,7 @@ function renderSwatchFill(spec: SwatchSpec): TemplateResult {
     'split' in spec
       ? `linear-gradient(135deg, ${spec.split[0]} 50%, ${spec.split[1]} 50%)`
       : spec.fill;
-  return html`<span style="position:absolute;inset:0;background:${background}"></span>`;
+  return html`<span class="swatch-fill" .style=${`background: ${background}`}></span>`;
 }
 
 /** Plain-props option shape (855 §17 R2 — the non-JsonForms usage path). */
@@ -124,6 +124,8 @@ export class OptionButtonGroupRenderer extends JsonFormsRendererBase {
   }
 
   static styles = css`
+    .swatch-fill { position: absolute; inset: 0; }
+
     :host {
       display: block;
       margin-block-end: var(--justsearch-shell-form-control-spacing, 0.75rem);

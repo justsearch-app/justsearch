@@ -72,7 +72,7 @@ export class FilterChip extends JfElement {
       type="button"
       part="chip"
       aria-pressed=${this.active ? 'true' : 'false'}
-      style=${`--chip-active-bg: ${toneAccentSoft(tone)}; --chip-active-fg: ${toneAccent(tone)}`}
+      .style=${`--chip-active-bg: ${toneAccentSoft(tone)}; --chip-active-fg: ${toneAccent(tone)}`}
     >
       <slot></slot>
     </button>`;

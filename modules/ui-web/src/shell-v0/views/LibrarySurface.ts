@@ -662,6 +662,9 @@ export class LibrarySurface extends JfElement {
     .jf-icon-spin {
       animation: jf-spin 1s linear infinite;
     }
+    :host .literal-path { white-space:pre-wrap;overflow-wrap:anywhere; }
+    :host .error-code { display: block; }
+
   `,
     // Tempdoc 914 D3 — the failed chip's look is shared with the declared FolderCardRenderer so the
     // two render sites cannot drift; see failedChipPresentation.ts.
@@ -1064,7 +1067,7 @@ export class LibrarySurface extends JfElement {
         : this.forgetReadStatus === 'unavailable' ? 'Unfinished forgets could not be read. Their outcomes are unknown.'
           : page?.items.length === 0 ? 'No unfinished forgets on this page.' : ''}</div>
       <ul>${(page?.items ?? []).map(item => html`<li>
-        <div><code style="white-space:pre-wrap;overflow-wrap:anywhere">${item.path === null ? 'Exact target unavailable' : describeExactPath(item.path)}</code></div>
+        <div><code class="literal-path">${item.path === null ? 'Exact target unavailable' : describeExactPath(item.path)}</code></div>
         <p>${forgetObservationText(item)}</p>
         <jf-button label=${`Retry forget for ${item.path === null ? 'unavailable target' : describeExactPath(item.path)}`} .disabled=${busy || !ready || item.path === null || item.scope === null || item.reason === 'WITHDRAWAL_PENDING'}
           .onActivate=${() => void this.decideUnfinishedForget(item, 'retry')}>Retry</jf-button>
@@ -2328,7 +2331,7 @@ export class LibrarySurface extends JfElement {
           <h4>Exact paths kept out</h4>
           <p>These paths are kept out of future indexing. Removing an entry permits a later indexing pass; it does not add a watched folder or index anything automatically. Save patterns to apply your edits.</p>
           <ul>${this.excludesLiterals.map((entry) => html`<li>
-            <span>${entry.literal.scope === 'FOLDER' ? 'Folder' : 'File'}: </span><code style="white-space:pre-wrap;overflow-wrap:anywhere">${describeExactPath(entry.literal.path)}</code>
+            <span>${entry.literal.scope === 'FOLDER' ? 'Folder' : 'File'}: </span><code class="literal-path">${describeExactPath(entry.literal.path)}</code>
             <jf-button variant="ghost" label=${`Remove keep-out for ${describeExactPath(entry.literal.path)}`}
               .disabled=${this.excludesBusy || this.excludesAttempt !== null}
               .onActivate=${() => { this.excludesLiterals = this.excludesLiterals.filter((current) => current.literal.id !== entry.literal.id); }}>Remove keep-out</jf-button>
@@ -2431,9 +2434,9 @@ export class LibrarySurface extends JfElement {
         @confirm-band-confirm=${() => void this.cancelCurrentReindex()}
         @confirm-band-cancel=${() => { this.cancelRebuildConfirm = false; this.cancelRebuildKey = null; }}></jf-confirm-band>` : nothing}
       ${this.gapDecisionError ? html`<p role="alert">${this.gapDecisionError}
-        ${this.gapDecisionErrorCode && !this.gapDecisionError.endsWith(` (Code: ${this.gapDecisionErrorCode})`) ? html`<small style="display: block">Code: ${this.gapDecisionErrorCode}</small>` : nothing}</p>` : nothing}
+        ${this.gapDecisionErrorCode && !this.gapDecisionError.endsWith(` (Code: ${this.gapDecisionErrorCode})`) ? html`<small class="error-code">Code: ${this.gapDecisionErrorCode}</small>` : nothing}</p>` : nothing}
       ${this.reindexCancelError ? html`<p role="alert">${this.reindexCancelError}
-        ${this.reindexCancelErrorCode && !this.reindexCancelError.endsWith(` (Code: ${this.reindexCancelErrorCode})`) ? html`<small style="display: block">Code: ${this.reindexCancelErrorCode}</small>` : nothing}</p>` : nothing}
+        ${this.reindexCancelErrorCode && !this.reindexCancelError.endsWith(` (Code: ${this.reindexCancelErrorCode})`) ? html`<small class="error-code">Code: ${this.reindexCancelErrorCode}</small>` : nothing}</p>` : nothing}
       ${this.reindexCancelRecorded ? html`<p role="status">Rebuild cancellation recorded.</p>` : nothing}
     </section>`;
   }

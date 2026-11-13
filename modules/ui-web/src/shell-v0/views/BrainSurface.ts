@@ -725,6 +725,10 @@ export class BrainSurface extends JfElement {
 
   static styles = [
     css`
+      .progress-bar.last-known-progress { background: var(--text-muted); }
+      .progress-bar.enrichment-progress { background: var(--accent-warning); }
+      .enrichment-heading { font-weight: 600; }
+
     /* Tempdoc 571 §11 / 578 — Brain is a host surface: display:contents pass-through (layout-purity)
        delegating layout to <jf-surface-tabs>. Its own "AI Brain" body scrolls inside .brain-scroll;
        the Memory member carries its own SurfaceLayout. */
@@ -1264,6 +1268,35 @@ export class BrainSurface extends JfElement {
       font-size: var(--font-size-xs);
       color: var(--text-warning);
     }
+    :host .error-code { display: block; }
+    :host .download-progress { margin-top: 1rem; }
+    :host .download-totals { margin-top: 0.5rem; display:flex; justify-content:space-between; font-size: var(--font-size-xs); color: var(--text-secondary); }
+    :host .download-detail { margin-top: 0.25rem; font-size: var(--font-size-xs); color: var(--text-secondary); }
+    :host .download-actions { margin-top: 0.75rem; }
+    :host .warning-section { border-color: var(--accent-warning-45); background: var(--accent-warning-08); }
+    :host .status-layout { display: flex; gap: 0.625rem; align-items: flex-start; }
+    :host .status-content { flex: 1; }
+    :host .warning-heading { font-weight: 600; color: var(--text-warning); }
+    :host .warning-description { font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 0.375rem; }
+    :host .warning-code { font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: 0.25rem; font-family: monospace; }
+    :host .download-retry { width: 100%; margin-top: 0.75rem; }
+    :host .observed-heading { font-weight: 600; color: var(--text-secondary); }
+    :host .status-description { font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 0.25rem; }
+    :host .observed-percent { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-muted); }
+    :host .enrichment-bar { margin-top: 0.625rem; }
+    :host .observed-detail { font-size: var(--font-size-xs); color: var(--text-muted); margin-top: 0.5rem; }
+    :host .progress-percent { font-weight: 600; font-variant-numeric: tabular-nums; }
+    :host .enrichment-detail { font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: 0.5rem; display: flex; align-items: center; gap: 0.375rem; }
+    :host .parts-list { margin-top: 0.625rem; font-size: var(--font-size-sm); }
+    :host .parts-empty { color: var(--text-secondary); padding: 0.5rem 0; }
+    :host .part-badge { margin-right: 0.5rem; vertical-align: middle; }
+    :host .part-detail { color: var(--text-secondary); font-family: monospace; font-size: var(--font-size-xs); }
+    :host .parts-heading { margin-bottom: 0.5rem; }
+    :host .part-name { color: var(--text-secondary); font-family: monospace; }
+    :host .small-detail { font-size: var(--font-size-xs); color: var(--text-secondary); }
+    :host .runtime-detail { margin-top: 0.5rem; font-size: var(--font-size-xs); color: var(--text-secondary); }
+    :host .provider-heading { font-size: var(--font-size-xs); color: var(--text-secondary); margin-bottom: 0.5rem; }
+
   `,
   ];
 
@@ -1865,7 +1898,7 @@ export class BrainSurface extends JfElement {
     return html`<section class="graphics-card" aria-label="Graphics card memory">
       <span>Graphics card</span><div class="progress" role=${known ? 'meter' : 'img'} aria-label="Graphics memory used by all apps"
         aria-valuemin=${known ? 0 : nothing} aria-valuemax=${known ? total : nothing} aria-valuenow=${used ?? nothing} aria-valuetext=${known ? `${formatBytes(used!)} of ${formatBytes(total!)} in use by all apps${devices && devices > 1 ? ` · one of ${devices} graphics devices` : ''}` : nothing}>
-        ${known ? html`<div class="progress-bar" style=${`width: ${(used! / total!) * 100}%`}></div>` : nothing}
+        ${known ? html`<div class="progress-bar" .style=${`width: ${(used! / total!) * 100}%`}></div>` : nothing}
       </div><span class="step-meta">${known ? `${formatBytes(used!)} of ${formatBytes(total!)} in use · all apps` : 'Memory use unknown'}${adapter ? ` · ${adapter}` : ''}${devices && devices > 1 ? ` · one of ${devices} graphics devices` : ''}</span>
     </section>`;
   }
@@ -2567,7 +2600,7 @@ export class BrainSurface extends JfElement {
     return html`
       ${this.bulkError ? html`<jf-error-alert tone="error" .onDismiss=${() => (this.bulkError = null)}>
         ${this.bulkError.message}
-        ${this.bulkError.errorCode && !this.bulkError.message.endsWith(` (Code: ${this.bulkError.errorCode})`) ? html`<small style="display: block">Code: ${this.bulkError.errorCode}</small>` : nothing}
+        ${this.bulkError.errorCode && !this.bulkError.message.endsWith(` (Code: ${this.bulkError.errorCode})`) ? html`<small class="error-code">Code: ${this.bulkError.errorCode}</small>` : nothing}
       </jf-error-alert>` : nothing}
       ${this.bulkOutcomeKey ? html`<jf-operation-outcome-detail
         operation-key=${this.bulkOutcomeKey} api-base=${this.apiBase}></jf-operation-outcome-detail>` : nothing}
@@ -2912,14 +2945,14 @@ export class BrainSurface extends JfElement {
         </div>` : nothing}
         ${aiState === 'installing'
           ? html`
-              <div style="margin-top: 1rem">
+              <div class="download-progress">
                 ${pct !== null
                   ? html`
                       <div class="progress">
-                        <div class="progress-bar" style="width: ${pct}%"></div>
+                        <div class="progress-bar" .style=${`width: ${pct}%`}></div>
                       </div>
                       <div
-                        style="margin-top: 0.5rem; display:flex; justify-content:space-between; font-size: var(--font-size-xs); color: var(--text-secondary)"
+                        class="download-totals"
                       >
                         <span>${this.installStatus?.phase?.replace(/_/g, ' ') ?? 'preparing'}</span>
                         <span>${formatBytes(bytesDone)} / ${formatBytes(bytesTotal)}</span>
@@ -2929,7 +2962,7 @@ export class BrainSurface extends JfElement {
                 ${this.renderStagedProgress()}
                 ${this.installStatus?.packages?.some((p) => p.resumed)
                   ? html`<div
-                      style="margin-top: 0.25rem; font-size: var(--font-size-xs); color: var(--text-secondary)"
+                      class="download-detail"
                     >
                       Resumed from your earlier download — the bytes already on disk were kept.
                     </div>`
@@ -2937,7 +2970,7 @@ export class BrainSurface extends JfElement {
                 ${/* Tempdoc 840 Phase 5 — pause is NOT cancel: the run keeps its lease and its place,
                       so "stop using my bandwidth for a minute" finally has an affordance that does not
                       end the run. */ ''}
-                <div class="row" style="margin-top: 0.75rem">
+                <div class="row download-actions">
                   <jf-button
                     variant="ghost"
                     label=${this.installStatus?.paused === true
@@ -3024,30 +3057,30 @@ export class BrainSurface extends JfElement {
     const activity = this.indexingProgress().activity;
     const canonicalWordings = reindexCauses.map((code) => reasonFor(code, activity).wording);
     return html`
-      <div class="section" style="border-color: var(--accent-warning-45); background: var(--accent-warning-08)">
-        <div style="display: flex; gap: 0.625rem; align-items: flex-start">
+      <div class="section warning-section">
+        <div class="status-layout">
           ${icon({ name: 'x-circle', size: 18 })}
-          <div style="flex: 1">
+          <div class="status-content">
             ${canonicalWordings.length > 0
               ? canonicalWordings.map(
                   (wording) =>
-                    html`<div style="font-weight: 600; color: var(--text-warning)">
+                    html`<div class="warning-heading">
                       ${wording}
                     </div>`,
                 )
-              : html`<div style="font-weight: 600; color: var(--text-warning)">
+              : html`<div class="warning-heading">
                   ${activity.confirmed ? '' : `${activity.summary} — last observed: `}Rebuild the index to restore full search.
                 </div>`}
             ${embeddingBlocked
               ? html`
-                  <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 0.375rem">
+                  <div class="warning-description">
                     ${isLegacy
                       ? 'Embedding model fingerprint missing.'
                       : 'Embedding model mismatch detected.'}
                   </div>
                   ${emb?.fingerprintStored && emb?.fingerprintCurrent
                     ? html`<div
-                        style="font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: 0.25rem; font-family: monospace"
+                        class="warning-code"
                       >
                         Stored: ${emb.fingerprintStored.substring(0, 12)}… → Current:
                         ${emb.fingerprintCurrent.substring(0, 12)}…
@@ -3057,7 +3090,7 @@ export class BrainSurface extends JfElement {
               : nothing}
             ${schemaBlocked
               ? html`
-                  <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 0.375rem">
+                  <div class="warning-description">
                     Schema incompatible${schema?.reindexRequiredReason
                       ? html` — ${schema.reindexRequiredReason}`
                       : nothing}.
@@ -3079,7 +3112,7 @@ export class BrainSurface extends JfElement {
             void this.refreshAll();
           }}
           @op-error=${(event: CustomEvent<OpErrorEventDetail>) => this.showBulkError(event.detail)}
-          style="width: 100%; margin-top: 0.75rem"
+          class="download-retry"
         ></jf-operation>
       </div>
     `;
@@ -3134,13 +3167,13 @@ export class BrainSurface extends JfElement {
     if (!progress.activity.confirmed) {
       return html`
         <div class="section" data-testid="brain-enrichment-progress">
-          <div style="display: flex; gap: 0.625rem; align-items: flex-start">
+          <div class="status-layout">
             ${icon({ name: 'zap', size: 18 })}
-            <div style="flex: 1">
-              <div style="font-weight: 600; color: var(--text-secondary)">
+            <div class="status-content">
+              <div class="observed-heading">
                 Semantic search build — last known
               </div>
-              <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 0.25rem">
+              <div class="status-description">
                 ${progress.activity.summary}${this._unifiedAiState?.snapshotLive ? '' : ` — ${reasonFor('binding.unreachable').wording}`} — these figures are the last observed
                 values, not live progress.
               </div>
@@ -3148,17 +3181,17 @@ export class BrainSurface extends JfElement {
             ${pct === null
               ? nothing
               : html`<div
-                  style="font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-muted)"
+                  class="observed-percent"
                 >
                   ${pct}%
                 </div>`}
           </div>
           ${pct === null
             ? nothing
-            : html`<div class="progress" style="margin-top: 0.625rem">
-                <div class="progress-bar" style="width: ${pct}%; background: var(--text-muted)"></div>
+            : html`<div class="progress enrichment-bar">
+                <div class="progress-bar last-known-progress" .style=${`width: ${pct}%`}></div>
               </div>`}
-          <div style="font-size: var(--font-size-xs); color: var(--text-muted); margin-top: 0.5rem">
+          <div class="observed-detail">
             ${ENRICHMENT_SCOPE_NOTE} · ${NUM.format(pending)} pending when last observed
           </div>
         </div>
@@ -3168,18 +3201,18 @@ export class BrainSurface extends JfElement {
       <div
         class="section"
         data-testid="brain-enrichment-progress"
-        style=${progress.activity.enrichmentDeferred ? '' : 'border-color: var(--accent-warning-30); background: var(--accent-warning-08)'}
+        .style=${progress.activity.enrichmentDeferred ? '' : 'border-color: var(--accent-warning-30); background: var(--accent-warning-08)'}
       >
-        <div style="display: flex; gap: 0.625rem; align-items: flex-start">
+        <div class="status-layout">
           ${icon({ name: 'zap', size: 18 })}
-          <div style="flex: 1">
-            <div style=${`font-weight: 600; color: var(${progress.activity.enrichmentDeferred ? '--text-secondary' : '--text-warning'})`}>
+          <div class="status-content">
+            <div class="enrichment-heading" .style=${`color: var(${progress.activity.enrichmentDeferred ? '--text-secondary' : '--text-warning'})`}>
               ${progress.activity.enrichmentDeferred ? progress.activity.summary : ENRICHMENT_IN_PROGRESS_LABEL}
             </div>
             <!-- The subtitle names the SCOPE of the number above it. Before this it promised chunk
                  embeddings while the figure measured document vectors — one stage's number under
                  another stage's sentence. -->
-            <div style="font-size: var(--font-size-sm); color: var(--text-secondary); margin-top: 0.25rem">
+            <div class="status-description">
               ${progress.activity.detail ?? ''}
               ${ENRICHMENT_SCOPE_NOTE}: semantic vectors, passage vectors, keyword expansion and
               entity recognition.
@@ -3187,14 +3220,14 @@ export class BrainSurface extends JfElement {
           </div>
           ${pct === null
             ? nothing
-            : html`<div style="font-weight: 600; font-variant-numeric: tabular-nums">${pct}%</div>`}
+            : html`<div class="progress-percent">${pct}%</div>`}
         </div>
         ${pct === null || progress.activity.enrichmentDeferred
           ? nothing
-          : html`<div class="progress" style="margin-top: 0.625rem">
-              <div class="progress-bar" style="width: ${pct}%; background: var(--accent-warning)"></div>
+          : html`<div class="progress enrichment-bar">
+              <div class="progress-bar enrichment-progress" .style=${`width: ${pct}%`}></div>
             </div>`}
-        <div style="font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: 0.5rem; display: flex; align-items: center; gap: 0.375rem">
+        <div class="enrichment-detail">
           ${progress.activity.enrichmentDeferred ? nothing : icon({ name: 'loader-2', size: 12, spin: true })}
           ${NUM.format(pending)} ${progress.activity.enrichmentDeferred ? 'waiting' : 'pending'} across all stages
         </div>
@@ -3210,9 +3243,9 @@ export class BrainSurface extends JfElement {
     // the per-feature green dot (which asserts "running right now") drops to neutral.
     const live = this.aiKnown();
     return html`<div data-testid="brain-observed-features"><h4>Observed search features · ${features.length > 0 ? `${activeCount}/${features.length} ${live ? 'active' : 'when last observed'}` : 'Unknown'}</h4>
-        <div style="margin-top: 0.625rem; font-size: var(--font-size-sm)">
+        <div class="parts-list">
           ${features.length === 0
-            ? html`<div style="color: var(--text-secondary); padding: 0.5rem 0">
+            ? html`<div class="parts-empty">
                 No ONNX feature data yet — runtime status pending.
               </div>`
             : features.map(
@@ -3227,11 +3260,11 @@ export class BrainSurface extends JfElement {
                             : featureInUse(f) === true
                               ? 'success'
                               : 'neutral'}
-                        style="margin-right: 0.5rem; vertical-align: middle"
+                        class="part-badge"
                       ></jf-status-dot>
                       ${f.label ?? f.id ?? 'feature'}
                     </span>
-                    <span style="color: var(--text-secondary); font-family: monospace; font-size: var(--font-size-xs)"
+                    <span class="part-detail"
                       >${observedEpLabel(f)}${live ? '' : ' · last observed'}</span
                     >
                   </div>
@@ -3252,7 +3285,7 @@ export class BrainSurface extends JfElement {
     if (!tiers?.length) return nothing;
     const intent = this.planPreview?.intent ?? 'this';
     return html`
-      <div style="margin-bottom: 0.5rem">
+      <div class="parts-heading">
         ${tiers.map((t) => {
           const total = t.totalBytes ?? 0;
           const download = t.downloadBytes ?? 0;
@@ -3262,9 +3295,9 @@ export class BrainSurface extends JfElement {
               ? 'to download'
               : 'installed';
           return html`
-            <div class="data-row" style=${t.includedByIntent ? '' : 'opacity: 0.55'}>
+            <div class="data-row" .style=${t.includedByIntent ? '' : 'opacity: 0.55'}>
               <span>${t.label || t.tier || 'tier'}</span>
-              <span style="color: var(--text-secondary); font-family: monospace">
+              <span class="part-name">
                 ${total ? formatBytes(total) : '—'} · ${statusText}
               </span>
             </div>
@@ -3344,9 +3377,7 @@ export class BrainSurface extends JfElement {
         class="component-row"
         data-testid="component-row-${r.id}"
         data-state=${r.state}
-        style=${r.selected && r.state !== 'unavailable' && r.state !== 'not-in-mode'
-          ? ''
-          : 'opacity: 0.62'}
+        .style=${r.selected && r.state !== 'unavailable' && r.state !== 'not-in-mode' ? '' : 'opacity: 0.62'}
       >
         <div class="component-name">
           <span class="component-label">${r.label}</span>
@@ -3418,7 +3449,7 @@ export class BrainSurface extends JfElement {
               ${s.percent === null
                 ? nothing
                 : html`<div class="progress">
-                    <div class="progress-bar" style="width: ${s.percent}%"></div>
+                    <div class="progress-bar" .style=${`width: ${s.percent}%`}></div>
                   </div>`}
               ${s.blockedReason
                 ? html`<div class="stage-blocked" data-testid="install-stage-blocked-${s.id}">
@@ -3442,7 +3473,7 @@ export class BrainSurface extends JfElement {
                 return html`
                   <div class="data-row" data-testid="package-row-${p.packageId ?? ''}">
                     <span>${p.label || p.packageId || 'package'}</span>
-                    <span style="color: var(--text-secondary); font-family: monospace"
+                    <span class="part-name"
                       >${skip
                         ? skip.badge
                         : p.bytesTotal
@@ -3452,8 +3483,7 @@ export class BrainSurface extends JfElement {
                   </div>
                   ${skip?.detail
                     ? html`<div
-                        class="package-skip-detail"
-                        style="font-size: var(--font-size-xs); color: var(--text-secondary)"
+                        class="package-skip-detail small-detail"
                       >
                         ${skip.detail}
                       </div>`
@@ -3462,7 +3492,7 @@ export class BrainSurface extends JfElement {
               })
             : this.planPreview
               ? nothing
-              : html`<div style="color: var(--text-secondary); padding: 0.5rem 0">
+              : html`<div class="parts-empty">
                   No model packages yet — install AI to populate this list.
                 </div>`}
 `;
@@ -3608,7 +3638,7 @@ export class BrainSurface extends JfElement {
                 </div>
                 ${!live ? html`<p>Checking pack status…</p>` : nothing}
                 ${this.packStatus
-                  ? html`<div style="margin-top: 0.5rem; font-size: var(--font-size-xs); color: var(--text-secondary)">
+                  ? html`<div class="runtime-detail">
                       ${live ? 'Pack status:' : 'Pack status — last observed:'} <code>${this.packStatus.state}</code>
                       ${this.packStatus.phase ? html` · ${this.packStatus.phase}` : nothing}
                       ${this.packStatus.message ? html` — ${this.packStatus.message}` : nothing}
@@ -3708,7 +3738,7 @@ export class BrainSurface extends JfElement {
         ${this.expanded.executable ? this.settingInput('serverExecutable', 'Server executable') : nothing}
         ${this.expanded.executable ? this.settingInput('llamaLibPath', 'Llama library path') : nothing}
       </div></div>
-      ${this.inference?.gpu ? html`<p class="runtime-observation" style=${isGpuReadingProvisional(this._unifiedAiState?.aiEngine?.stability) || !live ? 'opacity: 0.6' : ''}>
+      ${this.inference?.gpu ? html`<p class="runtime-observation" .style=${isGpuReadingProvisional(this._unifiedAiState?.aiEngine?.stability) || !live ? 'opacity: 0.6' : ''}>
         CUDA: ${this.inference.gpu.cudaAvailable ? 'available' : 'no'} · ${projectFact('core.ai.gpu', this._unifiedAiState).value ?? 'Graphics memory unknown'}
         ${this.inference.tier ? ` · ${this.inference.tier.replace(/_/g, ' ')}` : ''}
       </p>` : nothing}
@@ -3756,7 +3786,7 @@ export class BrainSurface extends JfElement {
         ${optionalGaps.length > 0
           ? html`<div
               data-testid="install-optional-gaps"
-              style="font-size: var(--font-size-xs); color: var(--text-secondary); margin-bottom: 0.5rem"
+              class="provider-heading"
             >
               Optional files not installed (no capability depends on them):
               <code

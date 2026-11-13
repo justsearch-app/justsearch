@@ -328,7 +328,7 @@ export class Sv3ContextBar extends JfElement {
           class="fill"
           data-color=${horizon.color}
           data-testid="sv3-context-meter-fill"
-          style=${`width:${horizon.pct}%`}
+          .style=${`width: ${horizon.pct}%`}
         ></span>
       </span>
     </span>`;

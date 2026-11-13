@@ -10,9 +10,11 @@
  * `theme.tokens['accent-tint']`.
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import './PresentationGallerySurface.js';
 import { BUILTIN_PRESENTATIONS } from '../themes/builtinPresentations.js';
+
+afterEach(() => vi.restoreAllMocks());
 
 interface GalleryHost extends HTMLElement {
   updateComplete: Promise<boolean>;
@@ -20,15 +22,17 @@ interface GalleryHost extends HTMLElement {
 
 /** Mount the gallery and return one `background:` value per rendered card, keyed by declaration id. */
 async function swatchBackgroundsById(): Promise<Map<string, string>> {
+  const styleWrite = vi.spyOn(HTMLElement.prototype, 'style', 'set');
   const el = document.createElement('jf-presentation-gallery-surface') as GalleryHost;
   document.body.appendChild(el);
   await el.updateComplete;
   const out = new Map<string, string>();
   for (const card of Array.from(el.shadowRoot?.querySelectorAll('.card') ?? [])) {
     const id = card.getAttribute('data-presentation-id') ?? '';
-    // Read the raw attribute: happy-dom's CSSStyleDeclaration does not parse `oklch(...)`, so
-    // `.style.background` is empty even when the binding rendered correctly.
-    const style = card.querySelector('.swatch')?.getAttribute('style') ?? '';
+    // happy-dom does not parse oklch in cssText. Observe the real property assignment.
+    const swatch = card.querySelector('.swatch');
+    const write = styleWrite.mock.contexts.indexOf(swatch as HTMLElement);
+    const style = String(styleWrite.mock.calls[write]?.[0] ?? '');
     out.set(id, style.replace(/^background:\s*/, '').trim());
   }
   document.body.removeChild(el);

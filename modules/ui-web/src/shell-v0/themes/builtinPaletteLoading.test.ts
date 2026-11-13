@@ -3,7 +3,7 @@
 
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import {
   __resetThemeStateForTest,
   applyAppearance,
@@ -11,6 +11,12 @@ import {
 } from '../state/themeState.js';
 import { __resetUserStateForTest } from '../state/UserStateDocument.js';
 import { __resetCatalogForTest } from './themesCatalog.js';
+
+// happy-dom does not retain @layer rules in cssRules; inspect what the real sheet receives.
+let replaceSync: MockInstance<CSSStyleSheet['replaceSync']>;
+beforeEach(() => { replaceSync = vi.spyOn(CSSStyleSheet.prototype, 'replaceSync'); });
+afterEach(() => vi.restoreAllMocks());
+const paletteCss = () => replaceSync.mock.calls.filter(([css]) => css.startsWith('@layer user-theme')).at(-1)?.[0];
 
 const themesDir = join(__dirname, '../../../public/themes');
 const paletteFiles = readdirSync(themesDir)
@@ -60,14 +66,14 @@ describe('built-in palettes through the production appearance writer', () => {
           .toEqual([]);
         expect(document.documentElement.getAttribute('data-theme')).toBe(mode);
         expect(getActiveThemeId()).toBe(id);
-        const style = document.getElementById('jf-active-theme');
-        expect(style?.dataset.themeId).toBe(id);
-        expect(style?.textContent).toContain('@layer user-theme');
-        expect(style?.textContent).toContain(':root');
+        const paletteCall = replaceSync.mock.calls.findIndex(([css]) => css.startsWith('@layer user-theme'));
+        expect(document.adoptedStyleSheets).toContain(replaceSync.mock.contexts[paletteCall]);
+        expect(paletteCss()).toContain('@layer user-theme');
+        expect(paletteCss()).toContain(':root');
         const css = assets.get(`/themes/${id}.css`);
-        if (css !== undefined) expect(style?.textContent).toContain(css);
+        if (css !== undefined) expect(paletteCss()).toContain(css);
         if (id === 'core.high-vis') {
-          expect(style?.textContent).toContain('--focus-ring-color: #008890;');
+          expect(paletteCss()).toContain('--focus-ring-color: #008890;');
         }
       });
     }

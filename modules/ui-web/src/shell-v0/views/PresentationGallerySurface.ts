@@ -250,7 +250,7 @@ export class PresentationGallerySurface extends JfElement {
                 <div
                   class="swatch"
                   data-testid="gallery-swatch"
-                  style="background: ${this.swatchTint(decl)}"
+                  .style=${`background: ${this.swatchTint(decl)}`}
                 ></div>
                 <div class="card-name">${decl.displayName}</div>
                 <div class="origin-label">${this.originLabel(decl.origin)}</div>

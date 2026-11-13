@@ -125,6 +125,9 @@ export class AgentEmitterDemo extends JfElement {
     .log-entry {
       padding: 0.0625rem 0;
     }
+    :host .demo-description { color:var(--text-secondary);margin:0 0 0.5rem; }
+    :host .emissions-empty { color:var(--text-muted); }
+
   `;
 
   // §28.W8 — emit a low-risk Effect tagged 'agent' so it auto-applies
@@ -235,7 +238,7 @@ export class AgentEmitterDemo extends JfElement {
             Close
           </button>
         </header>
-        <p style="color:var(--text-secondary);margin:0 0 0.5rem;">
+        <p class="demo-description">
           Each button emits an Effect tagged <code>originator: 'agent'</code>.
           Auto-apply (low-risk) lands in the audit log immediately; proposed
           (high-risk) surfaces in the lower-right PendingEffect queue for
@@ -263,7 +266,7 @@ export class AgentEmitterDemo extends JfElement {
         </div>
         <div class="log">
           ${this.log.length === 0
-            ? html`<div class="log-entry" style="color:var(--text-muted)">No emissions yet.</div>`
+            ? html`<div class="log-entry emissions-empty">No emissions yet.</div>`
             : this.log
                 .slice()
                 .reverse()

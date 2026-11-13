@@ -416,6 +416,8 @@ export class LogSurface extends JfElement {
     }
     /* 574 B2 — the status pills are the jf-status-badge atom now; the per-surface .badge fork
        (tinted bg + solid tone text) is deleted. */
+    :host .log-description { font-size: var(--font-size-sm);color:var(--text-secondary);margin:0.25rem 0 0.5rem; }
+
   `,
   ];
 
@@ -436,7 +438,7 @@ export class LogSurface extends JfElement {
             ? html`<jf-status-badge tone="warning">paused</jf-status-badge>`
             : nothing}
         </h2>
-        <div class="sub" style="font-size: var(--font-size-sm);color:var(--text-secondary);margin:0.25rem 0 0.5rem">
+        <div class="sub log-description">
           What the system is doing internally — live diagnostic stream from
           head + worker. For action audit (who clicked what), see Activity.
         </div>

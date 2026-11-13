@@ -39,7 +39,7 @@ import { summarizeWireDrift } from '../../api/wireDriftTelemetry.js';
 // Tempdoc 941 — the sibling FE-defect ring: which of OUR stream handlers threw, and how often.
 import { summarizeStreamHandlerFailures } from '../../api/streamHandlerTelemetry.js';
 import { icon } from '../components/Icon.js';
-import { renderAtRestCard } from './security/atRestCard.js';
+import { renderAtRestCard, atRestPillStyles } from './security/atRestCard.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 // Slice 447 §X.11.5 Phase 6: plugin recovery-overlay client. Overlays take precedence
 // over the backend-declared core recovery for the matched (conditionId, subject) pair.
@@ -399,8 +399,16 @@ export class HealthSurface extends JfElement {
   }
 
   static styles = [
+    atRestPillStyles,
     surfaceLayoutStyles,
     css`
+      .dot.engine-dot { width: 0.5rem; height: 0.5rem; }
+      .result-dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 50%; flex-shrink: 0; align-self: center; }
+      .health-pill { border-radius: 0.25rem; }
+      .connection-pill { float: right; padding: 0.125rem 0.5rem; font-size: var(--font-size-xs); }
+      .gpu-layer-pill { padding: 0.0625rem 0.375rem; font-size: var(--font-size-xs); }
+      .gpu-available-pill { float: right; padding: 0.125rem 0.5rem; font-weight: 500; }
+
     :host {
       min-width: 0;
       max-width: 100%;
@@ -697,6 +705,30 @@ export class HealthSurface extends JfElement {
       color: var(--text-secondary);
       font-size: var(--font-size-sm);
     }
+    :host .header-actions { display: flex; align-items: center; gap: 0.5rem; }
+    :host .generation-history { margin-top: 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: var(--font-size-xs); }
+    :host .secondary-text { color: var(--text-secondary); }
+    :host .generation-number { font-weight: 600; font-variant-numeric: tabular-nums; }
+    :host .block-detail { display: block; }
+    :host .recent-history { margin-top: 0.875rem; font-size: var(--font-size-xs); }
+    :host .history-summary { cursor: pointer; color: var(--text-secondary); }
+    :host .history-list { margin: 0.5rem 0 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.25rem; }
+    :host .history-result { display:flex; gap:0.5rem; align-items: baseline; font-variant-numeric: tabular-nums; }
+    :host .danger-text { color: var(--text-danger); }
+    :host .history-count { color: var(--text-secondary); font-size: var(--font-size-xs); }
+    :host .history-session { display:flex; gap:0.5rem; align-items: baseline; font-variant-numeric: tabular-nums; cursor: pointer; }
+    :host .session-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 18rem; min-width: 0; }
+    :host .connection-status { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0; }
+    :host .status-label { font-size: var(--font-size-sm); }
+    :host .observation-age { font-size: var(--font-size-xs); color: var(--text-secondary); }
+    :host .queue-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.375rem 1rem; margin-top: 0.5rem; font-size: var(--font-size-sm); }
+    :host .queue-value { font-family: monospace; text-align: right; }
+    :host .gpu-layer-details { margin-top: 0.5rem; border-top: 1px solid var(--border-subtle); padding-top: 0.5rem; }
+    :host .gpu-layer-heading { font-size: var(--font-size-xs); color: var(--text-secondary); margin-bottom: 0.375rem; }
+    :host .gpu-layer-grid { display: grid; grid-template-columns: max-content 1fr; gap: 0.375rem 1rem; font-size: var(--font-size-sm); }
+    :host .gpu-layer-value { text-align: right; }
+    :host .compact-empty { padding: 0.5rem 0; }
+
   `,
   ];
 
@@ -1028,7 +1060,7 @@ export class HealthSurface extends JfElement {
           <h2>Health</h2>
           <p role="status">${label}</p>
         </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem">
+        <div class="header-actions">
           <label class="checkbox">
             <input
               type="checkbox"
@@ -1080,7 +1112,7 @@ export class HealthSurface extends JfElement {
           <span>Rebuilding…</span>
         </div>
         <div class="progress">
-          <div class="progress-bar info" style="width: ${pct}%"></div>
+          <div class="progress-bar info" .style=${`width: ${pct}%`}></div>
         </div>
       </div>
     `;
@@ -1241,7 +1273,7 @@ export class HealthSurface extends JfElement {
                 <div class="progress">
                   <div
                     class="progress-bar ${memColor}"
-                    style="width: ${Math.min(memRatio * 100, 100)}%"
+                    .style=${`width: ${Math.min(memRatio * 100, 100)}%`}
                   ></div>
                 </div>
               `
@@ -1300,11 +1332,11 @@ export class HealthSurface extends JfElement {
         <span class="key">Index state</span>
         <span
           class="val"
-          style="color: ${failure ? 'var(--accent-danger)' : !activity.confirmed
+          .style=${`color: ${failure ? 'var(--accent-danger)' : !activity.confirmed
             ? 'var(--text-secondary)'
             : progress.phase === 'ready' && this.status?.worker?.core?.indexHealthy === true
               ? 'var(--accent-success)'
-              : 'var(--text-secondary)'}"
+              : 'var(--text-secondary)'}`}
           >${failure ?? indexState}</span>
         ${failure ? html`<span>${indexState}</span>` : nothing}
       </div>
@@ -1351,13 +1383,13 @@ export class HealthSurface extends JfElement {
           <span class="key">Status</span>
           <span
             class="val"
-            style="color: ${apiStatus === 'connected'
+            .style=${`color: ${apiStatus === 'connected'
               ? 'var(--accent-success)'
               : apiStatus === 'connecting…'
                 ? 'var(--text-muted)'
                 : apiStatus === 'reconnecting…'
                   ? 'var(--accent-warning)'
-                  : 'var(--accent-danger)'}"
+                  : 'var(--accent-danger)'}`}
             >${apiStatus}</span
           >
         </div>
@@ -1377,11 +1409,11 @@ export class HealthSurface extends JfElement {
           <span class="key">Status</span>
           <span
             class="val"
-            style="color: ${!confirmed ? 'var(--text-secondary)' : indexHealthy === true
+            .style=${`color: ${!confirmed ? 'var(--text-secondary)' : indexHealthy === true
               ? 'var(--accent-success)'
               : indexHealthy === false
                 ? 'var(--accent-danger)'
-                : 'var(--text-secondary)'}"
+                : 'var(--text-secondary)'}`}
             >${indexHealthy === true
               ? 'Healthy'
               : indexHealthy === false
@@ -1496,16 +1528,16 @@ export class HealthSurface extends JfElement {
     return html`
       <div
         data-testid="brain-generation-sparkline"
-        style="margin-top: 0.75rem; display: flex; align-items: center; gap: 0.5rem; font-size: var(--font-size-xs)"
+        class="generation-history"
       >
         ${/* Round-14 finding 10 — "gen" was unqualified and collided with a DIFFERENT in-product
               "generation": /api/inference/status `generation` is an int engine-instance counter,
               while /api/knowledge/status `servingSearchGenerationId` is a string index id. Beside a
               model filename the abbreviation also read as "1st-generation model" (a version claim).
               Naming the axis is the whole fix — the value is unchanged. */ ''}
-        <span style="color: var(--text-secondary)">engine generation:</span>
-        <span style="font-weight: 600; font-variant-numeric: tabular-nums">${currentGen}</span>
-        <svg role="img" aria-label="Engine instance history" width="${W}" height="${H}" style="display: block">
+        <span class="secondary-text">engine generation:</span>
+        <span class="generation-number">${currentGen}</span>
+        <svg role="img" aria-label="Engine instance history" width="${W}" height="${H}" class="block-detail">
           <polyline
             data-testid="brain-generation-sparkline-line"
             points="${pointsStr}"
@@ -1535,41 +1567,38 @@ export class HealthSurface extends JfElement {
     return html`
       ${this.renderGenerationSparkline()}
       <details
-        class="transitions"
+        class="transitions recent-history"
         data-testid="brain-transitions-timeline"
-        style="margin-top: 0.875rem; font-size: var(--font-size-xs)"
       >
         ${/* Round-14 finding 10 — "mode" is ambiguous on this very window: the same panel carries a
               Simple | Detailed disclosure mode and the search surface has rungs. These rows are the
               INFERENCE state machine's transitions; say so. */ ''}
-        <summary style="cursor: pointer; color: var(--text-secondary)">
+        <summary class="history-summary">
           Recent inference transitions (${rows.length})
         </summary>
         <ul
-          style="margin: 0.5rem 0 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.25rem"
+          class="history-list"
         >
           ${rows.map(
             (r) => html`
               <li
                 data-testid="brain-transition-row"
                 data-success=${String(r.success)}
-                style="display:flex; gap:0.5rem; align-items: baseline; font-variant-numeric: tabular-nums"
+                class="history-result"
               >
                 <span
-                  style="display:inline-block; width:0.5rem; height:0.5rem; border-radius:50%; background:${r.success
-                    ? 'var(--accent-tint)'
-                    : 'var(--accent-danger)'}; flex-shrink:0; align-self: center"
+                  class="result-dot" .style=${`background: ${r.success ? 'var(--accent-tint)' : 'var(--accent-danger)'}`}
                 ></span>
-                <span style="color: var(--text-secondary)"
+                <span class="secondary-text"
                   >${formatTime(new Date(r.timestampMs))}</span
                 >
                 <span>${r.fromMode.toLowerCase()} → ${r.toMode.toLowerCase()}</span>
-                <span style="color: var(--text-secondary)"
+                <span class="secondary-text"
                   >· ${r.reason.toLowerCase().replace(/_/g, ' ')}</span
                 >
-                <span style="color: var(--text-secondary)">· ${r.durationMs}ms</span>
+                <span class="secondary-text">· ${r.durationMs}ms</span>
                 ${r.wireCode
-                  ? html`<span style="color: var(--text-danger)">· ${r.wireCode}</span>`
+                  ? html`<span class="danger-text">· ${r.wireCode}</span>`
                   : nothing}
               </li>
             `,
@@ -1595,18 +1624,17 @@ export class HealthSurface extends JfElement {
     }
     return html`
       <details
-        class="traces"
+        class="traces recent-history"
         data-testid="brain-trace-explorer"
-        style="margin-top: 0.875rem; font-size: var(--font-size-xs)"
       >
-        <summary style="cursor: pointer; color: var(--text-secondary)">
+        <summary class="history-summary">
           Recent spans (${this.recentSpans.length})
-          <span style="color: var(--text-secondary); font-size: var(--font-size-xs)">
+          <span class="history-count">
             · click a row to copy trace ID
           </span>
         </summary>
         <ul
-          style="margin: 0.5rem 0 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.25rem"
+          class="history-list"
         >
           ${this.recentSpans.map(
             (s) => html`
@@ -1614,7 +1642,7 @@ export class HealthSurface extends JfElement {
                 data-testid="brain-trace-row"
                 role="button"
                 tabindex="0"
-                style="display:flex; gap:0.5rem; align-items: baseline; font-variant-numeric: tabular-nums; cursor: pointer"
+                class="history-session"
                 @click=${() => {
                   if (s.trace_id) {
                     void navigator.clipboard?.writeText(s.trace_id);
@@ -1627,17 +1655,15 @@ export class HealthSurface extends JfElement {
                 title=${s.trace_id ? `trace_id=${s.trace_id} (click to copy)` : ''}
               >
                 <span
-                  style="display:inline-block; width:0.5rem; height:0.5rem; border-radius:50%; background:${s.status === 'ERROR'
-                    ? 'var(--accent-danger)'
-                    : 'var(--accent-tint)'}; flex-shrink:0; align-self: center"
+                  class="result-dot" .style=${`background: ${s.status === 'ERROR' ? 'var(--accent-danger)' : 'var(--accent-tint)'}`}
                 ></span>
-                <span style="color: var(--text-secondary)">
+                <span class="secondary-text">
                   ${s.start ? formatTime(new Date(s.start)) : '—'}
                 </span>
-                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 18rem; min-width: 0" title=${s.name ?? ''}>
+                <span class="session-name" title=${s.name ?? ''}>
                   ${s.name ?? '(unnamed)'}
                 </span>
-                <span style="color: var(--text-secondary)">
+                <span class="secondary-text">
                   · ${typeof s.duration_ms === 'number' ? `${Math.round(s.duration_ms)}ms` : '—'}
                 </span>
               </li>
@@ -1662,20 +1688,16 @@ export class HealthSurface extends JfElement {
         <h3>
           ${icon({ name: 'cpu', size: 12 })} AI Engine
           <span
-            style="float: right; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: var(--font-size-xs); ${isOnline
-              ? 'background: var(--accent-success-16); color: var(--text-success);'
-              : 'background: var(--surface-2); color: var(--text-secondary);'}"
+            class="health-pill connection-pill" .style=${`background: ${isOnline ? 'var(--accent-success-16)' : 'var(--surface-2)'}; color: ${isOnline ? 'var(--text-success)' : 'var(--text-secondary)'}`}
             >${mode}</span
           >
         </h3>
-        <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0">
+        <div class="connection-status">
           <span
-            class="dot"
-            style="background: ${isOnline
-              ? 'var(--accent-success)'
-              : 'var(--text-secondary)'}; width: 0.5rem; height: 0.5rem"
+            class="dot engine-dot"
+            .style=${`background: ${isOnline ? 'var(--accent-success)' : 'var(--text-secondary)'}`}
           ></span>
-          <span style="font-size: var(--font-size-sm)"
+          <span class="status-label"
             >${isOnline
               ? 'Online'
               : mode === 'Status unconfirmed' ? 'Last observed AI state — current status unconfirmed'
@@ -1686,28 +1708,28 @@ export class HealthSurface extends JfElement {
                   ? reasonFor(failure, activity).wording
                   : 'Offline'}</span
           >
-          <span style="font-size: var(--font-size-xs); color: var(--text-secondary)">· AI state updated ${formatRelativeMs(inferenceAt)}</span>
+          <span class="observation-age">· AI state updated ${formatRelativeMs(inferenceAt)}</span>
         </div>
         <p data-testid="health-ai-indexing-activity">${activity.summary}${activity.detail ? ` — ${activity.detail}` : ''}</p>
         <div
-          style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.375rem 1rem; margin-top: 0.5rem; font-size: var(--font-size-sm)"
+          class="queue-grid"
         >
-          <span class="key" style="color: var(--text-secondary)">${activity.confirmed ? 'Embed queue' : 'Last observed embed queue'}</span>
-          <span class="val" style="font-family: monospace; text-align: right"
+          <span class="key secondary-text">${activity.confirmed ? 'Embed queue' : 'Last observed embed queue'}</span>
+          <span class="val queue-value"
             >${progress.phase === 'unknown' ? '—' : NUM.format(progress.embeddingPending)}</span
           >
-          <span class="key" style="color: var(--text-secondary)">${activity.confirmed ? 'VDU queue' : 'Last observed VDU queue'}</span>
-          <span class="val" style="font-family: monospace; text-align: right"
+          <span class="key secondary-text">${activity.confirmed ? 'VDU queue' : 'Last observed VDU queue'}</span>
+          <span class="val queue-value"
             >${progress.phase === 'unknown' ? '—' : NUM.format(progress.vduPending)}</span
           >
-          <span class="key" style="color: var(--text-secondary)">Context (actual)</span>
-          <span class="val" style="font-family: monospace; text-align: right"
+          <span class="key secondary-text">Context (actual)</span>
+          <span class="val queue-value"
             >${this.inference.llmContextTokens != null
               ? NUM.format(this.inference.llmContextTokens)
               : 'N/A'}</span
           >
-          <span class="key" style="color: var(--text-secondary)">Context (configured)</span>
-          <span class="val" style="font-family: monospace; text-align: right"
+          <span class="key secondary-text">Context (configured)</span>
+          <span class="val queue-value"
             >${this.inference.configuredContextTokens != null
               ? `${NUM.format(this.inference.configuredContextTokens)}`
               : 'N/A'}</span
@@ -1736,7 +1758,7 @@ export class HealthSurface extends JfElement {
     ];
     const pill = (e: EngineRealized): TemplateResult => {
       if (!e.loaded) {
-        return html`<span style="color: var(--text-secondary); font-size: var(--font-size-xs)"
+        return html`<span class="history-count"
           >not loaded</span
         >`;
       }
@@ -1744,28 +1766,26 @@ export class HealthSurface extends JfElement {
       const text = onGpu ? 'GPU' : e.accelerator === 'cpu' ? 'CPU' : 'loaded';
       return html`<span
         title=${e.failureReason ?? ''}
-        style="padding: 0.0625rem 0.375rem; border-radius: 0.25rem; font-size: var(--font-size-xs); ${onGpu
-          ? 'background: var(--accent-success-16); color: var(--text-success);'
-          : 'background: var(--surface-2); color: var(--text-secondary);'}"
+        class="health-pill gpu-layer-pill" .style=${`background: ${onGpu ? 'var(--accent-success-16)' : 'var(--surface-2)'}; color: ${onGpu ? 'var(--text-success)' : 'var(--text-secondary)'}`}
         >${text}</span
       >`;
     };
     return html`
       <div
-        style="margin-top: 0.5rem; border-top: 1px solid var(--border-subtle); padding-top: 0.5rem"
+        class="gpu-layer-details"
       >
         <div
-          style="font-size: var(--font-size-xs); color: var(--text-secondary); margin-bottom: 0.375rem"
+          class="gpu-layer-heading"
         >
           Retrieval engines
         </div>
         <div
-          style="display: grid; grid-template-columns: max-content 1fr; gap: 0.375rem 1rem; font-size: var(--font-size-sm)"
+          class="gpu-layer-grid"
         >
           ${rows.map(
             ([label, e]) => html`
-              <span class="key" style="color: var(--text-secondary)">${label}</span>
-              <span style="text-align: right">${pill(e)}</span>
+              <span class="key secondary-text">${label}</span>
+              <span class="gpu-layer-value">${pill(e)}</span>
             `,
           )}
         </div>
@@ -1786,9 +1806,7 @@ export class HealthSurface extends JfElement {
         ${!this.headCurrent() ? html`<p>Last observed graphics-card data (${this.statusAges()}) — current status unconfirmed.</p>` : nothing}
         <h3>${icon({ name: 'cpu', size: 12 })} GPU
           <span
-            style="float:right; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-weight: 500; ${gpu.available
-              ? 'background: var(--accent-success-16); color: var(--text-success);'
-              : 'background: var(--surface-2); color: var(--text-secondary);'}"
+            class="health-pill gpu-available-pill" .style=${`background: ${gpu.available ? 'var(--accent-success-16)' : 'var(--surface-2)'}; color: ${gpu.available ? 'var(--text-success)' : 'var(--text-secondary)'}`}
             >${gpu.available ? 'Detected' : 'Unavailable'}</span
           >
         </h3>
@@ -1803,7 +1821,7 @@ export class HealthSurface extends JfElement {
                       >
                     </div>
                     <div class="progress">
-                      <div class="progress-bar ${color}" style="width: ${ratio * 100}%"></div>
+                      <div class="progress-bar ${color}" .style=${`width: ${ratio * 100}%`}></div>
                     </div>
                   `
                 : nothing}
@@ -1842,7 +1860,7 @@ export class HealthSurface extends JfElement {
                   `
                 : nothing}
             `
-          : html`<div class="empty" style="padding: 0.5rem 0">
+          : html`<div class="empty compact-empty">
               Graphics-card telemetry unavailable; CPU-only operation is not established by this probe.
             </div>`}
       </div>
@@ -2177,7 +2195,7 @@ export class HealthSurface extends JfElement {
         </details>
         ${this.bulkError ? html`<jf-error-alert tone="error" .onDismiss=${() => (this.bulkError = null)}>
           ${this.bulkError.message}
-          ${this.bulkError.errorCode && !this.bulkError.message.endsWith(` (Code: ${this.bulkError.errorCode})`) ? html`<small style="display: block">Code: ${this.bulkError.errorCode}</small>` : nothing}
+          ${this.bulkError.errorCode && !this.bulkError.message.endsWith(` (Code: ${this.bulkError.errorCode})`) ? html`<small class="block-detail">Code: ${this.bulkError.errorCode}</small>` : nothing}
         </jf-error-alert>` : nothing}
         ${this.bulkOutcomeKey ? html`<jf-operation-outcome-detail
           operation-key=${this.bulkOutcomeKey} api-base=${this.apiBase}></jf-operation-outcome-detail>` : nothing}

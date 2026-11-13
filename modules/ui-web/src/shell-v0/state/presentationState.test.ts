@@ -3,7 +3,7 @@
 /**
  * 569 Fix D — one apply writer + one catalog.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
 import {
   applyPresentation,
   previewPresentation,
@@ -17,9 +17,15 @@ import { SETTINGS_INTERFACE_REGION } from '../themes/builtinPresentations.js';
 import { saveCustomPresentation } from '../themes/presentationCatalog.js';
 import { getDocument, __resetUserStateForTest } from './UserStateDocument.js';
 
+// happy-dom does not retain @layer rules in cssRules; inspect what the real sheet receives.
+let replaceSync: MockInstance<CSSStyleSheet['replaceSync']>;
+beforeEach(() => { replaceSync = vi.spyOn(CSSStyleSheet.prototype, 'replaceSync'); });
+afterEach(() => vi.restoreAllMocks());
+const paletteCss = () => replaceSync.mock.calls.filter(([css]) => css.startsWith('@layer user-theme')).at(-1)?.[0];
+
 beforeEach(() => {
   __resetPresentationForTest();
-  document.head.querySelector('#jf-active-theme')?.remove();
+  document.adoptedStyleSheets = [];
 });
 
 describe('569 §19 Seam 5/6 — persist active declaration + versioned revert', () => {
@@ -84,8 +90,7 @@ describe('applyPresentation (the one writer)', () => {
     // body tier applied
     expect(activeBodyFor(SETTINGS_INTERFACE_REGION)).toBeDefined();
     // theme tier applied through the one appearance writer (injected @layer user-theme style)
-    const style = document.head.querySelector('#jf-active-theme') as HTMLStyleElement | null;
-    expect(style?.textContent).toContain('--accent-tint: #3366cc');
+    expect(paletteCss()).toContain('--accent-tint: #3366cc');
   });
 
   it('does not apply a hard-invalid declaration', () => {
@@ -112,6 +117,6 @@ describe('previewPresentation', () => {
     });
     expect(r.verdict.ok).toBe(true);
     // not applied: the appearance writer injected nothing for this candidate
-    expect(document.head.querySelector('#jf-active-theme')).toBeNull();
+    expect(paletteCss()).toBeUndefined();
   });
 });

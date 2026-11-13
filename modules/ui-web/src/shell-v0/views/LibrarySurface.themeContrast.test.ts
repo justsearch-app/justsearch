@@ -1,14 +1,17 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi, type MockInstance } from 'vitest';
 import { applyAppearance, __resetThemeStateForTest } from '../state/themeState.js';
 import { contrastRatio, parseColor, WCAG_AA } from '../themes/contrast.js';
+
+let replaceSync: MockInstance<CSSStyleSheet['replaceSync']>;
+beforeEach(() => { replaceSync = vi.spyOn(CSSStyleSheet.prototype, 'replaceSync'); });
 
 // S34.9: Library's primary buttons use accent-on-tint. The OS-following path must
 // update this derived ink together with the fill, just like an explicit theme choice.
 afterEach(() => {
   __resetThemeStateForTest();
-  document.getElementById('jf-role-foregrounds')?.remove();
+  document.adoptedStyleSheets = [];
   document.documentElement.removeAttribute('data-theme');
   vi.restoreAllMocks();
 });
@@ -28,7 +31,8 @@ it('keeps Library primary-button ink legible when Follow OS changes light and da
   }) as CSSStyleDeclaration);
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   const assertContrast = () => {
-    const css = document.getElementById('jf-role-foregrounds')?.textContent ?? '';
+    const css = replaceSync.mock.calls.filter(([text]) => text.startsWith('@layer user-override')).at(-1)?.[0] ?? '';
+    expect(document.adoptedStyleSheets).toContain(replaceSync.mock.contexts.at(-1));
     const ink = parseColor(css.match(/--accent-on-tint:\s*([^;]+);/)?.[1] ?? '');
     expect(ink).not.toBeNull();
     const fill = parseColor(dark ? 'rgb(0, 204, 178)' : 'rgb(0, 95, 82)')!;

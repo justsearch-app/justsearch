@@ -6,16 +6,23 @@
  * Reads (`getTokens`) are available at every tier. The WRITES (`previewTokens`, `selectTheme`) are
  * trust-attenuated: UNTRUSTED structurally omits them (createThemeApi returns the read-only subset),
  * so an untrusted plugin cannot restyle the app — §4.4. `previewTokens` injects a per-plugin scoped
- * `<style id="jf-plugin-token-preview--<pluginId>">` from {name→value} pairs; every name is
+ * constructed stylesheet owned by the plugin from {name→value} pairs; every name is
  * allowlisted against KNOWN_TOKEN_NAMES AND every value is sanitized (rejecting brace/angle-bracket
  * breakout characters) — the plugin can never inject a raw CSS rule.
  */
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { createHostApi } from './HostApiImpl.js';
 import type { PluginTrustTier } from './plugin-types.js';
 import { KNOWN_TOKEN_NAMES } from '../themes/designTokenTree.js';
 import { __resetCatalogForTest } from '../themes/themesCatalog.js';
 import { __resetUserStateForTest } from '../state/UserStateDocument.js';
+
+import { clearTokenPreview } from '../themes/tokenIntrospection.js';
+
+// happy-dom drops @layer rules from cssRules, so inspect the real replaceSync input.
+let replaceSync: MockInstance<CSSStyleSheet['replaceSync']>;
+beforeEach(() => { replaceSync = vi.spyOn(CSSStyleSheet.prototype, 'replaceSync'); });
+afterEach(() => vi.restoreAllMocks());
 
 const PLUGIN_ID = 'token-editor';
 const PREVIEW_ID = `jf-plugin-token-preview--${PLUGIN_ID}`;
@@ -32,7 +39,7 @@ function knownToken(): string {
 }
 
 afterEach(() => {
-  document.getElementById(PREVIEW_ID)?.remove();
+  clearTokenPreview(PREVIEW_ID);
 });
 
 describe('host.theme.getTokens — read, every tier (560 §23)', () => {
@@ -66,20 +73,21 @@ describe('host.theme write attenuation by tier (560 §24)', () => {
 });
 
 describe('host.theme.previewTokens — value-only, sanitized (560 §23/§24)', () => {
-  it('injects a host-generated @layer user-theme <style> (per-plugin id) for a known token', () => {
+  it('injects a host-generated @layer user-theme sheet (per-plugin owner) for a known token', () => {
     const name = knownToken();
     theme().previewTokens!(new Map([[name, 'rgb(1, 2, 3)']]));
-    const el = document.getElementById(PREVIEW_ID);
-    expect(el).not.toBeNull();
-    expect(el!.textContent).toContain('@layer user-theme');
-    expect(el!.textContent).toContain(`--${name}: rgb(1, 2, 3);`);
+    const sheet = replaceSync.mock.contexts.at(-1);
+    const css = replaceSync.mock.lastCall?.[0];
+    expect(document.adoptedStyleSheets).toContain(sheet);
+    expect(css).toContain('@layer user-theme');
+    expect(css).toContain(`--${name}: rgb(1, 2, 3);`);
   });
 
   it('throws on an unknown token and writes nothing (allowlist closure)', () => {
     expect(() => theme().previewTokens!(new Map([['definitely-not-a-token', 'red']]))).toThrow(
       /unknown token/,
     );
-    expect(document.getElementById(PREVIEW_ID)).toBeNull();
+    expect(document.adoptedStyleSheets).toHaveLength(0);
   });
 
   it('throws on a brace/angle-bracket value and writes NOTHING — no CSS-rule injection', () => {
@@ -88,7 +96,7 @@ describe('host.theme.previewTokens — value-only, sanitized (560 §23/§24)', (
       theme().previewTokens!(new Map([[name, 'red} html{display:none']])),
     ).toThrow(/break out of the :root rule|brace/);
     // the malicious value never reached the DOM
-    expect(document.getElementById(PREVIEW_ID)).toBeNull();
+    expect(document.adoptedStyleSheets).toHaveLength(0);
   });
 
   it('writes nothing if ANY value is unsafe (validate-before-write)', () => {
@@ -101,15 +109,15 @@ describe('host.theme.previewTokens — value-only, sanitized (560 §23/§24)', (
         ]),
       ),
     ).toThrow();
-    expect(document.getElementById(PREVIEW_ID)).toBeNull();
+    expect(document.adoptedStyleSheets).toHaveLength(0);
   });
 
   it('clears the preview on an empty map', () => {
     const name = knownToken();
     theme().previewTokens!(new Map([[name, 'green']]));
-    expect(document.getElementById(PREVIEW_ID)).not.toBeNull();
+    expect(document.adoptedStyleSheets).toContain(replaceSync.mock.contexts.at(-1));
     theme().previewTokens!(new Map());
-    expect(document.getElementById(PREVIEW_ID)).toBeNull();
+    expect(document.adoptedStyleSheets).toHaveLength(0);
   });
 });
 

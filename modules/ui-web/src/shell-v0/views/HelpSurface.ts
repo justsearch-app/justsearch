@@ -174,7 +174,7 @@ export class HelpSurface extends JfElement {
       return html`
         <jf-button label="Getting started" .onActivate=${() => { reopenGettingStarted(); requestSurfaceNavigation('core.search-v3-surface'); }}>Getting started</jf-button>
         ${this.renderShortcuts()}
-        <section style="margin-top: 1rem">
+        <section class="reference-section">
           <div class="panel">
             <div class="panel-title">Quick troubleshooting</div>
             <ul>
@@ -182,7 +182,7 @@ export class HelpSurface extends JfElement {
             </ul>
           </div>
         </section>
-        <section style="margin-top: 1rem">
+        <section class="reference-section">
           <div class="panel">
             <div class="panel-title">${icon({ name: 'wifi', size: 16 })} Network activity</div>
             <ul>
@@ -393,6 +393,10 @@ export class HelpSurface extends JfElement {
     .jf-icon-spin {
       animation: jf-spin 1s linear infinite;
     }
+    :host .reference-section { margin-top: 1rem; }
+    :host .report-section { margin-top: 1.5rem; }
+    :host .report-description { margin: 0; font-size: var(--font-size-xs); line-height: 1.6; color: var(--text-secondary); }
+
   `,
   ];
 
@@ -550,12 +554,12 @@ export class HelpSurface extends JfElement {
         <div>
           ${this.renderFaq()}
 
-          <section style="margin-top: 1.5rem">
+          <section class="report-section">
             <div class="panel">
               <div class="panel-title">
                 ${icon({ name: 'shield', size: 16 })} Local-first
               </div>
-              <p style="margin: 0; font-size: var(--font-size-xs); line-height: 1.6; color: var(--text-secondary)">
+              <p class="report-description">
                 Search, indexing, and built-in inference run on this machine.
                 The UI talks to the local backend over loopback; network activity is listed below.
               </p>

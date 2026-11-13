@@ -6,13 +6,15 @@
  *
  * One source of truth for: enumerating {@link KNOWN_TOKEN_NAMES} with their computed values + a
  * widget category, and applying a value-only live preview through a host-generated
- * `@layer user-theme` `<style>` element. The host always generates the CSS from
+ * `@layer user-theme` constructed stylesheet. The host always generates the CSS from
  * {known-token-name → value} pairs — a caller (including an untrusted plugin reaching this via the
  * `theme` capability) never supplies raw CSS, and every key is validated against
  * {@link KNOWN_TOKEN_NAMES}. So a preview can only ever restyle a vetted token: no second
  * presentation authority, no CSS-injection vector (560 §4.4).
  */
 import { KNOWN_TOKEN_NAMES, isSafeTokenValue } from './designTokenTree.js';
+
+const previewSheets = new WeakMap<Document, Map<string, CSSStyleSheet>>();
 
 export type TokenWidgetType = 'color' | 'number' | 'angle' | 'duration' | 'text';
 
@@ -77,9 +79,9 @@ export function listTokens(): TokenInfo[] {
 
 /**
  * Apply a value-only live preview: for each `[name, value]` in {@code changes}, set
- * `--name: value` inside a host-generated `@layer user-theme` `<style id={styleId}>`. Validation
+ * `--name: value` inside a host-generated `@layer user-theme` stylesheet owned by `styleId`. Validation
  * happens BEFORE any DOM write — if any name is not in {@link KNOWN_TOKEN_NAMES} the call throws and
- * nothing is applied (the allowlist closure). An empty map clears the preview (removes the element).
+ * nothing is applied (the allowlist closure). An empty map clears the preview (removes the sheet).
  *
  * Tempdoc 567 §8 / A3 — an optional `mode` scopes the preview to `[data-theme="<mode>"]` instead of
  * `:root`, so a light-mode-only edit (a `p-*` primitive channel) previews against the active light
@@ -114,17 +116,28 @@ export function applyTokenPreview(
   }
   const selector = mode ? `[data-theme="${mode}"]` : ':root';
   const css = `${selector} {\n${decls.join('\n')}\n}`;
-  let styleEl = document.getElementById(styleId);
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = styleId;
-    document.head.appendChild(styleEl);
+  let sheets = previewSheets.get(document);
+  if (!sheets) {
+    sheets = new Map();
+    previewSheets.set(document, sheets);
   }
-  styleEl.textContent = `@layer user-theme { ${css} }`;
+  let sheet = sheets.get(styleId);
+  if (!sheet) {
+    sheet = new CSSStyleSheet();
+    sheets.set(styleId, sheet);
+  }
+  sheet.replaceSync(`@layer user-theme { ${css} }`);
+  if (!document.adoptedStyleSheets.includes(sheet)) {
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+  }
 }
 
-/** Remove the preview `<style id={styleId}>` if present (the reset path). */
+/** Remove the preview stylesheet owned by `styleId` if present (the reset path). */
 export function clearTokenPreview(styleId: string): void {
-  const styleEl = document.getElementById(styleId);
-  if (styleEl) styleEl.remove();
+  const sheets = previewSheets.get(document);
+  const sheet = sheets?.get(styleId);
+  if (sheet) {
+    document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== sheet);
+    sheets!.delete(styleId);
+  }
 }

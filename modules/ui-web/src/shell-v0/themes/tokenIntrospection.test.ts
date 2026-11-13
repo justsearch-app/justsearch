@@ -3,18 +3,24 @@
 /**
  * Tempdoc 560 §24 — tokenIntrospection: value sanitization (Fix 1) + value-aware widget (Fix 5).
  */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import {
   applyTokenPreview,
+  clearTokenPreview,
   isColorLiteral,
   listTokens,
 } from './tokenIntrospection.js';
 import { KNOWN_TOKEN_NAMES } from './designTokenTree.js';
 
+// happy-dom drops @layer rules from cssRules, so inspect the real replaceSync input.
+let replaceSync: MockInstance<CSSStyleSheet['replaceSync']>;
+beforeEach(() => { replaceSync = vi.spyOn(CSSStyleSheet.prototype, 'replaceSync'); });
+afterEach(() => vi.restoreAllMocks());
+
 const STYLE_ID = 'jf-test-token-preview';
 const known = () => [...KNOWN_TOKEN_NAMES][0]!;
 
-afterEach(() => document.getElementById(STYLE_ID)?.remove());
+afterEach(() => clearTokenPreview(STYLE_ID));
 
 describe('isColorLiteral — value-aware widget rule (Fix 5)', () => {
   it('accepts hex + self-contained color functions', () => {
@@ -37,30 +43,32 @@ describe('isColorLiteral — value-aware widget rule (Fix 5)', () => {
 describe('applyTokenPreview — sanitization (Fix 1)', () => {
   it('injects a scoped @layer style for a known token + safe value', () => {
     applyTokenPreview(new Map([[known(), '#abcdef']]), STYLE_ID);
-    const el = document.getElementById(STYLE_ID);
-    expect(el?.textContent).toContain('@layer user-theme');
-    expect(el?.textContent).toContain(`--${known()}: #abcdef;`);
+    const sheet = replaceSync.mock.contexts.at(-1);
+    const css = replaceSync.mock.lastCall?.[0];
+    expect(document.adoptedStyleSheets).toContain(sheet);
+    expect(css).toContain('@layer user-theme');
+    expect(css).toContain(`--${known()}: #abcdef;`);
   });
 
   it('throws on an unknown token and writes nothing', () => {
     expect(() => applyTokenPreview(new Map([['nope-not-a-token', 'red']]), STYLE_ID)).toThrow(
       /unknown token/,
     );
-    expect(document.getElementById(STYLE_ID)).toBeNull();
+    expect(document.adoptedStyleSheets).toHaveLength(0);
   });
 
   it('throws on a brace/angle-bracket value and writes nothing (no rule injection)', () => {
     expect(() =>
       applyTokenPreview(new Map([[known(), 'red} html{display:none']]), STYLE_ID),
     ).toThrow(/break out of the :root rule|brace/);
-    expect(document.getElementById(STYLE_ID)).toBeNull();
+    expect(document.adoptedStyleSheets).toHaveLength(0);
   });
 
   it('clears the preview on an empty map', () => {
     applyTokenPreview(new Map([[known(), 'blue']]), STYLE_ID);
-    expect(document.getElementById(STYLE_ID)).not.toBeNull();
+    expect(document.adoptedStyleSheets).toContain(replaceSync.mock.contexts.at(-1));
     applyTokenPreview(new Map(), STYLE_ID);
-    expect(document.getElementById(STYLE_ID)).toBeNull();
+    expect(document.adoptedStyleSheets).toHaveLength(0);
   });
 });
 

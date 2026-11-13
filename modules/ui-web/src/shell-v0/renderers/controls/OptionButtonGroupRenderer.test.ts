@@ -70,7 +70,7 @@ describe('<jf-option-button-group>', () => {
     const tiles = el.shadowRoot?.querySelectorAll('.option-swatch-tile');
     expect(tiles?.length).toBe(3);
     const darkFill = tiles?.[1]?.firstElementChild as HTMLElement;
-    expect(darkFill?.getAttribute('style')).toContain('background:#1a1a1e');
+    expect(darkFill?.getAttribute('style')).toContain('background: #1a1a1e');
     const selected = el.shadowRoot?.querySelector('button.option-btn.selected');
     expect(selected?.querySelector('.option-swatch-check')).toBeTruthy();
   });
@@ -268,7 +268,7 @@ describe('<jf-option-button-group>', () => {
       expect(tiles?.length).toBe(3);
       // `dark` is a flat {fill} spec — the rendered fill span's background is the literal color.
       const darkFill = tiles?.[1]?.firstElementChild as HTMLElement;
-      expect(darkFill?.getAttribute('style')).toContain('background:#1a1a1e');
+      expect(darkFill?.getAttribute('style')).toContain('background: #1a1a1e');
       // `system` is a {split} spec — rendered as a diagonal two-tone gradient.
       const systemFill = tiles?.[0]?.firstElementChild as HTMLElement;
       expect(systemFill?.getAttribute('style')).toContain('linear-gradient(135deg, #1a1a1e 50%, #f4f4f5 50%)');

@@ -85,7 +85,7 @@ beforeAll(async () => {
             };
             window.ownThemeState = () => ({ stored: localStorage.getItem(__DOCUMENT_STORAGE_KEY),
               ids: theme.listThemes().map(t => t.id), active: theme.getActiveThemeId(),
-              styled: !!document.getElementById('jf-active-theme') });
+              styled: document.adoptedStyleSheets.some(sheet => [...sheet.cssRules].some(rule => rule.cssText.startsWith('@layer user-theme'))) });
             window.exhaustOwnThemeStorage = () => {
               // Fill this context's real localStorage. Then an ordinary session-only edit makes
               // the next document write larger than the stored one, even after deleting a theme.

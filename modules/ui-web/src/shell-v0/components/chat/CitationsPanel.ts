@@ -520,7 +520,7 @@ export class CitationsPanel extends JfElement {
   /** 559 Authority IV — the score renders as a LABELED metric, not a bare "%". */
   private renderScore(score: EvidenceScore): TemplateResult {
     return html`<div class="confidence-bar">
-        <div class="fill ${tierClass(score.tier)}" style="width:${score.pct}%"></div>
+        <div class="fill ${tierClass(score.tier)}" .style=${`width: ${score.pct}%`}></div>
       </div>
       <span class="score ${tierClass(score.tier)}" aria-label="${score.label}: ${score.pct}%">
         ${score.pct}%<span class="score-metric">${score.label}</span>

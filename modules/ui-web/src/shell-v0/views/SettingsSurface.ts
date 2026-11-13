@@ -938,6 +938,25 @@ export class SettingsSurface extends JfElement {
       color: var(--text-secondary);
       margin-top: 0.25rem;
     }
+    :host .theme-help { margin: 0 0 0.75rem 0; }
+    :host .section-help { margin: 0 0 0.5rem 0; }
+    :host .follow-os-action { margin-left: 0.5rem; }
+    :host .empty-help { margin: 0; }
+    :host .plugin-install-row { margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; }
+    :host .plugin-install-input { flex: 1; padding: 0.4rem 0.625rem; background: var(--surface-secondary); border: 1px solid var(--border-subtle); border-radius: 0.375rem; color: var(--text-primary); font-size: var(--font-size-sm); }
+    :host .warning-text { color: var(--text-warning); }
+    :host .help-start { margin-top: 0; }
+    :host .spaced-content { margin-top: 0.75rem; }
+    :host .spaced-row { margin-top: 0.5rem; }
+    :host .saving-status { font-size: var(--font-size-xs); color: var(--text-tint); }
+    :host .grants-help { margin: 0 0 0.5rem; }
+    :host .grant-install-row { margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center; }
+    :host .capability-table { width:100%;border-collapse:collapse;font-size: var(--font-size-sm); }
+    :host .capability-heading { text-align:left;color:var(--text-secondary); }
+    :host .capability-cell { padding:0.25rem 0.5rem; }
+    :host .capability-code { padding:0.25rem 0.5rem;font-family:var(--font-mono); }
+    :host .capability-time { padding:0.25rem 0.5rem;color:var(--text-tertiary); }
+
   `,
   ];
 
@@ -2144,8 +2163,8 @@ export class SettingsSurface extends JfElement {
       >
         ${params.swatch
           ? html`
-              <span class="theme-swatch" style="background:${params.swatch.surface}">
-                <span class="theme-swatch-accent" style="background:${params.swatch.accent}"></span>
+              <span class="theme-swatch" .style=${`background: ${params.swatch.surface}`}>
+                <span class="theme-swatch-accent" .style=${`background: ${params.swatch.accent}`}></span>
               </span>
             `
           : icon({ name: 'circle', size: 18 })}
@@ -2258,7 +2277,7 @@ export class SettingsSurface extends JfElement {
     return html`
       <div class="section section-composite theme-composite" data-testid="settings-themes">
         <h3>${icon({ name: 'palette', size: 12 })} Theme</h3>
-        <p class="help" style="margin: 0 0 0.75rem 0">
+        <p class="help theme-help">
           Pick a full theme palette. Composes with the dark/light variant in
           Appearance above.
         </p>
@@ -2398,7 +2417,7 @@ export class SettingsSurface extends JfElement {
               this.host_.layout.setSurfaceVisibility(s.id, (e.target as HTMLInputElement).checked)}
             aria-label=${`Show ${label} in the ${where}`}
           />
-          <span class="rail-label" style=${visible ? '' : 'opacity: 0.5'}>${label}</span>
+          <span class="rail-label" .style=${visible ? '' : 'opacity: 0.5'}>${label}</span>
           ${move ? html`
             <jf-button
               class="rail-arrow"
@@ -2428,14 +2447,14 @@ export class SettingsSurface extends JfElement {
     return html`
       <div class="section">
         <h3>${icon({ name: 'menu', size: 12 })} Switcher</h3>
-        <p class="help" style="margin: 0 0 0.5rem 0">
+        <p class="help section-help">
           Choose which areas the switcher shows. A hidden area still opens with its shortcut or from Ctrl+K.
           ${hasOverrides
             ? html`
                 <jf-button
                   size="sm"
                   label=${SETTINGS_CONTROL_LABELS['rail'].reset}
-                  style="margin-left: 0.5rem"
+                  class="follow-os-action"
                   title="Show every area and window in the default order"
                   .onActivate=${() => this.host_.layout.clearAllLayoutOverrides()}
                 >
@@ -2497,7 +2516,7 @@ export class SettingsSurface extends JfElement {
     return html`
       <div class="section">
         <h3>${icon({ name: 'layers', size: 12 })} Layout</h3>
-        <p class="help" style="margin: 0 0 0.5rem 0">Choose how the workspace is arranged.</p>
+        <p class="help section-help">Choose how the workspace is arranged.</p>
         <jf-option-button-group
           .options=${options}
           .value=${activeId}
@@ -2523,13 +2542,12 @@ export class SettingsSurface extends JfElement {
                 ${this.plugins.map((p) => this.renderPluginRow(p))}
               </ul>
             `
-          : html`<p class="help" style="margin: 0">No plugins installed.</p>`}
-        <div class="plugin-loader" style="margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center;">
+          : html`<p class="help empty-help">No plugins installed.</p>`}
+        <div class="plugin-loader plugin-install-row">
           <input
             type="text"
-            class="filter-input"
+            class="filter-input plugin-install-input"
             placeholder=${SETTINGS_CONTROL_LABELS['plugins'].url}
-            style="flex: 1; padding: 0.4rem 0.625rem; background: var(--surface-secondary); border: 1px solid var(--border-subtle); border-radius: 0.375rem; color: var(--text-primary); font-size: var(--font-size-sm);"
             @keydown=${(e: KeyboardEvent) => {
               if (e.key === 'Enter') void this.loadPluginFromInput();
             }}
@@ -2676,8 +2694,7 @@ export class SettingsSurface extends JfElement {
             : nothing}
           ${!trusted && this.untrustedLoads.has(p.manifest.id)
             ? html`<div
-                class="plugin-extras"
-                style="color: var(--text-warning);"
+                class="plugin-extras warning-text"
               >
                 Untrusted — its own UI is hidden. Approve to trust this source and load it fully.
               </div>`
@@ -2895,11 +2912,11 @@ export class SettingsSurface extends JfElement {
     return html`
       <div class="section">
         <h3>${icon({ name: 'database', size: 12 })} Data</h3>
-        <p class="help" style="margin-top: 0">
+        <p class="help help-start">
           Start fresh by deleting local data. Downloaded AI models and the AI runtime are kept.
           This does not remove JustSearch itself.
         </p>
-        <div style="margin-top: 0.75rem">
+        <div class="spaced-content">
           <jf-button
             variant="danger"
             label=${SETTINGS_CONTROL_LABELS['data'].delete}
@@ -2927,7 +2944,7 @@ export class SettingsSurface extends JfElement {
     return html`
       <div class="section" data-testid="settings-app-updates">
         <h3>${icon({ name: 'download', size: 12 })} App updates</h3>
-        <p class="help" style="margin-top: 0">
+        <p class="help help-start">
           ${available
             ? `Version ${status.availableVersion} is ready to install.`
             : repairRequired
@@ -2936,7 +2953,7 @@ export class SettingsSurface extends JfElement {
                 ? `JustSearch ${status.currentVersion} is up to date.`
                 : `Installed version: ${status?.currentVersion ?? 'unknown'}.`}
         </p>
-        <div class="row" style="margin-top: 0.5rem">
+        <div class="row spaced-row">
           <jf-button
             variant="secondary"
             label=${SETTINGS_CONTROL_LABELS['app-updates'].check}
@@ -3126,7 +3143,7 @@ export class SettingsSurface extends JfElement {
               ? html`<jf-status-badge tone="warning">Session-only</jf-status-badge>`
               : nothing}
             ${this.saving
-              ? html`<span style="font-size: var(--font-size-xs); color: var(--text-tint)">Saving…</span>`
+              ? html`<span class="saving-status">Saving…</span>`
               : nothing}
 
           </div>
@@ -3581,14 +3598,14 @@ export class SettingsSurface extends JfElement {
     return html`
       <div class="section" data-testid="settings-durable-grants">
         <h3>Durable grants</h3>
-        <p class="help" style="margin: 0 0 0.5rem">
+        <p class="help grants-help">
           "Allow always" approvals the trust gate honors without re-prompting — per operation, or for a
           whole capability family (e.g. <code>file-operations</code>). They persist across restarts.
           Destructive (high-risk) actions are never covered: they ask every time. Nor is a file action
           that reaches outside your indexed folders — that one asks, naming the path.
         </p>
         ${this.durableGrants.length === 0
-          ? html`<p class="help" style="margin: 0">No durable grants.</p>`
+          ? html`<p class="help empty-help">No durable grants.</p>`
           : html`<ul class="plugin-list">
               ${this.durableGrants.map(
                 (g) => html`
@@ -3614,14 +3631,12 @@ export class SettingsSurface extends JfElement {
               )}
             </ul>`}
         <div
-          class="plugin-loader"
-          style="margin-top: 0.5rem; display: flex; gap: 0.5rem; align-items: center;"
+          class="plugin-loader grant-install-row"
         >
           <input
             type="text"
-            class="filter-input grant-family-input"
+            class="filter-input grant-family-input plugin-install-input"
             placeholder=${SETTINGS_CONTROL_LABELS['durable-grants'].family}
-            style="flex: 1; padding: 0.4rem 0.625rem; background: var(--surface-secondary); border: 1px solid var(--border-subtle); border-radius: 0.375rem; color: var(--text-primary); font-size: var(--font-size-sm);"
             @keydown=${(e: KeyboardEvent) => {
               if (e.key === 'Enter') void this.grantFamilyFromInput();
             }}
@@ -3659,7 +3674,7 @@ export class SettingsSurface extends JfElement {
     return html`
       <div class="section section-composite" data-testid="settings-delivered-contributions">
         <h3>Delivered contributions</h3>
-        <p class="help" style="margin: 0 0 0.5rem">
+        <p class="help grants-help">
           The live composed registry: every <em>operation</em> from all sources (core, agent-tools,
           workflows, MCP, plugins) plus all <em>plugin-contributed</em> surfaces, resources, prompts,
           channels and shapes. <strong>${runtimeOnly}</strong> ${runtimeOnly === 1 ? 'is' : 'are'}
@@ -3667,7 +3682,7 @@ export class SettingsSurface extends JfElement {
           are served at <code>/api/registry/*</code>, not duplicated here. Read-only observability.
         </p>
         ${this.witnessEntries.length === 0
-          ? html`<p class="help" style="margin: 0">No live contributions reported.</p>`
+          ? html`<p class="help empty-help">No live contributions reported.</p>`
           : html`<ul class="plugin-list">
               ${this.witnessEntries.map(
                 (e) => html`
@@ -3708,23 +3723,23 @@ export class SettingsSurface extends JfElement {
         ${this.consents.length === 0
           ? html`<p class="toggle-desc">No consent decisions recorded yet.</p>`
           : html`
-              <table style="width:100%;border-collapse:collapse;font-size: var(--font-size-sm);">
+              <table class="capability-table">
                 <thead>
-                  <tr style="text-align:left;color:var(--text-secondary);">
-                    <th style="padding:0.25rem 0.5rem;">Plugin</th>
-                    <th style="padding:0.25rem 0.5rem;">Capability</th>
-                    <th style="padding:0.25rem 0.5rem;">Decision</th>
-                    <th style="padding:0.25rem 0.5rem;">Granted</th>
-                    <th style="padding:0.25rem 0.5rem;"></th>
+                  <tr class="capability-heading">
+                    <th class="capability-cell">Plugin</th>
+                    <th class="capability-cell">Capability</th>
+                    <th class="capability-cell">Decision</th>
+                    <th class="capability-cell">Granted</th>
+                    <th class="capability-cell"></th>
                   </tr>
                 </thead>
                 <tbody>
                   ${this.consents.map(
                     (c) => html`
                       <tr data-consent-row="${c.contributorId}:${c.capability}">
-                        <td style="padding:0.25rem 0.5rem;font-family:var(--font-mono);">${c.contributorId}</td>
-                        <td style="padding:0.25rem 0.5rem;font-family:var(--font-mono);">${c.capability}</td>
-                        <td style="padding:0.25rem 0.5rem;">
+                        <td class="capability-code">${c.contributorId}</td>
+                        <td class="capability-code">${c.capability}</td>
+                        <td class="capability-cell">
                           <select
                             data-testid="consent-decision-select"
                             .value=${c.decision}
@@ -3739,10 +3754,10 @@ export class SettingsSurface extends JfElement {
                             <option value="deny" ?selected=${c.decision === 'deny'}>${SETTINGS_CONTROL_LABELS['plugin-permissions'].deny}</option>
                           </select>
                         </td>
-                        <td style="padding:0.25rem 0.5rem;color:var(--text-tertiary);">
+                        <td class="capability-time">
                           ${formatDateTime(new Date(c.decidedAt))}
                         </td>
-                        <td style="padding:0.25rem 0.5rem;">
+                        <td class="capability-cell">
                           <button
                             class="option-btn"
                             @click=${() =>

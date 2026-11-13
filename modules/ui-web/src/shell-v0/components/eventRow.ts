@@ -59,7 +59,7 @@ function renderEventOutcome(kind: string, outcome: string | undefined): Template
     class="outcome"
     data-testid="ledger-outcome"
     data-tone=${tone}
-    style=${`color: ${toneText(tone)}`}
+    .style=${`color: ${toneText(tone)}`}
     >${glyph ? html`<span aria-hidden="true">${glyph}</span> ` : ''}${said}</span
   >`;
 }
