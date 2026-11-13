@@ -51,6 +51,7 @@ public final class StructuredContentHandler extends DefaultHandler {
   private List<String> listItems;
   private StringBuilder itemBuffer;
   private boolean inListItem = false;
+  private StringBuilder boundaryBuffer;
 
   public StructuredContentHandler(int maxContentLength) {
     this(maxContentLength, false);
@@ -83,6 +84,7 @@ public final class StructuredContentHandler extends DefaultHandler {
         }
       }
       case "table" -> {
+        if (inCell) appendBufferSeparator();
         tableNestingDepth++;
         if (tableNestingDepth == 1) {
           flushTextBuffer();
@@ -91,7 +93,7 @@ public final class StructuredContentHandler extends DefaultHandler {
           currentRow = null;
           cellBuffer = null;
         }
-        // Nested tables: ignore inner table elements
+        // Nested tables: flatten their text into the enclosing cell.
       }
       case "tr" -> {
         if (inTable && tableNestingDepth == 1) {
@@ -116,6 +118,10 @@ public final class StructuredContentHandler extends DefaultHandler {
         }
       }
       case "ol" -> {
+        if (inCell) {
+          appendBufferSeparator();
+          break;
+        }
         listNestingDepth++;
         if (listNestingDepth == 1) {
           flushTextBuffer();
@@ -125,6 +131,10 @@ public final class StructuredContentHandler extends DefaultHandler {
         }
       }
       case "ul" -> {
+        if (inCell) {
+          appendBufferSeparator();
+          break;
+        }
         listNestingDepth++;
         if (listNestingDepth == 1) {
           flushTextBuffer();
@@ -134,6 +144,10 @@ public final class StructuredContentHandler extends DefaultHandler {
         }
       }
       case "li" -> {
+        if (inCell) {
+          appendBufferSeparator();
+          break;
+        }
         if (inList && listNestingDepth == 1) {
           itemBuffer = new StringBuilder();
           inListItem = true;
@@ -165,6 +179,7 @@ public final class StructuredContentHandler extends DefaultHandler {
       }
       case "p" -> {
         paragraphDepth--;
+        appendBufferSeparator();
         if (!inTable && !inListItem && headingLevel == 0) {
           flushTextBuffer();
         }
@@ -187,12 +202,14 @@ public final class StructuredContentHandler extends DefaultHandler {
         }
       }
       case "tr" -> {
+        if (tableNestingDepth > 1) appendBufferSeparator();
         if (inTable && tableNestingDepth == 1 && currentRow != null) {
           tableRows.add(currentRow);
           currentRow = new ArrayList<>();
         }
       }
       case "td", "th" -> {
+        if (tableNestingDepth > 1) appendBufferSeparator();
         if (inTable && tableNestingDepth == 1 && cellBuffer != null && currentRow != null) {
           currentRow.add(finishText(cellBuffer));
           cellBuffer = new StringBuilder();
@@ -200,6 +217,10 @@ public final class StructuredContentHandler extends DefaultHandler {
         }
       }
       case "ol", "ul" -> {
+        if (inCell) {
+          appendBufferSeparator();
+          break;
+        }
         listNestingDepth--;
         if (listNestingDepth == 0 && inList) {
           if (!listItems.isEmpty()) {
@@ -210,6 +231,10 @@ public final class StructuredContentHandler extends DefaultHandler {
         }
       }
       case "li" -> {
+        if (inCell) {
+          appendBufferSeparator();
+          break;
+        }
         if (inList && listNestingDepth == 1 && itemBuffer != null) {
           String text = finishText(itemBuffer);
           if (!text.isEmpty()) {
@@ -219,6 +244,7 @@ public final class StructuredContentHandler extends DefaultHandler {
           inListItem = false;
         }
       }
+      case "br" -> appendBufferSeparator();
       default -> {
         // Ignore unknown elements
       }
@@ -234,6 +260,14 @@ public final class StructuredContentHandler extends DefaultHandler {
         && ((retained < length && Character.isLowSurrogate(ch[start + retained]))
             || totalChars + retained >= maxContentLength)) retained--;
     String text = new String(ch, start, retained);
+
+    // A structural separator already supplies the whitespace before the next word.
+    // Keep empty/whitespace-only blocks from adding more, even across SAX callbacks.
+    StringBuilder buffer = inCell ? cellBuffer : inListItem ? itemBuffer : null;
+    if (headingLevel == 0 && buffer != null && buffer == boundaryBuffer) {
+      text = text.stripLeading();
+      if (!text.isEmpty()) boundaryBuffer = null;
+    }
 
     if (headingLevel > 0 && headingBuffer != null) {
       headingBuffer.append(text);
@@ -257,12 +291,34 @@ public final class StructuredContentHandler extends DefaultHandler {
       // PDFBox's physical line separators arrive here, including between characters callbacks.
       // Reuse character admission so retained separators consume the same surrogate-safe budget.
       characters(ch, start, length);
+    } else if (!pdf && (inCell || inListItem)) {
+      // Tika's HTML parser emits a br as an ignorable newline rather than an element.
+      for (int i = start; i < start + length; i++) {
+        if (ch[i] == '\n' || ch[i] == '\r') {
+          appendBufferSeparator();
+          break;
+        }
+      }
     }
   }
 
   private String finishText(StringBuilder buffer) {
     String text = buffer.toString().strip();
     return pdf ? PdfTextNormalization.joinLineEndHyphens(text) : text;
+  }
+
+  private void appendBufferSeparator() {
+    if (limitReached || headingLevel > 0) return;
+    StringBuilder buffer = inCell ? cellBuffer : inListItem ? itemBuffer : null;
+    if (buffer == null) return;
+    boundaryBuffer = buffer;
+    if (buffer.isEmpty() || Character.isWhitespace(buffer.charAt(buffer.length() - 1))) return;
+    if (totalChars < maxContentLength) {
+      // A space preserves paragraph boundaries even when PDF physical lines join hyphens.
+      buffer.append(' ');
+      totalChars++;
+    }
+    if (totalChars >= maxContentLength) limitReached = true;
   }
 
   /**
