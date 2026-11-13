@@ -87,6 +87,17 @@ export function extract(source, file = 'fixture.ts', exports = new Map()) {
   const out = [];
   const add = (n, property, v) => out.push({ file, line: ast.getLineAndCharacterOfPosition(n.getStart(ast)).line + 1, property, value: v });
   const name = n => ts.isPropertyAccessExpression(n) ? n.name.text : ts.isElementAccessExpression(n) ? value(n.argumentExpression) : '';
+  const styleProperty = name => {
+    const p = name.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`);
+    return name === 'cssText' ? name : target.test(p) ? p : '';
+  };
+  function addStyle(n, p, expression, simple = true) {
+    const v = simple ? value(expression) : unknown;
+    if (p === 'cssText') {
+      if (v.includes(unknown)) add(n, 'font-size', v);
+      out.push(...declarations(v, file, source, expression.getStart(ast) + 1));
+    } else add(n, p, v);
+  }
   function visit(n) {
     // Maximal string expressions also catch assembled declarations, without double-counting leaves.
     if (ts.isStringLiteralLike(n) || ts.isTemplateExpression(n) || ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.PlusToken) {
@@ -94,17 +105,20 @@ export function extract(source, file = 'fixture.ts', exports = new Map()) {
       return;
     }
     if (ts.isBinaryExpression(n) && n.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && n.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
-      const p = { fontSize: 'font-size', borderRadius: 'border-radius', font: 'font', cssText: 'cssText',
-        borderTopLeftRadius: 'border-top-left-radius', borderTopRightRadius: 'border-top-right-radius',
-        borderBottomLeftRadius: 'border-bottom-left-radius', borderBottomRightRadius: 'border-bottom-right-radius' }[name(n.left)];
-      if (p && /\.style\b|\[['"]style['"]\]/.test(n.left.getText(ast))) {
-        if (p === 'cssText') {
-          const v = n.operatorToken.kind === ts.SyntaxKind.EqualsToken ? value(n.right) : unknown;
-          if (v.includes(unknown)) add(n, 'font-size', v);
-          out.push(...declarations(v, file, source, n.right.getStart(ast) + 1));
-        }
-        else add(n, p, n.operatorToken.kind === ts.SyntaxKind.EqualsToken ? value(n.right) : unknown);
+      const p = styleProperty(name(n.left));
+      if (p) {
+        addStyle(n, p, n.right, n.operatorToken.kind === ts.SyntaxKind.EqualsToken);
         return;
+      }
+    }
+    if (ts.isCallExpression(n) && name(n.expression) === 'assign' && ts.isIdentifier(n.expression.expression) && n.expression.expression.text === 'Object') {
+      for (const source of n.arguments.slice(1)) if (ts.isObjectLiteralExpression(source)) {
+        for (const entry of source.properties) {
+          if (!entry.name) continue;
+          const key = ts.isComputedPropertyName(entry.name) ? value(entry.name.expression) : entry.name.text;
+          const p = styleProperty(key);
+          if (p) addStyle(entry, p, ts.isShorthandPropertyAssignment(entry) ? entry.name : entry.initializer || entry);
+        }
       }
     }
     if (ts.isCallExpression(n) && name(n.expression) === 'setProperty') {

@@ -72,6 +72,56 @@ const tsCases = [
   ['inline markup', 'html`<div style="border-radius: 6px">Text</div>`'],
 ];
 for (const [name, source] of tsCases) test(`rejects TS ${name}`, () => assert.ok(scan(source, 'fixture.ts').length, source));
+const receiverCases = [
+  ['aliased fontSize', v => `const s = el.style; s.fontSize = '${v}px';`, 17, 13],
+  ['destructured style', v => `const { style } = el; style.borderRadius = '${v}px';`, 6, 4],
+  ['style parameter', v => `function f(st: CSSStyleDeclaration) { st.fontSize = '${v}px'; }`, 17, 13],
+  ['aliased setProperty', v => `const s = el.style; s.setProperty('font-size', '${v}px');`, 17, 13],
+  ['aliased cssText', v => `const s = el.style; s.cssText = 'font-size: ${v}px';`, 17, 13],
+  ['Object.assign fontSize', v => `Object.assign(el.style, { fontSize: '${v}px' });`, 17, 13],
+  ['Object.assign radius', v => `Object.assign(st, { borderRadius: '${v}px' });`, 6, 4],
+  ['aliased font', v => `st.font = 'italic ${v}px sans-serif';`, 17, 13],
+  ['aliased bracket setter', v => `const p = 'fontSize'; st[p] = '${v}px';`, 17, 13],
+  ['aliased setProperty font', v => `st.setProperty('font', '${v}px sans-serif');`, 17, 13],
+  ['aliased setProperty radius', v => `st.setProperty('border-radius', '${v}px');`, 6, 4],
+  ['aliased setProperty token', v => `st.setProperty('--font-size-test', '${v}px');`, 17, 13],
+  ['Object.assign shorthand', v => `const fontSize = '${v}px'; Object.assign(st, { fontSize });`, 17, 13],
+  ['Object.assign computed key', v => `const p = 'fontSize'; Object.assign(st, { [p]: '${v}px' });`, 17, 13],
+  ['Object.assign cssText', v => `Object.assign(st, { cssText: 'font-size: ${v}px' });`, 17, 13],
+];
+for (const corner of ['TopLeft', 'TopRight', 'BottomLeft', 'BottomRight', 'StartStart', 'StartEnd', 'EndStart', 'EndEnd']) {
+  const property = `border${corner}Radius`;
+  const cssProperty = property.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`);
+  receiverCases.push(
+    [`aliased ${property}`, v => `st.${property} = '${v}px';`, 6, 4],
+    [`aliased setProperty ${cssProperty}`, v => `st.setProperty('${cssProperty}', '${v}px');`, 6, 4],
+    [`Object.assign ${property}`, v => `Object.assign(st, { ${property}: '${v}px' });`, 6, 4],
+  );
+}
+for (const [name, source, forbidden, allowed] of receiverCases) {
+  test(`rejects TS ${name}`, () => assert.ok(scan(source(forbidden), 'fixture.ts').length, source(forbidden)));
+  test(`allows TS ${name}`, () => assert.deepEqual(scan(source(allowed), 'fixture.ts'), []));
+}
+for (const source of [
+  'st.fontSize = size;',
+  'st.borderRadius = radius;',
+  'st.font = font;',
+  'st.cssText = styles;',
+  "st.setProperty('font-size', size);",
+  'st.setProperty(property, value);',
+  'Object.assign(st, { fontSize: size });',
+  'Object.assign(st, { borderRadius: radius });',
+  'Object.assign(st, { cssText: styles });',
+  "st.fontSize += '13px';",
+  "st.cssText += 'font-size:13px';",
+]) test(`rejects unresolved TS ${source}`, () => assert.ok(scan(source, 'fixture.ts').length, source));
+test('allows property reads and plain object definitions', () => assert.deepEqual(scan(`
+const x = s.fontSize;
+const { borderRadius } = s;
+st.setProperty('width', '17px');
+Object.assign(st, { width: '17px' });
+const settings = { fontSize: '17px', borderRadius: '6px' };
+`, 'fixture.ts'), []));
 test('does not scan comments or ordinary numeric properties', () => assert.deepEqual(scan(`
 // font-size: 14px;
 /* css\`p { font-size: 14px; }\` */
