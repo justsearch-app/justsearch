@@ -51,6 +51,8 @@
         ["node", "scripts/ci/check-live-channels.mjs"],
         ["node", "scripts/ci/check-contrast-matrix.mjs"],
         ["node", "scripts/ci/check-style-literal-ratchet.mjs"],
+        ["node", "scripts/ci/check-csp-element-styles.mjs"],
+        ["node", "scripts/ci/check-csp-element-styles.test.mjs"],
         ["node", "scripts/ci/check-search-window-scenarios.mjs"],
         ["node", "scripts/ci/check-search-view-size.mjs"],
         ["node", "scripts/ci/check-search-window-scenarios.test.mjs"],

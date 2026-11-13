@@ -19,7 +19,7 @@
  *  - Palette themes via CSS file injection. User selects a theme
  *    by id; the loader fetches `/themes/<id>.css` (or accepts an
  *    inline CSS string for tests / Tauri-fs-API-loaded user
- *    themes), injects it into `<head>` as `<style id="jf-active-theme">`,
+ *    themes), adopts it as a constructed stylesheet,
  *    and broadcasts the active theme id via the userConfig channel.
  *
  * Slice 477 H2.2 — themes inject under `@layer user-theme` so they
@@ -47,7 +47,7 @@ import {
 } from '../themes/themesCatalog.js';
 import { setUiMode } from './uiModeState.js';
 
-const ACTIVE_THEME_STYLE_ID = 'jf-active-theme';
+const activeThemeSheets = new WeakMap<Document, CSSStyleSheet>();
 
 /**
  * Tempdoc 727 F-5 — the `system` (Follow OS) resolver.
@@ -243,7 +243,7 @@ export async function restoreActiveThemeIfPersisted(
 }
 
 /**
- * Apply a theme by injecting its CSS into the document head.
+ * Apply a theme through a constructed stylesheet adopted by the document.
  *
  * Slice 477 H2.2 — the injected CSS is automatically wrapped in
  * `@layer user-theme { ... }`. `tokens.css` wraps its `:root`/
@@ -265,16 +265,15 @@ export async function restoreActiveThemeIfPersisted(
  */
 export function applyTheme(themeId: string, cssText: string): void {
   if (typeof document === 'undefined') return;
-  let styleEl = document.getElementById(
-    ACTIVE_THEME_STYLE_ID,
-  ) as HTMLStyleElement | null;
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = ACTIVE_THEME_STYLE_ID;
-    document.head.appendChild(styleEl);
+  let sheet = activeThemeSheets.get(document);
+  if (!sheet) {
+    sheet = new CSSStyleSheet();
+    activeThemeSheets.set(document, sheet);
   }
-  styleEl.textContent = `@layer user-theme {\n${cssText}\n}`;
-  styleEl.dataset.themeId = themeId;
+  sheet.replaceSync(`@layer user-theme {\n${cssText}\n}`);
+  if (!document.adoptedStyleSheets.includes(sheet)) {
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+  }
   // Persist via the consolidated document; subscribers fire after
   // persistence.
   mutateDocument((doc) =>
@@ -290,7 +289,7 @@ export function applyTheme(themeId: string, cssText: string): void {
  *
  * Owns ALL theme-affecting DOM state in ONE function: the `data-theme`
  * light/dark attribute, the `high-contrast` class, AND the palette
- * `@layer user-theme` <style> (via its internal {@link applyTheme} /
+ * `@layer user-theme` stylesheet (via its internal {@link applyTheme} /
  * {@link clearActiveTheme} / {@link loadAndApplyTheme} steps). Every change-path
  * (settings light/dark + high-contrast; the palette pick via the host API) and
  * the boot replay route through this one function, so the three layers cannot
@@ -426,14 +425,15 @@ export function getSurfaceMode(): 'glass' | 'solid' {
 }
 
 /**
- * Clear the active theme — removes the injected `<style>` and
+ * Clear the active theme — removes the adopted stylesheet and
  * notifies subscribers with null.
  */
 export function clearActiveTheme(): void {
   if (typeof document !== 'undefined') {
-    const styleEl = document.getElementById(ACTIVE_THEME_STYLE_ID);
-    if (styleEl) {
-      styleEl.remove();
+    const sheet = activeThemeSheets.get(document);
+    if (sheet) {
+      document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== sheet);
+      activeThemeSheets.delete(document);
     }
   }
   mutateDocument((doc) =>
@@ -497,8 +497,11 @@ export async function loadAndApplyTheme(
 /** Test-only: reset module state. */
 export function __resetThemeStateForTest(): void {
   if (typeof document !== 'undefined') {
-    const styleEl = document.getElementById(ACTIVE_THEME_STYLE_ID);
-    if (styleEl) styleEl.remove();
+    const sheet = activeThemeSheets.get(document);
+    if (sheet) {
+      document.adoptedStyleSheets = document.adoptedStyleSheets.filter((s) => s !== sheet);
+      activeThemeSheets.delete(document);
+    }
   }
   // The consolidated reset clears both projections; tests for
   // themeState in isolation should call this AND/OR

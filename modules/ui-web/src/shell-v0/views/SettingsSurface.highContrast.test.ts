@@ -333,8 +333,8 @@ describe('SettingsSurface — declared theme picker swatches (fix-round F1)', ()
     const tiles = Array.from(group.shadowRoot!.querySelectorAll('.option-swatch-tile'));
     const fills = tiles.map((t) => t.firstElementChild?.getAttribute('style') ?? '');
     expect(fills[0]).toContain('linear-gradient(135deg, #1a1a1e 50%, #f4f4f5 50%)'); // system
-    expect(fills[1]).toContain('background:#1a1a1e'); // dark
-    expect(fills[2]).toContain('background:#f4f4f5'); // light
+    expect(fills[1]).toContain('background: #1a1a1e'); // dark
+    expect(fills[2]).toContain('background: #f4f4f5'); // light
   });
 
   it('renders a check badge on the swatch tile matching the current theme value', async () => {

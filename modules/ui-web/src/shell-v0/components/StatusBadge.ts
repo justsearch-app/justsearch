@@ -75,7 +75,7 @@ export class StatusBadge extends JfElement {
     return html`<span
       class="badge"
       part="badge"
-      style=${`--badge-bg: ${bg}; --badge-fg: ${fg}; --badge-border: ${border}`}
+      .style=${`--badge-bg: ${bg}; --badge-fg: ${fg}; --badge-border: ${border}`}
     >
       <slot>${this.label ?? ''}</slot>
     </span>`;

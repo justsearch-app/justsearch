@@ -1,14 +1,43 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { applyAppearance, __resetThemeStateForTest } from '../state/themeState.js';
 import { contrastRatio, parseColor, WCAG_AA } from '../themes/contrast.js';
+
+// happy-dom drops @layer rules from cssRules. Record each sheet's current text,
+// then inspect only sheets adopted by this document (including later overwrites).
+let sheetText: WeakMap<CSSStyleSheet, string>;
+// The @layer a sheet was first written with stays its owner mark, even if later text drops it.
+let sheetLayer: WeakMap<CSSStyleSheet, string>;
+beforeEach(() => {
+  sheetText = new WeakMap();
+  sheetLayer = new WeakMap();
+  const { replaceSync, replace } = CSSStyleSheet.prototype;
+  vi.spyOn(CSSStyleSheet.prototype, 'replaceSync').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    markLayer(this, text);
+    return replaceSync.call(this, text);
+  });
+  vi.spyOn(CSSStyleSheet.prototype, 'replace').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    markLayer(this, text);
+    return replace.call(this, text);
+  });
+});
+const markLayer = (sheet: CSSStyleSheet, text: string) => {
+  const layer = /^@layer\s+([\w-]+)/.exec(text)?.[1];
+  if (layer && !sheetLayer.has(sheet)) sheetLayer.set(sheet, layer);
+};
+// Current text of every adopted sheet first written with the given layer.
+const layerCss = (layer: string) => document.adoptedStyleSheets
+  .filter((sheet) => sheetLayer.get(sheet) === layer).map((sheet) => sheetText.get(sheet) ?? '');
+const roleCss = () => layerCss('user-override');
 
 // S34.9: Library's primary buttons use accent-on-tint. The OS-following path must
 // update this derived ink together with the fill, just like an explicit theme choice.
 afterEach(() => {
   __resetThemeStateForTest();
-  document.getElementById('jf-role-foregrounds')?.remove();
+  document.adoptedStyleSheets = [];
   document.documentElement.removeAttribute('data-theme');
   vi.restoreAllMocks();
 });
@@ -28,7 +57,8 @@ it('keeps Library primary-button ink legible when Follow OS changes light and da
   }) as CSSStyleDeclaration);
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   const assertContrast = () => {
-    const css = document.getElementById('jf-role-foregrounds')?.textContent ?? '';
+    expect(roleCss()).toHaveLength(1);
+    const css = roleCss()[0]!;
     const ink = parseColor(css.match(/--accent-on-tint:\s*([^;]+);/)?.[1] ?? '');
     expect(ink).not.toBeNull();
     const fill = parseColor(dark ? 'rgb(0, 204, 178)' : 'rgb(0, 95, 82)')!;

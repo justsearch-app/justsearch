@@ -206,7 +206,7 @@ export class HoverPreviewHost extends JfElement {
         data-aggregate-kind=${a.aggregateKind}
         data-aggregate-id=${a.aggregateId}
         data-section-count=${bodies.length}
-        style=${`top:${top}px;left:${left}px`}
+        .style=${`top: ${top}px; left: ${left}px`}
         @mouseenter=${() => {
           if (this.hideTimer !== null) {
             window.clearTimeout(this.hideTimer);

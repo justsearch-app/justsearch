@@ -371,27 +371,24 @@ export class SecuritySurface extends JfElement {
   }
 
   private renderChatProtection(): TemplateResult {
-    const inputStyle =
-      'padding:0.4rem 0.6rem; background:var(--surface-2); color:var(--text-secondary); border:1px solid var(--surface-3); border-radius:0.25rem';
-    const row = 'display:flex; gap:0.5rem; margin-top:0.5rem; align-items:center; flex-wrap:wrap';
     let body: TemplateResult;
     if (this.encAwaitingRecoverySave && this.encRecoveryKey) {
       // Tempdoc 629 (#4): the REQUIRED recovery-save gate. Setup/regenerate is not "done" until the
       // user acknowledges — and the key cannot be re-shown (only its wrap is stored).
       body = html`
-        <p class="help" style="margin-top:0">
+        <p class="help help-start">
           <strong>Save your recovery key now.</strong> It is the only way back into your chat history if
           you forget your passphrase, and it <strong>cannot be shown again</strong>. Your search index is
           unaffected.
         </p>
         <div
-          style="margin-top:0.5rem; padding:0.6rem; background:var(--accent-warning-16); border-radius:0.25rem"
+          class="recovery-notice"
         >
-          <code style="display:block; word-break:break-all; font-size:var(--font-size-md)" data-testid="enc-recovery-key"
+          <code class="recovery-key" data-testid="enc-recovery-key"
             >${this.encRecoveryKey}</code
           >
         </div>
-        <div style=${row}>
+        <div class="protection-form-row">
           <jf-button variant="secondary" .onActivate=${() => void this.copyRecoveryKey()}>Copy</jf-button>
           <jf-button variant="secondary" .onActivate=${() => this.downloadEmergencyKit()}
             >Download kit</jf-button
@@ -403,14 +400,14 @@ export class SecuritySurface extends JfElement {
       `;
     } else if (this.encState === 'not_configured') {
       body = html`
-        <p class="help" style="margin-top:0">
+        <p class="help help-start">
           Encrypt new chat messages with a passphrase so they can't be read without unlocking. This only
           applies going forward — messages already saved stay unencrypted.
           <strong>If you forget the passphrase, your chat history is lost for good</strong> — your
           search index is unaffected (it rebuilds from your files). You'll save a recovery key next.
         </p>
-        <div style=${row}>
-          <input id="enc-pass" type="password" placeholder=${SETTINGS_CONTROL_LABELS['core.security-surface'].choose} style=${inputStyle} />
+        <div class="protection-form-row">
+          <input id="enc-pass" type="password" placeholder=${SETTINGS_CONTROL_LABELS['core.security-surface'].choose} class="protection-form-input" />
           <jf-button
             ?disabled=${this.encBusy}
             .onActivate=${() => void this.setupEncryption(this.encInputValue())}
@@ -421,11 +418,11 @@ export class SecuritySurface extends JfElement {
       `;
     } else if (this.encState === 'locked') {
       body = html`
-        <p class="help" style="margin-top:0">
+        <p class="help help-start">
           Your new chat messages are <strong>locked</strong>. Enter your passphrase to unlock them.
         </p>
-        <div style=${row}>
-          <input id="enc-pass" type="password" placeholder=${SETTINGS_CONTROL_LABELS['core.security-surface'].passphrase} style=${inputStyle} />
+        <div class="protection-form-row">
+          <input id="enc-pass" type="password" placeholder=${SETTINGS_CONTROL_LABELS['core.security-surface'].passphrase} class="protection-form-input" />
           <jf-button
             ?disabled=${this.encBusy}
             .onActivate=${() => void this.unlockEncryption(this.encInputValue())}
@@ -436,12 +433,12 @@ export class SecuritySurface extends JfElement {
       `;
     } else if (this.encState === 'unlocked') {
       body = html`
-        <p class="help" style="margin-top:0">
+        <p class="help help-start">
           Your new chat messages are <strong>encrypted and unlocked</strong>.
         </p>
         ${this.encRecoveryUnsaved
           ? html`<div
-              style="margin-top:0.5rem; padding:0.6rem; background:var(--accent-warning-16); border-radius:0.25rem"
+              class="recovery-notice"
               role="status"
             >
               <strong>You haven't confirmed saving your recovery key.</strong> It can't be shown again
@@ -449,7 +446,7 @@ export class SecuritySurface extends JfElement {
               <em>${SETTINGS_CONTROL_LABELS['core.security-surface'].regenerate}</em> to get a fresh one to save.
             </div>`
           : nothing}
-        <div style=${row}>
+        <div class="protection-form-row">
           <jf-button
             variant="secondary"
             ?disabled=${this.encBusy}
@@ -480,18 +477,18 @@ export class SecuritySurface extends JfElement {
           </jf-button>
         </div>
         ${this.encShowImport
-          ? html`<div style=${row}>
+          ? html`<div class="protection-form-row">
               <input
                 id="enc-import-file"
                 type="file"
                 accept="application/json,.json"
-                style=${inputStyle}
+                class="protection-form-input"
               />
               <input
                 id="enc-import-pass"
                 type="password"
                 placeholder=${SETTINGS_CONTROL_LABELS['core.security-surface'].backupPassphrase}
-                style=${inputStyle}
+                class="protection-form-input"
               />
               <jf-button
                 ?disabled=${this.encBusy}
@@ -510,17 +507,17 @@ export class SecuritySurface extends JfElement {
             </div>`
           : nothing}
         ${this.encImportSummary
-          ? html`<p class="help" style="margin-top:0.5rem; color:var(--text-secondary)">
+          ? html`<p class="help help-detail">
               ${this.encImportSummary}
             </p>`
           : nothing}
-        <div style=${row}>
-          <label class="help" for="enc-autolock" style="margin:0"
+        <div class="protection-form-row">
+          <label class="help autolock-label" for="enc-autolock"
             >${SETTINGS_CONTROL_LABELS['core.security-surface'].autoLock}</label
           >
           <select
             id="enc-autolock"
-            style=${inputStyle}
+            class="protection-form-input"
             .value=${String(readAutoLockMinutes())}
             @change=${(e: Event) =>
               this.setAutoLock(Number((e.target as HTMLSelectElement).value))}
@@ -532,9 +529,9 @@ export class SecuritySurface extends JfElement {
           </select>
         </div>
         ${this.encShowChangePass
-          ? html`<div style=${row}>
-              <input id="enc-oldpass" type="password" placeholder=${SETTINGS_CONTROL_LABELS['core.security-surface'].currentPassphrase} style=${inputStyle} />
-              <input id="enc-newpass" type="password" placeholder=${SETTINGS_CONTROL_LABELS['core.security-surface'].newPassphrase} style=${inputStyle} />
+          ? html`<div class="protection-form-row">
+              <input id="enc-oldpass" type="password" placeholder=${SETTINGS_CONTROL_LABELS['core.security-surface'].currentPassphrase} class="protection-form-input" />
+              <input id="enc-newpass" type="password" placeholder=${SETTINGS_CONTROL_LABELS['core.security-surface'].newPassphrase} class="protection-form-input" />
               <jf-button
                 ?disabled=${this.encBusy}
                 .onActivate=${() =>
@@ -550,7 +547,7 @@ export class SecuritySurface extends JfElement {
           : nothing}
       `;
     } else {
-      body = html`<p class="help" style="margin-top:0">Checking encryption status…</p>`;
+      body = html`<p class="help help-start">Checking encryption status…</p>`;
     }
     return html`
       <div class="section">
@@ -560,7 +557,7 @@ export class SecuritySurface extends JfElement {
           ? html`<jf-system-notice tone="warning" live="polite">${this.encWarning}</jf-system-notice>`
           : nothing}
         ${this.encError
-          ? html`<p class="help" style="color:var(--text-danger); margin-top:0.5rem">${this.encError}</p>`
+          ? html`<p class="help encryption-error">${this.encError}</p>`
           : nothing}
       </div>
     `;
@@ -585,6 +582,9 @@ export class SecuritySurface extends JfElement {
     surfaceScrollLayoutStyles,
     atRestCardStyles,
     css`
+      .protection-form-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; flex-wrap: wrap; }
+      .protection-form-input { padding: 0.4rem 0.6rem; background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--surface-3); border-radius: 0.25rem; }
+
       .body {
         padding: 1rem 1.5rem;
         display: flex;
@@ -638,6 +638,13 @@ export class SecuritySurface extends JfElement {
         color: var(--text-secondary);
         line-height: 1.5;
       }
+    :host .help-start { margin-top:0; }
+    :host .recovery-notice { margin-top:0.5rem; padding:0.6rem; background:var(--accent-warning-16); border-radius:0.25rem; }
+    :host .recovery-key { display:block; word-break:break-all; font-size:var(--font-size-md); }
+    :host .help-detail { margin-top:0.5rem; color:var(--text-secondary); }
+    :host .autolock-label { margin:0; }
+    :host .encryption-error { color:var(--text-danger); margin-top:0.5rem; }
+
     `,
   ];
 }

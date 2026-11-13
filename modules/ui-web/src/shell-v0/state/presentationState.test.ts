@@ -3,7 +3,7 @@
 /**
  * 569 Fix D — one apply writer + one catalog.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   applyPresentation,
   previewPresentation,
@@ -17,9 +17,39 @@ import { SETTINGS_INTERFACE_REGION } from '../themes/builtinPresentations.js';
 import { saveCustomPresentation } from '../themes/presentationCatalog.js';
 import { getDocument, __resetUserStateForTest } from './UserStateDocument.js';
 
+// happy-dom drops @layer rules from cssRules. Record each sheet's current text,
+// then inspect only sheets adopted by this document (including later overwrites).
+let sheetText: WeakMap<CSSStyleSheet, string>;
+// The @layer a sheet was first written with stays its owner mark, even if later text drops it.
+let sheetLayer: WeakMap<CSSStyleSheet, string>;
+beforeEach(() => {
+  sheetText = new WeakMap();
+  sheetLayer = new WeakMap();
+  const { replaceSync, replace } = CSSStyleSheet.prototype;
+  vi.spyOn(CSSStyleSheet.prototype, 'replaceSync').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    markLayer(this, text);
+    return replaceSync.call(this, text);
+  });
+  vi.spyOn(CSSStyleSheet.prototype, 'replace').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    markLayer(this, text);
+    return replace.call(this, text);
+  });
+});
+afterEach(() => vi.restoreAllMocks());
+const markLayer = (sheet: CSSStyleSheet, text: string) => {
+  const layer = /^@layer\s+([\w-]+)/.exec(text)?.[1];
+  if (layer && !sheetLayer.has(sheet)) sheetLayer.set(sheet, layer);
+};
+// Current text of every adopted sheet first written with the given layer.
+const layerCss = (layer: string) => document.adoptedStyleSheets
+  .filter((sheet) => sheetLayer.get(sheet) === layer).map((sheet) => sheetText.get(sheet) ?? '');
+const paletteCss = () => layerCss('user-theme');
+
 beforeEach(() => {
   __resetPresentationForTest();
-  document.head.querySelector('#jf-active-theme')?.remove();
+  document.adoptedStyleSheets = [];
 });
 
 describe('569 §19 Seam 5/6 — persist active declaration + versioned revert', () => {
@@ -83,9 +113,9 @@ describe('applyPresentation (the one writer)', () => {
     expect(res.ok).toBe(true);
     // body tier applied
     expect(activeBodyFor(SETTINGS_INTERFACE_REGION)).toBeDefined();
-    // theme tier applied through the one appearance writer (injected @layer user-theme style)
-    const style = document.head.querySelector('#jf-active-theme') as HTMLStyleElement | null;
-    expect(style?.textContent).toContain('--accent-tint: #3366cc');
+    // theme tier applied through the one appearance writer (adopted @layer user-theme sheet)
+    expect(paletteCss()).toHaveLength(1);
+    expect(paletteCss()[0]).toContain('--accent-tint: #3366cc');
   });
 
   it('does not apply a hard-invalid declaration', () => {
@@ -112,6 +142,6 @@ describe('previewPresentation', () => {
     });
     expect(r.verdict.ok).toBe(true);
     // not applied: the appearance writer injected nothing for this candidate
-    expect(document.head.querySelector('#jf-active-theme')).toBeNull();
+    expect(paletteCss()).toHaveLength(0);
   });
 });

@@ -150,7 +150,7 @@ export class RunNode extends JfElement {
     const content = minimal || !char ? nothing : char;
     return html`<span
       class="g ${klass} ${p.live ? 'live' : ''}"
-      style=${`color:${toneAccent(p.tone)}`}
+      .style=${`color: ${toneAccent(p.tone)}`}
       aria-hidden="true"
       >${content}</span
     >`;

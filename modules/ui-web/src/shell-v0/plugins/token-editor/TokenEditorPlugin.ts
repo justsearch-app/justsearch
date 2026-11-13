@@ -60,6 +60,41 @@ function resolveColorToRgb(cssColor: string): [number, number, number] | null {
   return [d[0] ?? 0, d[1] ?? 0, d[2] ?? 0];
 }
 
+const PANEL_CSS = `
+        :host { display: block; height: 100%; overflow: auto; padding: 1rem;
+                color: var(--text-primary);
+                font-size: var(--font-size-sm); font-family: var(--font-native); }
+        h1 { margin: 0 0 0.25rem; font-size: var(--font-size-md); }
+        h2 { margin: 1.1rem 0 0.4rem; font-size: var(--font-size-xs); text-transform: uppercase;
+             letter-spacing: 0.06em; opacity: 0.65; }
+        p.hint { margin: 0 0 0.5rem; opacity: 0.6; font-size: var(--font-size-sm); }
+        button { padding: 0.35rem 0.625rem; cursor: pointer; }
+        .row { display: grid; grid-template-columns: 1fr auto auto; align-items: center;
+               gap: 0.6rem; padding: 0.25rem 0; border-bottom: 1px solid var(--border-subtle); }
+        .name { font-family: var(--font-mono); font-size: var(--font-size-sm); }
+        .val { opacity: 0.6; font-size: var(--font-size-xs); font-variant-numeric: tabular-nums;
+               min-width: 4.5rem; text-align: right; }
+        input[type=range] { width: 9rem; }
+        input[type=text] { width: 9rem; padding: 0.2rem 0.35rem; font-size: var(--font-size-sm); }
+        .save-row { display: flex; gap: 0.5rem; align-items: center; margin: 0.4rem 0; }
+        .save-row input { flex: 1; padding: 0.35rem 0.5rem; }
+        .saved { display: flex; flex-direction: column; gap: 0.35rem; }
+        .saved-item { display: flex; gap: 0.5rem; align-items: center; }
+        .saved-item .lbl { flex: 1; }
+        .empty { opacity: 0.5; font-size: var(--font-size-sm); margin: 0; }
+        .role-row { display: grid; grid-template-columns: 5rem auto 1fr; align-items: center;
+                    gap: 0.6rem; padding: 0.25rem 0; border-bottom: 1px solid var(--border-subtle); }
+        .role-label { font-size: var(--font-size-sm); }
+        .role-swatch { display: inline-flex; align-items: center; justify-content: center;
+                       min-width: 2.6rem; padding: 0.1rem 0.45rem; border-radius: 0.25rem;
+                       font-size: var(--font-size-xs); font-weight: 600; }
+        .role-ratio { font-size: var(--font-size-xs); opacity: 0.7; font-variant-numeric: tabular-nums; }
+        .role-ratio.warn { color: var(--text-danger); opacity: 1; }
+        /* tempdoc 576 §6 B6 — per-role nudge-to-compliant: how far below the floor + which way to push. */
+        .role-nudge { font-size: var(--font-size-xs); color: var(--text-warning); grid-column: 1 / -1; opacity: 0.95; }
+`;
+let panelSheet: CSSStyleSheet | null = null;
+
 class TokenEditorPanel extends HTMLElement {
   // Tempdoc 567 §8 / A3 — authored values are bucketed: mode-invariant hue seeds (`h-*`) are SHARED,
   // mode-variant primitive channels (`p-*`) are authored PER light/dark mode. Save maps the shared
@@ -112,40 +147,13 @@ class TokenEditorPanel extends HTMLElement {
   }
 
   private renderShell(): void {
+    // The desktop window refuses a <style> parsed from markup; the panel's CSS is an adopted sheet.
+    panelSheet ??= new CSSStyleSheet();
+    if (panelSheet.cssRules.length === 0) panelSheet.replaceSync(PANEL_CSS);
+    if (!this.root.adoptedStyleSheets.includes(panelSheet)) {
+      this.root.adoptedStyleSheets = [...this.root.adoptedStyleSheets, panelSheet];
+    }
     this.root.innerHTML = `
-      <style>
-        :host { display: block; height: 100%; overflow: auto; padding: 1rem;
-                color: var(--text-primary);
-                font-size: var(--font-size-sm); font-family: var(--font-native); }
-        h1 { margin: 0 0 0.25rem; font-size: var(--font-size-md); }
-        h2 { margin: 1.1rem 0 0.4rem; font-size: var(--font-size-xs); text-transform: uppercase;
-             letter-spacing: 0.06em; opacity: 0.65; }
-        p.hint { margin: 0 0 0.5rem; opacity: 0.6; font-size: var(--font-size-sm); }
-        button { padding: 0.35rem 0.625rem; cursor: pointer; }
-        .row { display: grid; grid-template-columns: 1fr auto auto; align-items: center;
-               gap: 0.6rem; padding: 0.25rem 0; border-bottom: 1px solid var(--border-subtle); }
-        .name { font-family: var(--font-mono); font-size: var(--font-size-sm); }
-        .val { opacity: 0.6; font-size: var(--font-size-xs); font-variant-numeric: tabular-nums;
-               min-width: 4.5rem; text-align: right; }
-        input[type=range] { width: 9rem; }
-        input[type=text] { width: 9rem; padding: 0.2rem 0.35rem; font-size: var(--font-size-sm); }
-        .save-row { display: flex; gap: 0.5rem; align-items: center; margin: 0.4rem 0; }
-        .save-row input { flex: 1; padding: 0.35rem 0.5rem; }
-        .saved { display: flex; flex-direction: column; gap: 0.35rem; }
-        .saved-item { display: flex; gap: 0.5rem; align-items: center; }
-        .saved-item .lbl { flex: 1; }
-        .empty { opacity: 0.5; font-size: var(--font-size-sm); margin: 0; }
-        .role-row { display: grid; grid-template-columns: 5rem auto 1fr; align-items: center;
-                    gap: 0.6rem; padding: 0.25rem 0; border-bottom: 1px solid var(--border-subtle); }
-        .role-label { font-size: var(--font-size-sm); }
-        .role-swatch { display: inline-flex; align-items: center; justify-content: center;
-                       min-width: 2.6rem; padding: 0.1rem 0.45rem; border-radius: 0.25rem;
-                       font-size: var(--font-size-xs); font-weight: 600; }
-        .role-ratio { font-size: var(--font-size-xs); opacity: 0.7; font-variant-numeric: tabular-nums; }
-        .role-ratio.warn { color: var(--text-danger); opacity: 1; }
-        /* tempdoc 576 §6 B6 — per-role nudge-to-compliant: how far below the floor + which way to push. */
-        .role-nudge { font-size: var(--font-size-xs); color: var(--text-warning); grid-column: 1 / -1; opacity: 0.95; }
-      </style>
       <h1>Theme Editor</h1>
       <p class="hint">Edit the design seeds — colours and surfaces derive automatically.</p>
       <p class="hint mode-hint"></p>

@@ -41,7 +41,7 @@ export const COLOR_ROLES: readonly ColorRole[] = ROLE_CATALOG.map((r) => ({
   floor: r.floor,
 }));
 
-const STYLE_ID = 'jf-role-foregrounds';
+const foregroundSheets = new WeakMap<Document, CSSStyleSheet>();
 
 /**
  * Tempdoc 567 §8 (deferred → built) — the contrast floor the TINTED role foreground is derived to. Set
@@ -107,13 +107,16 @@ export function deriveRoleForegrounds(doc: Document = document): void {
     probe.remove();
   }
 
-  let style = doc.getElementById(STYLE_ID) as HTMLStyleElement | null;
-  if (!style) {
-    style = doc.createElement('style');
-    style.id = STYLE_ID;
-    doc.head.appendChild(style);
+  let sheet = foregroundSheets.get(doc);
+  if (!sheet) {
+    const Sheet = doc.defaultView?.CSSStyleSheet ?? CSSStyleSheet;
+    sheet = new Sheet();
+    foregroundSheets.set(doc, sheet);
   }
-  style.textContent = decls.length
+  sheet.replaceSync(decls.length
     ? `@layer user-override {\n  :root {\n    ${decls.join('\n    ')}\n  }\n}`
-    : '';
+    : '');
+  if (!doc.adoptedStyleSheets.includes(sheet)) {
+    doc.adoptedStyleSheets = [...doc.adoptedStyleSheets, sheet];
+  }
 }

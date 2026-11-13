@@ -14,8 +14,16 @@ import { html, css, nothing, type TemplateResult } from 'lit';
 import { icon } from '../../components/Icon.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
 
+export const atRestPillStyles = css`
+  .at-rest-pill { float: right; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-weight: 500; }
+    :host .at-rest-note { padding: 0.5rem 0; }
+    :host .at-rest-disclosure { padding: 0.5rem 0; line-height: 1.5; }
+
+`;
+
 /** Card CSS for surfaces that don't already define `.card`/`.data-row` (e.g. the Security surface). */
 export const atRestCardStyles = css`
+  ${atRestPillStyles}
   .card {
     padding: 0.875rem;
     background: var(--surface-secondary);
@@ -151,7 +159,7 @@ export function renderAtRestCard(status: StatusSnapshot | null): TemplateResult 
     <div class="card section">
       <h3>${icon({ name: 'shield', size: 12 })} Data protection
         <span
-          style="float:right; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-weight: 500; ${pillCss}"
+          class="at-rest-pill" .style=${pillCss}
           >${pillLabel}</span
         >
       </h3>
@@ -180,7 +188,7 @@ export function renderAtRestCard(status: StatusSnapshot | null): TemplateResult 
         <span class="val">${convLabel}</span>
       </div>
       ${notEncrypted
-        ? html`<div class="empty" style="padding: 0.5rem 0">
+        ? html`<div class="empty at-rest-note">
             Turn on device encryption (BitLocker with a startup PIN on Windows) to protect your data at
             rest. Note: Windows backs the recovery key up to your Microsoft account by default.
           </div>`
@@ -190,7 +198,7 @@ export function renderAtRestCard(status: StatusSnapshot | null): TemplateResult 
            pre-setup content, and agent-run transcripts saved for search are never passphrase-encrypted
            regardless of this setting (AgentHistoryIndexer writes plaintext .md, not covered by
            DataKeyManager). -->
-      <div class="empty" style="padding: 0.5rem 0; line-height: 1.5">
+      <div class="empty at-rest-disclosure">
         <strong>What this protects:</strong> your chat history and memories are encrypted with your
         passphrase${convState === 'unlocked'
           ? ' — readable right now because they are unlocked'

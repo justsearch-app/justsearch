@@ -85,7 +85,7 @@ export function presentedToolStatus(
 
 /**
  * The ONE tone → accent-token map for status chrome. Returns a CSS token reference (never a bare
- * colour literal), so consumers apply it via `style="color: ${toneAccent(...)}"` and the literal
+ * colour literal), so consumers bind the CSS through Lit's `.style` property. The literal
  * token names never appear at the call site (the status-tone gate's invariant).
  */
 export function toneAccent(tone: NoticeTone): string {

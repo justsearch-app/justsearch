@@ -195,6 +195,8 @@ export class MacroDryRun extends JfElement {
     }
     /* 574 B (remediation) — cancel = jf-button (secondary), Run macro = jf-button variant="primary";
        the bespoke button/.primary fork is deleted. */
+    :host .dry-run-error { margin: 0.75rem 1rem 0; }
+
   `;
 
   render(): TemplateResult {
@@ -219,7 +221,7 @@ export class MacroDryRun extends JfElement {
           ? html`<jf-error-alert
               tone="warning"
               data-testid="macro-dry-run-warning"
-              style="margin: 0.75rem 1rem 0"
+              class="dry-run-error"
             >
               ⚠ This macro re-runs ${backendOps.length} backend
               operation${backendOps.length === 1 ? '' : 's'}:

@@ -158,6 +158,8 @@ export class ContextInspectorPane extends JfElement {
       color: var(--text-tint);
       font-style: italic;
     }
+    :host .segment-empty { padding:0.35rem 0.1rem; }
+
   `;
 
   private renderSegment(seg: InspectorSegment): TemplateResult {
@@ -198,7 +200,7 @@ export class ContextInspectorPane extends JfElement {
                         : nothing}
                     </div>
                     ${p.segments.length === 0
-                      ? html`<div class="seg-text" style="padding:0.35rem 0.1rem">— none —</div>`
+                      ? html`<div class="seg-text segment-empty">— none —</div>`
                       : p.segments.map((s) => this.renderSegment(s))}
                   </div>
                 `,

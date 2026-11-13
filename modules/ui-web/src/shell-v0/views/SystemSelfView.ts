@@ -176,6 +176,8 @@ export class SystemSelfView extends JfElement {
         margin-top: 0;
         padding: 0.5rem 0.75rem;
       }
+    :host .idle-connection { margin-top: 0.25rem; }
+
     `,
   ];
 
@@ -316,7 +318,7 @@ export class SystemSelfView extends JfElement {
                 <div class="idle" data-testid="self-view-idle">
                   <strong>System idle</strong> — nothing is running right now.
                   ${this.aiState
-                    ? html`<div style="margin-top: 0.25rem">Connection: ${this.aiState.phase}.</div>`
+                    ? html`<div class="idle-connection">Connection: ${this.aiState.phase}.</div>`
                     : nothing}
                 </div>
               `

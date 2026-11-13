@@ -3,18 +3,49 @@
 /**
  * Tempdoc 560 §24 — tokenIntrospection: value sanitization (Fix 1) + value-aware widget (Fix 5).
  */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyTokenPreview,
+  clearTokenPreview,
   isColorLiteral,
   listTokens,
 } from './tokenIntrospection.js';
 import { KNOWN_TOKEN_NAMES } from './designTokenTree.js';
 
+// happy-dom drops @layer rules from cssRules. Record each sheet's current text,
+// then inspect only sheets adopted by this document (including later overwrites).
+let sheetText: WeakMap<CSSStyleSheet, string>;
+// The @layer a sheet was first written with stays its owner mark, even if later text drops it.
+let sheetLayer: WeakMap<CSSStyleSheet, string>;
+beforeEach(() => {
+  sheetText = new WeakMap();
+  sheetLayer = new WeakMap();
+  const { replaceSync, replace } = CSSStyleSheet.prototype;
+  vi.spyOn(CSSStyleSheet.prototype, 'replaceSync').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    markLayer(this, text);
+    return replaceSync.call(this, text);
+  });
+  vi.spyOn(CSSStyleSheet.prototype, 'replace').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    markLayer(this, text);
+    return replace.call(this, text);
+  });
+});
+afterEach(() => vi.restoreAllMocks());
+const markLayer = (sheet: CSSStyleSheet, text: string) => {
+  const layer = /^@layer\s+([\w-]+)/.exec(text)?.[1];
+  if (layer && !sheetLayer.has(sheet)) sheetLayer.set(sheet, layer);
+};
+// Current text of every adopted sheet first written with the given layer.
+const layerCss = (layer: string) => document.adoptedStyleSheets
+  .filter((sheet) => sheetLayer.get(sheet) === layer).map((sheet) => sheetText.get(sheet) ?? '');
+const paletteCss = () => layerCss('user-theme');
+
 const STYLE_ID = 'jf-test-token-preview';
 const known = () => [...KNOWN_TOKEN_NAMES][0]!;
 
-afterEach(() => document.getElementById(STYLE_ID)?.remove());
+afterEach(() => clearTokenPreview(STYLE_ID));
 
 describe('isColorLiteral — value-aware widget rule (Fix 5)', () => {
   it('accepts hex + self-contained color functions', () => {
@@ -37,30 +68,31 @@ describe('isColorLiteral — value-aware widget rule (Fix 5)', () => {
 describe('applyTokenPreview — sanitization (Fix 1)', () => {
   it('injects a scoped @layer style for a known token + safe value', () => {
     applyTokenPreview(new Map([[known(), '#abcdef']]), STYLE_ID);
-    const el = document.getElementById(STYLE_ID);
-    expect(el?.textContent).toContain('@layer user-theme');
-    expect(el?.textContent).toContain(`--${known()}: #abcdef;`);
+    expect(paletteCss()).toHaveLength(1);
+    const css = paletteCss()[0];
+    expect(css).toContain('@layer user-theme');
+    expect(css).toContain(`--${known()}: #abcdef;`);
   });
 
   it('throws on an unknown token and writes nothing', () => {
     expect(() => applyTokenPreview(new Map([['nope-not-a-token', 'red']]), STYLE_ID)).toThrow(
       /unknown token/,
     );
-    expect(document.getElementById(STYLE_ID)).toBeNull();
+    expect(paletteCss()).toHaveLength(0);
   });
 
   it('throws on a brace/angle-bracket value and writes nothing (no rule injection)', () => {
     expect(() =>
       applyTokenPreview(new Map([[known(), 'red} html{display:none']]), STYLE_ID),
     ).toThrow(/break out of the :root rule|brace/);
-    expect(document.getElementById(STYLE_ID)).toBeNull();
+    expect(paletteCss()).toHaveLength(0);
   });
 
   it('clears the preview on an empty map', () => {
     applyTokenPreview(new Map([[known(), 'blue']]), STYLE_ID);
-    expect(document.getElementById(STYLE_ID)).not.toBeNull();
+    expect(paletteCss()).toHaveLength(1);
     applyTokenPreview(new Map(), STYLE_ID);
-    expect(document.getElementById(STYLE_ID)).toBeNull();
+    expect(paletteCss()).toHaveLength(0);
   });
 });
 

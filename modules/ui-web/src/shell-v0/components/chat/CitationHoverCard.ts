@@ -93,7 +93,7 @@ export class CitationHoverCard extends JfElement {
     const docName = this.data.parentDocId.split('/').pop() ?? this.data.parentDocId;
     const scoreLabel = groundingLabel(this.data.score);
     return html`
-      <div class="card" style="transform: translate(${this.x}px, ${this.y}px)">
+      <div class="card" .style=${`transform: translate(${this.x}px, ${this.y}px)`}>
         <div class="doc-name">${this.data.headingText || docName}</div>
         ${this.data.excerpt
           ? html`<div class="excerpt">${displayPassageExcerpt(this.data.excerpt)}</div>`

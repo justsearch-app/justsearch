@@ -7,7 +7,7 @@ import { __resetUserStateForTest, __resetInMemoryStateForTest, getDocument } fro
 import { __resetPresentationForTest } from './presentationRuntime.js';
 
 beforeEach(() => { localStorage.clear(); __resetUserStateForTest(); __resetPresentationForTest(); });
-afterEach(() => { localStorage.clear(); __resetUserStateForTest(); __resetPresentationForTest(); document.getElementById('jf-active-theme')?.remove(); });
+afterEach(() => { localStorage.clear(); __resetUserStateForTest(); __resetPresentationForTest(); document.adoptedStyleSheets = []; });
 it('SA5 successful restore reports success', async () => {
   const fetcher = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ ui: { theme: 'light' } }) });
   expect(await restoreAppearanceOnBoot(fetcher)).toBe(true);

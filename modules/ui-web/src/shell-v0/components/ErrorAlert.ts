@@ -68,7 +68,7 @@ export class ErrorAlert extends JfElement {
       class="alert"
       part="alert"
       role="alert"
-      style=${`--alert-fg: ${toneAccent(tone)}; --alert-bg: ${toneAccentSoft(tone)}`}
+      .style=${`--alert-fg: ${toneAccent(tone)}; --alert-bg: ${toneAccentSoft(tone)}`}
     >
       <slot name="icon"></slot>
       <span class="msg"><slot></slot></span>

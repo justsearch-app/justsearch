@@ -4,9 +4,9 @@
  * Tests for slice 474 alpha — Theme Manifest L1 (palette themes).
  *
  * Covers:
- *  - applyTheme injects <style id="jf-active-theme"> with the CSS text
- *  - applyTheme replaces the existing element on subsequent calls
- *  - clearActiveTheme removes the element + sets state to null
+ *  - applyTheme adopts a constructed stylesheet with the CSS text
+ *  - applyTheme replaces the existing sheet on subsequent calls
+ *  - clearActiveTheme removes the sheet + sets state to null
  *  - subscribers receive initial value + change notifications
  *  - loadAndApplyTheme fetches `/themes/<id>.css` and applies it
  *  - loadAndApplyTheme throws on non-2xx response
@@ -27,6 +27,36 @@ import {
 } from './themeState.js';
 import { __resetUserStateForTest } from './UserStateDocument.js';
 
+// happy-dom drops @layer rules from cssRules. Record each sheet's current text,
+// then inspect only sheets adopted by this document (including later overwrites).
+let sheetText: WeakMap<CSSStyleSheet, string>;
+// The @layer a sheet was first written with stays its owner mark, even if later text drops it.
+let sheetLayer: WeakMap<CSSStyleSheet, string>;
+beforeEach(() => {
+  sheetText = new WeakMap();
+  sheetLayer = new WeakMap();
+  const { replaceSync, replace } = CSSStyleSheet.prototype;
+  vi.spyOn(CSSStyleSheet.prototype, 'replaceSync').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    markLayer(this, text);
+    return replaceSync.call(this, text);
+  });
+  vi.spyOn(CSSStyleSheet.prototype, 'replace').mockImplementation(function (this: CSSStyleSheet, text) {
+    sheetText.set(this, text);
+    markLayer(this, text);
+    return replace.call(this, text);
+  });
+});
+afterEach(() => vi.restoreAllMocks());
+const markLayer = (sheet: CSSStyleSheet, text: string) => {
+  const layer = /^@layer\s+([\w-]+)/.exec(text)?.[1];
+  if (layer && !sheetLayer.has(sheet)) sheetLayer.set(sheet, layer);
+};
+// Current text of every adopted sheet first written with the given layer.
+const layerCss = (layer: string) => document.adoptedStyleSheets
+  .filter((sheet) => sheetLayer.get(sheet) === layer).map((sheet) => sheetText.get(sheet) ?? '');
+const paletteCss = () => layerCss('user-theme');
+
 describe('themeState (slice 474 alpha)', () => {
   beforeEach(() => {
     __resetThemeStateForTest();
@@ -36,29 +66,25 @@ describe('themeState (slice 474 alpha)', () => {
     __resetThemeStateForTest();
   });
 
-  it('applyTheme injects a <style id="jf-active-theme"> element', () => {
+  it('applyTheme adopts a constructed stylesheet', () => {
     applyTheme('core.solarized', ':root { --accent-tint: #b58900; }');
-    const styleEl = document.getElementById('jf-active-theme') as HTMLStyleElement | null;
-    expect(styleEl).not.toBeNull();
-    expect(styleEl?.tagName).toBe('STYLE');
-    expect(styleEl?.textContent).toContain('--accent-tint');
-    expect(styleEl?.dataset.themeId).toBe('core.solarized');
+    expect(paletteCss()).toHaveLength(1);
+    expect(paletteCss()[0]).toContain('--accent-tint');
     expect(getActiveThemeId()).toBe('core.solarized');
   });
 
-  it('applyTheme replaces the existing element on subsequent calls (one style at a time)', () => {
+  it('applyTheme replaces the existing sheet on subsequent calls (one style at a time)', () => {
     applyTheme('core.nord', ':root { --accent-tint: #88c0d0; }');
     applyTheme('core.solarized', ':root { --accent-tint: #b58900; }');
-    const styles = document.querySelectorAll('style#jf-active-theme');
-    expect(styles.length).toBe(1);
-    expect(styles[0]?.textContent).toContain('#b58900');
+    expect(paletteCss()).toHaveLength(1);
+    expect(paletteCss()[0]).toContain('#b58900');
     expect(getActiveThemeId()).toBe('core.solarized');
   });
 
-  it('clearActiveTheme removes the element and resets state', () => {
+  it('clearActiveTheme removes the sheet and resets state', () => {
     applyTheme('core.nord', ':root { --accent-tint: #88c0d0; }');
     clearActiveTheme();
-    expect(document.getElementById('jf-active-theme')).toBeNull();
+    expect(paletteCss()).toHaveLength(0);
     expect(getActiveThemeId()).toBeNull();
   });
 
@@ -99,7 +125,7 @@ describe('themeState (slice 474 alpha)', () => {
     await loadAndApplyTheme('core.nord', fakeFetch as unknown as typeof fetch);
     expect(fakeFetch).toHaveBeenCalledWith('/themes/core.nord.css');
     expect(getActiveThemeId()).toBe('core.nord');
-    expect(document.getElementById('jf-active-theme')?.textContent).toContain(
+    expect(paletteCss()[0]).toContain(
       '#88c0d0',
     );
   });
@@ -267,7 +293,7 @@ describe('themeState — §2.C / C5 single appearance writer', () => {
   it('C1: restoreAppearanceOnBoot replays BOTH layers from ONE call (settings + persisted palette)', async () => {
     // Persist a palette id, then wipe the live DOM so the boot path must re-apply both layers.
     applyTheme('core.testpalette', ':root { --accent-tint: #abc; }');
-    document.getElementById('jf-active-theme')?.remove();
+    document.adoptedStyleSheets = [];
     document.documentElement.removeAttribute('data-theme');
 
     // Route by URL: settings → ui prefs; palette .json 404 → .css served.
@@ -289,9 +315,8 @@ describe('themeState — §2.C / C5 single appearance writer', () => {
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
     expect(document.documentElement.classList.contains('high-contrast')).toBe(true);
     // Layer 2 — the persisted palette was re-injected, from the SAME boot call.
-    const styleAfter = document.getElementById('jf-active-theme');
-    expect(styleAfter).not.toBeNull();
-    expect((styleAfter as HTMLStyleElement | null)?.dataset.themeId).toBe('core.testpalette');
+    expect(paletteCss()).toHaveLength(1);
+    expect(getActiveThemeId()).toBe('core.testpalette');
   });
 });
 

@@ -23,7 +23,7 @@ type Harness = { phase?: string; discoveryHold: boolean; hold: boolean; renderHo
 const inputTypes = ['keydown', 'keyup', 'keypress', 'pointerdown', 'pointerup', 'pointermove', 'pointercancel',
   'mousedown', 'mouseup', 'click', 'wheel', 'touchstart', 'input', 'dragenter', 'dragover', 'dragleave', 'drop',
   'mouseenter', 'mouseleave', 'scroll', 'contextmenu', 'paste'];
-declare global { interface Window { frameHarness: Harness; frameProbe: { createProfile: (id: string, label: string) => void; setActiveProfileId: (id: string) => void; dismissWalkthrough: (id: string) => void; applyAppearance: (appearance: { paletteId: string; theme: string }) => Promise<void>; gateFactoryReset: (root: HTMLElement) => Promise<boolean> } } }
+declare global { interface Window { frameHarness: Harness; frameProbe: { createProfile: (id: string, label: string) => void; setActiveProfileId: (id: string) => void; dismissWalkthrough: (id: string) => void; applyAppearance: (appearance: { paletteId: string; theme: string }) => Promise<void>; getActiveThemeId: () => string | null; gateFactoryReset: (root: HTMLElement) => Promise<boolean> } } }
 beforeAll(async () => {
   output = await mkdtemp(path.join(tmpdir(), 'boot-frame-'));
   version = (await readFile(path.resolve('../../gradle.properties'), 'utf8')).match(/^version=(.+)$/m)![1]!;
@@ -33,8 +33,8 @@ beforeAll(async () => {
   const adapter = path.join(output, 'adapter.ts');
   await writeFile(adapter, `import { gateFactoryReset } from ${JSON.stringify(path.join(root, 'src/boot/factoryReset.ts'))};
 import { createProfile, setActiveProfileId, dismissWalkthrough } from ${JSON.stringify(path.join(root, 'src/shell-v0/state/UserStateDocument.ts'))};
-import { applyAppearance } from ${JSON.stringify(path.join(root, 'src/shell-v0/state/themeState.ts'))};
-Object.assign(window, { frameProbe: { createProfile, setActiveProfileId, dismissWalkthrough, applyAppearance, gateFactoryReset } });`);
+import { applyAppearance, getActiveThemeId } from ${JSON.stringify(path.join(root, 'src/shell-v0/state/themeState.ts'))};
+Object.assign(window, { frameProbe: { createProfile, setActiveProfileId, dismissWalkthrough, applyAppearance, getActiveThemeId, gateFactoryReset } });`);
   const config = path.join(output, 'config.mjs');
   await writeFile(config, `import original from ${JSON.stringify(path.join(root, 'vite.config.js'))};
 import { mergeConfig } from ${JSON.stringify(path.resolve('node_modules/vite/dist/node/index.js'))};
@@ -1316,7 +1316,12 @@ legibilityCases.forEach(({ palette, mode }, caseIndex) => it(`SW5 X1 window cont
     try {
       // Measured once the saved palette is applied: the hand-offs under the frame, and engine recovery
       // while the app boots behind it (it mounts first, and the palette follows some frames later).
-      if (surface.startsWith('hand-off') || surface === 'engine recovery') await page.waitForFunction(palette => document.querySelector(`style[data-theme-id="${palette}"]`) !== null, palette);
+      if (surface.startsWith('hand-off') || surface === 'engine recovery') {
+        await page.addScriptTag({ type: 'module', url: new URL(probe, url).href });
+        await page.waitForFunction(palette =>
+          window.frameProbe?.getActiveThemeId() === palette && document.adoptedStyleSheets.some(sheet =>
+            [...sheet.cssRules].some(rule => rule.cssText.startsWith('@layer user-theme'))), palette);
+      }
       if (surface.startsWith('hand-off')) expect({ surface, frame: await page.locator('#boot-frame').count() }).toEqual({ surface, frame: 1 });
       expect({ surface, labels: await controlLabels(page) }).toEqual({ surface, labels: ['Minimize', 'Maximize', 'Close'] });
       await measureSurface(page, surface);

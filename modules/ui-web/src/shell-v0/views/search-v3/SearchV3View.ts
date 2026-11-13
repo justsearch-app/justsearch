@@ -707,6 +707,8 @@ export class SearchV3View extends JfElement {
         cursor: default;
         z-index: var(--z-overlay);
       }
+    :host .forget-notice { white-space:pre-wrap;overflow-wrap:anywhere; }
+
     `,
   ];
 
@@ -2774,7 +2776,7 @@ export class SearchV3View extends JfElement {
         ${this.recoveryNotice()}
         <div class="column">
         ${this.search.forgetNotice ? html`<div role="status" aria-live="polite" data-testid="sv3-forget-notice">
-          <span style="white-space:pre-wrap;overflow-wrap:anywhere">${this.search.forgetNotice}</span>
+          <span class="forget-notice">${this.search.forgetNotice}</span>
           <jf-button label="Review in Library" .onActivate=${() => requestSurfaceNavigation('core.library-surface')}>Review in Library</jf-button>
         </div>` : nothing}
         <jf-sv3-main

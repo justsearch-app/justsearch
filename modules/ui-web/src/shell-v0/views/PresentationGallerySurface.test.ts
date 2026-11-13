@@ -26,10 +26,9 @@ async function swatchBackgroundsById(): Promise<Map<string, string>> {
   const out = new Map<string, string>();
   for (const card of Array.from(el.shadowRoot?.querySelectorAll('.card') ?? [])) {
     const id = card.getAttribute('data-presentation-id') ?? '';
-    // Read the raw attribute: happy-dom's CSSStyleDeclaration does not parse `oklch(...)`, so
-    // `.style.background` is empty even when the binding rendered correctly.
-    const style = card.querySelector('.swatch')?.getAttribute('style') ?? '';
-    out.set(id, style.replace(/^background:\s*/, '').trim());
+    // Custom properties retain the declared colour verbatim, including oklch(...).
+    const swatch = card.querySelector<HTMLElement>('.swatch');
+    out.set(id, swatch?.style.getPropertyValue('--swatch-tint').trim() ?? '');
   }
   document.body.removeChild(el);
   return out;

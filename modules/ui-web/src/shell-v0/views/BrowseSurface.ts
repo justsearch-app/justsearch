@@ -123,6 +123,8 @@ export class BrowseSurface extends JfElement {
   static styles = [
     surfaceLayoutStyles,
     css`
+      .empty-state.empty-folder { padding-top: 0.25rem; padding-bottom: 0.25rem; text-align: left; font-size: var(--font-size-xs); }
+
     .header {
       flex-shrink: 0;
       display: flex;
@@ -249,6 +251,8 @@ export class BrowseSurface extends JfElement {
       animation: spin 1s linear infinite;
       color: var(--text-secondary);
     }
+    :host .browse-error { margin: 0.5rem 1.5rem; }
+
   `,
   ];
 
@@ -391,7 +395,7 @@ export class BrowseSurface extends JfElement {
     return html`
       <div
         class="row"
-        style="padding-left: ${1.5 + level * 1}rem"
+        .style=${`padding-left: ${1.5 + level * 1}rem`}
         @click=${() => void this.toggle(path)}
         role="treeitem"
         aria-expanded=${String(isOpen)}
@@ -490,7 +494,7 @@ export class BrowseSurface extends JfElement {
     return html`
       <div
         class="row file"
-        style="padding-left: ${1.5 + level * 1}rem"
+        .style=${`padding-left: ${1.5 + level * 1}rem`}
         @click=${() => void this.openFile(file.path)}
         @contextmenu=${(e: MouseEvent) => void this.handleFileContextMenu(e, file)}
         title=${file.path}
@@ -520,8 +524,8 @@ export class BrowseSurface extends JfElement {
     const files = this.fileChildren[path] ?? [];
     if (folders.length === 0 && files.length === 0 && !this.inflight[path]) {
       return html`<div
-        class="empty-state"
-        style="padding-left: ${1.5 + level * 1}rem; padding-top: 0.25rem; padding-bottom: 0.25rem; text-align: left; font-size: var(--font-size-xs)"
+        class="empty-state empty-folder"
+        .style=${`padding-left: ${1.5 + level * 1}rem`}
       >
         empty
       </div>`;
@@ -609,7 +613,7 @@ export class BrowseSurface extends JfElement {
         <div class="filter-helper">Explore indexed files by folder structure.</div>
       </div>
       ${this.error
-        ? html`<jf-error-alert tone="error" style="margin: 0.5rem 1.5rem"
+        ? html`<jf-error-alert tone="error" class="browse-error"
             >${this.error}</jf-error-alert
           >`
         : nothing}

@@ -83,7 +83,7 @@ export class StatusDot extends JfElement {
       part="dot"
       role=${labelled ? 'img' : 'presentation'}
       aria-label=${labelled ? this.label! : nothing}
-      style=${`--dot-color: ${toneAccent(tone)}`}
+      .style=${`--dot-color: ${toneAccent(tone)}`}
     ></span>`;
   }
 }
