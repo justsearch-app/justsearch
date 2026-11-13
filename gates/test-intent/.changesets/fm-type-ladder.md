@@ -274,6 +274,33 @@ The new src/boot/type-ladder-lockdown.test.ts and src/boot/woff2-axes.test.ts ar
           "reason": "Rule 1 has no 7px tier; the delegated Search radius choice removes the minus-one radius. Hairline shadow, background, ghost scale and shadow assertions remain."
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/FailedFilesList.buttons-lockdown.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-adopted-scenario",
+          "task": "t-20261113-uicritique",
+          "scenario": "R1",
+          "scenarioName": "rule 1",
+          "quote": "Six text sizes and four corner radii, nothing in between. Text: 11 small labels · 12 secondary text · 13 body and controls · 15 the search field and lead sentences · 20 headings · 28 the page headline. Corners: 4 marks and bars · 8 controls and rows · 14 fields, cards, panels and dialogs · fully round. Weight 400 for text, 500 for names and actions, 600 only for the brand.",
+          "location": "task t-20261113-uicritique user turn round 7",
+          "label": "agent-drafted, owner-adopted"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none. The 16px value is the old shared --font-size-md rung, which rule 1 removes; no record prescribes 16px for default buttons.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "A default ('Other action') button beside the failed-file actions computes font-size 16px with padding 8px 16px.",
+          "newAssertion": "It computes font-size 15px with padding 8px 16px.",
+          "reason": "Rule 1 allows only 11/12/13/15/20/28 px text; the shared 16px rung maps to 15px. The assertion still guards that the failed-file actions keep their compact size while an ordinary button keeps the default size and padding."
+        }
+      ]
     }
   ]
 }
