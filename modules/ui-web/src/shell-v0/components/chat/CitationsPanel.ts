@@ -260,7 +260,7 @@ export class CitationsPanel extends JfElement {
       padding: 0.5rem 0.75rem;
       background: var(--surface-2);
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       font-size: var(--font-size-sm);
       color: var(--text-primary);
     }
@@ -392,13 +392,13 @@ export class CitationsPanel extends JfElement {
       display: inline-block;
       width: 2.5rem;
       height: 0.375rem;
-      border-radius: 0.1875rem;
+      border-radius: 4px;
       background: var(--surface-tertiary);
       overflow: hidden;
     }
     .confidence-bar-fill {
       height: 100%;
-      border-radius: 0.1875rem;
+      border-radius: 4px;
       transition: width var(--duration-normal);
     }
     .score.high { color: var(--text-tint); }
@@ -433,13 +433,13 @@ export class CitationsPanel extends JfElement {
     .confidence-bar {
       width: 3rem;
       height: 4px;
-      border-radius: 2px;
+      border-radius: 4px;
       background: var(--border-subtle);
       overflow: hidden;
     }
     .confidence-bar .fill {
       height: 100%;
-      border-radius: 2px;
+      border-radius: 4px;
       transition: width var(--duration-normal);
     }
     .confidence-bar .fill.high { background: var(--accent-tint); }

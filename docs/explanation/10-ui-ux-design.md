@@ -14,7 +14,7 @@ and the frozen tempdocs.
 ## 1. Design principles
 
 JustSearch is a keyboard-first desktop utility for finding files and working with their
-contents. Use the system UI font and familiar interaction patterns. Primary actions must
+contents. Use the shipped Inter variable font and familiar interaction patterns. Primary actions must
 be reachable by keyboard, with visible focus and meaningful labels.
 
 **Simple is the default; Detailed is available on request.** Routine actions and status
@@ -36,15 +36,19 @@ visual reference:
   teal button; secondary actions are quiet text controls.
 - **Reserve teal** for the main action, switches that are on, progress, and links that add
   something. Do not use it as decoration or a file-type colour code.
-- **Use the existing typography and surface tokens.** Headlines are regular weight (400),
-  in the 24–30 px range; body text is 14–15 px and grey details are 12–13 px. Hairlines are
+- **Use the existing typography and surface tokens.** Inter ships with the app; 20 and 28 px
+  text uses its display optical size through the variable font's optical-size axis. The six
+  text sizes are 11 px for small labels, 12 px for secondary text, 13 px for body and controls,
+  15 px for the search field and lead sentences, 20 px for headings, and 28 px for the page
+  headline. The four corner radii are 4 px for marks and bars, 8 px for controls and rows,
+  14 px for fields, cards, panels and dialogs, and fully round. Hairlines are
   approximately seven-percent white in the dark theme, with theme-appropriate contrast in
   light and high-contrast modes. The token names below are the implementation vocabulary;
   do not copy raw style values into components where the style-literal ratchet forbids them.
 
 | Purpose | Existing tokens and source |
 |---|---|
-| System UI font | `--font-native` in `styles/tokens.css`; Search uses `--font-sans` in `views/search-v3/sv3-tokens.css.ts` |
+| Shipped Inter UI font | `--font-native` in `styles/tokens.css`; Search uses `--font-sans` in `views/search-v3/sv3-tokens.css.ts` |
 | Search headline | `--font-size-sv3-display`, used at weight 400 by `Sv3Composer` |
 | Body text | `--font-size-sv3-sm` in Search; `--font-size-md` in the shared scale |
 | Grey details | `--font-size-sv3-xs` / `--secondary-label` in Search; `--font-size-sm` / `--text-secondary` in the shared scale |

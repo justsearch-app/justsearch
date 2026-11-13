@@ -78,7 +78,7 @@ export class Sv3Empty extends JfElement {
         pointer-events: none;
         position: absolute;
         inset: 0;
-        border-radius: calc(var(--radius-md) - 1px);
+        border-radius: var(--radius-md);
         box-shadow: var(--empty-tile-edge);
       }
       /* Individual transform properties rather than the shorthand: the spec composes translate,

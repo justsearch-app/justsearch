@@ -46,7 +46,7 @@ export class ErrorAlert extends JfElement {
       align-items: flex-start;
       gap: 0.5rem;
       padding: 0.625rem 0.75rem;
-      border-radius: 0.375rem;
+      border-radius: 8px;
       border: 1px solid var(--alert-fg);
       background: var(--alert-bg);
       color: var(--alert-fg);

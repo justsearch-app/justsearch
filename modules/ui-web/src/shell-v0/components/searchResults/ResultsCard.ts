@@ -911,7 +911,7 @@ export class ResultsCard extends JfElement {
         flex-shrink: 0;
         padding: 0.05rem 0.45rem;
         border: 1px solid var(--border-subtle);
-        border-radius: 1rem;
+        border-radius: 14px;
         background: var(--surface-2);
         color: var(--text-tertiary);
         font-size: var(--font-size-xs);
@@ -972,7 +972,7 @@ export class ResultsCard extends JfElement {
       .results-card-snapshot {
         margin: 0.35rem 0;
         border: 1px solid var(--border-subtle);
-        border-radius: 0.375rem;
+        border-radius: 8px;
         overflow: hidden;
       }
       .results-card-excerpt-expanded .results-card-snapshot {

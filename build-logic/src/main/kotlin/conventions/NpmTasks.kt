@@ -62,7 +62,7 @@ abstract class NpmBuildTask @Inject constructor(
     private val execOperations: ExecOperations,
 ) : DefaultTask() {
 
-    /** Source files that trigger rebuild. */
+    /** Web sources and assets (including public/ and index.html) that trigger rebuild. */
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val sourceFiles: ConfigurableFileCollection

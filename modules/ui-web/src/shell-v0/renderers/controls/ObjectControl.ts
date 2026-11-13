@@ -27,7 +27,7 @@ export class ObjectControl extends JsonFormsRendererBase {
       margin-block-end: var(--justsearch-shell-form-control-spacing, 0.75rem);
     }
     .object-title {
-      font-size: var(--justsearch-shell-form-section-title-size, 1.125rem);
+      font-size: var(--justsearch-shell-form-section-title-size, 20px);
       font-weight: var(--justsearch-shell-form-section-title-weight, 600);
       margin-block-end: 0.5rem;
     }

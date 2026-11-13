@@ -707,7 +707,7 @@ export class Sv3Main extends JfElement {
         --md-cite-region-bg: var(--sv3-selected-region);
         --md-cite-pad-x-rest: 0.25em;
         --md-cite-pad-x: 0.25em;
-        --md-cite-radius: 0.25em;
+        --md-cite-radius: 4px;
         /* §5.3 (F2) — the sentence region's horizontal breathing room. Flush to the glyphs the wash
            read as a text-selection smear rather than a designed region; the inset cancels the padding
            exactly, so it paints ~3px wider on each side and occupies the same width — not one glyph
@@ -795,30 +795,13 @@ export class Sv3Main extends JfElement {
            rule restores the affordance under the pointer. */
         --md-link-decoration: none;
 
-        /* The prose variant's heading ramp (tempdoc 822 §2.3, slice S5). The variant reads the
-           SHIPPED type scale for h1/h2/h3 (and '--font-size-sm' for h4-h6), so the spec's heading
-           scale — 1.25 / 1.125 / 1rem — arrives the same way the two steps above do: as a re-point
-           onto this window's own ramp, which already IS that scale. Inside the renderer nothing else
-           reads these three steps, so re-pointing the ramp here retunes exactly the headings.
-           The variant's remaining defaults (line-height 1.3, the asymmetric margin, the table
-           padding and rules, the 24rem truncation cap, the between-items gap, the rule margin) are
-           the shared sheet's — retuned there by tempdoc 873 for EVERY prose surface, not forked
-           here; 'Sv3Main.imports.test.ts' carries that decision in writing, name by name. */
+        /* Shared document headings: h1 20, h2 15, h3-h6 13. The 13px bottom step
+           arrives through the shared bridge above, independently of the answer body's 15px. */
         --font-size-xl: var(--font-size-sv3-xl);
-        --font-size-lg: var(--font-size-sv3-lg);
         --font-size-md: var(--font-size-sv3-base);
-        /* Tempdoc 873 §4 — the answer prose steps up to 15px, and ONLY the answer prose. The
-           window's own '--font-size-sv3-sm' stays 14px, so tool cards, the reasoning trace, the
-           sources panel and the hover card are untouched; this re-point lives in the
-           '.sv3-markdown'-ONLY rule and reaches nothing else (the shared colour/size bridge above
-           still points '--font-size-sm' at 14px, which is what '.sv3-citations' keeps riding).
-           One declaration carries both halves: the renderer's ':host' reads '--font-size-sm' for
-           the body size, and its variant's h4-h6 read the same name — so re-pointing it lifts body
-           text off 14px AND keeps the deepest headings from landing BELOW the body they lead (they
-           sit AT body size, distinguished by weight, which is what the ramp's bottom step means).
-           There is no sv3 ramp step at 15px — 'sm' is 14 and 'base' is 16 — and minting one for a
-           single consumer would fork the window's ramp, so the value is written at its use site. */
-        --font-size-sm: 0.9375rem;
+        --font-size-sm: var(--font-size-sv3-sm);
+        /* Preserve the answer body's 15px without promoting its document headings. */
+        font-size: var(--font-size-sv3-base);
       }
       /* The expanded evidence sits under the TAIL ROW, not under the answer (Phase F11), so its
          rhythm is the row's own 8px. An outer-tree rule on the host beats the component's own :host

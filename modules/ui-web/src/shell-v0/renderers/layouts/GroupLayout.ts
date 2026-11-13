@@ -32,7 +32,7 @@ export class GroupLayout extends JsonFormsRendererBase {
       margin: 0;
     }
     legend {
-      font-size: var(--justsearch-shell-form-section-title-size, 1.125rem);
+      font-size: var(--justsearch-shell-form-section-title-size, 20px);
       font-weight: var(--justsearch-shell-form-section-title-weight, 600);
       padding: 0 0.5rem;
     }

@@ -99,7 +99,7 @@ export const facetChipStyles: CSSResult = css`
     font-size: var(--font-size-xs);
     font-family: inherit;
     border: 1px solid var(--border-subtle);
-    border-radius: 1rem;
+    border-radius: 14px;
     background: var(--surface-2);
     color: var(--text-secondary);
     cursor: pointer;

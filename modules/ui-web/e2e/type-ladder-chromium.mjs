@@ -6,8 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import http from 'node:http';
 import { once } from 'node:events';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import { readWoff2Axes } from './woff2-axes.mjs';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 // Vitest launches this as a child with NODE_ENV=test; this must still be a production UI.
@@ -285,17 +284,15 @@ try {
   }
   const fonts = await Promise.all(fontResponses);
   for (const url of fontRequests) if (new URL(url).origin !== origin) failures.push({ surface: 'fonts', selector: 'network', value: url, reason: 'external font request' });
-  for (const [i, font] of fonts.entries()) {
+  for (const font of fonts) {
     if (font.error || font.status !== 200) { failures.push({ surface: 'fonts', selector: 'network', value: font.url, reason: font.error || `HTTP ${font.status}` }); continue; }
     if (!interUrls.has(font.url)) continue;
-    const file = path.join(scratch, `font-${i}`); await fs.writeFile(file, font.body);
     try {
       // Inspect the downloaded bytes, rather than trusting font-face descriptors or system fonts.
-      const { stdout } = await promisify(execFile)('/usr/bin/python3', ['-c', "import json,sys; from fontTools.ttLib import TTFont; f=TTFont(sys.argv[1]); print(json.dumps({a.axisTag:[a.minValue,a.maxValue] for a in f['fvar'].axes} if 'fvar' in f else {}))", file], { env: { ...process.env, PYTHONPATH: '', PYTHONNOUSERSITE: '1' } });
-      const axes = JSON.parse(stdout);
+      const axes = readWoff2Axes(font.body);
       checks.push({ id: 'font-file-axes', url: font.url, axes });
       if (!(axes.opsz?.[0] <= 20 && axes.opsz?.[1] >= 28 && axes.wght?.[0] <= 400 && axes.wght?.[1] >= 600)) failures.push({ surface: 'fonts', selector: font.url, value: axes, reason: 'file lacks display opsz or variable weight range' });
-    } catch (error) { failures.push({ surface: 'fonts', selector: font.url, value: String(error), reason: 'font axes unverified (requires system python3 fontTools and brotli)' }); }
+    } catch (error) { failures.push({ surface: 'fonts', selector: font.url, value: String(error), reason: 'font axes unverified (invalid WOFF2 or fvar table)' }); }
   }
   if (!fonts.some(f => interUrls.has(f.url))) failures.push({ surface: 'fonts', selector: 'network', value: 'no font responses', reason: 'no app font file loaded' });
   for (const f of failures) console.error(`${f.surface}: ${f.selector}: ${JSON.stringify(f.value)} (${f.reason})`);

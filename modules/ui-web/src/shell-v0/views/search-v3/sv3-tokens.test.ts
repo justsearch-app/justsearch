@@ -72,7 +72,7 @@ describe('the token sheet is host-scoped, never global', () => {
 describe('the geometry tokens the window is built from', () => {
   it('declares the spec geometry set verbatim', () => {
     for (const decl of [
-      '--control-radius: 0.5rem',
+      '--control-radius: var(--radius)',
       '--sidebar-content-inset: 0.5rem',
       '--sidebar-control-gap: 0.5rem',
       '--sidebar-row-content-inset: 0.625rem',
@@ -92,17 +92,14 @@ describe('the geometry tokens the window is built from', () => {
     }
   });
 
-  it('derives the radius ladder additively off one knob, with controls on a second', () => {
-    expect(tokens).toContain('--radius: 0.625rem');
-    expect(tokens).toContain('--radius-sm: calc(var(--radius) - 4px)');
-    expect(tokens).toContain('--radius-md: calc(var(--radius) - 2px)');
-    expect(tokens).toContain('--radius-lg: var(--radius)');
-    expect(tokens).toContain('--radius-xl: calc(var(--radius) + 4px)');
-    expect(tokens).toContain('--radius-2xl: calc(var(--radius) + 8px)');
-    expect(tokens).toContain('--radius-3xl: calc(var(--radius) + 12px)');
-    expect(tokens).toContain('--radius-4xl: calc(var(--radius) + 16px)');
-    // The second knob is independent of the ladder — a control is not a surface.
-    expect(tokens).not.toContain('--control-radius: var(--radius');
+  it('keeps the theme control knob and fixed mark and panel tiers', () => {
+    expect(tokens).toContain('--radius: 8px');
+    expect(tokens).toContain('--radius-sm: 4px');
+    expect(tokens).toContain('--radius-md: var(--radius)');
+    for (const tier of ['lg', 'xl', '2xl', '3xl', '4xl']) {
+      expect(tokens).toContain(`--radius-${tier}: 14px`);
+    }
+    expect(tokens).toContain('--control-radius: var(--radius)');
   });
 
   it('declares the three improvements: z-scale, spacing ladder, pad compensation', () => {
@@ -127,11 +124,10 @@ describe('the geometry tokens the window is built from', () => {
     expect(tokens).toContain('--control-pad-3: calc(0.75rem - 1px)');
   });
 
-  it('keeps the platform type stack and no shipped face', () => {
-    expect(tokens).toContain(
-      "--font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
-    );
+  it('inherits the shipped UI family and keeps a system monospace stack', () => {
+    expect(tokens).toContain('--font-sans: var(--font-native)');
     expect(tokens).toContain('--font-mono: ui-monospace');
+    // Faces live in the global token sheet, so the window does not duplicate them.
     expect(tokens).not.toContain('@font-face');
   });
 
@@ -909,7 +905,7 @@ describe('the composer glass is token-fed material, so dark inverts without a co
     expect(rule).toContain('font-size: var(--font-size-sv3-display)');
     expect(rule).toContain('font-weight: 400');
     expect(rule).toContain('letter-spacing: -0.025em');
-    expect(tokens).toContain('--font-size-sv3-display: 1.875rem');
+    expect(tokens).toContain('--font-size-sv3-display: 28px');
   });
 });
 
@@ -1015,7 +1011,7 @@ describe('the empty state is the spec anatomy, in tokens', () => {
     expect(tile).toContain('background: var(--card)');
     expect(tile).toContain('box-shadow: var(--empty-tile-shadow)');
     // The hairline edge is the elevation inversion at its smallest, and it is a TOKEN both ways.
-    expect(ruleFor('.tile::before {')).toContain('border-radius: calc(var(--radius-md) - 1px)');
+    expect(ruleFor('.tile::before {')).toContain('border-radius: var(--radius-md)');
     expect(ruleFor('.tile::before {')).toContain('box-shadow: var(--empty-tile-edge)');
     expect(ruleFor('.tile.ghost {')).toContain('scale: 0.84');
     expect(ruleFor('.tile.ghost {')).toContain('box-shadow: none');

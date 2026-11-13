@@ -407,7 +407,7 @@ export class HealthLitView extends JfElement {
     .occurrence-severity {
       font-size: var(--font-size-xs);
       padding: 0 0.25rem;
-      border-radius: 2px;
+      border-radius: 4px;
       align-self: center;
     }
     .occurrence-severity[data-severity='INFO'] {

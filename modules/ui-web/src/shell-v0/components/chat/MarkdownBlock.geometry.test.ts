@@ -153,7 +153,7 @@ function resolvedRule(selector: string): Map<string, string> {
 const RETUNED_873: ReadonlyArray<readonly [string, string, string]> = [
   // name                          now                    was (822)
   ['--md-list-indent', '1.75rem', '1.25rem'], //                        the list column becomes a column
-  ['--md-heading-weight', '700', '600'], //                             a step a scanning reader can see
+  ['--md-heading-weight', '500', '700'], //                             slice 2b: document heading tier
   ['--md-heading-margin', '1.75rem 0 0.5rem', '1.25rem 0 0.5rem'], //   the ABOVE half only
   ['--md-item-adjacent-gap', '0.375rem', '0.25rem'], //                 items stop running together
 ];
@@ -187,7 +187,7 @@ const FROZEN_DEFAULTS: ReadonlyArray<readonly [string, string]> = [
   ['--md-code-padding', '0.125rem 0.375rem'], //                       inline code (:327)
   ['--md-code-size', 'var(--font-size-sm)'], //                        inline code (:330)
   ['--md-code-font', 'monospace'], //                                  inline code (:329)
-  ['--md-pre-radius', '0.375rem'], //                                  pre (:335)
+  ['--md-pre-radius', '8px'], //                                  pre (:335)
   ['--md-pre-padding', '0.625rem 0.75rem'], //                         pre (:334)
   ['--md-quote-border', '3px solid var(--border-subtle)'], //          blockquote border-left (:360)
   ['--md-quote-padding', '0.75rem'], //                                blockquote padding-left (:361)
@@ -266,7 +266,7 @@ const BEFORE: ReadonlyArray<readonly [string, Readonly<Record<string, string>>]>
     ':host',
     {
       display: 'block',
-      'font-family': 'system-ui, -apple-system, sans-serif',
+      'font-family': 'var(--font-native)',
       'font-size': 'var(--font-size-sm)',
       'line-height': '1.6',
       color: 'var(--text-primary)',
@@ -289,7 +289,7 @@ const BEFORE: ReadonlyArray<readonly [string, Readonly<Record<string, string>>]>
     {
       background: 'var(--surface-tertiary)',
       padding: '0.625rem 0.75rem',
-      'border-radius': '0.375rem',
+      'border-radius': '8px',
       'overflow-x': 'auto',
       margin: '0.5em 0',
     },
@@ -603,7 +603,7 @@ describe('the prose variant is reachable ONLY through the attribute', () => {
 
 /** name → the value design §2.3 records for it (or tempdoc 873's retune of it), and what it is for. */
 const VARIANT_DEFAULTS: ReadonlyArray<readonly [string, string]> = [
-  ['--md-heading-weight', '700'], //                           873 retune (was 600)
+  ['--md-heading-weight', '500'], //                           slice 2b document heading weight
   ['--md-heading-line-height', '1.3'],
   ['--md-heading-margin', '1.75rem 0 0.5rem'], //              asymmetric: a heading owns what follows
   ['--md-table-size', 'var(--font-size-xs)'],
@@ -676,8 +676,8 @@ describe('the variant carries its own defaults, so it renders under any host', (
     // numbers arrive without a single rem literal crossing into this component (§2.1).
     const ramp: ReadonlyArray<readonly [string, string]> = [
       ['h1', 'var(--font-size-xl)'],
-      ['h2', 'var(--font-size-lg)'],
-      ['h3', 'var(--font-size-md)'],
+      ['h2', 'var(--font-size-md)'],
+      ['h3', 'var(--font-size-sm)'],
     ];
     for (const [tag, step] of ramp) {
       const rule = RULES.get(`${VARIANT_PREFIX} .md-content ${tag}`) as Decls;

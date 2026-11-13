@@ -141,7 +141,7 @@ export class OptionButtonGroupRenderer extends JsonFormsRendererBase {
       align-items: center;
       padding: 0.75rem;
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       background: transparent;
       color: var(--text-primary);
       cursor: pointer;
@@ -198,7 +198,7 @@ export class OptionButtonGroupRenderer extends JsonFormsRendererBase {
     .option-swatch-tile {
       width: 2.75rem;
       height: 2.75rem;
-      border-radius: 0.625rem;
+      border-radius: 8px;
       border: 1px solid var(--border-subtle);
       position: relative;
       overflow: hidden;

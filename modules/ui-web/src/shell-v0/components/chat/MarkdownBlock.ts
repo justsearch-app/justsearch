@@ -882,7 +882,7 @@ export class MarkdownBlock extends JfElement {
        rejected. */
     .cite-sentence-selected {
       background: var(--md-cite-region-bg, transparent);
-      border-radius: var(--md-cite-radius, 0.25em);
+      border-radius: var(--md-cite-radius, 4px);
       padding: 0 var(--md-cite-region-pad-x, 0);
       margin: 0 var(--md-cite-region-inset-x, 0);
     }
@@ -937,7 +937,7 @@ export class MarkdownBlock extends JfElement {
       font-weight: 600;
       user-select: none;
       padding: 0 var(--md-cite-pad-x-rest, 0);
-      border-radius: var(--md-cite-radius, 0.25em);
+      border-radius: var(--md-cite-radius, 4px);
       /* Live audit 2026-08-25 (D4) — WCAG 2.2 2.5.8 (Target Size, Minimum). The mark measured
          13 x 16 CSS px. The extension below is what carries the floor; this only establishes the
          containing block for it, and position:relative on an inline box moves nothing. */

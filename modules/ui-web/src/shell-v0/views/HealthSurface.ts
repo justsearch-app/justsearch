@@ -452,7 +452,7 @@ export class HealthSurface extends JfElement {
     }
     .header h2 {
       margin: 0;
-      font-size: var(--font-size-md);
+      font-size: var(--font-size-headline);
       font-weight: 500;
     }
     /* 574 B2 — the health status pill is the jf-status-badge atom now; the per-surface
@@ -504,7 +504,7 @@ export class HealthSurface extends JfElement {
     .card-icon-box {
       width: 1.625rem;
       height: 1.625rem;
-      border-radius: 0.4rem;
+      border-radius: 8px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -645,7 +645,7 @@ export class HealthSurface extends JfElement {
     .event-row {
       padding: 0.5rem 0.625rem;
       background: var(--surface-tertiary);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       font-size: var(--font-size-xs);
       display: flex;
       justify-content: space-between;
@@ -672,7 +672,7 @@ export class HealthSurface extends JfElement {
     .failed-row {
       padding: 0.5rem 0.625rem;
       background: var(--surface-tertiary);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       font-size: var(--font-size-xs);
       margin-bottom: 0.25rem;
     }

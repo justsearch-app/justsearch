@@ -528,7 +528,7 @@ export class LibrarySurface extends JfElement {
       margin-bottom: 1rem;
       background: var(--accent-warning-08);
       border: 1px solid var(--accent-warning-30);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       color: var(--text-warning);
       font-size: var(--font-size-sm);
     }
@@ -558,7 +558,7 @@ export class LibrarySurface extends JfElement {
       margin-bottom: 1rem;
       background: var(--accent-danger-08);
       border: 1px solid var(--accent-danger);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       color: var(--text-danger);
     }
     .error-banner button {
@@ -596,7 +596,7 @@ export class LibrarySurface extends JfElement {
       padding: 0.4rem 0.5rem;
       background: var(--surface-secondary);
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       color: var(--text-primary);
       font-family: monospace;
       font-size: var(--font-size-sm);
@@ -652,7 +652,7 @@ export class LibrarySurface extends JfElement {
       padding: 0.5rem;
       background: var(--surface-tertiary);
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       color: var(--text-primary);
       font-family: monospace;
       font-size: var(--font-size-sm);
@@ -672,7 +672,7 @@ export class LibrarySurface extends JfElement {
     folderRowStyles,
     css`
       .folders-scroll { padding: 1.8rem 2.5rem; min-width: 0; }
-      .header-left h2 { font-size: var(--font-size-xl); font-weight: 400; }
+      .header-left h2 { font-size: var(--font-size-headline); font-weight: 400; }
       .header { margin-bottom: 1.5rem; }
       .subtitle { overflow-wrap: anywhere; }
       .header-left .subtitle { font-size: var(--font-size-sm); }

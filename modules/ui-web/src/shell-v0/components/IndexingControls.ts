@@ -66,7 +66,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
     button, select {
       font: inherit; font-size: var(--font-size-xs); color: var(--text-primary);
       background: var(--surface-1); border: 1px solid var(--border-default);
-      border-radius: .3rem; padding: .3rem .45rem; min-height: 1.75rem; max-width: 100%;
+      border-radius: 8px; padding: .3rem .45rem; min-height: 1.75rem; max-width: 100%;
     }
     button { cursor: pointer; }
     button[aria-disabled="true"] { opacity: .65; cursor: default; }

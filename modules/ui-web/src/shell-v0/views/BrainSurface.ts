@@ -739,7 +739,7 @@ export class BrainSurface extends JfElement {
       height: 100%;
       overflow-y: auto;
       color: var(--text-primary);
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: var(--font-native);
     }
     .header {
       position: sticky;
@@ -782,7 +782,7 @@ export class BrainSurface extends JfElement {
       background: var(--surface-primary);
       color: var(--text-primary);
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       padding: 0.4rem 0.75rem;
       cursor: pointer;
       font-size: var(--font-size-sm);
@@ -905,7 +905,7 @@ export class BrainSurface extends JfElement {
       align-items: center;
       padding: 0.625rem 0.75rem;
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       margin-bottom: 0.5rem;
     }
     .variant.active {
@@ -940,7 +940,7 @@ export class BrainSurface extends JfElement {
        ModalController so the scroll-lock/focus-restore half cannot be forgotten. */
     dialog.consent {
       border: 1px solid var(--border-subtle);
-      border-radius: 0.75rem;
+      border-radius: 14px;
       max-width: 32rem;
       width: 100%;
       padding: 0;
@@ -971,7 +971,7 @@ export class BrainSurface extends JfElement {
       max-height: 15rem;
       overflow-y: auto;
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
     }
     .consent-terms li {
       display: flex;
@@ -1171,7 +1171,7 @@ export class BrainSurface extends JfElement {
       color: var(--text-primary);
     }
     .body { padding: 1.75rem 2.5rem; gap: 1.5rem; min-width: 0; overflow-wrap: anywhere; }
-    .brain-headline { margin: 0 0 0.75rem; font-size: var(--font-size-xl); font-weight: 400; }
+    .brain-headline { margin: 0 0 0.75rem; font-size: var(--font-size-headline); font-weight: 400; }
     .brain-sentence { font-size: var(--font-size-lg); color: var(--text-secondary); line-height: 1.8; margin: 0 0 1rem; max-width: 65rem; }
     .brain-status-detail, .step-meta { font-size: var(--font-size-xs); color: var(--text-secondary); line-height: 1.5; }
     .brain-status-detail { margin-bottom: 0.5rem; }
@@ -1182,7 +1182,7 @@ export class BrainSurface extends JfElement {
     button.feature-phrase:hover, button.step-info:hover { color: var(--text-tint); background: transparent; }
     button:focus-visible, a:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 4px; }
     .feature-switch-wrap { display: inline-flex; flex-wrap: wrap; max-width: 100%; align-items: center; vertical-align: middle; margin-inline: 0.4rem; }
-    button.feature-switch { border: 1px solid var(--border-subtle); border-radius: 1rem; width: 2rem; height: 1.15rem; padding: 0.1rem; background: var(--surface-tertiary); }
+    button.feature-switch { border: 1px solid var(--border-subtle); border-radius: 14px; width: 2rem; height: 1.15rem; padding: 0.1rem; background: var(--surface-tertiary); }
     button.feature-switch span { display: block; width: 0.8rem; height: 0.8rem; border-radius: 50%; background: var(--text-secondary); }
     button.feature-switch[aria-checked='true'] { background: var(--accent-tint); }
     button.feature-switch[aria-checked='true'] span { margin-left: auto; background: var(--accent-on-tint); }
@@ -1211,7 +1211,7 @@ export class BrainSurface extends JfElement {
     }
     .brain-links { align-items: center; font-size: var(--font-size-sm); color: var(--text-secondary); gap: 1.5rem; }
     .brain-links a { display: inline-flex; align-items: center; gap: 0.4rem; color: inherit; text-decoration: none; }
-    .feature-panel { position: absolute; top: calc(100% + 0.75rem); right: 0; width: min(25rem, calc(100vw - 6rem)); max-height: min(24rem, 60vh, calc(100vh - 8rem)); overflow: auto; text-align: left; padding: 1rem; box-sizing: border-box; background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 0.75rem; z-index: 1; box-shadow: 0 0.5rem 2rem #0004; }
+    .feature-panel { position: absolute; top: calc(100% + 0.75rem); right: 0; width: min(25rem, calc(100vw - 6rem)); max-height: min(24rem, 60vh, calc(100vh - 8rem)); overflow: auto; text-align: left; padding: 1rem; box-sizing: border-box; background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 14px; z-index: 1; box-shadow: 0 0.5rem 2rem #0004; }
     .feature-tradeoffs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     .feature-tradeoffs h3 { font-size: var(--font-size-xs); color: var(--text-secondary); font-weight: 400; }
     .feature-tradeoffs p { font-size: var(--font-size-sm); line-height: 1.5; }
@@ -1234,7 +1234,7 @@ export class BrainSurface extends JfElement {
 
     .section, .variant { border: 0; border-radius: 0; background: transparent; padding: 1rem 0; border-top: 1px solid var(--border-subtle); }
     jf-button::part(control) { border: 0; border-radius: 0; background: transparent; }
-    jf-button.install-action::part(control), jf-button.consent-confirm::part(control) { background: var(--accent-tint); color: var(--accent-on-tint); border-radius: 1rem; }
+    jf-button.install-action::part(control), jf-button.consent-confirm::part(control) { background: var(--accent-tint); color: var(--accent-on-tint); border-radius: 14px; }
     jf-button.repair-action::part(control) { color: var(--text-primary); font-weight: 600; }
     dialog.consent { box-sizing: border-box; width: min(32rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); overflow: auto; }
     @media (max-width: 800px) {

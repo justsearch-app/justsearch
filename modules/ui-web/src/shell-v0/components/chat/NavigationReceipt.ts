@@ -66,7 +66,7 @@ export class NavigationReceipt extends JfElement {
       align-items: center;
       gap: 0.5rem;
       padding: 0.5rem 0.75rem;
-      border-radius: 0.375rem;
+      border-radius: 8px;
       font-family: ui-monospace, monospace;
       font-size: var(--font-size-sm);
       background: var(--surface-2);

@@ -87,7 +87,7 @@ export class StatusCard extends JfElement {
       font-size: var(--font-size-xs);
       text-transform: uppercase;
       padding: 0.125rem 0.4rem;
-      border-radius: 3px;
+      border-radius: 4px;
       background: var(--justsearch-shell-status-badge-bg, #f3f3f3);
     }
     .reason {

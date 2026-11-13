@@ -68,14 +68,14 @@ export const markdownTypography = css`
     --md-code-padding: 0.125rem 0.375rem;
     --md-code-size: var(--font-size-sm);
     --md-code-font: monospace;
-    --md-pre-radius: 0.375rem;
+    --md-pre-radius: 8px;
     --md-pre-padding: 0.625rem 0.75rem;
     --md-quote-border: 3px solid var(--border-subtle);
     --md-quote-padding: 0.75rem;
     --md-link-decoration: underline;
 
     display: block;
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: var(--font-native);
     font-size: var(--font-size-sm);
     line-height: var(--md-line-height);
     color: var(--text-primary);
@@ -162,8 +162,8 @@ export const markdownTypography = css`
      Tempdoc 846 §2.3 — 'DocumentPane' is the second surface to opt in (a document IS headings,
      tables and rules), through the same attribute, not a parallel one. */
   :host([prose]) {
-    /* Tempdoc 873 §2 — 700, matching the 'strong' move above and for the same reason. */
-    --md-heading-weight: 700;
+    /* Document headings use medium weight; document emphasis keeps its own weight. */
+    --md-heading-weight: 500;
     --md-heading-line-height: 1.3;
     /* Asymmetric on purpose — a heading belongs to what FOLLOWS it, so the space above is the
        separation from the previous block and the space below is not. Tempdoc 873 §3 widens only
@@ -204,10 +204,10 @@ export const markdownTypography = css`
     font-size: var(--font-size-xl);
   }
   :host([prose]) .md-content h2 {
-    font-size: var(--font-size-lg);
+    font-size: var(--font-size-md);
   }
   :host([prose]) .md-content h3 {
-    font-size: var(--font-size-md);
+    font-size: var(--font-size-sm);
   }
   /* h4-h6 share the bottom step — the ramp bottoms out there, and so does the spec's: the
      deepest headings sit at body size and are distinguished by weight alone. */
