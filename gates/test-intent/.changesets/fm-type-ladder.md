@@ -364,3 +364,13 @@ The new src/boot/type-ladder-lockdown.test.ts and src/boot/woff2-axes.test.ts ar
   "note": "Rule 1 assigns controls 13px and headings 20px. FailedFilesList requires a default button at 15px; MarkdownBlock.geometry and Sv3Main.imports require h2 15px/h3 13px. The quoted delegation to implement the agreed design does not authorize overriding these roles or postponing them; labelling the choices does not supply authority."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-l90hk26d-test-intent",
+  "verdict": "accept",
+  "digest": "sha256:84c0813e485092eee4a5f065e2c1763e3428f57012b3ce980875d7c2c9306799"
+}
+```
