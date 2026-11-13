@@ -19,12 +19,12 @@ export function scanSource(source, filename = 'fixture.ts') {
     : ts.isElementAccessExpression(n) && ts.isStringLiteralLike(n.argumentExpression) ? n.argumentExpression.text : '';
   const str = n => n && ts.isStringLiteralLike(n) ? n.text.toLowerCase() : null;
   function visit(node) {
-    if (ts.isTaggedTemplateExpression(node) &&
-        (ts.isIdentifier(node.tag) && node.tag.text === 'html' || name(node.tag) === 'html') &&
-        ts.isTemplateExpression(node.template)) {
+    const tagName = ts.isTaggedTemplateExpression(node) ? (ts.isIdentifier(node.tag) ? node.tag.text : name(node.tag)) : '';
+    if (tagName === 'html' || tagName === 'svg') {
       // Replace expressions with a sentinel so quotes and > inside JS do not affect HTML parsing.
-      const parts = [node.template.head.text];
-      for (const span of node.template.templateSpans) parts.push('\u0000', span.literal.text);
+      const t = node.template;
+      const parts = ts.isNoSubstitutionTemplateLiteral(t) ? [t.text] : [t.head.text];
+      if (!ts.isNoSubstitutionTemplateLiteral(t)) for (const span of t.templateSpans) parts.push('\u0000', span.literal.text);
       const html = parts.join('').replace(/<!--[\s\S]*?-->/g, '');
       // Scan attribute values only, ignoring text, comments and similarly named attributes.
       for (const tag of html.matchAll(/<([A-Za-z][\w:-]*)\b((?:[^>"']|"[^"]*"|'[^']*')*)>/g)) {

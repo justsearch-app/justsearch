@@ -8,6 +8,8 @@ const cases = [
   ['html`<div style="top: 0; ${styleMap(x)}"></div>`', 'bound-style-attribute'],
   ['html`<div style=${styleMap({ width: `${pct}%` })}></div>`', 'bound-style-attribute'],
   ['html`<div style="color:red;width:45%">${value}</div>`', 'literal-style-attribute'],
+  ['html`<div style="color:red"></div>`', 'literal-style-attribute'],
+  ['svg`<rect style=${paint}></rect>`', 'bound-style-attribute'],
   ["el.setAttribute('style', value)", 'set-style-attribute'],
   ['root.innerHTML = `<style>:host{display:block}</style><div>${x}</div>`', 'markup-style-element'],
   ["root.innerHTML = '<style>p{}</style>'", 'markup-style-element'],
