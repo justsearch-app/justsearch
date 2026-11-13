@@ -89,8 +89,10 @@ describe('applyPresentation (the one writer)', () => {
     expect(res.ok).toBe(true);
     // body tier applied
     expect(activeBodyFor(SETTINGS_INTERFACE_REGION)).toBeDefined();
-    // theme tier applied through the one appearance writer (injected @layer user-theme style)
-    expect(paletteCss()).toContain('--accent-tint: #3366cc');
+    // theme tier applied through the one appearance writer (adopted @layer user-theme sheet)
+    const paletteCall = replaceSync.mock.calls.findIndex(([css]) => css.startsWith('@layer user-theme'));
+    expect(document.adoptedStyleSheets).toContain(replaceSync.mock.contexts[paletteCall]);
+    expect(replaceSync.mock.calls[paletteCall]?.[0]).toContain('--accent-tint: #3366cc');
   });
 
   it('does not apply a hard-invalid declaration', () => {

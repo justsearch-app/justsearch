@@ -139,6 +139,7 @@ export class Sv3ContextBar extends JfElement {
         overflow: hidden;
       }
       .fill {
+        display: block;
         block-size: 100%;
       }
       .fill[data-color='green'] {
