@@ -42,7 +42,6 @@ import io.justsearch.ipc.MigrationStartRequest;
 import io.justsearch.ipc.TraceDegradation;
 import io.justsearch.ort.ModelCapabilities;
 import io.justsearch.ort.OrtSessionAssembler;
-import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -1039,18 +1038,18 @@ final class KnowledgeServerModelStartCutoverTest {
     return new EmbeddingAssembly(sessions, shape, tokenizer, capabilities);
   }
 
-  private static void closeServer(KnowledgeServer server) throws IOException {
+  private static void closeServer(KnowledgeServer server) throws java.io.IOException {
     for (int attempt = 1; ; attempt++) {
       try {
         server.close();
         return;
-      } catch (IOException failure) {
+      } catch (java.io.IOException failure) {
         // A loaded loop may outlive the product's 5 s join. Retry only its retained shutdown;
         // any other failure (including an additional suppressed failure) must still fail the test.
         if (attempt >= 6
             || !"Application services still own resources".equals(failure.getMessage())
             || failure.getSuppressed().length != 0
-            || !(failure.getCause() instanceof IOException retained)
+            || !(failure.getCause() instanceof java.io.IOException retained)
             || !"Indexing loop still running; resources retained for shutdown retry"
                 .equals(retained.getMessage())
             || retained.getCause() != null || retained.getSuppressed().length != 0) {
