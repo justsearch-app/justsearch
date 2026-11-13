@@ -104,6 +104,9 @@ public class PdfImageRenderer implements AutoCloseable {
                 renderedImages.add(tempPath);
                 LOG.trace("Rendered page {}/{} to: {}", page + 1, pageCount, tempPath);
             }
+        } catch (RuntimeException failure) {
+            io.justsearch.core.execution.EngineFutures.rethrowCancellation(failure);
+            throw new IOException("Cannot read/render VDU PDF", failure);
         }
 
         LOG.debug("Rendered {} pages from: {}", renderedImages.size(), pdfPath.getFileName());

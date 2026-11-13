@@ -189,6 +189,14 @@ public final class VduOfflineTriggerSampler {
             log.warn("Automatic enrichment pass failed", failure);
           }
           else {
+            if (loadedPass && outcome.blockedReason()
+                == io.justsearch.app.api.OfflineProcessingOutcome.BlockReason.CIRCUIT_OPEN) {
+              // The batch gates entry during cool-down. Keep sampling the same idle window
+              // so the next eligible tick can run its recovery trial without user activity.
+              synchronized (VduOfflineTriggerSampler.this) {
+                loadedAttemptAt = Long.MIN_VALUE;
+              }
+            }
             if (loadedPass && outcome.processed() == 0 && outcome.failed() == 0
                 && outcome.remaining() > 0 && outcome.blockedReason()
                     == io.justsearch.app.api.OfflineProcessingOutcome.BlockReason.NONE) {

@@ -462,7 +462,7 @@ public class VduProcessor {
             throw deferred;
         } catch (IOException e) {
             LOG.error("VDU I/O error for: {}", filePath, e);
-            throw new VduException("Failed to read/render document: " + e.getMessage(), e);
+            throw new DocumentFailure("Failed to read/render document: " + e.getMessage(), e);
         } catch (Exception e) {
             EngineFutures.rethrowCancellation(e);
             // Check for timeout (wrapped in CompletionException)
@@ -742,6 +742,13 @@ public class VduProcessor {
     /** VDU-specific exception for better error handling. */
     public static class VduException extends Exception {
         public VduException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    /** Input could not be read or rendered; this supplies no evidence about service health. */
+    public static final class DocumentFailure extends VduException {
+        public DocumentFailure(String message, Throwable cause) {
             super(message, cause);
         }
     }

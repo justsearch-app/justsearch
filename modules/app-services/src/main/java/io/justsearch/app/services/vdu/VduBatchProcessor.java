@@ -186,6 +186,9 @@ public class VduBatchProcessor {
             vduCapabilityState.clearAll();
             return report(progress, 0, 0, 0, BlockReason.NONE);
         }
+        if (circuitBreaker.isClosed()) {
+            vduCapabilityState.clear(VduCapabilityState.REASON_CIRCUIT_OPEN);
+        }
 
         Long vramBytes = gpuCapabilitiesService.snapshot().effective().totalVramBytes();
         if (!VramRequirements.meetsGgufRequirements(vramBytes)) {
@@ -198,6 +201,13 @@ public class VduBatchProcessor {
             return report(progress, selected, 0, 0, BlockReason.MISSING_VISION);
         }
         vduCapabilityState.clear(VduCapabilityState.REASON_MISSING_MMPROJ);
+
+        // Cooling passes must not launch vision or spend a document's retry allowance.
+        // HALF_OPEN is admitted: this sequential batch supplies the recovery trial.
+        if (circuitBreaker.state() == EngineCircuitBreaker.State.OPEN) {
+            vduCapabilityState.block(VduCapabilityState.REASON_CIRCUIT_OPEN);
+            return report(progress, selected, 0, 0, BlockReason.CIRCUIT_OPEN);
+        }
 
         try {
             if (automaticEligibility == null) vduProcessor.enterVduMode();
@@ -243,12 +253,11 @@ public class VduBatchProcessor {
                     blocked = BlockReason.PROCESSING_REFUSED;
                     break;
                 }
-                if (!circuitBreaker.isClosed()) {
+                if (circuitBreaker.state() == EngineCircuitBreaker.State.OPEN) {
                     vduCapabilityState.block(VduCapabilityState.REASON_CIRCUIT_OPEN);
                     blocked = BlockReason.CIRCUIT_OPEN;
                     break;
                 }
-                vduCapabilityState.clear(VduCapabilityState.REASON_CIRCUIT_OPEN);
 
                 String attemptId = java.util.UUID.randomUUID().toString();
                 int retryCount = knowledgeClient.markVduProcessing(
@@ -265,7 +274,7 @@ public class VduBatchProcessor {
                     checkInterrupted();
                     Path filePath = Path.of(docId);
                     if (!Files.exists(filePath)) {
-                        throw new VduProcessor.VduException("File no longer exists", null);
+                        throw new VduProcessor.DocumentFailure("File no longer exists", null);
                     }
                     result = vduProcessor.process(filePath, engineContext,
                         () -> pictureReadingEnabled.getAsBoolean() && !shouldInterruptBatch.getAsBoolean()
@@ -304,7 +313,13 @@ public class VduBatchProcessor {
                         break;
                     }
                     LOG.warn("VDU processing failed for {}", docId, failure);
-                    circuitBreaker.recordFailure(failure);
+                    if (!(failure instanceof VduProcessor.DocumentFailure)) {
+                        circuitBreaker.recordFailure(failure);
+                    }
+                    if (circuitBreaker.state() == EngineCircuitBreaker.State.OPEN) {
+                        vduCapabilityState.block(VduCapabilityState.REASON_CIRCUIT_OPEN);
+                        blocked = BlockReason.CIRCUIT_OPEN;
+                    }
                     // Control/write failures are outside the model catch: never recursively mark
                     // an unacknowledged write as a successful FAILED document.
                     try { markVduFailed(knowledgeClient, docId, failure.getMessage(), attemptId, engineContext); }
@@ -314,11 +329,13 @@ public class VduBatchProcessor {
                     }
                     recordFailed();
                     failed++;
-                    report(progress, selected, processed, failed, BlockReason.NONE);
+                    report(progress, selected, processed, failed, blocked);
+                    if (blocked == BlockReason.CIRCUIT_OPEN) break;
                     continue;
                 }
                 checkInterrupted();
                 circuitBreaker.recordSuccess();
+                vduCapabilityState.clear(VduCapabilityState.REASON_CIRCUIT_OPEN);
                 String extractedText = result.extractedText();
                 boolean hasText = extractedText != null && !extractedText.isBlank();
                 GateVerdict verdict = result.gateVerdict();
