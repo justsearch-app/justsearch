@@ -406,7 +406,7 @@ export class ToolCallCard extends JfElement {
       font-size: var(--font-size-xs);
       line-height: 1.4;
       padding: 0 0.4em;
-      border-radius: 999px;
+      border-radius: 9999px;
       background: var(--accent-tint-16);
       color: var(--text-tint);
     }
@@ -430,7 +430,7 @@ export class ToolCallCard extends JfElement {
     .search-open-in-search {
       margin-top: 0.5rem;
       padding: 0.25rem 0.75rem;
-      border-radius: 999px;
+      border-radius: 9999px;
       border: 1px solid var(--border-subtle);
       background: var(--surface-tertiary);
       color: var(--text-primary);

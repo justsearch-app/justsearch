@@ -221,7 +221,7 @@ export const sv3Tokens = css`
     /* ── T2 geometry / material ────────────────────────────────────────────
        Semantic on purpose: sidebar, palette, tooltip and toolbar controls cannot quietly drift
        apart, because they read the same names. Enforced by sv3-tokens.test.ts. */
-    --control-radius: 0.5rem;
+    --control-radius: var(--radius);
     --sidebar-width: 16rem;
     /* The collapsed ICON rail (the spec's icon sidebar width — 3rem). Its own token
        rather than a literal because the grip's position reads it too, and a boundary drawn somewhere
@@ -288,17 +288,15 @@ export const sv3Tokens = css`
        Pinned by 'sv3-occlusion.test.ts'. */
     --sv3-composer-occlusion: 112px;
 
-    /* ── Radius ladder — one knob, additive ────────────────────────────────
-       --radius shifts the whole window's roundness while the 4px differences between tiers
-       hold. --control-radius above is the SECOND, independent knob: controls are not surfaces. */
-    --radius: 0.625rem;
-    --radius-sm: calc(var(--radius) - 4px);
-    --radius-md: calc(var(--radius) - 2px);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) + 4px);
-    --radius-2xl: calc(var(--radius) + 8px);
-    --radius-3xl: calc(var(--radius) + 12px);
-    --radius-4xl: calc(var(--radius) + 16px);
+    /* --radius remains the theme's control-corner knob; marks and panels keep fixed tiers. */
+    --radius: 8px;
+    --radius-sm: 4px;
+    --radius-md: var(--radius);
+    --radius-lg: 14px;
+    --radius-xl: 14px;
+    --radius-2xl: 14px;
+    --radius-3xl: 14px;
+    --radius-4xl: 14px;
 
     /* ── Reading measure ───────────────────────────────────────────────────
        The design spec's transcript column is 'max-w-3xl'. It reuses the
@@ -348,22 +346,19 @@ export const sv3Tokens = css`
     --control-pad-3: calc(0.75rem - 1px);
 
     /* ── Type ──────────────────────────────────────────────────────────────
-       No shipped face: the platform stack, four effective sizes, weights 400/500/600. */
-    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+       Shipped variable Inter; six sizes, with explicit opsz 32 on rules selecting the 20/28px display rungs. */
+    --font-sans: var(--font-native);
     --font-mono: ui-monospace, 'SF Mono', 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono',
       monospace;
-    /* The BADGE rung, and only that: the design spec's desktop ramp table gives "Badge sm" its own
-       10px (sm:text-[.625rem]). It sits below the four-size UI ramp
-       the way the display size sits above it, so the ramp itself is untouched. */
-    --font-size-sv3-2xs: 0.625rem;
+    /* Small labels share the 11px rung; secondary text uses 12px. */
+    --font-size-sv3-2xs: 11px;
     --font-size-sv3-xs: 0.75rem;
-    --font-size-sv3-sm: 0.875rem;
-    --font-size-sv3-base: 1rem;
-    --font-size-sv3-lg: 1.125rem;
+    --font-size-sv3-sm: 13px;
+    --font-size-sv3-base: 15px;
+    --font-size-sv3-lg: 20px;
     --font-size-sv3-xl: 1.25rem;
-    /* The hero headline is the ONE display size outside the four-size UI ramp, and the one place the
-       desktop ramp steps UP rather than down. */
-    --font-size-sv3-display: 1.875rem;
+    /* Page headline. */
+    --font-size-sv3-display: 28px;
 
     /* ── Motion budget ─────────────────────────────────────────────────────
        Effectively two values (micro / layout), with one reserved for the signature morph.

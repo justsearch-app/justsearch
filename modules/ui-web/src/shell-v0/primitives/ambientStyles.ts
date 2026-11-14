@@ -23,6 +23,15 @@
 import { css } from 'lit';
 
 export const ambientStyles = css`
+  /* Native form controls otherwise use the browser's separate font and size defaults. */
+  button, input, select, textarea {
+    font-family: inherit;
+    font-size: inherit;
+  }
+  button {
+    font-size: var(--font-size-sm);
+  }
+
   /* Scrollbar WIDTH is NOT an inherited property (only scrollbar-color is — CSS Scrollbars L1), so
      the :root \`scrollbar-width: thin\` in tokens.css reaches the light-DOM scrollers but leaves
      shadow-DOM scrollers at the default "auto" width (live-verified §15 gap). Setting ONLY the

@@ -594,6 +594,7 @@ export class SecuritySurface extends JfElement {
       h2 {
         margin: 0;
         font-size: var(--font-size-lg);
+        font-variation-settings: "opsz" 32;
       }
       .subtitle {
         margin: 0.25rem 0 0 0;

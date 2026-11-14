@@ -252,6 +252,7 @@ export class PresentationEditorSurface extends JfElement {
   static styles = [
     surfaceScrollLayoutStyles,
     css`
+      h2 { font-size: var(--font-size-lg); font-variation-settings: "opsz" 32; }
       .split {
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -291,7 +292,7 @@ export class PresentationEditorSurface extends JfElement {
         background: var(--surface-1);
         color: var(--text-primary);
         border: 1px solid var(--border-subtle);
-        border-radius: 0.3rem;
+        border-radius: 8px;
         box-sizing: border-box;
       }
       .toolbar {
@@ -311,7 +312,7 @@ export class PresentationEditorSurface extends JfElement {
         background: var(--surface-1);
         color: var(--text-primary);
         border: 1px solid var(--border-subtle);
-        border-radius: 0.3rem;
+        border-radius: 8px;
         padding: 0.3rem 0.5rem;
       }
       .linter {

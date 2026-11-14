@@ -114,7 +114,7 @@ export class StatusPanel extends JfElement {
     .header, section, .plugins { border-bottom: var(--frame-hairline) solid var(--border-subtle); }
     .header, .heading, .footer { display: flex; align-items: center; gap: var(--jf-space-3); }
     .header > div, .heading > span { flex: 1; min-width: 0; }
-    h2 { margin: 0; font-size: var(--font-size-lg); font-weight: var(--jf-weight-medium); }
+    h2 { margin: 0; font-size: var(--font-size-lg); font-variation-settings: "opsz" 32; font-weight: var(--jf-weight-medium); }
     h3 { margin: 0; font-size: var(--font-size-sm); font-weight: var(--jf-weight-medium); color: var(--text-secondary); }
     p { margin: var(--jf-space-1) 0; }
     .detail, time { color: var(--text-secondary); font-size: var(--font-size-xs); }

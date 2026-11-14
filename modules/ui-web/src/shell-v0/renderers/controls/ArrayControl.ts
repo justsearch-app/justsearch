@@ -29,7 +29,8 @@ export class ArrayControl extends JsonFormsRendererBase {
       margin-block-end: var(--justsearch-shell-form-control-spacing, 0.75rem);
     }
     .array-title {
-      font-size: var(--justsearch-shell-form-section-title-size, 1.125rem);
+      font-size: var(--justsearch-shell-form-section-title-size, 20px);
+      font-variation-settings: "opsz" 32;
       font-weight: var(--justsearch-shell-form-section-title-weight, 600);
       margin-block-end: 0.5rem;
     }
@@ -52,6 +53,7 @@ export class ArrayControl extends JsonFormsRendererBase {
     button {
       padding: var(--justsearch-shell-form-button-padding, 0.25rem 0.5rem);
       font: inherit;
+      font-size: var(--font-size-sm);
       border: 1px solid var(--justsearch-shell-form-button-border, #ccc);
       border-radius: 4px;
       background: var(--justsearch-shell-form-button-bg, transparent);

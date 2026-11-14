@@ -110,7 +110,7 @@ export class ContextInspectorPane extends JfElement {
       padding: 0.4rem 0.55rem;
       background: var(--surface-2);
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       margin-top: 0.35rem;
     }
     .seg-head {

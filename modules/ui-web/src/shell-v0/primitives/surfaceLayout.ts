@@ -47,7 +47,7 @@ const regionBase = css`
   :host {
     box-sizing: border-box;
     color: var(--text-primary);
-    font-family: system-ui, -apple-system, sans-serif;
+    font-family: var(--font-native);
   }
   /* 559 Authority VI slack/fill — the declared reading-column policy. When the
      host declares data-fill="reading", BOTH header and body collapse to a
@@ -67,7 +67,8 @@ const regionBase = css`
   }
   .header h1 {
     margin: 0;
-    font-size: var(--font-size-md);
+    font-size: var(--font-size-headline);
+    font-variation-settings: "opsz" 32;
     font-weight: 600;
   }
   .header .sub {

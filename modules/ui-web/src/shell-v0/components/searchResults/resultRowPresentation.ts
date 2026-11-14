@@ -139,7 +139,7 @@ export const highlightStyles = css`
   mark.hl {
     background: var(--accent-highlight);
     color: var(--accent-on-highlight);
-    border-radius: 2px;
+    border-radius: 4px;
     padding: 0 1px;
   }
 `;

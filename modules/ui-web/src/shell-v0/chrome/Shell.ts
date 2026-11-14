@@ -601,7 +601,7 @@ export class Shell extends JfElement {
       height: 100vh;
       box-sizing: border-box;
       color: var(--text-primary);
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: var(--font-native);
       background: var(--surface-1);
     }
     jf-top-bar {

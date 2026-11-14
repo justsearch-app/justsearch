@@ -100,7 +100,7 @@ export class AutonomyDial extends JfElement {
     .segments {
       display: inline-flex;
       border: 1px solid var(--border-default);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       overflow: hidden;
       width: fit-content;
     }

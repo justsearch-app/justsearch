@@ -64,8 +64,8 @@ export class ChatShapeMount extends JfElement {
       background: var(--accent-danger-08);
       color: var(--text-danger);
       border: 1px solid var(--accent-danger-30);
-      border-radius: 0.375rem;
-      font-family: system-ui, -apple-system, sans-serif;
+      border-radius: 8px;
+      font-family: var(--font-native);
       font-size: var(--font-size-sm);
     }
     .chat-shape-mount-error code {

@@ -125,8 +125,10 @@ export type TokenName =
   | '--font-display'
   | '--font-mono'
   | '--font-native'
+  | '--font-size-headline'
   | '--font-size-lg'
   | '--font-size-md'
+  | '--font-size-secondary'
   | '--font-size-sm'
   | '--font-size-xl'
   | '--font-size-xs'
@@ -377,8 +379,10 @@ export const TOKEN_NAMES: readonly TokenName[] = [
   '--font-display',
   '--font-mono',
   '--font-native',
+  '--font-size-headline',
   '--font-size-lg',
   '--font-size-md',
+  '--font-size-secondary',
   '--font-size-sm',
   '--font-size-xl',
   '--font-size-xs',

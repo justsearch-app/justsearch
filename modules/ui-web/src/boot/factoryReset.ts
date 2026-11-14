@@ -25,14 +25,15 @@ class FactoryResetRecovery extends LitElement {
   static styles = css`
     :host { display: block; box-sizing: border-box; min-height: 100vh; padding: 1.5rem;
       color: var(--text-primary, CanvasText); background: var(--surface-1, Canvas);
-      font: 1rem system-ui, sans-serif; overflow-wrap: anywhere; }
+      font-family: var(--font-native); font-size: var(--font-size-md); overflow-wrap: anywhere; }
     section { max-width: 38rem; margin: 2rem auto; min-width: 0; }
+    h1 { font-size: var(--font-size-headline); font-variation-settings: "opsz" 32; }
     p, li { line-height: 1.6; }
     ul { padding-inline-start: 1.25rem; }
     .actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }
     button { padding: 0.65rem 1rem; border: 1px solid var(--border-subtle, ButtonText);
-      border-radius: 0.375rem; color: var(--text-primary, ButtonText);
-      background: var(--surface-2, ButtonFace); font: inherit; cursor: pointer; }
+      border-radius: 8px; color: var(--text-primary, ButtonText);
+      background: var(--surface-2, ButtonFace); font: inherit; font-size: var(--font-size-sm); cursor: pointer; }
     button:focus-visible { outline: 2px solid var(--focus-ring-color, Highlight); outline-offset: 3px; }
     button:disabled { cursor: wait; }
     [role='alert'] { border-inline-start: 3px solid currentColor; padding-inline-start: 0.75rem; }

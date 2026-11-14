@@ -119,6 +119,7 @@ export class ActionButton extends JfElement {
       background: var(--justsearch-shell-form-button-bg, transparent);
       cursor: pointer;
       font: inherit;
+      font-size: var(--font-size-sm);
       color: inherit;
     }
     button.invoke:disabled {

@@ -76,7 +76,7 @@ export class CapabilityMap extends JfElement {
       gap: 0.5rem;
       padding: 0.4rem 0.5rem;
       border: 1px solid var(--border-subtle);
-      border-radius: 0.4rem;
+      border-radius: 8px;
       background: var(--surface-2);
       font-size: var(--font-size-sm);
     }

@@ -75,7 +75,7 @@ export class HoverPreviewHost extends JfElement {
       background: var(--surface-2);
       color: var(--text-primary);
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       padding: 0.5rem 0.625rem;
       font-size: var(--font-size-sm);
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);

@@ -326,6 +326,7 @@ export class Sv3Composer extends JfElement {
         margin: 0;
         color: var(--foreground);
         font-size: var(--font-size-sv3-display);
+        font-variation-settings: "opsz" 32;
         font-weight: 400;
         letter-spacing: -0.025em;
         text-align: center;
@@ -689,7 +690,7 @@ export class Sv3Composer extends JfElement {
         background: transparent;
         color: var(--foreground);
         font-family: inherit;
-        font-size: var(--font-size-sv3-sm);
+        font-size: var(--font-size-sv3-base);
         line-height: 1.625;
         /* Grows with its content between the spec's floor and ceiling; past the ceiling the UA
            scrolls the field itself, which is the field's own overflow and not a window scroller. */

@@ -21,11 +21,12 @@ const surfaces = ['library', 'browse'].map(name => ({
 __seedForTest({ schemaVersion: '1.0', catalogVersion: 1, namespace: 'core', primitive: 'Surface', entries: surfaces });
 const theme = createThemeApi('CORE', 'csp-verifier');
 theme.saveTheme({ id: 'custom.csp-proof', displayName: 'CSP proof', tokens: { 'h-teal': '120' } });
-const host = createMockHostApi({ theme, data: { fetch: (url, init) => fetch(url, init) } });
+export const host = createMockHostApi({ theme, data: { fetch: (url, init) => fetch(url, init) } });
 const root = document.getElementById('root');
+export const bootFrame = document.getElementById('boot-frame');
 root.replaceChildren();
-const nav = document.createElement('nav');
-const mount = document.createElement('div');
+export const nav = document.createElement('nav');
+export const mount = document.createElement('div');
 root.append(nav, mount);
 for (const [name, tag] of [['Library', 'jf-library-surface'], ['AI Brain', 'jf-brain-surface'], ['Settings', 'jf-settings-surface']]) {
   const button = document.createElement('button'); button.textContent = name;

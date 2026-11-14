@@ -103,7 +103,7 @@ export class SettingsWindow extends JfElement {
       max-height: 92vh;
       padding: 0;
       border: 1px solid var(--border-subtle);
-      border-radius: 0.75rem;
+      border-radius: 14px;
       background: var(--surface-1);
       color: var(--text-primary);
       box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
@@ -137,7 +137,7 @@ export class SettingsWindow extends JfElement {
       align-items: center;
       justify-content: center;
       border: 1px solid transparent;
-      border-radius: 0.4rem;
+      border-radius: 8px;
       background: var(--surface-2);
       color: var(--text-secondary);
       cursor: pointer;

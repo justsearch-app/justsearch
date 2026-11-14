@@ -793,7 +793,7 @@ export class DocumentPane extends JfElement {
       box-sizing: border-box;
       background: var(--surface-1);
       color: var(--text-primary);
-      font-family: system-ui, sans-serif;
+      font-family: var(--font-native);
     }
     .header {
       flex-shrink: 0;
@@ -838,10 +838,10 @@ export class DocumentPane extends JfElement {
         border-color var(--duration-fast);
     }
     .toggle-btn:first-child {
-      border-radius: 0.375rem 0 0 0.375rem;
+      border-radius: 8px 0 0 8px;
     }
     .toggle-btn:last-child {
-      border-radius: 0 0.375rem 0.375rem 0;
+      border-radius: 0 8px 8px 0;
       margin-left: -1px;
     }
     .toggle-btn:hover:not([aria-disabled='true']) {
@@ -1021,7 +1021,7 @@ export class DocumentPane extends JfElement {
     pre.source span.hl-strong {
       background: var(--accent-tint);
       color: var(--accent-on-tint);
-      border-radius: 2px;
+      border-radius: 4px;
     }
     /* Forced colors (Windows High Contrast) erase the highlight's tint, which would leave the cited
        passage looking like every other line. The strong phase takes the system's Mark pair (the

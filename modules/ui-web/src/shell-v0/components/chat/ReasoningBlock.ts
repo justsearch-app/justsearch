@@ -214,7 +214,7 @@ export class ReasoningBlock extends JfElement {
       cursor: pointer;
       font-size: var(--font-size-xs);
       padding: 0.125rem 0.25rem;
-      border-radius: 3px;
+      border-radius: 4px;
     }
     .copy-btn:hover {
       color: var(--text-primary);
