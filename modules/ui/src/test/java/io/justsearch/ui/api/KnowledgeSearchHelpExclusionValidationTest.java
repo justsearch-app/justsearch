@@ -47,7 +47,10 @@ class KnowledgeSearchHelpExclusionValidationTest {
     var ctx = context(Map.of("query", "needle", "excludedCollections",
         java.util.Collections.nCopies(17, "justsearch-help"), "pipeline", Map.of()));
     controller(client).handleSearch(ctx);
-    verify(ctx).status(400);
+    var status = ArgumentCaptor.forClass(Integer.class);
+    verify(ctx, atLeast(0)).status(status.capture());
+    assertEquals(1, java.util.Collections.frequency(status.getAllValues(), 400),
+        "more than 16 exclusions must be rejected with 400");
     var body = ArgumentCaptor.forClass(Object.class);
     verify(ctx).json(body.capture());
     assertTrue(body.getValue().toString().contains("16"), "error must explain the limit");

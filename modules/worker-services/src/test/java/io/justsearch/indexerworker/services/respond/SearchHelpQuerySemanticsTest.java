@@ -52,9 +52,11 @@ class SearchHelpQuerySemanticsTest {
     var response = build(text, count, request().build(), decision);
     assertEquals(7, response.getHelpMatches().getCount());
     // Deliberately differs from the wire default SIMPLE: the decision owns the parse.
+    var syntax = org.mockito.ArgumentCaptor.forClass(LuceneRuntimeTypes.QuerySyntax.class);
     verify(text).buildTextQuery(eq("needle"), argThat(filters ->
-        List.of("justsearch-help").equals(filters.collection())),
-        eq(LuceneRuntimeTypes.QuerySyntax.LUCENE));
+        List.of("justsearch-help").equals(filters.collection())), syntax.capture());
+    assertEquals(LuceneRuntimeTypes.QuerySyntax.LUCENE, syntax.getValue(),
+        "the Help count must parse with the decision's syntax");
   }
 
   private static SearchRequest.Builder request() {
