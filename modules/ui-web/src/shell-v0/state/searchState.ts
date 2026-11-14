@@ -636,9 +636,11 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
   inflightAbort = new AbortController();
   // A refined pass behind displayed results refines quietly; everything else is a full search.
   const refiningBehindResults = stage === 'refined' && state.results.length > 0 && !state.error;
+  const refiningQuickResponse = stage === 'refined' && state.passStage === 'quick'
+    && state.restrictionsKey === restrictionsKey;
   state = {
     ...state,
-    helpMatches: undefined,
+    helpMatches: stage === 'refined' ? state.helpMatches : undefined,
     isSearching: !refiningBehindResults,
     isRefining: refiningBehindResults,
     slowSearch: false,
@@ -677,7 +679,8 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
       state = { ...state, isSearching: false, isRefining: false, slowSearch: false,
         ...(syntaxInvalid ? { results: [], totalHits: 0, matchCount: 0, helpMatches: undefined, facets: null,
           facetsTruncated: false, passStage: null, searchTrace: null, countsPending: false } : {}),
-        error: syntaxInvalid && stage === 'quick' ? null : searchFailureMessage(errorInfo),
+        error: (syntaxInvalid && stage === 'quick') || (!syntaxInvalid && refiningQuickResponse)
+          ? null : searchFailureMessage(errorInfo),
         errorInfo };
       emit();
       return false;
@@ -762,7 +765,8 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
       isSearching: false,
       isRefining: false,
       slowSearch: false,
-      error: 'Search could not be completed. Open Health to check the connection and service status before trying again.',
+      error: refiningQuickResponse ? null
+        : 'Search could not be completed. Open Health to check the connection and service status before trying again.',
     };
     emit();
     return false;

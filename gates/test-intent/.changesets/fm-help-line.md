@@ -16,6 +16,14 @@ New isolated checks cover runtime exclusions before text/dense/SPLADE/chunk budg
   "entries": [
     {
       "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/KnowledgeSearchHelpBoundaryTest.java"
+      ],
+      "class": "Structural rule kept",
+      "rule": "Malformed excludedCollections produce exactly one 400 response before worker admission.",
+      "whySurvives": "Remove only the redundant org.mockito.Mockito qualifier from atLeast(0); the existing static import resolves the same method. Every assertion, input and verification remains identical. PMD reports UnnecessaryFullyQualifiedName at line 87 on both the untouched d2c718ea87 shared clone and the repaired tree."
+    },
+    {
+      "items": [
         "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpAppliedFiltersTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpDeliveryGovernorTest.java",
         "modules/ui/src/test/java/io/justsearch/ui/api/mcp/McpEntityCarriageMetricTest.java",

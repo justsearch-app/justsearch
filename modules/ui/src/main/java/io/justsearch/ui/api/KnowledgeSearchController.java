@@ -371,13 +371,18 @@ public class KnowledgeSearchController {
       List<String> excludedCollections = List.of();
       Object excludedRaw = body.get("excludedCollections");
       if (excludedRaw != null) {
+        if (excludedRaw instanceof List<?> values && values.size() > 16) {
+          ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
+              "excludedCollections must contain at most 16 values", telemetry, ApiErrorHandler.routeOf(ctx)));
+          return;
+        }
         if (!(excludedRaw instanceof List<?> values)
-            || values.stream().anyMatch(v -> !(v instanceof String text) || text.isBlank())) {
+            || values.stream().anyMatch(v -> !(v instanceof String text) || text.trim().isBlank())) {
           ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
               "excludedCollections must be an array of non-blank strings", telemetry, ApiErrorHandler.routeOf(ctx)));
           return;
         }
-        excludedCollections = values.stream().map(String.class::cast).distinct().toList();
+        excludedCollections = values.stream().map(String.class::cast).map(String::trim).distinct().toList();
       }
 
       // Optional: projection

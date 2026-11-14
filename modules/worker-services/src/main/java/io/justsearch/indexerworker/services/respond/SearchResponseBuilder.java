@@ -181,7 +181,7 @@ public final class SearchResponseBuilder {
             ? facetsResult.matchedDocs()
             : computeMatchCount(decision, outcome, inputs);
     responseBuilder.setMatchCount(matchCount);
-    attachHelpMatches(inputs, responseBuilder);
+    attachHelpMatches(decision, outcome, inputs, responseBuilder);
 
     // Tempdoc 549 Phase E3: ComponentTiming retired. Per-stage timing is projected onto the
     // trace's TraceStage.ms by SearchTraceProjector (retrievalMs → FUSION.ms, chunkMergeMs →
@@ -295,9 +295,11 @@ public final class SearchResponseBuilder {
 
 
   /** Count Help with the same lexical syntax and hard predicates, independently of retrieval. */
-  private void attachHelpMatches(SearchInputs inputs, SearchResponse.Builder response) {
+  private void attachHelpMatches(SearchDecision decision, SearchOutcome outcome,
+      SearchInputs inputs, SearchResponse.Builder response) {
     String help = io.justsearch.configuration.InternalCollections.HELP;
-    if (!inputs.request().getExcludedCollectionsList().contains(help)) return;
+    if (!inputs.request().getCursor().isBlank()
+        || !inputs.request().getExcludedCollectionsList().contains(help)) return;
     var filters = inputs.runtimeFilters();
     // A positive collection scope is another predicate: disjoint scopes have no Help matches.
     if (filters.collection() != null
@@ -310,8 +312,15 @@ public final class SearchResponseBuilder {
         .withExcludedCollections(inputs.request().getExcludedCollectionsList().stream()
             .filter(collection -> !help.equals(collection)).toList());
     try {
+      var syntax = switch (decision) {
+        case SearchDecision.SparseShortcut sparse -> sparse.runtimeSyntax();
+        case SearchDecision.MultiLegDecision multiLeg -> multiLeg.runtimeSyntax();
+        default -> LuceneRuntimeTypes.QuerySyntax.SIMPLE;
+      };
+      String queryText = outcome.correctionApplied()
+          ? outcome.correctedQuery() : inputs.request().getQuery();
       var query = textQueryOps.buildTextQuery(
-          inputs.request().getQuery(), helpFilters, inputs.runtimeSyntax());
+          queryText, helpFilters, syntax);
       // countQueryOrThrow is exact, so capped stays false. A failed count is omitted, never totalHits.
       int count = query == null ? 0 : indexCountOps.countQueryOrThrow(query);
       response.setHelpMatches(io.justsearch.ipc.HelpMatches.newBuilder().setCount(count));
