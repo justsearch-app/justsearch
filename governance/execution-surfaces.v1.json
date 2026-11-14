@@ -219,6 +219,13 @@
       "guard": "exempt:consumer reads the canonical type; no projection law to mutate-guard"
     },
     {
+      "id": "fe-sv3-search",
+      "kind": "consumer",
+      "lang": "ts",
+      "path": "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.ts",
+      "guard": "exempt:consumer reads the canonical type; no projection law to mutate-guard"
+    },
+    {
       "id": "fe-results-card",
       "kind": "projection",
       "lang": "ts",
