@@ -1,13 +1,13 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, expect, it, vi } from 'vitest';
-import './Sv3Results.js';
-import { SV3_RESULTS_IDLE, type Sv3ResultsView } from './sv3-search.js';
-import { requestSurfaceNavigation } from '../../controllers/navigateRequest.js';
-import { buildSearchIntent } from '../../state/searchState.js';
-import { restrictionWire } from '../../state/searchFiltersState.js';
+import '../Sv3Results.js';
+import { SV3_RESULTS_IDLE, type Sv3ResultsView } from '../sv3-search.js';
+import { requestSurfaceNavigation } from '../../../controllers/navigateRequest.js';
+import { buildSearchIntent } from '../../../state/searchState.js';
+import { restrictionWire } from '../../../state/searchFiltersState.js';
 
-vi.mock('../../controllers/navigateRequest.js', { spy: true });
+vi.mock('../../../controllers/navigateRequest.js', { spy: true });
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });
 
 it.each(['quick', 'refined'] as const)('%s ordinary search excludes Help without changing Ask restrictions', stage => {

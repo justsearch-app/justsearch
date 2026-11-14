@@ -119,3 +119,14 @@ New isolated checks cover runtime exclusions before text/dense/SPLADE/chunk budg
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1dc09-9d09-7761-a321-949c61bcafd9",
+  "verdict": "reject",
+  "digest": "sha256:91c3fec6ffea1a6604e11f002bee8eb06ed3f04061d779a3c714234a859b5d39",
+  "note": "Sv3Results.help.test.ts is not isolated: existing SearchV3View.ask.test.ts reads it as source input at lines 264 and 278. Runtime readFileSync tracing confirmed both reads. Test-intent rules prohibit exempt new tests from being read by existing tests. Supply a New entry with evidence and acceptance, or isolate the test without weakening the scanner. All 14 new cases pass on the candidate; no MCP/VDU assertion was weakened."
+}
+```
