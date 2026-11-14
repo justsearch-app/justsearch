@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Sv3Results } from '../Sv3Results.js';
+import type { ResultsCard } from '../../../components/searchResults/ResultsCard.js';
 import { SV3_RESULTS_IDLE } from '../sv3-search.js';
 import { __resetAiStateForTest, __feedForTest, __feedContactForTest, setInstallState } from '../../../state/aiStateStore.js';
 import { NAVIGATE_TO_SURFACE_EVENT } from '../../../controllers/navigateRequest.js';
@@ -24,6 +25,7 @@ it('S5-12 literal-only empty screen explains words without repeating the query',
 it('S5-12 unknown execution uses the general empty message and no AI advice', async () => {
   const el = await mount(null);
   expect(el.shadowRoot!.textContent).toContain('Nothing matches this search');
+  expect(el.shadowRoot!.querySelector('jf-results-card')).toBeNull();
   expect(el.shadowRoot!.querySelector('[data-testid="empty-ai"]')).toBeNull();
 });
 it('S5-5 empty filtered results retain removable restrictions and offer Clear filters', async () => {
@@ -31,8 +33,15 @@ it('S5-5 empty filtered results retain removable restrictions and offer Clear fi
     filters: [{ key: 'facet-file_kind-pdf', kind: 'facet', field: 'file_kind', value: 'pdf', label: 'Type: pdf' }],
     facetSelections: { file_kind: ['pdf'] } }; await el.updateComplete;
   expect(el.shadowRoot!.textContent).toContain('Filters are on');
+  const card = el.shadowRoot!.querySelector<ResultsCard>('jf-results-card');
+  expect(card).not.toBeNull();
+  await card!.updateComplete;
+  expect(card!.shadowRoot!.querySelector('[data-testid="more-filters"]')).not.toBeNull();
   expect(el.shadowRoot!.querySelector('[data-testid="empty-clear-filters"]')).not.toBeNull();
   expect(el.shadowRoot!.querySelector('[aria-label="Remove filter: Type: pdf"]')).not.toBeNull();
+  el.view = { ...el.view, filters: [], facetSelections: {} };
+  await el.updateComplete;
+  expect(el.shadowRoot!.querySelector('jf-results-card')).toBeNull();
 });
 const literal = { stages: [{ id: 'sparse-retrieval', status: 'executed' },
   { id: 'dense-retrieval', status: 'skipped' }, { id: 'splade-retrieval', status: 'skipped' }] } as const;

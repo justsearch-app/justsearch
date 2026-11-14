@@ -324,7 +324,7 @@ describe('the four outcomes are distinct, and each says only what it knows', () 
     expect(empty.querySelector('h2')!.textContent).toBe('Nothing matches this search');
     expect(empty.querySelector('[role="status"] > p')!.textContent).toBe('Try fewer or different words.');
     expect(rowsOf(results)).toHaveLength(0);
-    expect(cardOf(results)?.shadowRoot?.querySelector('[data-testid="search-result-row"]')).toBeNull();
+    expect(cardOf(results)).toBeNull();
     expect(results.shadowRoot?.querySelector('[data-testid="sv3-results-failed"]')).toBeNull();
   });
 

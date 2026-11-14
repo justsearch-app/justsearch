@@ -202,7 +202,7 @@ export class Sv3Results extends JfElement {
     return html`
       <section class="results" aria-label="Search results" data-testid="sv3-results"
         @card-preview=${this.onCardPreview} @keydown=${this.onPreviewKeydown}>
-        ${cache(view.status === 'ready' || view.status === 'empty' ? html`${this.filters(view.filters)} ${this.selection(view)} ${this.card(view)}` : html``)} ${this.body(view)}
+        ${cache(view.status === 'ready' || (view.status === 'empty' && view.filters.length > 0) ? html`${this.filters(view.filters)} ${this.selection(view)} ${this.card(view)}` : html``)} ${this.body(view)}
       </section>
       ${this.preview()}
     `;
@@ -316,7 +316,6 @@ export class Sv3Results extends JfElement {
   private card(view: Sv3ResultsView): TemplateResult {
     return html`<jf-results-card
       data-testid="sv3-results-card"
-      ?hidden=${view.status === 'empty' && view.filters.length === 0}
       selection-mode="explicit"
       .snapshot=${view.snapshot ?? { query: view.query, results: [], matchCount: 0, totalHits: 0,
         facetsTruncated: false, countsPending: true, isSearching: view.status === 'loading', processingTimeMs: null, error: view.failure }}
@@ -332,7 +331,6 @@ export class Sv3Results extends JfElement {
     sv3Shared,
     css`
       jf-results-card { --font-size-xs: var(--font-size-sv3-xs, var(--font-size-secondary)); }
-      jf-results-card[hidden] { display: none; }
       .empty-results { padding: var(--space-6) 0; }
       .empty-results h2 { margin: 0; font-size: var(--font-size-lg); font-weight: 500; line-height: 1.3; }
       .empty-results p { margin: var(--space-1) 0 0; font-size: var(--font-size-sm); }

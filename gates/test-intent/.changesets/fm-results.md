@@ -9,9 +9,9 @@ author-session: codex-builder-fm-results-20261114
 
 5a is the results UI, document pane and nothing-found screen. Decisions E1–E10 and amendments A1–A12 below are delegated agent choices; amendments take precedence. They are not presented as the owner's own wording. The delegated scope and original user turn are retained in every source.
 
-`Obsolete` identifies superseded UI wording, default diagnostic visibility and control locations. The assertions that still apply remain. Diagnostic, citation and contrast checks now opt into the existing developer preference. Pending-response preservation uses an explicitly held response instead of relying on a microtask race. The known facet/pinned-scope stale-response issue remains outside this slice.
+`Obsolete` identifies superseded UI wording, default diagnostic visibility and control locations. The assertions that still apply remain. Diagnostic controls and contrast checks opt into the existing developer preference only where needed; Ask citation headers and default reader behavior are checked without that opt-in. Pending-response preservation uses an explicitly held response instead of relying on a microtask race. The known facet/pinned-scope stale-response issue remains outside this slice.
 
-Baseline f5fd95ca9d: the 10 originally affected existing files pass 274/274 in the shared clone, which owns separate dependencies. New files: 24 assertion failures and 2 preservation passes on that baseline; the initial 11 checks ran before product changes. Earlier candidate: all 10,074 ordinary unit checks passed. Generated candidate evidence is attached for the five new isolated files. `run-evidence --before` is left to the orchestrator because its worktree creation writes repository Git metadata. The builder writes no acceptance record.
+Baseline f5fd95ca9d: the 10 originally affected existing files pass 274/274 in the shared clone, which owns separate dependencies. New files: 24 assertion failures and 2 preservation passes on that baseline; the initial 11 checks ran before product changes. Earlier candidate: all 10,074 ordinary unit checks passed. The changeset lists all ten new test files; regenerated JSON evidence remains for the orchestrator. `run-evidence --before` is left to the orchestrator because its worktree creation writes repository Git metadata. The builder writes no acceptance record.
 
 The harness adds dark/light results, scan pane and nothing-found states plus the 600×400 pane pair. The proportion baseline relocates Search filter-editor witnesses from the composer to the existing editor under More filters, retains all field/error/focus checks, and adds viewport checks while visiting each scrollable editor control. The old whole-card versus dock rectangle witness becomes the last visible row versus the top field after scrolling, with both presence and viewport constraints. Unchanged Ask/top-bar baseline failures remain failures: nine rows across five families, all reproduced before 5a. The eight new states pass all 80 constraints; a11y passes all 110 registered states.
 
@@ -238,37 +238,63 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
           "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required: no count and no filter row in those states (as on main d61d78ce4e/eea268db53). Restore the check that was removed for this (`expect(cardOf(results)).toBeNull()` or its equivalent for these states).",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision (builder repair brief, 2026-11-14): Required: no count and no filter row in those states (as on main d61d78ce4e/eea268db53). Restore the check that was removed for this (`expect(cardOf(results)).toBeNull()` or its equivalent for these states).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required: DOM order matches visual order when the field is on top: field, then summary and filters, then results; Tab from the field reaches the filters, Shift+Tab from the first result reaches the filters then the field.",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision (builder repair brief, 2026-11-14): Required: DOM order matches visual order when the field is on top: field, then summary and filters, then results; Tab from the field reaches the filters, Shift+Tab from the first result reaches the filters then the field.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required: a text action (normal text colour, weight 500, a chevron icon) that opens a menu (reuse the app's existing menu component) with Any time / Past week / Past month / Past year (and \"Custom dates\" shown as the label when More filters set dates); same in browser and desktop; keyboard and screen-reader names work.",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision (builder repair brief, 2026-11-14): Required: a text action (normal text colour, weight 500, a chevron icon) that opens a menu (reuse the app's existing menu component) with Any time / Past week / Past month / Past year (and \"Custom dates\" shown as the label when More filters set dates); same in browser and desktop; keyboard and screen-reader names work.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required: a new result list starts at the top (first row visible directly under the field and filters); opening or closing the pane keeps the current scroll position. Remove the bottom-dock scroll assumptions that cause this.",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision (builder repair brief, 2026-11-14): Required: a new result list starts at the top (first row visible directly under the field and filters); opening or closing the pane keeps the current scroll position. Remove the bottom-dock scroll assumptions that cause this.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required: this year \"12 Nov\"; other years \"9 Oct 2025\" (use the app's existing date formatting/locale helpers).",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision (builder repair brief, 2026-11-14): Required: this year \"12 Nov\"; other years \"9 Oct 2025\" (use the app's existing date formatting/locale helpers).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required (decision): remove Markdown marks for all files except code and plain text (code = the extensions the app already treats as code; .txt/.log/.csv stay raw), because extracted office/PDF/mail text is stored Markdown-structured; remove extraction marker lines for all files: \"--- OCR page N ---\" and any other \"--- ... ---\" separator lines that the extractors insert (find their producers in modules/worker-services, e.g. extract/PdfOcrEngine.java, and match exactly what they emit; do not strip ordinary \"---\" text a user wrote). Display only: copy, export, Ask, citations and the pane keep raw text and offsets.",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator snippet-cleaning decision (builder repair brief, 2026-11-14; supersedes A5): remove Markdown marks for all files except code and plain text (code = the extensions the app already treats as code; .txt/.log/.csv stay raw), because extracted office/PDF/mail text is stored Markdown-structured; remove extraction marker lines for all files: \"--- OCR page N ---\" and any other \"--- ... ---\" separator lines that the extractors insert (find their producers in modules/worker-services, e.g. extract/PdfOcrEngine.java, and match exactly what they emit; do not strip ordinary \"---\" text a user wrote). Display only: copy, export, Ask, citations and the pane keep raw text and offsets.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision: inline dash-run rule in cleanSnippet: remove whitespace-delimited runs of three or more dashes in Markdown-structured document snippets, including flattened inline \"---\". Snippets flatten lines, so a standalone user dash run cannot be distinguished from StructuredDocument.appendPageBreak's page break. Display only; raw text and offsets are kept. Code and txt/log/csv snippets stay literal.",
+          "label": "agent choice"
         }
       ],
-      "conflictSearch": "Repository docs/decisions searched for result counts, snippets, copy, details pane, no results and developer tools. No conflicting UI decision found. Private task records were not read in this builder session. E3/A1/A6 retire the previous summary words and effectiveMode-only fixture; E4/A2/A7 relocate the filter editor and keep its validation; E5/A10/A11 move copy/Why and collections; E7/A8 move diagnostics behind developer tools and retain anchors; E8/A1/A9 replace empty copy. Every changed assertion is listed in tmp/s5-evidence/test-expectations.txt. No retained payload, selection, error, raw-text or contrast assertion was removed. Repair request supersedes A5: all extracted document formats are Markdown-cleaned, with the existing code-extension set and txt/log/csv literal. Failure/loading card-absence assertions are restored (including x5), not weakened. Additional expectation changes are listed in tmp/s5-evidence/test-expectations-2.txt."
+      "conflictSearch": "Repository docs/decisions searched for result counts, snippets, copy, details pane, no results and developer tools. No conflicting UI decision found. Private task records were not read in this builder session. E3/A1/A6 retire the previous summary words and effectiveMode-only fixture; E4/A2/A7 relocate the filter editor and keep its validation; E5/A10/A11 move copy/Why and collections; E7/A8 move diagnostics behind developer tools and retain anchors; E8/A1/A9 replace empty copy. Every changed assertion is listed in tmp/s5-evidence/test-expectations.txt. No retained payload, selection, error, raw-text or contrast assertion was removed. Repair request supersedes A5: all extracted document formats are Markdown-cleaned, with the existing code-extension set and txt/log/csv literal. Failure/loading card-absence assertions are restored (including x5), not weakened. Additional expectation changes are listed in tmp/s5-evidence/test-expectations-2.txt. Test-intent audit repair restores no-card expectations for unfiltered zero results; filtered zero results retain the row and clearing controls. DocumentPane citation headers with an Ask turn stay visible by default; provenance, path-header and Rendered/Source controls opt in only in the cases that assert them. Anchors, offsets, decay, missing files, empty state and accessibility retain their default-view expectations."
     },
     {
       "items": [
@@ -312,19 +338,28 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
           "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required: no count and no filter row in those states (as on main d61d78ce4e/eea268db53). Restore the check that was removed for this (`expect(cardOf(results)).toBeNull()` or its equivalent for these states).",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision (builder repair brief, 2026-11-14): Required: no count and no filter row in those states (as on main d61d78ce4e/eea268db53). Restore the check that was removed for this (`expect(cardOf(results)).toBeNull()` or its equivalent for these states).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required: DOM order matches visual order when the field is on top: field, then summary and filters, then results; Tab from the field reaches the filters, Shift+Tab from the first result reaches the filters then the field.",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision (builder repair brief, 2026-11-14): Required: DOM order matches visual order when the field is on top: field, then summary and filters, then results; Tab from the field reaches the filters, Shift+Tab from the first result reaches the filters then the field.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required: a text action (normal text colour, weight 500, a chevron icon) that opens a menu (reuse the app's existing menu component) with Any time / Past week / Past month / Past year (and \"Custom dates\" shown as the label when More filters set dates); same in browser and desktop; keyboard and screen-reader names work.",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision (builder repair brief, 2026-11-14): Required: a text action (normal text colour, weight 500, a chevron icon) that opens a menu (reuse the app's existing menu component) with Any time / Past week / Past month / Past year (and \"Custom dates\" shown as the label when More filters set dates); same in browser and desktop; keyboard and screen-reader names work.",
+          "label": "agent choice"
         }
       ]
     },
@@ -338,10 +373,11 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
         "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts",
         "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts",
         "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts",
-        "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts"
+        "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts",
+        "modules/ui-web/src/shell-v0/views/first-minutes-page-break.test.ts"
       ],
       "class": "New",
-      "behaviour": "Executed-leg summary; available/displayed/capped counts; format-aware display-only text; date and folder visibility; default diagnostic gating; text facets/date presets; per-row raw copy without selection changes and with focus return; literal/general/filtered empty outcomes and AI navigation-only advice; stable mounted editor; browser footer and preview metadata; restored Context fallback without memory writes. Supplemental cases were written during implementation and then run in the unchanged shared clone; initial 11 checks preceded product edits.",
+      "behaviour": "Executed-leg summary; available/displayed/capped counts; format-aware display-only text; date and folder visibility; default diagnostic gating; text facets/date presets; per-row raw copy without selection changes and with focus return; literal/general/filtered empty outcomes and AI navigation-only advice; stable mounted editor; browser footer and preview metadata; restored Context fallback without memory writes. Supplemental cases were written during implementation and then run in the unchanged shared clone; initial 11 checks preceded product edits. StructuredDocument page-break removal, including flattened inline dash runs, with literal code/plain-text preservation; unfiltered zero results omit the card while filtered zero results retain More filters and removable restrictions.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -480,34 +516,60 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
           "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required: no count and no filter row in those states (as on main d61d78ce4e/eea268db53). Restore the check that was removed for this (`expect(cardOf(results)).toBeNull()` or its equivalent for these states).",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision (builder repair brief, 2026-11-14): Required: no count and no filter row in those states (as on main d61d78ce4e/eea268db53). Restore the check that was removed for this (`expect(cardOf(results)).toBeNull()` or its equivalent for these states).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required: DOM order matches visual order when the field is on top: field, then summary and filters, then results; Tab from the field reaches the filters, Shift+Tab from the first result reaches the filters then the field.",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision (builder repair brief, 2026-11-14): Required: DOM order matches visual order when the field is on top: field, then summary and filters, then results; Tab from the field reaches the filters, Shift+Tab from the first result reaches the filters then the field.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required: a text action (normal text colour, weight 500, a chevron icon) that opens a menu (reuse the app's existing menu component) with Any time / Past week / Past month / Past year (and \"Custom dates\" shown as the label when More filters set dates); same in browser and desktop; keyboard and screen-reader names work.",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision (builder repair brief, 2026-11-14): Required: a text action (normal text colour, weight 500, a chevron icon) that opens a menu (reuse the app's existing menu component) with Any time / Past week / Past month / Past year (and \"Custom dates\" shown as the label when More filters set dates); same in browser and desktop; keyboard and screen-reader names work.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required: a new result list starts at the top (first row visible directly under the field and filters); opening or closing the pane keeps the current scroll position. Remove the bottom-dock scroll assumptions that cause this.",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision (builder repair brief, 2026-11-14): Required: a new result list starts at the top (first row visible directly under the field and filters); opening or closing the pane keeps the current scroll position. Remove the bottom-dock scroll assumptions that cause this.",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required: this year \"12 Nov\"; other years \"9 Oct 2025\" (use the app's existing date formatting/locale helpers).",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision (builder repair brief, 2026-11-14): Required: this year \"12 Nov\"; other years \"9 Oct 2025\" (use the app's existing date formatting/locale helpers).",
+          "label": "agent choice"
         },
         {
-          "kind": "owner-words",
-          "quote": "Required (decision): remove Markdown marks for all files except code and plain text (code = the extensions the app already treats as code; .txt/.log/.csv stay raw), because extracted office/PDF/mail text is stored Markdown-structured; remove extraction marker lines for all files: \"--- OCR page N ---\" and any other \"--- ... ---\" separator lines that the extractors insert (find their producers in modules/worker-services, e.g. extract/PdfOcrEngine.java, and match exactly what they emit; do not strip ordinary \"---\" text a user wrote). Display only: copy, export, Ask, citations and the pane keep raw text and offsets.",
-          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator snippet-cleaning decision (builder repair brief, 2026-11-14; supersedes A5): remove Markdown marks for all files except code and plain text (code = the extensions the app already treats as code; .txt/.log/.csv stay raw), because extracted office/PDF/mail text is stored Markdown-structured; remove extraction marker lines for all files: \"--- OCR page N ---\" and any other \"--- ... ---\" separator lines that the extractors insert (find their producers in modules/worker-services, e.g. extract/PdfOcrEngine.java, and match exactly what they emit; do not strip ordinary \"---\" text a user wrote). Display only: copy, export, Ask, citations and the pane keep raw text and offsets.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision: inline dash-run rule in cleanSnippet: remove whitespace-delimited runs of three or more dashes in Markdown-structured document snippets, including flattened inline \"---\". Snippets flatten lines, so a standalone user dash run cannot be distinguished from StructuredDocument.appendPageBreak's page break. Display only; raw text and offsets are kept. Code and txt/log/csv snippets stay literal.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/fm-results.json",
@@ -520,7 +582,8 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
         "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts",
         "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts",
         "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts",
-        "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts"
+        "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts",
+        "modules/ui-web/src/shell-v0/views/first-minutes-page-break.test.ts"
       ]
     }
   ]
@@ -528,10 +591,12 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
 ```
 
 
-Repair evidence (5ef58a99e4 before checkout): the four new isolated files fail 13 assertions before the product fix; 34 literal-text preservation cases pass. Restored pending/failure assertions fail twice before; restored x5 fails once before. The shared-clone known-good eea268db53 withholds the card; its active restriction chips remain visible, so the stricter no-filter assertion has no known-good pass there. Exact extractor separator inventory found only the OCR marker at PdfOcrEngine.java:341 and :477; ordinary user separators remain. The exact restored pending/transport/refused/syntax/stale checks also run against eea268db53. Candidate execution evidence is regenerated; fail-before publication remains for the orchestrator because the builder cannot create repository worktrees or commit. Acceptance records below are unchanged.
+Repair evidence (5ef58a99e4 before checkout): the four new isolated files fail 13 assertions before the product fix; 34 literal-text preservation cases pass. Restored pending/failure assertions fail twice before; restored x5 fails once before. The shared-clone known-good eea268db53 withholds the card; its active restriction chips remain visible, so the stricter no-filter assertion has no known-good pass there. Extractor separators include the OCR marker at PdfOcrEngine.java:341 and :477 and StructuredDocument.appendPageBreak's "---". The delegated inline dash-run rule documents the display-only ambiguity after snippet line flattening; raw text remains. The exact restored pending/transport/refused/syntax/stale checks also run against eea268db53. Evidence must be regenerated for this repaired tree; fail-before publication remains for the orchestrator because the builder cannot create repository worktrees or commit. Acceptance records below are unchanged.
 
 
 A real Chromium date-choice probe exposed focus loss during the temporary cache disconnection. A focused check failed on null activeElement before the focus repair, then passed; the same control regains focus only if the reader has not focused another control while waiting. The browser probe now reads Modified date: Past week on the focused date action after the rerun.
+
+Audit repair validation on c9a2476b2f with uncommitted repairs: lint and tsc pass; the ordinary suite passes 818 files / 10,129 tests, and the final focused run passes 79 tests. The lockdown suite passes 54 files / 689 tests; no failing files require an isolated rerun. The Ask citation-header check fails by assertion before repair and passes on the repaired tree and eea268db53; the baseline's 13 original Search checks also pass. All ten new test files, including first-minutes-page-break.test.ts, classify as assertion failures on eea268db53 (77 failures, two preservation passes) using a shared clone with separate dependencies. A11y passes all 110 surfaces. The proportion gate exits 2 with nine non-OK rows, all reproduced on eea268db53: chat-occlusion and light (overlap), tasks-occlusion (missing overlap counterpart), sv3-composer-occlusion and light (clipped dock), chat-composer-small and light (missing dock), and chat-activity-rail-open and light (no scroller). There are no new non-OK rows; all 80 first-minutes constraints pass. JSON evidence remains unchanged: run-evidence --before creates Git worktrees, which this builder is forbidden to create. The orchestrator must regenerate it for every file in newChecks.
 
 ## Acceptance records
 

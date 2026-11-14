@@ -1129,7 +1129,7 @@ export class DocumentPane extends JfElement {
    */
   private renderCitationHeader(): TemplateResult | typeof nothing {
     const h = this.citationHeader;
-    if (h === null) return nothing;
+    if (h === null || (h.turnLabel === null && !getShowDeveloperTools())) return nothing;
     const parts = [
       h.passage === null ? nothing : html`<span class="citation-passage">${h.passage}</span>`,
       this.renderInclusion(h),
@@ -1268,7 +1268,8 @@ export class DocumentPane extends JfElement {
         </div>` : nothing}`;
     }
     return html`
-      ${getShowDeveloperTools() ? html`${this.renderCitationHeader()}${this.renderProvenanceLine()}` : nothing}
+      ${this.renderCitationHeader()}
+      ${getShowDeveloperTools() ? this.renderProvenanceLine() : nothing}
       ${['ocr', 'vdu'].includes((this.provenance ?? '').toLowerCase())
         ? html`<p class="scan-note">Read from a scan. A few words may be wrong.</p>` : nothing}
       ${this.renderSpanNotice()}${this.renderAnchorNotice()}${this.renderWindowNote()}

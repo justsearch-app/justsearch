@@ -5,7 +5,7 @@ import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { setUiMode, __resetUiModeForTest } from '../../state/uiModeState.js';
 import './DocumentPane.js';
 import { setShowDeveloperTools } from '../../state/developerToolsState.js';
-beforeEach(() => setShowDeveloperTools(true));
+beforeEach(() => setShowDeveloperTools(false));
 afterEach(() => setShowDeveloperTools(false));
 import type { DocumentPane } from './DocumentPane.js';
 import {
@@ -150,6 +150,22 @@ describe('DocumentPane — 849 citation header', () => {
       ' ',
     );
 
+  it('keeps the Ask citation header visible by default', async () => {
+    const el = await open(headerFor());
+    const header = el.shadowRoot?.querySelector('[data-testid="citation-header"]');
+    expect(header).not.toBeNull();
+    expect(header?.textContent).toContain('Cited in the answer to');
+    expect(header?.textContent).toContain('How does indexing reach the head?');
+  });
+
+  it('keeps citation details outside Ask behind developer tools', async () => {
+    const el = await open(headerFor({ question: null }));
+    expect(el.shadowRoot?.querySelector('[data-testid="citation-header"]')).toBeNull();
+    setShowDeveloperTools(true);
+    await el.updateComplete;
+    expect(headerText(el)).toContain('Passage 4 of 9');
+  });
+
   it('says which turn cited the document, where the passage sits, and what happened to it', async () => {
     const el = await open(headerFor());
     const text = headerText(el);
@@ -220,6 +236,7 @@ describe('DocumentPane — 849 citation header', () => {
   });
 
   it('renders no header at all for the line-addressed mount sites', async () => {
+    setShowDeveloperTools(true);
     const el = await open(null);
     expect(el.shadowRoot?.querySelector('[data-testid="citation-header"]')).toBeNull();
     // …and the TEXT-EXTRACTION provenance line is untouched by any of this (§7's name-collision
@@ -308,6 +325,7 @@ describe('DocumentPane — load + render (markdown)', () => {
   });
 
   it('toggles to Source mode and back to Rendered', async () => {
+    setShowDeveloperTools(true);
     stubFetchOnce({ content: MD_FIXTURE });
     const el = make();
     el.docPath = 'notes/thread.md';
@@ -333,6 +351,7 @@ describe('DocumentPane — load + render (markdown)', () => {
   });
 
   it('a non-markdown docPath defaults to Source mode with Rendered disabled', async () => {
+    setShowDeveloperTools(true);
     stubFetchOnce({ content: 'plain text content' });
     const el = make();
     el.docPath = 'notes/readme.txt';
@@ -514,6 +533,7 @@ describe('DocumentPane — header path truncation (Search Thread Round-2 R5c)', 
   });
 
   it('Detailed: renders a formatDisplayPath-truncated header text with the full path in title', async () => {
+    setShowDeveloperTools(true);
     setUiMode('advanced'); // Tempdoc 738 (C4) — the full/truncated path is the Detailed form.
     const longPath =
       'projects/deeply/nested/folder/structure/that/goes/on/for/a/while/before/reaching/the-actual-filename.md';
@@ -530,6 +550,7 @@ describe('DocumentPane — header path truncation (Search Thread Round-2 R5c)', 
   });
 
   it('Detailed: renders a short path verbatim (no truncation needed)', async () => {
+    setShowDeveloperTools(true);
     setUiMode('advanced');
     stubFetchOnce({ content: MD_FIXTURE });
     const el = make();
@@ -542,6 +563,7 @@ describe('DocumentPane — header path truncation (Search Thread Round-2 R5c)', 
   });
 
   it('Simple (default): renders a humanized folder breadcrumb, not the raw path (Tempdoc 738 C4)', async () => {
+    setShowDeveloperTools(true);
     stubFetchOnce({ content: MD_FIXTURE });
     const el = make();
     el.docPath = 'f:\\justsearch-public\\ssot\\docs\\help\\getting-started.md';
@@ -561,6 +583,7 @@ describe('DocumentPane — zero-content diagnostic (tempdoc 671 parity)', () => 
   });
 
   it('shows the provenance diagnostic even when content is empty', async () => {
+    setShowDeveloperTools(true);
     stubFetchOnce({
       content: '',
       textProvenance: 'vdu_pending',
@@ -582,6 +605,7 @@ describe('DocumentPane — VDU abstention-gate provenance (tempdoc 677)', () => 
   });
 
   it('labels vdu_empty as VDU-ran-but-found-nothing, not the silent base-method fall-through', async () => {
+    setShowDeveloperTools(true);
     stubFetchOnce({
       content: 'OCR baseline text',
       textProvenance: 'vdu_empty',
@@ -594,6 +618,7 @@ describe('DocumentPane — VDU abstention-gate provenance (tempdoc 677)', () => 
   });
 
   it('labels vdu_rejected with the abstention-gate label and an explanatory tooltip', async () => {
+    setShowDeveloperTools(true);
     stubFetchOnce({
       content: 'OCR baseline text',
       textProvenance: 'vdu_rejected',
