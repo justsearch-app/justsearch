@@ -147,6 +147,8 @@ export class TopBar extends JfElement {
       padding: var(--jf-space-1) calc(var(--jf-space-4) - var(--jf-space-1) / 2); border-radius: var(--frame-pill-radius);
       font-weight: var(--jf-weight-medium); white-space: nowrap; }
     .segment:hover { color: var(--text-primary); }
+    /* Areas are words only while their words show; an icon stands in only where the word is hidden. */
+    .segment svg { display: none; }
     .segment[aria-current='page'], .area-trigger { background: var(--surface-2); color: var(--text-primary); }
     .segment[aria-current='page'] svg, .area-trigger svg { color: var(--text-secondary); }
     .area-trigger { display: none; }
@@ -189,6 +191,7 @@ export class TopBar extends JfElement {
       .segment:not([aria-current='page']) .label { position: absolute; inline-size: var(--frame-hairline);
         block-size: var(--frame-hairline); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
       .segment:not([aria-current='page']) { padding-inline: var(--jf-space-3); }
+      .segment:not([aria-current='page']) svg { display: inline-block; }
     }
     /* Minimal bar below 720 px of room (45rem; 600 × 400): brand dot, the active area as a menu, pill
        icon, Menu. */
