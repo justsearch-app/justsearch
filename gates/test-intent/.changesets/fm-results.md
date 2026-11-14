@@ -452,3 +452,13 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
   "note": "Entry 1 weakens the live x5 stale-count/facet oracle to row absence; entry 3 has no fail-before evidence (failBefore null), and before/after execution plus file isolation could not be verified because Vitest is missing and dependency preparation fails with EAI_AGAIN."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-88g7ap3z-test-intent",
+  "verdict": "accept",
+  "digest": "sha256:1d60e7801ddcb908d429fa7316889397e9847359b86abd27f3c91b8c26b242de"
+}
+```
