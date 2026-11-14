@@ -17,5 +17,5 @@ it('completed factory-reset storage cleanup clears Hide and Help marks before a 
   expect(native.invoke).toHaveBeenCalledWith('complete_factory_reset_storage');
   __resetInMemoryStateForTest();
   expect(getWalkthroughProgress('core.getting-started')).toBeUndefined();
-  expect(api?.projectFirstUse({ roots: 0, searchable: 0, waiting: 0, reading: false, aiActive: false })).toMatchObject({ visible: true, done: [false, false, false] });
+  expect(api?.projectFirstUse({ roots: 0, searchable: 0, waiting: 0, reading: false, aiActive: false })).toMatchObject({ visible: false, done: [false, false, false] });
 });

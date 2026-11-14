@@ -88,7 +88,7 @@ beforeEach(() => {
       { headers: { 'content-type': 'text/event-stream' } });
     if (path.includes('/api/thread/')) return json({ conversationId: decodeURIComponent(path.split('/api/thread/')[1]!), events: rows, lifecycles: [] });
     if (path.includes('/history')) return json({ messages: rows.map(r => ({ id: r.id, role: r.kind === 'USER_MESSAGE' ? 'user' : 'assistant', content: r.content, ...r.attributes })) });
-    if (path.endsWith('/api/chat/conversations')) return json({ conversations: [] });
+    if (path.includes('/api/chat/conversations?')) return json({ sessions: [{ sessionId:'existing', title:'Saved conversation', firstUserMessage:'', createdAtMs:1, lastActiveAtMs:1, messageCount:2, shapeId:'core.rag-ask' }] });
     return json({});
   });
 });

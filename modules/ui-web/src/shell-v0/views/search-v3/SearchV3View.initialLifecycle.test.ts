@@ -41,7 +41,7 @@ async function mount(shape?: string): Promise<SearchV3View> {
 }
 async function send(el: SearchV3View): Promise<void> {
   await type(el, raw);
-  composer(el).shadowRoot!.querySelector<HTMLButtonElement>('[data-testid=sv3-composer-send]')!.click();
+  composer(el).shadowRoot!.querySelector<HTMLTextAreaElement>('[data-testid=sv3-composer-input]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   await settle(el);
 }
 function releaseHistory(status = 200): void { historyOpen = true; for (const release of releases.splice(0)) release(status); }
@@ -146,7 +146,7 @@ describe('IR15 initial context confirmation', () => {
       if (mode === 'navigation-ABA') { restoreActiveConversation('elsewhere'); await settle(el); restoreActiveConversation('origin'); await settle(el); }
       if (mode === 'search-placement-ABA') {
         emit(el, 'sv3-tier-change', { tier: 'search' }); await settle(el); await type(el, 'search B');
-        composer(el).shadowRoot!.querySelector<HTMLButtonElement>('[data-testid=sv3-composer-send]')!.click(); await settle(el);
+        composer(el).shadowRoot!.querySelector<HTMLTextAreaElement>('[data-testid=sv3-composer-input]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await settle(el);
         restoreActiveConversation('origin'); await settle(el);
       }
       if (mode === 'New') el.shadowRoot!.querySelector('jf-sv3-sidebar')!.dispatchEvent(new CustomEvent('sv3-session-new', { bubbles: true, composed: true }));

@@ -162,21 +162,6 @@ export const HISTORY_LOCKED_REFUSED = 'Your last message was not sent.';
 /** The transparency note (tempdoc 603 C2; inventory C8) — the reference window's own label. */
 export const REWRITE_NOTE_LABEL = 'Interpreted as:';
 
-/**
- * The zero-corpus remedy (tempdoc 811 C-4; inventory E10) — the shipped landing's own wording, which
- * names both the destination and why the reader is being sent there.
- */
-export const CORPUS_ADD_FOLDERS = 'Add folders in Library to start searching';
-
-/** Beside the remedy: the reader has no files of their own to search yet (the bundled Help aside). */
-export const CORPUS_NONE = 'None of your files are searchable yet.';
-
-/** The person's own file count is not known: said in words, never a number (FA4). */
-export const CORPUS_UNKNOWN = 'Searching your files · how many is not known yet';
-
-/** Where {@link CORPUS_ADD_FOLDERS} goes. The surface that OWNS folder management, not one hop short. */
-export const CORPUS_REMEDY_TARGET = 'core.library-surface';
-
 /* ── The degradation banner (inventory E1/E2/E3) ───────────────────────────────────────────────
  *
  * The banner's HEADLINE, BODY, CAUSES and REMEDY LABEL are all the readiness authority's
@@ -270,7 +255,7 @@ export const CONTEXT_SUMMARY_SAVE = 'Save';
 export const CONTEXT_SUMMARY_CANCEL = 'Cancel';
 
 /** The bar under the transcript: the meter's trigger, and the aggregate of what is hidden. */
-export const CONTEXT_METER_LABEL = 'Context';
+const CONTEXT_METER_LABEL = 'Context';
 export const CONTEXT_METER_BAR_LABEL = 'Context window used';
 export const CONTEXT_INCLUDE_ALL = 'Include all';
 export const CONTEXT_INCLUDE_ALL_LABEL = 'Include every hidden message back into the context';

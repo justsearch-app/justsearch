@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { setInstallState as firstMinutesInstall } from '../../state/aiStateStore.js';
+import { getShowDeveloperTools, setShowDeveloperTools as firstMinutesDeveloper } from '../../state/developerToolsState.js';
 
 /**
  * The composer's MODE control (tempdoc 852 S4, parity ledger row 12) — the visible affordance for a
@@ -112,7 +114,6 @@ import {
 } from './Sv3Composer.js';
 import {
   SV3_DELEGATE_SEND_HINT,
-  SV3_SEARCH_SEND_HINT,
   SV3_SEND_HINT,
   SV3_TIER_DEFAULT,
   SV3_TIER_MENU_LABEL,
@@ -128,7 +129,7 @@ let fetchMock: ReturnType<typeof vi.fn>;
 /** The observed state in which BOTH tiers are available — the window's own precondition. */
 function aiOnline(): void {
   __feedForTest({
-    inference: { mode: 'online', available: true } as never,
+    inference: { gpu: { cudaAvailable: true }, mode: 'online', available: true } as never,
     status: { worker: { core: { indexedDocuments: 42 } } } as unknown as StatusSnapshot,
   });
   __feedContactForTest();
@@ -141,7 +142,7 @@ function aiOnline(): void {
  */
 function aiOnlineWithoutDocuments(): void {
   __feedForTest({
-    inference: { mode: 'online', available: true } as never,
+    inference: { gpu: { cudaAvailable: true }, mode: 'online', available: true } as never,
     status: { worker: { core: { indexedDocuments: 0 } } } as unknown as StatusSnapshot,
   });
   __feedContactForTest();
@@ -153,7 +154,10 @@ const askDispatches = (): unknown[][] =>
 const searchRequests = (): unknown[][] =>
   fetchMock.mock.calls.filter((call) => String(call[0]).includes('/api/knowledge/search'));
 
+let previousDeveloperTools: boolean;
+
 beforeEach(() => {
+  previousDeveloperTools = getShowDeveloperTools();
   sessionStorage.clear();
   localStorage.clear();
   __resetConversationListForTest();
@@ -163,13 +167,13 @@ beforeEach(() => {
   ctrlExists = false;
   fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, body: null });
   vi.stubGlobal('fetch', fetchMock);
-  __resetAiStateForTest();
+  __resetAiStateForTest(); firstMinutesInstall(true, false); firstMinutesDeveloper(true);
 });
 
 afterEach(() => {
   for (const child of [...document.body.children]) child.remove();
   resetSearchState();
-  __resetAiStateForTest();
+  __resetAiStateForTest(); firstMinutesDeveloper(previousDeveloperTools);
   vi.unstubAllGlobals();
 });
 
@@ -235,7 +239,13 @@ async function type(el: Mounted, draft: string): Promise<HTMLTextAreaElement> {
 /** Send through the primary control — the affordance the mode control governs. */
 async function pressSend(el: Mounted): Promise<void> {
   const composer = await region(el, 'jf-sv3-composer');
-  q<HTMLButtonElement>(composer, 'sv3-composer-send')?.click();
+  if ((el as SearchV3View).tier === 'search') {
+    (await type(el, composer.shadowRoot!.querySelector<HTMLTextAreaElement>('textarea')!.value)).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  } else {
+    const send = q<HTMLButtonElement>(composer, 'sv3-composer-send');
+    expect(send).not.toBeNull();
+    send!.click();
+  }
   await settle(el);
 }
 
@@ -282,7 +292,8 @@ describe('the mode the next send takes is on screen, not only in a chord', () =>
     const row = [
       ...(composer.shadowRoot?.querySelectorAll<HTMLElement>('.controls [data-testid]') ?? []),
     ].map((node) => node.dataset.testid);
-    expect(row.slice(0, 2)).toEqual(['sv3-composer-tier', 'sv3-composer-effort']);
+    expect(row[0]).toBe('sv3-composer-tier');
+    expect(row).not.toContain('sv3-composer-effort');
   });
 
   it('opens a radio menu naming every tier, with the default badged', async () => {
@@ -398,8 +409,8 @@ describe('the accelerator keeps its meaning', () => {
     await type(el, 'delegate this');
     await pressEnter(el, { ctrlKey: true });
 
-    expect(submits).toEqual([{ query: 'delegate this', tier: 'delegate' }]);
-    expect(ctrl.send).toHaveBeenCalledTimes(1);
+    expect(submits).toEqual([]);
+    expect(ctrl.send).not.toHaveBeenCalled();
     expect(askDispatches()).toHaveLength(0);
   });
 
@@ -449,7 +460,7 @@ describe('the routing explanation follows the mode', () => {
     const composer = await region(el, 'jf-sv3-composer');
     const send = () => q<HTMLButtonElement>(composer, 'sv3-composer-send');
 
-    expect(send()?.getAttribute('aria-label')).toContain(SV3_SEARCH_SEND_HINT);
+    expect(send()).toBeNull();
 
     await chooseTier(el, 'ask');
     await composer.updateComplete;
@@ -477,7 +488,7 @@ describe('the notice states the CHOSEN tier availability', () => {
     // Search, the default, refuses nothing here: the ask tier's reason is not its to state.
     expect(notice()).toBeNull();
 
-    await chooseTier(el, 'ask');
+    (el as SearchV3View).tier = 'ask'; await el.updateComplete;
     await composer.updateComplete;
     const askReason = notice()?.textContent?.trim() ?? '';
     expect(askReason).not.toBe('');
@@ -503,6 +514,7 @@ describe('the control row holds at most one open menu', () => {
     const el = await mount();
     const composer = await region(el, 'jf-sv3-composer');
 
+    await chooseTier(el, 'ask');
     q<HTMLButtonElement>(composer, 'sv3-composer-effort')?.click();
     await composer.updateComplete;
     expect(q(composer, 'sv3-composer-effort-menu')).not.toBeNull();

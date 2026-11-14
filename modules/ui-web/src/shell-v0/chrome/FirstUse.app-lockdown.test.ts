@@ -70,7 +70,7 @@ type AppWindow = Window & { observe(roots: number | null, count: number | null, 
   attachHost(): void; addCalls: unknown[]; finishAdd(result: unknown): void;
   updateHelp(n: number): void;
   search: { setQuery(query: string): void; submitSearch(): void };
-  firstUse: { recordFirstUseSearch(): void; hideGettingStarted(): void; reopenGettingStarted(): void };
+  firstUse: { hideGettingStarted(): void; reopenGettingStarted(): void };
   userState: { markWalkthroughStepComplete(id: string, step: string): void; createProfile(id: string, label: string): void; setActiveProfileId(id: string): void };
 };
 let server: ViteDevServer;
@@ -124,40 +124,39 @@ describe('first use through the real frame', { timeout: 60_000 }, () => {
     await page.evaluate(() => (window as unknown as AppWindow).observe(1, 2, 8)); await settle(page);
     expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(0);
     expect(await page.locator('jf-sv3-composer textarea').count()).toBe(1);
-    expect(await page.getByText('2 files searchable so far · 8 waiting to be read', { exact: true }).count()).toBe(1);
+    expect(await page.getByText('2 files searchable so far', { exact: true }).count()).toBe(0);
   });
   it('Help alone keeps setup current, and unknown own counts stay unknown', async () => {
     const page = await open();
     expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(1);
-    expect(await page.locator('jf-status-pill').getByRole('button', { name: 'Getting started · 1 of 3', exact: true }).count()).toBe(1);
+    expect(await page.locator('jf-status-pill').getByRole('button', { name: 'Getting started · 1 of 3', exact: true }).count()).toBe(0);
     await page.evaluate(() => { const w = window as unknown as AppWindow; w.search.setQuery('help'); w.search.submitSearch(); }); await settle(page);
-    expect(await card(page).count()).toBe(1);
+    expect(await card(page).count()).toBe(0);
     expect(await page.locator('jf-getting-started [aria-label="Done"]').count()).toBe(0);
     await page.evaluate(() => (window as unknown as AppWindow).updateHelp(8)); await page.clock.runFor(60_000); await settle(page);
-    expect(await card(page).count()).toBe(1);
+    expect(await card(page).count()).toBe(0);
     expect(await page.locator('jf-getting-started [aria-label="Done"]').count()).toBe(0);
     await page.goto(url + '?own-unknown'); await page.locator('body[data-ready="true"]').waitFor(); await settle(page);
     expect(await card(page).count()).toBe(0);
     expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(0);
   });
-  it('a folder is under way until own documents exist; empty folders point to Library', async () => {
+  it('reading exposes only the partial count; settled folders repeat no corpus fact', async () => {
     const page = await open();
-    expect(await card(page).count()).toBe(1);
     await page.evaluate(() => (window as unknown as AppWindow).observe(1, 0, 8)); await settle(page);
-    expect(await page.locator('jf-getting-started [aria-label="Done"]').count()).toBe(0);
-    expect(await card(page).textContent()).toContain('Under way');
+    expect(await card(page).count()).toBe(0);
+    expect(await page.getByText('0 files searchable so far', { exact: true }).count()).toBe(0);
     await page.evaluate(() => (window as unknown as AppWindow).observe(1, 0)); await settle(page);
-    expect(await page.locator('jf-getting-started [aria-label="Done"]').count()).toBe(0);
-    expect(await page.locator('jf-getting-started').getByRole('button', { name: 'Open Library', exact: true }).count()).toBe(1);
+    expect(await page.getByText('0 files searchable so far', { exact: true }).count()).toBe(0);
+    expect(await page.locator('jf-sv3-composer textarea').count()).toBe(1);
     await page.evaluate(() => (window as unknown as AppWindow).observe(0, 1)); await settle(page);
-    expect(await page.locator('jf-getting-started [aria-label="Done"]').count()).toBe(1);
-    expect(await page.getByText('1 file searchable so far', { exact: true }).count()).toBe(1);
+    expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(0);
+    expect(await page.getByText('1 file searchable so far', { exact: true }).count()).toBe(0);
     await page.evaluate(() => (window as unknown as AppWindow).updateHelp(8)); await page.clock.runFor(60_000); await settle(page);
-    expect(await page.getByText('1 file searchable so far', { exact: true }).count()).toBe(1);
+    expect(await page.getByText('1 file searchable so far', { exact: true }).count()).toBe(0);
   });
   it('browser cancel and add failure restore keyboard focus; duplicate submission stays single', async () => {
     const page = await open();
-    expect(await card(page).count()).toBe(1);
+    expect(await card(page).count()).toBe(0);
     await page.evaluate(() => (window as unknown as AppWindow).attachHost()); await settle(page);
     await add(page).click();
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -178,21 +177,20 @@ describe('first use through the real frame', { timeout: 60_000 }, () => {
     await page.evaluate(() => (window as unknown as AppWindow).observe(0, 0)); await settle(page);
     expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(1);
   });
-  it('Hide, a real second window, reload, Help reopen and profile switch share the same progress', async () => {
-    const page = await open(); expect(await card(page).count()).toBe(1);
+  it('legacy progress remains shared across windows, reload and profiles without resurrecting removed UI', async () => {
+    const page = await open();
     const other = await context!.newPage(); await other.goto(url); await other.locator('body[data-ready="true"]').waitFor();
-    await other.locator('jf-getting-started .card').waitFor();
-    await page.getByRole('button', { name: 'Hide Getting started', exact: true }).click();
-    await other.waitForFunction(() => { const raw = localStorage.getItem('justsearch.userState.v2'); return raw && JSON.parse(raw).walkthroughState?.['core.getting-started']?.dismissed; });
+    await page.evaluate(() => (window as unknown as AppWindow).firstUse.hideGettingStarted());
+    await other.waitForFunction(() => JSON.parse(localStorage.getItem('justsearch.userState.v2') || '{}').walkthroughState?.['core.getting-started']?.dismissed);
     await settle(other); expect(await card(other).count()).toBe(0);
     await page.reload(); await page.locator('body[data-ready="true"]').waitFor(); await settle(page);
     expect(await card(page).count()).toBe(0);
-    await page.evaluate(() => { location.hash = '#justsearch://surface/core.help-surface'; });
-    await page.locator('jf-help-surface').getByRole('button', { name: 'Getting started', exact: true }).click();
-    await card(page).waitFor(); await settle(other);
-    expect(await card(other).count()).toBe(1);
+    await page.evaluate(() => (window as unknown as AppWindow).firstUse.reopenGettingStarted());
+    await other.waitForFunction(() => JSON.parse(localStorage.getItem('justsearch.userState.v2') || '{}').walkthroughState?.['core.getting-started']?.dismissed === false);
+    await settle(other); expect(await card(other).count()).toBe(0);
     await page.evaluate(() => { const w = window as unknown as AppWindow; w.userState.createProfile('work', 'Work'); w.userState.setActiveProfileId('work'); });
-    await settle(page); expect(await card(page).count()).toBe(1);
+    await settle(page); expect(await card(page).count()).toBe(0);
+    expect(await add(page).count()).toBe(1);
   });
   it('explicit addresses and the saved journal win without an onboarding history entry', async () => {
     const page = await open('', '#justsearch://surface/core.library-surface');
@@ -205,31 +203,28 @@ describe('first use through the real frame', { timeout: 60_000 }, () => {
     expect(await page.locator('jf-library-surface').count()).toBe(1);
     expect(await card(page).count()).toBe(0);
   });
-  it('keyword search needs no AI and Help reopening stays visible after a returned search', async () => {
-    const page = await open(); expect(await card(page).count()).toBe(1);
+  it('keyword search needs no AI and writes no first-use completion', async () => {
+    const page = await open();
     await page.evaluate(() => (window as unknown as AppWindow).observe(1, 2)); await settle(page);
-    await page.locator('jf-sv3-composer textarea').fill('notes'); await page.keyboard.press('Enter');
-    await page.waitForFunction(() => JSON.parse(localStorage.getItem('justsearch.userState.v2') || '{}').walkthroughState?.['core.getting-started']?.completedStepIds.includes('try-search'));
-    await settle(page); expect(await card(page).count()).toBe(0);
+    await page.locator('jf-sv3-composer textarea').fill('notes'); await page.keyboard.press('Enter'); await settle(page);
+    expect(await page.locator('jf-sv3-results').count()).toBe(1);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('justsearch.userState.v2') || '{}').walkthroughState?.['core.getting-started']?.completedStepIds ?? [])).not.toContain('try-search');
     await page.evaluate(() => { location.hash = '#justsearch://surface/core.help-surface'; });
-    await page.locator('jf-help-surface').getByRole('button', { name: 'Getting started', exact: true }).click();
-    await settle(page);
-    expect(await card(page).count(), 'Help reopening must survive a docked Search composer').toBe(1);
-    expect(await page.locator('jf-getting-started .step').filter({ hasText: 'Optional: answers and search by meaning' }).count()).toBe(1);
-    expect(await page.locator('jf-getting-started [aria-label="Done"]').count()).toBe(2);
+    await page.locator('jf-help-surface').waitFor();
+    expect(await page.locator('jf-help-surface').getByRole('button', { name: 'Getting started', exact: true }).count()).toBe(0);
     expect(await page.evaluate(() => (window as unknown as AppWindow).addCalls.length)).toBe(0);
   });
-  it('reloading during indexing rediscovers the folder and live count before offering search', async () => {
-    const page = await open('?reading'); expect(await card(page).count()).toBe(1);
+  it('reloading during reading rediscovers the folder without a first-reading count', async () => {
+    const page = await open('?reading'); expect(await card(page).count()).toBe(0);
     for (let i = 0; i < 2; i++) {
-      expect(await page.getByText('2 files searchable so far · 8 waiting to be read', { exact: true }).count()).toBe(1);
+      expect(await page.getByText('2 files searchable so far', { exact: true }).count()).toBe(0);
       expect(await page.locator('jf-sv3-composer textarea').count()).toBe(1);
       expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(0);
       if (i === 0) { await page.reload(); await page.locator('body[data-ready="true"]').waitFor(); await settle(page); }
     }
   });
   it('leaving and returning during an add keeps failure actionable and focuses the new path field', async () => {
-    const page = await open(); expect(await card(page).count()).toBe(1);
+    const page = await open(); expect(await card(page).count()).toBe(0);
     await page.evaluate(() => (window as unknown as AppWindow).attachHost()); await settle(page);
     await add(page).click(); await page.getByRole('textbox', { name: 'Folder path', exact: true }).fill('/notes');
     await page.getByRole('button', { name: 'Add', exact: true }).click();
@@ -245,7 +240,7 @@ describe('first use through the real frame', { timeout: 60_000 }, () => {
   for (const [width, height] of [[1280, 800], [900, 800], [600, 400]] as const) {
     for (const theme of ['dark', 'light', 'forced']) it(`${width}x${height}, ${theme}, enlarged text keeps setup actions reachable without horizontal overflow`, async () => {
       const page = await open('', '', { width, height });
-      expect(await card(page).count()).toBe(1);
+      expect(await card(page).count()).toBe(0);
       await page.emulateMedia({ colorScheme: theme === 'light' ? 'light' : 'dark', forcedColors: theme === 'forced' ? 'active' : 'none' });
       await page.evaluate(palette => { document.documentElement.setAttribute('data-theme', palette); document.documentElement.style.fontSize = '200%'; }, theme === 'light' ? 'light' : 'dark');
       await settle(page);
@@ -258,8 +253,8 @@ describe('first use through the real frame', { timeout: 60_000 }, () => {
         } }; walk(el.shadowRoot!); return bad;
       });
       expect(overflow).toEqual([]);
-      await page.getByRole('button', { name: 'Open AI Brain', exact: true }).scrollIntoViewIfNeeded();
-      expect(await page.getByRole('button', { name: 'Open AI Brain', exact: true }).isVisible()).toBe(true);
+      await add(page).scrollIntoViewIfNeeded();
+      expect(await add(page).isVisible()).toBe(true);
       await add(page).click();
       expect(await page.getByRole('textbox', { name: 'Folder path', exact: true }).isVisible()).toBe(true);
     });

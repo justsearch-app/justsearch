@@ -16,6 +16,7 @@
  */
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import './SearchV3View.js';
+import { submitInSession as localConversation, SV3_SESSIONS_EMPTY as EMPTY_CONVERSATIONS } from './sv3-sessions.js';
 import type { SearchV3View } from './SearchV3View.js';
 import { Sv3SessionRow } from './Sv3SessionRow.js';
 import { Sv3Sidebar } from './Sv3Sidebar.js';
@@ -46,8 +47,9 @@ function widen(el: HTMLElement, width: number): void {
   el.getBoundingClientRect = () => ({ width, height: 900, x: 0, y: 0, top: 0, left: 0, right: width, bottom: 900, toJSON: () => ({}) }) as DOMRect;
 }
 
-async function mount(boxWidth = 1568): Promise<Mounted> {
+async function mount(boxWidth = 1568, existing = true): Promise<Mounted> {
   const el = document.createElement('jf-sv3-window') as Mounted;
+  if (existing) el.sessions = { ...localConversation(EMPTY_CONVERSATIONS, 'Pending local conversation', 1, 'ask', 'geometry-conversation'), activeId: null };
   widen(el, boxWidth);
   document.body.appendChild(el);
   await el.updateComplete;
@@ -518,7 +520,7 @@ describe('renaming a conversation from its row', () => {
         }),
       ),
     );
-    const el = await mount();
+    const el = await mount(1568, false);
     await loadConversations();
     await el.updateComplete;
     await sidebar(el).updateComplete;

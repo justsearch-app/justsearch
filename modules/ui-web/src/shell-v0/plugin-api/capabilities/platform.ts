@@ -114,7 +114,10 @@ export function createPlatformApi(tier: PluginTrustTier): PluginPlatform {
             return null;
           }
         },
-        pickFolder: () => nativePickFolder(),
+        pickFolder: async () => {
+          const result = await nativePickFolder();
+          return typeof result === 'string' ? result : null;
+        },
         // 577 Phase 8 — delegates to the one revealLocalPath invoke site.
         revealInExplorer: (path: string) => revealLocalPath(path),
         openExternal: async (url: string) => openExternalUrl(url),

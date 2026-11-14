@@ -20,6 +20,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import './SearchV3View.js';
+import { getShowDeveloperTools, setShowDeveloperTools } from '../../state/developerToolsState.js';
 import type { SearchV3View } from './SearchV3View.js';
 import { Sv3Composer } from './Sv3Composer.js';
 import { Sv3SessionRow } from './Sv3SessionRow.js';
@@ -92,7 +93,10 @@ function aiOnline(): void {
   __feedContactForTest();
 }
 
+let previousDeveloperTools: boolean;
+
 beforeEach(() => {
+  previousDeveloperTools = getShowDeveloperTools();
   sessionStorage.clear();
   localStorage.clear();
   __resetConversationListForTest();
@@ -103,7 +107,7 @@ beforeEach(() => {
   fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
   stubFetch();
-  aiOnline();
+  aiOnline(); setShowDeveloperTools(true);
 });
 
 afterEach(() => {
@@ -111,6 +115,7 @@ afterEach(() => {
   for (const el of [...document.querySelectorAll('input.outsider')]) el.remove();
   resetSearchState();
   __resetAiStateForTest();
+  setShowDeveloperTools(previousDeveloperTools);
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -383,7 +388,7 @@ describe('tempdoc 864 Layer 1(b) — the whole glass box is the field', () => {
   });
 
   it('a press on the model label is left alone, so its text stays selectable', async () => {
-    const el = await mount();
+    const el = await mount(); el.tier = 'ask'; await el.updateComplete;
     const composer = await region(el, 'jf-sv3-composer');
     const field = await fieldOf(el);
     blurEverything();

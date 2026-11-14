@@ -1089,7 +1089,7 @@ describe('presence: a live run this window never dispatched (tempdoc 822 Phase F
     aiOnline();
     const el = await mount();
     await settle(el);
-    expect(await rowsOf(el)).toHaveLength(0);
+    expect(el.shadowRoot!.querySelector('jf-sv3-sidebar')).toBeNull();
     expect(getCtrl).not.toHaveBeenCalled();
   });
 });

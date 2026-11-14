@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { setInstallState as firstMinutesInstall } from '../../state/aiStateStore.js';
+import { getShowDeveloperTools, setShowDeveloperTools as firstMinutesDeveloper } from '../../state/developerToolsState.js';
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import './SearchV3View.js';
@@ -62,10 +64,13 @@ async function type(view: SearchV3View, id: string, value: string): Promise<void
   const field = control<HTMLTextAreaElement>(composer(view), id);
   field.value = value; field.dispatchEvent(new Event('input')); await settle(view);
 }
+let previousDeveloperTools: boolean;
+
 beforeEach(() => {
+  previousDeveloperTools = getShowDeveloperTools();
   registerCoreStores(); resetInspectorState(); sessionStorage.clear(); localStorage.clear();
-  __resetConversationListForTest(); __resetDraftProvidersForTest(); __resetDraftKeptForTest(); __resetAiStateForTest();
-  __feedForTest({ inference: { mode: 'online', available: true } as never,
+  __resetConversationListForTest(); __resetDraftProvidersForTest(); __resetDraftKeptForTest(); __resetAiStateForTest(); firstMinutesInstall(true, false); firstMinutesDeveloper(true);
+  __feedForTest({ inference: { gpu: { cudaAvailable: true }, mode: 'online', available: true } as never,
     status: { worker: { core: { indexedDocuments: 42 } } } as unknown as StatusSnapshot });
   __feedContactForTest();
   http = vi.fn(async (url: unknown) => String(url).includes('/api/chat/dispatch') ? done()
@@ -75,7 +80,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   deactivateProjection(); takePendingSelection(); document.body.replaceChildren(); await new Promise<void>(resolve => setTimeout(resolve, 0));
-  resetSearchState(); __resetAiStateForTest(); __resetAgentSessionStore();
+  resetSearchState(); __resetAiStateForTest(); firstMinutesDeveloper(previousDeveloperTools); __resetAgentSessionStore();
   vi.unstubAllGlobals(); vi.restoreAllMocks();
 });
 
@@ -109,7 +114,7 @@ for (const preparation of ['text', 'files', 'schema'] as const) {
     const view = await mount();
     if (preparation !== 'text') {
       await type(view, 'sv3-composer-input', 'chosen');
-      control(composer(view), 'sv3-composer-send').click(); await settle(view);
+      control<HTMLTextAreaElement>(composer(view), 'sv3-composer-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await settle(view);
       control(view, 'sv3-column').dispatchEvent(new CustomEvent('card-scope-file',
         { detail: { path: 'chosen.md' }, bubbles: true, composed: true })); await settle(view);
     }

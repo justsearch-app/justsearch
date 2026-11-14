@@ -94,6 +94,7 @@
       "outFile": "search-trace.ts",
       "consumers": [
         "modules/ui-web/src/shell-v0/state/searchState.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/sv3-search.ts",
         "modules/ui-web/src/api/generated/index.ts"
       ]
     },

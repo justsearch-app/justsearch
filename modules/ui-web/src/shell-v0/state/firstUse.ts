@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** One first-use projection. Unknown observations never become setup advice. */
 import { getAiState, subscribeAiState, type AiState } from './aiStateStore.js';
+import { folderStatus } from './folderStatus.js';
 import { isWorkerReportedIndex, selectIndexingProgress } from './indexingProgress.js';
 import { getWalkthroughProgress, mutateDocument, subscribeWalkthroughProgress, type WalkthroughProgress } from './UserStateDocument.js';
 import type { IndexedRootView } from '../../api/generated/schema-types/indexed-root-view.js';
@@ -22,19 +23,16 @@ function validProgress(value: unknown): WalkthroughProgress | undefined {
     && p.completedStepIds.every(s => typeof s === 'string') && typeof p.dismissed === 'boolean'
     ? p as WalkthroughProgress : undefined;
 }
-export function projectFirstUse(facts: FirstUseFacts, saved?: unknown, legacy?: unknown, suppressed = false, pluginPending = false) {
+export function projectFirstUse(facts: FirstUseFacts, saved?: unknown, _legacy?: unknown, suppressed = false, _pluginPending = false) {
   const progress = validProgress(saved);
-  const old = validProgress(legacy);
   const own = facts.searchable;
   const count = own !== null && Number.isSafeInteger(own) && own >= 0 ? own : null;
   const done = [(count ?? 0) > 0,
     progress?.completedStepIds.includes('try-search') ?? false, facts.aiActive] as const;
   const reopened = progress?.completedStepIds.includes(REOPENED_MARKER) ?? false;
   const known = facts.roots !== null && count !== null;
-  const oldFinished = !!old && (old.dismissed || old.activeStepIndex >= 4);
-  const coreVisible = !suppressed && !progress?.dismissed && (reopened || known && !(done[0] && done[1])
-    && !(oldFinished && (facts.roots ?? 0) > 0));
-  const visible = !suppressed && !progress?.dismissed && (coreVisible || pluginPending);
+  const coreVisible = false;
+  const visible = false;
   const reading = facts.waiting !== null && facts.waiting > 0
     ? `${facts.waiting.toLocaleString()} waiting to be read` : facts.reading ? 'still reading' : '';
   return { ...facts, searchable: count, done, reopened, visible, coreVisible, known,
@@ -51,6 +49,34 @@ export type FirstUse = ReturnType<typeof projectFirstUse>;
 let roots: readonly IndexedRootView[] | null = null;
 let paths: ReadonlyMap<string, string> = new Map();
 const listeners = new Set<() => void>();
+// Window-session only: a restart never revives a first-reading count.
+const sessionReadings = new Map<string, boolean>();
+const normalizeFolder = (path: string) => {
+  const normalized = path.replaceAll('\\', '/').replace(/\/+$/, '') || '/';
+  return /^[a-z]:/i.test(normalized) ? normalized.toLowerCase() : normalized;
+};
+export function recordFirstUseFolderAdded(path: string, watchedBefore: readonly string[] | null): void {
+  const key = normalizeFolder(path);
+  if (watchedBefore?.some(value => normalizeFolder(value) === key)) return;
+  sessionReadings.set(key, false);
+  for (const listener of listeners) listener();
+}
+function sessionReadingActive(facts: FirstUseFacts, ai: AiState): boolean {
+  const fresh = ai.indexingStatusLive && isWorkerReportedIndex(ai.status)
+    && ai.status?.meta?.workerRpcStale !== true
+    && !ai.status?.operating?.freshness?.staleSources?.includes('indexing');
+  for (const [path, seenReading] of sessionReadings) {
+    const root = roots?.find(root => root.pathHash && normalizeFolder(paths.get(root.pathHash) ?? '') === path);
+    if (!fresh) continue;
+    const folder = root && folderStatus(root, { relativeTime: '', verifiedRelativeTime: '', provisional: false });
+    if (folder && ['ready', 'empty', 'keyword-only'].includes(folder.state)
+      || seenReading && !facts.reading && facts.waiting === 0
+        && selectIndexingProgress(ai.status, true, ai.episodeMaxPendingJobs, ai.enrichSettleSamples).phase === 'ready') {
+      sessionReadings.delete(path);
+    } else if (facts.reading) sessionReadings.set(path, true);
+  }
+  return sessionReadings.size > 0;
+}
 /** Fed by the existing frame observation; no new roots poller. Paths are retained on worker loss. */
 export function setFirstUseRoots(value: readonly IndexedRootView[] | null, resolved: ReadonlyMap<string, string>): void {
   roots = value; paths = new Map(resolved);
@@ -68,22 +94,28 @@ export function firstUseFacts(ai: AiState): FirstUseFacts {
   const progress = selectIndexingProgress(ai.status, ai.indexingStatusLive, ai.episodeMaxPendingJobs, ai.enrichSettleSamples);
   const queueKnown = ai.indexingStatusLive && isWorkerReportedIndex(ai.status)
     && typeof ai.status?.worker?.core?.pendingJobs === 'number';
+  const readingObserved = ai.indexingStatusLive && isWorkerReportedIndex(ai.status)
+    && ai.status?.meta?.workerRpcStale !== true
+    && !ai.status?.operating?.freshness?.staleSources?.includes('indexing');
   return { roots: roots === null ? null : roots.length,
     searchable: count !== null && Number.isInteger(count) && count >= 0 ? count : null,
     waiting: queueKnown ? progress.jobsQueued : null,
     // A scan can still be finding files while its observed queue is empty or absent.
-    reading: progress.activity.confirmed && !progress.pause
+    reading: readingObserved && !progress.pause
       && (progress.phase === 'indexing' || ai.status?.worker?.core?.indexState === 'INDEXING'),
     aiActive: ai.snapshotLive && ai.runtime.mode === 'online' && ai.capabilities.chat,
   };
 }
-export function getFirstUse(): FirstUse {
+export function getFirstUse(): FirstUse & { readonly sessionReading: boolean } {
   const suppressed = typeof location !== 'undefined' && new URLSearchParams(location.search).get('demoMode') === '1';
   const pending = listWalkthroughs().some(w => {
     const p = getWalkthroughProgress(w.id);
     return !p?.dismissed && (p?.activeStepIndex ?? 0) < w.steps.length;
   });
-  return projectFirstUse(firstUseFacts(getAiState()), getWalkthroughProgress(GETTING_STARTED_ID), getWalkthroughProgress('welcome'), suppressed, pending);
+  const ai = getAiState();
+  const facts = firstUseFacts(ai);
+  return { ...projectFirstUse(facts, getWalkthroughProgress(GETTING_STARTED_ID), getWalkthroughProgress('welcome'), suppressed, pending),
+    sessionReading: sessionReadingActive(facts, ai) };
 }
 export function subscribeFirstUse(listener: () => void): () => void {
   listeners.add(listener);
@@ -103,17 +135,6 @@ export function reopenGettingStarted(): void {
   mutateDocument(doc => { const ids = doc.walkthroughState?.[GETTING_STARTED_ID]?.completedStepIds ?? [];
     return { ...doc, walkthroughState: { ...doc.walkthroughState, [GETTING_STARTED_ID]: {
       activeStepIndex: 0, completedStepIds: [...new Set([...ids, REOPENED_MARKER])], dismissed: false,
-    } } };
-  });
-}
-/** Called only at searchState's successful response seam, never from a subscriber or restored rows. */
-export function recordFirstUseSearch(): void {
-  if ((getFirstUse().searchable ?? 0) <= 0) return;
-  mutateDocument(doc => {
-    const prev = doc.walkthroughState?.[GETTING_STARTED_ID];
-    if (prev?.completedStepIds.includes('try-search')) return doc;
-    return { ...doc, walkthroughState: { ...doc.walkthroughState, [GETTING_STARTED_ID]: {
-      activeStepIndex: 0, completedStepIds: [...(prev?.completedStepIds ?? []), 'try-search'], dismissed: prev?.dismissed ?? false,
     } } };
   });
 }

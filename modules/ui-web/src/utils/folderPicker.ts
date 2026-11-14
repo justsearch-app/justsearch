@@ -12,6 +12,8 @@
 
 import { isTauriRuntime } from './tauriRuntime';
 
+export type FolderPickerResult = string | null | { readonly error: string };
+
 export interface PickFolderOptions {
   title?: string;
   /** Optional starting directory for the dialog. */
@@ -21,14 +23,13 @@ export interface PickFolderOptions {
 /**
  * Open a native folder-picker dialog.
  *
- * @returns the selected absolute path, or `null` when:
- *   - the user cancelled
- *   - the runtime isn't Tauri (browser dev mode)
- *   - the dialog plugin failed to load
+ * @returns the selected absolute path, `null` on cancellation or browser runtime,
+ * or an error outcome for internal first-launch recovery. PluginPlatform maps
+ * failures back to `null` to preserve the plugin API contract.
  */
 export async function pickFolder(
   options: PickFolderOptions = {},
-): Promise<string | null> {
+): Promise<FolderPickerResult> {
   if (!isTauriRuntime()) return null;
   try {
     const mod = await import('@tauri-apps/plugin-dialog');
@@ -41,7 +42,7 @@ export async function pickFolder(
     if (Array.isArray(chosen)) return chosen[0] ?? null;
     if (typeof chosen === 'string' && chosen.length > 0) return chosen;
     return null;
-  } catch {
-    return null;
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
   }
 }

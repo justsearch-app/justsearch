@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { setInstallState as firstMinutesInstall } from '../../state/aiStateStore.js';
+import { getShowDeveloperTools, setShowDeveloperTools as firstMinutesDeveloper } from '../../state/developerToolsState.js';
 
 /**
  * Search mode in Search v3 (WP1.1) — end to end against a fake backend.
@@ -305,22 +307,25 @@ async function answerLatest(el: Mounted, answer = 'It is in the lease.'): Promis
 
 function aiOnline(): void {
   __feedForTest({
-    inference: { mode: 'online', available: true, llmContextTokens: 4096 } as never,
+    inference: { gpu: { cudaAvailable: true }, mode: 'online', available: true, llmContextTokens: 4096 } as never,
     status: { worker: { core: { indexedDocuments: 42 } } } as unknown as StatusSnapshot,
   });
   __feedContactForTest();
 }
 
-/** The no-GPU install: a reachable backend, documents indexed, and no chat model at all. */
+/** Reachable backend and CUDA, with documents indexed but no available chat model. */
 function chatUnavailable(): void {
   __feedForTest({
-    inference: { mode: 'unknown', available: false } as never,
+    inference: { gpu: { cudaAvailable: true }, mode: 'unknown', available: false } as never,
     status: { worker: { core: { indexedDocuments: 42 } } } as unknown as StatusSnapshot,
   });
   __feedContactForTest();
 }
 
+let previousDeveloperTools: boolean;
+
 beforeEach(() => {
+  previousDeveloperTools = getShowDeveloperTools();
   __seedForTest(Object.fromEntries(readFileSync('../app-api/src/main/resources/messages/registry-surface.en.properties', 'utf8')
     .split(/\r?\n/).filter(line => line.startsWith('search.')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])));
   sessionStorage.clear();
@@ -328,7 +333,7 @@ beforeEach(() => {
   __resetConversationListForTest();
   __resetDraftProvidersForTest();
   __resetDraftKeptForTest();
-  __resetAiStateForTest();
+  __resetAiStateForTest(); firstMinutesInstall(true, false); firstMinutesDeveloper(true);
   __resetSearchFiltersForTest();
   clearScopeChips();
   ctrl = makeCtrl();
@@ -357,7 +362,7 @@ afterEach(() => {
   resetSearchState();
   clearScopeChips();
   __resetSearchFiltersForTest();
-  __resetAiStateForTest();
+  __resetAiStateForTest(); firstMinutesDeveloper(previousDeveloperTools);
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -510,9 +515,8 @@ describe('S1.1/S1.2 — a fresh window is in Search mode, and reload runs nothin
     const composer = await region(el, 'jf-sv3-composer');
     expect(q(composer, 'sv3-composer-tier')?.getAttribute('aria-label')).toBe('Mode: Search');
     await type(el, 'lease');
-    expect(q(composer, 'sv3-composer-send')?.getAttribute('aria-label')).toMatch(
-      /^Search · Enter searches/,
-    );
+    expect(q(composer, 'sv3-composer-send')).toBeNull();
+    expect((await fieldOf(el)).getAttribute('aria-labelledby')).toBe('sv3-search-headline');
   });
 
   it('restores the draft into the composer without searching, asking or delegating', async () => {
@@ -539,7 +543,7 @@ describe('S1.1/S1.2 — a fresh window is in Search mode, and reload runs nothin
     expect(submits).toEqual([]);
     await pressEnter(el);
     await pressEnter(el, { ctrlKey: true });
-    expect(submits.map((s) => s.tier)).toEqual(['search', 'delegate']);
+    expect(submits.map((s) => s.tier)).toEqual(['search']);
   });
 
   it('does not search a half-composed IME string, and searches once composition ends', async () => {
@@ -554,6 +558,9 @@ describe('S1.1/S1.2 — a fresh window is in Search mode, and reload runs nothin
     field.value = '日本';
     field.dispatchEvent(new CompositionEvent('compositionend', { data: '日本' }));
     await passTime(el, 250);
+    expect(backend.searches).toEqual([]);
+    await pressEnter(el);
+    await passTime(el, 0);
     expect(backend.searches.map((s) => s.query)).toEqual(['日本']);
   });
 });
@@ -568,12 +575,11 @@ describe('S1.3 — the same staged searches the default window sends, and no tur
     const el = await mount();
     await type(el, 'northfield');
     await passTime(el, 250);
-    expect(backend.searches).toEqual([buildSearchIntent('northfield', {}, 'quick')]);
+    expect(backend.searches).toEqual([]);
     await passTime(el, 700);
-    expect(backend.searches).toEqual([
-      buildSearchIntent('northfield', {}, 'quick'),
-      buildSearchIntent('northfield', {}, 'refined'),
-    ]);
+    expect(backend.searches).toEqual([]);
+    await pressEnter(el); await passTime(el, 0);
+    expect(backend.searches).toEqual([buildSearchIntent('northfield', {}, 'refined')]);
     expect(await rowTitles(el)).toEqual(['Northfield.pdf']);
     // No answer, no agent, no conversation, no turn.
     expect(dispatches()).toEqual([]);
@@ -635,8 +641,8 @@ describe('S1.4 — with chat unavailable, Search works and every ask says why it
     await settle(el);
     expect(el.tier).toBe('search');
 
-    // Choosing Ask shows the existing reason, keeps the query and the selection.
-    await chooseTier(el, 'ask');
+    // An existing Ask remains readable with its refusal and original query.
+    (el as SearchV3View).tier = 'ask'; await el.updateComplete;
     const composer = await region(el, 'jf-sv3-composer');
     expect(q(composer, 'sv3-composer-notice')?.textContent?.trim()).not.toBe('');
     await pressEnter(el);
@@ -829,6 +835,7 @@ describe('S1.7 — chosen files belong to one Ask and its re-sends, nothing late
   });
 
   it('drops a prepared scope on New session', async () => {
+    recordTurn('uc-existing', 'A saved conversation', 'Existing answer');
     backend.corpus.lease = [wireHit('a', 'docs/a.md')];
     aiOnline();
     const el = await mount();
@@ -1005,6 +1012,7 @@ describe('S1.9 — an older query’s results are never shown as the current one
     await passTime(el, 50);
     expect(await rowTitles(el)).toEqual(['alpha.md']);
     await type(el, 'beta');
+    await pressEnter(el);
     expect(await rowTitles(el)).toEqual([]);
     const host = await results(el);
     expect(q(host as Element, 'sv3-results-loading')).not.toBeNull();
@@ -1021,7 +1029,8 @@ describe('S1.9 — an older query’s results are never shown as the current one
     await type(el, '');
     for (const release of backend.held) release();
     await settle(el);
-    expect(await rowTitles(el)).toEqual([]);
+    expect(await rowTitles(el)).toEqual(['alpha.md']);
+    expect((await fieldOf(el)).value).toBe('');
   });
 
   it('says "no documents matched" and "search failed" in different words', async () => {
@@ -1205,7 +1214,7 @@ describe('S1.10 — the composer, the heading and the rows describe the one shar
 
     // Back in Search mode, the list is the search for the text the composer holds.
     await chooseTier(el, 'search');
-    await settle(el);
+    await pressEnter(el); await settle(el);
     expect((await fieldOf(el)).value).toBe('what is the rent?');
     expect(await headingOf(el)).toBe('Results for “what is the rent?”');
     // The staged quick pass, once its debounce has run.

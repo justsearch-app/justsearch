@@ -7,6 +7,8 @@ import { isReservedCollection } from '../state/otherSources.js';
 import { icon } from '../components/Icon.js';
 import type { JfButton } from '../components/Button.js';
 import { z } from 'zod';
+import type { FolderPickerResult } from '../../utils/folderPicker.js';
+import { firstUseWatchedPaths, recordFirstUseFolderAdded } from '../state/firstUse.js';
 import '../components/Button.js';
 
 const previewSchema = z.object({ exists: z.boolean(), isDir: z.boolean(), fileCount: z.number().optional(),
@@ -28,6 +30,8 @@ export function emptyFolderAddState(): FolderAddState {
 interface FolderAddHost {
   readonly state: FolderAddState;
   api(): PluginHostApi;
+  /** Internal launch UI can distinguish dialog failure from cancellation. */
+  pickFolder?(): Promise<FolderPickerResult>;
   changed(): void;
   open(): Promise<void>;
   focus(target: 'path' | 'button'): Promise<void>;
@@ -46,7 +50,7 @@ export class FolderAddFlow {
   private pickerBusy = false;
   private previewTimer: ReturnType<typeof setTimeout> | null = null;
   private previewSeq = 0;
-  constructor(private readonly host: FolderAddHost) {}
+  constructor(private readonly host: FolderAddHost, private readonly firstLaunch = false) {}
   async open(): Promise<void> {
     const state = this.host.state;
     if (this.pickerBusy || state.addBusy) return;
@@ -55,9 +59,15 @@ export class FolderAddFlow {
     this.pickerBusy = true;
     try {
       if (this.host.api().platform.capabilities.has('folder-picker')) {
-        const picked = await this.host.api().platform.pickFolder();
+        const picked = await (this.host.pickFolder?.() ?? this.host.api().platform.pickFolder());
         if (!current()) return;
+        if (picked && typeof picked === 'object') throw new Error(picked.error);
         if (!picked) { await this.host.focus('button'); return; }
+        if (this.firstLaunch) {
+          this.pickerBusy = false;
+          await this.submit(picked);
+          return;
+        }
         this.setPath(picked);
       }
       state.showManualInput = true;
@@ -66,7 +76,8 @@ export class FolderAddFlow {
       if (current()) await this.host.focus('path');
     } catch (err) {
       state.error = `Folder picker could not open. ${err instanceof Error ? err.message : String(err)} Retry Add a folder.`;
-      this.host.changed(); await this.host.focus('button');
+      if (this.firstLaunch) { state.showManualInput = true; await this.host.open(); }
+      this.host.changed(); await this.host.focus(this.firstLaunch ? 'path' : 'button');
     } finally { this.pickerBusy = false; }
   }
   async cancel(): Promise<void> {
@@ -107,7 +118,7 @@ export class FolderAddFlow {
     if (!p || p.path !== path) return AVAILABLE;
     if (!p.exists) return unavailableBecause('Path not found');
     if (!p.isDir) return unavailableBecause('Not a folder');
-    if (p.alreadyWatched) return unavailableBecause('Already watched');
+    if (p.alreadyWatched) return this.firstLaunch ? AVAILABLE : unavailableBecause('Already watched');
     const overlap = overlapExplanation(p);
     return overlap ? unavailableBecause(overlap) : AVAILABLE;
   }
@@ -115,25 +126,28 @@ export class FolderAddFlow {
     const state = this.host.state;
     if (state.addBusy || this.pickerBusy) return;
     if (suggestedPath !== undefined) {
-      this.setPath(suggestedPath); state.showManualInput = true;
+      this.setPath(suggestedPath); state.showManualInput = !this.firstLaunch;
     }
     const path = state.pendingPath.trim();
     if (!path || this.availability().kind !== 'available') return;
     const current = this.host.current();
+    const watchedBefore = firstUseWatchedPaths();
     state.addBusy = true; state.error = null; state.actionMessage = 'Adding folder…'; this.host.changed();
     try {
       const collection = state.pendingCollection.trim();
       const result = await this.host.api().data.invokeOperation('core.add-watched-root', collection ? { path, collection } : { path });
       if (!current()) return;
       if (!result.success) throw new Error(result.message || 'Add refused');
+      recordFirstUseFolderAdded(path, watchedBefore);
       state.pendingPath = ''; state.pendingCollection = ''; state.pendingPreview = null; state.showManualInput = false;
-      state.actionMessage = 'Folder added. Indexing activity is shown below.';
+      state.actionMessage = this.firstLaunch ? null : 'Folder added. Indexing activity is shown below.';
       await this.host.added();
       state.addBusy = false; this.host.changed();
       if (current()) await this.host.focus('button');
     } catch (err) {
       if (!current()) return;
       state.actionMessage = null; state.addBusy = false;
+      if (this.firstLaunch) state.showManualInput = true;
       state.error = `Folder was not added. ${err instanceof Error ? err.message : String(err)} Correct the path or retry Add.`;
       this.host.changed(); await this.host.focus('path');
     } finally { if (current()) { state.addBusy = false; this.host.changed(); } }
@@ -145,10 +159,10 @@ export class FolderAddFlow {
       <input type="text" aria-label="Folder path" ?disabled=${state.addBusy} placeholder="Folder path"
         .value=${state.pendingPath} @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') void this.submit(); }}
         @input=${(e: Event) => this.setPath((e.target as HTMLInputElement).value)} />
-      <input class="add-collection" type="text" aria-label="Collection (optional)" ?disabled=${state.addBusy}
+      ${this.firstLaunch ? nothing : html`<input class="add-collection" type="text" aria-label="Collection (optional)" ?disabled=${state.addBusy}
         data-testid="library-add-collection" placeholder="Collection (optional)" .value=${state.pendingCollection}
         @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') void this.submit(); }}
-        @input=${(e: Event) => { state.pendingCollection = (e.target as HTMLInputElement).value; this.host.changed(); }} />
+        @input=${(e: Event) => { state.pendingCollection = (e.target as HTMLInputElement).value; this.host.changed(); }} />`}
       <jf-button variant="primary" label="Add" .availability=${this.availability()} .onActivate=${() => this.submit()}>Add</jf-button>
       <jf-button label="Cancel" .disabled=${state.addBusy} .onActivate=${() => this.cancel()}>Cancel</jf-button>
     </div>${this.renderPreview()}`;

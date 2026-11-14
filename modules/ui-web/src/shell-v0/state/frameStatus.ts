@@ -652,7 +652,6 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     pill = { kind: 'working', label: row.title, stale: row.stale ?? stale, ...(row.percent != null ? { percent: row.percent } : {}) };
   // A completion is a ready claim: it needs a fresh observation like calm does (ST2).
   } else if (!stale && input.finished && now - input.finished.at < FINISHED_DWELL_MS) pill = { kind: 'finished', label: input.finished.title, stale: false };
-  else if (input.gettingStarted?.visible && input.gettingStarted.known) pill = { kind: 'calm', label: `Getting started · ${input.gettingStarted.currentStep} of 3`, stale: false };
   else if (!stale && searchServesFully && progress.phase === 'ready') pill = { kind: 'calm', label: 'Up to date', stale: false };
   // Not "Up to date": that is a coverage claim, and semantic coverage is what is missing.
   else if (!stale && engine?.notRequested && (searchServesFully || awaitsUnrequestedAi(ai!.verdict, engine))

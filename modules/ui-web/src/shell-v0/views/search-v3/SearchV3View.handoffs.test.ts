@@ -277,6 +277,10 @@ it.each(['retry', 'edit'])('HO7 a reloaded summary %s states its missing inputs 
   expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('');
 });
 it('HO8 an outgoing conversation keeps its unsent draft and files one click away', async () => {
+  const reply=fetchMock.getMockImplementation()! as (url:unknown,init?:RequestInit)=>Promise<unknown>;
+  fetchMock.mockImplementation((url,init) => String(url).includes('/api/chat/conversations?')
+    ? Promise.resolve({ok:true,status:200,json:async()=>({sessions:[{sessionId:'previous',title:'Previous',createdAtMs:1,lastActiveAtMs:2,messageCount:2,shapeId:'core.rag-ask'}]})})
+    : reply(url,init));
   const view = await mount(); await navigate({ conversationId: 'previous' }); await drain(view);
   const c = await composer(view); const input = q<HTMLTextAreaElement>(c, 'sv3-composer-input')!;
   input.value = 'unsent draft'; input.dispatchEvent(new Event('input'));
@@ -633,7 +637,7 @@ it.each(invalidCutoverTasks)('C2 A2 visibly refuses invalid task data %j without
   const view = await mount(); await navigate(state); await drain(view); const c = await composer(view);
   expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('keep text');
   expect(c.shadowRoot!.textContent).toMatch(/Invalid|Unknown|No readable/);
-  q<HTMLButtonElement>(c, 'sv3-composer-send')!.click(); await drain(view);
+  q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await drain(view);
   expect(dispatches()).toHaveLength(0);
 });
 
@@ -756,6 +760,10 @@ it('DS1 ordinary compatibility model tier changes retain the actual no-retrieval
 });
 
 it('DS1 rejected fresh hash intake preserves live conversation B and both snapshots before traversal clearing', async () => {
+  const reply=fetchMock.getMockImplementation()! as (url:unknown,init?:RequestInit)=>Promise<unknown>;
+  fetchMock.mockImplementation((url,init) => String(url).includes('/api/chat/conversations?')
+    ? Promise.resolve({ok:true,status:200,json:async()=>({sessions:[{sessionId:'previous',title:'Previous',createdAtMs:1,lastActiveAtMs:2,messageCount:2,shapeId:'core.rag-ask'}]})})
+    : reply(url,init));
   const view = await mount(); await navigate({ conversationId: 'previous' }); await drain(view);
   const input = q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!;
   input.value = 'live conversation B'; input.dispatchEvent(new Event('input')); await drain(view);
@@ -773,6 +781,10 @@ it('DS1 rejected fresh hash intake preserves live conversation B and both snapsh
 });
 
 it.each(['live', 'review'])('DS1 bare history restoration cannot retire %s B when both existing recovery slots are needed', async review => {
+  const reply=fetchMock.getMockImplementation()! as (url:unknown,init?:RequestInit)=>Promise<unknown>;
+  fetchMock.mockImplementation((url,init) => String(url).includes('/api/chat/conversations?')
+    ? Promise.resolve({ok:true,status:200,json:async()=>({sessions:[{sessionId:'previous',title:'Previous',createdAtMs:1,lastActiveAtMs:2,messageCount:2,shapeId:'core.rag-ask'}]})})
+    : reply(url,init));
   const view = await mount(); await navigate({ conversationId: 'previous' }); await drain(view);
   const input = q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!;
   input.value = 'live conversation B'; input.dispatchEvent(new Event('input')); await drain(view);
@@ -788,6 +800,10 @@ it.each(['live', 'review'])('DS1 bare history restoration cannot retire %s B whe
 
 
 it('DS1 one-slot automatic hero navigation retains B at its origin while explicit New retains current B', async () => {
+  const reply=fetchMock.getMockImplementation()! as (url:unknown,init?:RequestInit)=>Promise<unknown>;
+  fetchMock.mockImplementation((url,init) => String(url).includes('/api/chat/conversations?')
+    ? Promise.resolve({ok:true,status:200,json:async()=>({sessions:[{sessionId:'previous',title:'Previous',createdAtMs:1,lastActiveAtMs:2,messageCount:2,shapeId:'core.rag-ask'}]})})
+    : reply(url,init));
   const view = await mount(); await navigate({ conversationId: 'previous' }); await drain(view);
   const input = q<HTMLTextAreaElement>(await composer(view), 'sv3-composer-input')!;
   input.value = 'origin B'; input.dispatchEvent(new Event('input')); await drain(view);

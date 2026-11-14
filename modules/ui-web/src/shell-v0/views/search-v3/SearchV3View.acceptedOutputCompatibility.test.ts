@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { setInstallState as firstMinutesInstall } from '../../state/aiStateStore.js';
+import { getShowDeveloperTools, setShowDeveloperTools as firstMinutesDeveloper } from '../../state/developerToolsState.js';
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import './SearchV3View.js';
@@ -29,10 +31,13 @@ async function settle(view: Region): Promise<void> {
   await view.updateComplete;
 }
 
+let previousDeveloperTools: boolean;
+
 beforeEach(() => {
+  previousDeveloperTools = getShowDeveloperTools();
   localStorage.clear(); sessionStorage.clear();
-  __resetConversationListForTest(); __resetDraftProvidersForTest(); __resetAiStateForTest();
-  __feedForTest({ inference: { mode: 'online', available: true } as never,
+  __resetConversationListForTest(); __resetDraftProvidersForTest(); __resetAiStateForTest(); firstMinutesInstall(true, false); firstMinutesDeveloper(true);
+  __feedForTest({ inference: { gpu: { cudaAvailable: true }, mode: 'online', available: true } as never,
     status: { worker: { core: { indexedDocuments: 42 } } } as unknown as StatusSnapshot });
   __feedContactForTest();
   transportFailure = ''; branched = false; chunks = [accepted]; terminal = {}; requests = []; records = []; streamError = ''; meta = null;
@@ -64,7 +69,7 @@ beforeEach(() => {
 afterEach(async () => {
   document.body.replaceChildren();
   await new Promise<void>(resolve => setTimeout(resolve, 0));
-  resetSearchState(); __resetAiStateForTest(); vi.unstubAllGlobals();
+  resetSearchState(); __resetAiStateForTest(); firstMinutesDeveloper(previousDeveloperTools); vi.unstubAllGlobals();
 });
 
 async function sendStructured(): Promise<Region> {

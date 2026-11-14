@@ -36,8 +36,6 @@ import { NAVIGATE_TO_SURFACE_EVENT } from '../../controllers/navigateRequest.js'
 import { applySv3Record } from './sv3-sessions.js';
 import { projectSv3RecordTurns } from './sv3-record.js';
 import {
-  CORPUS_ADD_FOLDERS,
-  CORPUS_REMEDY_TARGET,
   HISTORY_LOCKED_REFUSED,
   REWRITE_NOTE_LABEL,
   TURN_COPY_DONE,
@@ -795,18 +793,11 @@ describe('a stream failure is worded by the shared mapping, and an abort is not 
 /* ── E10: a corpus of zero offers the fix ────────────────────────────────────────────────────── */
 
 describe('the landing says what there is to search, or offers the way to get some', () => {
-  it('offers the remedy on a REPORTED zero, and navigates to the surface that owns it', async () => {
+  it('does not repeat the Library corpus remedy in Search', async () => {
     feed({ documents: 0, searchable: 0, own: 0 });
     const el = await mount();
     const composer = await region(el, 'jf-sv3-composer');
-    const remedy = q(composer, 'sv3-composer-corpus-remedy') as HTMLButtonElement | null;
-    expect(textOf(remedy)).toBe(CORPUS_ADD_FOLDERS);
-    const navigations: string[] = [];
-    document.addEventListener(NAVIGATE_TO_SURFACE_EVENT, (e) =>
-      navigations.push((e as CustomEvent<{ surfaceId: string }>).detail.surfaceId),
-    );
-    await press(remedy);
-    expect(navigations).toEqual([CORPUS_REMEDY_TARGET]);
+    expect(q(composer, 'sv3-composer-corpus-remedy')).toBeNull();
   });
 
   it('spends no chrome on the corpus once the window is working', async () => {
@@ -815,7 +806,7 @@ describe('the landing says what there is to search, or offers the way to get som
     const el = await mount();
     const composer = await region(el, 'jf-sv3-composer');
     // Present on the landing…
-    expect(q(composer, 'sv3-composer-corpus')).not.toBeNull();
+    expect(q(composer, 'sv3-composer-corpus')).toBeNull();
     await askGrounded(el, stream);
     await composer.updateComplete;
     // …and gone once the conversation owns the region. The fact belongs to the empty window.
@@ -881,8 +872,7 @@ describe('an answer can be copied and a conversation exported, through the share
   it('offers no conversation export trigger without a claimed conversation', async () => {
     feed();
     const el = await mount();
-    const sidebar = await region(el, 'jf-sv3-sidebar');
-    expect(sidebar.shadowRoot!.querySelector('jf-sv3-session-row')).toBeNull();
+    expect(el.shadowRoot!.querySelector('jf-sv3-sidebar')).toBeNull();
     expect(clipboard).not.toHaveBeenCalled();
   });
 });

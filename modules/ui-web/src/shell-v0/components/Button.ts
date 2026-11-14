@@ -113,12 +113,14 @@ export class JfButton extends JfElement {
       jf-control::part(control):hover {
         background: var(--surface-3);
       }
+      :host([variant='primary']) { color: var(--accent-on-tint); }
       :host([variant='primary']) jf-control::part(control) {
         background: var(--accent-tint);
         border-color: transparent;
         color: var(--accent-on-tint);
       }
       @media (forced-colors: active) {
+        :host([variant='primary']) { color: ButtonText; }
         :host([variant='primary']) jf-control::part(control) {
           background: ButtonFace;
           color: ButtonText;
@@ -135,21 +137,25 @@ export class JfButton extends JfElement {
       }
       /* Solid CTA tones — the ONE tone→accent fill (565 statusTone), high-emphasis (solid bg +
          on-accent text). \`tone\` overrides \`variant\` (later rules / equal specificity win). */
+      :host([tone='success']) { color: var(--accent-on-success); }
       :host([tone='success']) jf-control::part(control) {
         background: var(--accent-success);
         border-color: transparent;
         color: var(--accent-on-success);
       }
+      :host([tone='warning']) { color: var(--accent-on-warning); }
       :host([tone='warning']) jf-control::part(control) {
         background: var(--accent-warning);
         border-color: transparent;
         color: var(--accent-on-warning);
       }
+      :host([tone='error']) { color: var(--accent-on-danger); }
       :host([tone='error']) jf-control::part(control) {
         background: var(--accent-danger);
         border-color: transparent;
         color: var(--accent-on-danger);
       }
+      :host([tone='info']) { color: var(--text-primary); }
       :host([tone='info']) jf-control::part(control) {
         background: var(--surface-3);
         border-color: transparent;

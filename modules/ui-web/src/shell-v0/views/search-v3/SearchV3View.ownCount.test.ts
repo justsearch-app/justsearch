@@ -50,40 +50,14 @@ afterEach(() => {
   resetSearchState(); __resetAiStateForTest(); vi.unstubAllGlobals(); vi.restoreAllMocks();
 });
 
-describe('FA4 the composer counts the person\'s own files', () => {
-  it('states the own count, not the count that includes Help', async () => {
-    observe(12);
-    expect(await corpusLine()).toEqual({ kind: 'documents', text: 'Searching 12 files', remedy: false });
+describe('S4 returning Search does not repeat the Library corpus fact', () => {
+  for (const own of [12, 1, 0, undefined]) it(`omits the corpus line with own count ${own}, regardless of bundled Help`, async () => {
+    observe(own);
+    expect(await corpusLine()).toEqual({ kind: null, text: '', remedy: false });
   });
-
-  it('one own file reads in the singular', async () => {
-    observe(1);
-    expect((await corpusLine()).text).toBe('Searching 1 file');
-  });
-
-  it('with no own files it says so in words and offers the way to add some, whatever Help holds', async () => {
-    observe(0);
-    const line = await corpusLine();
-    expect(line.kind).toBe('empty');
-    expect(line.text).toContain('None of your files are searchable yet.');
-    expect(line.remedy).toBe(true);
-    expect(line.text).not.toMatch(/\d/);
-  });
-
-  it('an Engine that does not report the own count: the count is said to be unknown, never a number', async () => {
-    observe(undefined);
-    expect(await corpusLine()).toEqual({ kind: 'unknown', text: 'Searching your files · how many is not known yet', remedy: false });
-  });
-
-  it('before any status: unknown in words, never 0', async () => {
-    expect(await corpusLine()).toEqual({ kind: 'unknown', text: 'Searching your files · how many is not known yet', remedy: false });
-  });
-
-  it('an own count reported late replaces the unknown one', async () => {
-    observe(undefined);
-    expect((await corpusLine()).kind).toBe('unknown');
-    for (const child of [...document.body.children]) child.remove();
+  it('unknown and subsequently reported counts do not resurrect corpus chrome', async () => {
+    expect(await corpusLine()).toEqual({ kind: null, text: '', remedy: false });
     observe(7);
-    expect((await corpusLine()).text).toBe('Searching 7 files');
+    expect(await corpusLine()).toEqual({ kind: null, text: '', remedy: false });
   });
 });

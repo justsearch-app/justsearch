@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import './SearchV3View.js';
+import { submitInSession as localConversation, SV3_SESSIONS_EMPTY as EMPTY_CONVERSATIONS } from './sv3-sessions.js';
 import type { SearchV3View } from './SearchV3View.js';
 import type { Sv3Sidebar } from './Sv3Sidebar.js';
 import { sv3BoundaryStorageKeys } from './sv3-boundaries.js';
@@ -28,6 +29,7 @@ function savedSidebar(): (string | null)[] {
 
 async function mount(width = 640): Promise<SearchV3View> {
   const el = document.createElement('jf-sv3-window');
+  el.sessions = { ...localConversation(EMPTY_CONVERSATIONS, 'Pending local conversation', 1, 'ask', 'geometry-conversation'), activeId: null };
   el.getBoundingClientRect = () => ({ width }) as DOMRect;
   el.composerState = 'docked';
   document.body.append(el);

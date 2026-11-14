@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { setInstallState as firstMinutesInstall } from '../../state/aiStateStore.js';
+import { getShowDeveloperTools, setShowDeveloperTools as firstMinutesDeveloper } from '../../state/developerToolsState.js';
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import './SearchV3View.js';
@@ -57,11 +59,14 @@ async function fill(view: ElementView, value = schema): Promise<ElementView> {
   await c.updateComplete;
   return c;
 }
+let previousDeveloperTools: boolean;
+
 beforeEach(() => {
+  previousDeveloperTools = getShowDeveloperTools();
   sessionStorage.clear(); localStorage.clear();
   __resetConversationListForTest(); __resetDraftProvidersForTest(); __resetDraftKeptForTest();
-  __resetAiStateForTest();
-  __feedForTest({ inference: { mode: 'online', available: true } as never,
+  __resetAiStateForTest(); firstMinutesInstall(true, false); firstMinutesDeveloper(true);
+  __feedForTest({ inference: { gpu: { cudaAvailable: true }, mode: 'online', available: true } as never,
     status: { worker: { core: { indexedDocuments: 42 } } } as unknown as StatusSnapshot });
   __feedContactForTest();
   fetchMock = vi.fn(async (url: unknown) => {
@@ -83,7 +88,7 @@ afterEach(async () => {
   document.body.replaceChildren();
   // Disconnect closes the window's subscriptions and stream; settle its outstanding promises.
   await new Promise<void>(resolve => setTimeout(resolve, 0));
-  resetSearchState(); __resetAiStateForTest();
+  resetSearchState(); __resetAiStateForTest(); firstMinutesDeveloper(previousDeveloperTools);
   vi.unstubAllGlobals(); vi.restoreAllMocks();
 });
 it('XT1 XT9 offers Structured by keyboard with a labelled multiline schema kept within this window', async () => {
@@ -112,7 +117,7 @@ it('XT2 XT4 sends extraction schema and instruction and renders only terminal JS
   const view = await mount(); await choose(view, 'structured');
   const c = await fill(view);
   expect(q(c, 'sv3-composer-structured-inputs')?.textContent).toContain('this conversation');
-  q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  const send=q<HTMLButtonElement>(c, 'sv3-composer-send'); expect(send).not.toBeNull(); send!.click();
   await drain(view);
   expect(dispatches()).toHaveLength(1);
   const body = JSON.parse((dispatches()[0]![1] as RequestInit).body as string);
@@ -189,7 +194,7 @@ it('XT5 XD1 keeps undelivered extraction drafts and drops the unrecorded failed 
   expect(dispatches()).toHaveLength(1);
 });
 it('XT6 keeps schema and instruction when chat is unavailable', async () => {
-  __resetAiStateForTest();
+  __resetAiStateForTest(); firstMinutesInstall(true, false); firstMinutesDeveloper(true);
   const view = await mount(); await choose(view, 'structured'); const c = await fill(view);
   q<HTMLButtonElement>(c, 'sv3-composer-send')!.click(); await drain(view);
   expect(dispatches()).toHaveLength(0);

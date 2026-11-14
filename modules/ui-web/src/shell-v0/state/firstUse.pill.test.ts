@@ -13,11 +13,11 @@ const setup = { visible: true, known: true, currentStep: 1 };
 describe('Getting started calm pill', () => {
   it('uses the calm slot only; all urgent states and finished work keep precedence', () => {
     const derive = (extra: Partial<Parameters<typeof deriveFrameStatus>[0]> = {}) => deriveFrameStatus({ ai, now: 100000, contactLostAt: null, gettingStarted: setup, ...extra }).pill;
-    expect(derive({ ai: { ...ai, verdict: { kind: 'unknown', severity: 'info', reasons: [] } } as unknown as AiState }).label).toBe('Getting started · 1 of 3');
-    expect(derive({ gettingStarted: { ...setup, currentStep: 2 } }).label).toBe('Getting started · 2 of 3');
-    expect(derive({ gettingStarted: { ...setup, currentStep: 3 } }).label).toBe('Getting started · 3 of 3');
+    expect(derive({ ai: { ...ai, verdict: { kind: 'unknown', severity: 'info', reasons: [] } } as unknown as AiState }).label).toBe('Checking search status · last seen just now · checking');
+    expect(derive({ gettingStarted: { ...setup, currentStep: 2 } }).label).toBe('Up to date');
+    expect(derive({ gettingStarted: { ...setup, currentStep: 3 } }).label).toBe('Up to date');
     expect(derive({ gettingStarted: { ...setup, known: false }, ai: null }).kind).toBe('unknown');
-    expect(derive().label).toBe('Getting started · 1 of 3');
+    expect(derive().label).toBe('Up to date');
     for (const [section, kind] of [['needs', 'needs'], ['problems', 'problems'], ['running', 'working']] as const) {
       const row: StatusFact = { id: section, section, title: section };
       expect(derive({ conditions: [row] }).kind).toBe(kind);

@@ -15,6 +15,8 @@
  * no scope with a turn (`ConversationEngine.persistedAssistant` writes neither `docIds` nor
  * `fileCount`), so a reloaded turn has unknown inputs and cannot safely be replayed.
  */
+import { matchCountLabel } from '../../components/searchResults/matchCountLabel.js';
+import type { SearchTrace } from '../../../api/generated/schema-types/search-trace.js';
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import { localizeResourceKey } from '../../../i18n/resourceCatalog.js';
 import {
@@ -59,8 +61,7 @@ interface SearchHost extends Pick<ReactiveControllerHost, 'addController' | 'req
   draft(): SearchDraft;
   historyLocked(): boolean;
   clearAskFilterError(): void;
-  recordSearch(query: string): void;
-  closeRecents(): void;
+  recordSearch(query: string): ((count?: string) => void) | void;
   focusComposer(): Promise<void>;
   connected(): boolean;
   apiBase(): string;
@@ -253,6 +254,7 @@ export class Sv3SearchController implements ReactiveController {
    * holding another one means the default window (or an address) moved the SHARED query, which
    * this window has not followed yet — `sharedMove` holds the query it moved away from.
    */
+  private recentAttempt: { query: string; finish: ((count?: string) => void) | void; running: boolean } | null = null;
   private known = '';
   private sharedMove: { readonly previous: string } | null = null;
   private lastResults: readonly SearchHit[] | null = null;
@@ -297,8 +299,8 @@ export class Sv3SearchController implements ReactiveController {
     if (!this.host.draft().draftMayIssue()) return false;
     if (!this.host.draft().enterResults(this.host.composer.read(), text)) return false;
     const query = text.trim();
-    this.host.recordSearch(query);
-    this.host.closeRecents();
+    this.recentAttempt?.finish?.();
+    this.recentAttempt = { query, finish: this.host.recordSearch(query), running: false };
     this.submit(query);
     return true;
   }
@@ -502,6 +504,17 @@ export class Sv3SearchController implements ReactiveController {
       this.lastResults = snapshot.results;
       this.answered = snapshot.query;
       this.selected = sv3PruneSelection(this.selected, snapshot.results);
+    }
+    const attempt = this.recentAttempt;
+    if (attempt && snapshot.query === attempt.query) {
+      if (snapshot.isSearching || snapshot.isRefining) attempt.running = true;
+      else if (attempt.running && (snapshot.error || snapshot.results !== this.snapshot?.results)) {
+        this.recentAttempt = null;
+        const count = snapshot.error || snapshot.countsPending ? undefined : matchCountLabel(snapshot.matchCount,
+          snapshot.results.length, (snapshot.searchTrace as SearchTrace | null)?.effectiveMode === 'VECTOR',
+          snapshot.totalHits, snapshot.facetsTruncated);
+        attempt.finish?.(count);
+      }
     }
     this.snapshot = snapshot;
     if (this.showing && getSelection().surfaceId === 'core.search-v3-surface') this.publishSelection();

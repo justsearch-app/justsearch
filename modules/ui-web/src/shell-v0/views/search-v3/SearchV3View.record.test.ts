@@ -1002,13 +1002,13 @@ describe('the composer draft and the global activity indicator (A14, A15, G11)',
       const first = await mount();
       await type(first, 'unsent thought');
       first.remove();
-      expect(toasts).toEqual(['Draft kept']);
+      expect(toasts).toEqual([]);
 
       // Teach, don't nag: a second leave with a draft is silent.
       const second = await mount();
       await type(second, 'another unsent thought');
       second.remove();
-      expect(toasts).toEqual(['Draft kept']);
+      expect(toasts).toEqual([]);
     } finally {
       document.removeEventListener(EPHEMERAL_TOAST_EVENT, handler);
     }

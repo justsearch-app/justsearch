@@ -35,6 +35,7 @@ import type { StatusSnapshot } from '../../utils/statusPoll.js';
 import { SearchV3View } from './SearchV3View.js';
 import { Sv3Sidebar } from './Sv3Sidebar.js';
 import { Sv3Main } from './Sv3Main.js';
+import { submitInSession, SV3_SESSIONS_EMPTY } from './sv3-sessions.js';
 import { Sv3Composer } from './Sv3Composer.js';
 import { createCorePluginManifest } from '../../plugin-api/CorePlugin.js';
 import { isLazySurface } from '../lazySurfaceRegistry.js';
@@ -124,7 +125,7 @@ describe('the window mounts below the frame bar', () => {
   it('renders sidebar, main and composer without a second title band', async () => {
     const el = await mount();
     const root = el.shadowRoot;
-    expect(root?.querySelector('jf-sv3-sidebar')).toBeTruthy();
+    expect(root?.querySelector('jf-sv3-sidebar')).toBeNull();
     expect(root?.querySelector('.column')).toBeTruthy();
     expect(root?.querySelector('jf-sv3-topbar')).toBeNull();
     expect(root?.querySelector('jf-sv3-main')).toBeTruthy();
@@ -182,14 +183,9 @@ describe('the window mounts below the frame bar', () => {
     bar.remove();
   });
 
-  it('opens with an empty sidebar: no sessions until this window has searched', async () => {
-    // The fixture session list is gone (Phase A2) — the sidebar's zero state is now reached the real
-    // way. What the panel always offers is the way OUT of it: the New-search control.
+  it('opens with no sidebar before a conversation exists', async () => {
     const el = await mount();
-    const sidebar = await region(el, 'jf-sv3-sidebar');
-    expect(sidebar.shadowRoot?.querySelectorAll('[data-testid="sv3-sidebar-row"]')).toHaveLength(0);
-    expect(sidebar.shadowRoot?.querySelector('[data-testid="sv3-sidebar-empty"]')).toBeTruthy();
-    expect(sidebar.shadowRoot?.querySelector('[data-testid="sv3-sidebar-new"]')).toBeTruthy();
+    expect(el.shadowRoot?.querySelector('jf-sv3-sidebar')).toBeNull();
   });
 
   it('claims nothing about the corpus when the window is docked without a search', async () => {
@@ -208,8 +204,8 @@ describe('the window mounts below the frame bar', () => {
     const el = await mount();
     const composer = await region(el, 'jf-sv3-composer');
     expect(composer.shadowRoot?.querySelector('[data-testid="sv3-composer-input"]')).toBeTruthy();
-    expect(composer.shadowRoot?.querySelector('[data-testid="sv3-composer-send"]')).toBeTruthy();
-    expect(composer.shadowRoot?.querySelector('[data-testid="sv3-composer-effort"]')).toBeTruthy();
+    expect(composer.shadowRoot?.querySelector('[data-testid="sv3-composer-send"]')).toBeNull();
+    expect(composer.shadowRoot?.querySelector('[data-testid="sv3-composer-effort"]')).toBeNull();
     // The slice-3 scope placeholders are GONE, not merely unused (Phase F10).
     expect(composer.shadowRoot?.querySelector('[data-testid="sv3-composer-scope"]')).toBeNull();
   });
@@ -242,7 +238,7 @@ describe('the composer has two anatomies and one way between them', () => {
     expect(composer.shadowRoot?.querySelector('[data-testid="sv3-composer-headline"]')).toBeNull();
     // Both anatomies keep the field, the controls and the action — one component, two states.
     expect(composer.shadowRoot?.querySelector('[data-testid="sv3-composer-input"]')).toBeTruthy();
-    expect(composer.shadowRoot?.querySelector('[data-testid="sv3-composer-effort"]')).toBeTruthy();
+    expect(composer.shadowRoot?.querySelector('[data-testid="sv3-composer-effort"]')).toBeNull();
     // The region the composer vacated is the results' — what it holds is the search's business
     // (SearchV3View.search.test.ts), not the morph's.
     expect(await region(el, 'jf-sv3-main')).toBeTruthy();
@@ -250,6 +246,7 @@ describe('the composer has two anatomies and one way between them', () => {
 
   it('keeps the send control disabled until the field carries something to send', async () => {
     const el = await mount();
+    (el as SearchV3View).tier = 'ask'; await el.updateComplete;
     const composer = await composerOf(el);
     const send = composer.shadowRoot?.querySelector<HTMLButtonElement>(
       '[data-testid="sv3-composer-send"]',
@@ -290,9 +287,7 @@ describe('the composer has two anatomies and one way between them', () => {
     field!.value = 'northfield lease';
     field!.dispatchEvent(new Event('input'));
     await composer.updateComplete;
-    composer.shadowRoot
-      ?.querySelector<HTMLButtonElement>('[data-testid="sv3-composer-send"]')
-      ?.click();
+    field!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     await el.updateComplete;
     expect(el.getAttribute('composer-state')).toBe('docked');
 
@@ -308,6 +303,7 @@ describe('the composer has two anatomies and one way between them', () => {
    */
   it('compacts the effort control into a real glyph that keeps its whole name', async () => {
     const el = await mount();
+    (el as SearchV3View).tier = 'ask'; await el.updateComplete;
     const composer = await region(el, 'jf-sv3-composer');
     const control = (): HTMLElement | null =>
       composer.shadowRoot?.querySelector<HTMLElement>('[data-testid="sv3-composer-effort"]') ?? null;
@@ -633,13 +629,12 @@ describe('the window never scrolls; one inner region does', () => {
     const schemaRule = own(Sv3Composer).match(/:host \.schema-field \[id='sv3-schema'\]\s*\{[^}]*\}/)?.[0];
     expect(schemaRule).toContain('max-block-size: 8rem');
     expect(schemaRule).toContain('overflow: auto');
-    const recentRules = own(Sv3Composer).match(/\.recents \[role="listbox"\]\s*\{[^}]*\}/g) ?? [];
-    expect(recentRules).toHaveLength(1);
-    const recentRule = recentRules[0]!;
-    expect(recentRule).toContain('min-block-size: 0');
-    expect(recentRule).toContain('overflow-y: auto');
-    expect(recentRule).toContain('overscroll-behavior: contain');
-    expect(own(Sv3Composer)).toMatch(/\.band:has\(\.recents\)\s*\{[^}]*max-block-size: 100%/);
+    expect(own(Sv3Composer)).not.toContain('.recents [role="listbox"]');
+    const idleScrollerRule = own(Sv3Composer).match(/:host\(\[state='hero'\]\) \{ overflow-y: auto; \}/)?.[0];
+    expect(idleScrollerRule).toBeTruthy();
+    const searchTextRules = own(Sv3Composer).match(/\.search-field textarea \{[^}]*\}/g) ?? [];
+    expect(searchTextRules).toHaveLength(1);
+    expect(searchTextRules[0]).toBe('.search-field textarea { min-height: 0; height: auto; min-block-size: 1.5em; padding: 0; line-height: 1.5; white-space: pre; overflow: auto; resize: none; }');
     const recoveryRules = own(SearchV3View).match(/^\s*\.column > \.recovery-notice\s*\{[^}]*\}/gm) ?? [];
     expect(recoveryRules).toHaveLength(1);
     const recoveryRule = recoveryRules[0]!;
@@ -658,7 +653,8 @@ describe('the window never scrolls; one inner region does', () => {
     for (const ctor of [SearchV3View, Sv3Sidebar, Sv3Composer]) {
       const styles = own(ctor).replace(ctor === Sv3Composer ? schemaRule ?? '' : '', '')
         .replace(ctor === SearchV3View ? recoveryRule : '', '')
-        .replace(ctor === Sv3Composer ? recentRule : '', '');
+        .replace(ctor === Sv3Composer ? idleScrollerRule ?? '' : '', '')
+        .replace(ctor === Sv3Composer ? /\.search-field textarea \{[^}]*\}/g : /$^/, '');
       expect(styles).not.toContain('overflow-y: auto');
       expect(styles).not.toContain('overflow: auto');
       expect(styles).not.toContain('overflow: scroll');
@@ -667,8 +663,10 @@ describe('the window never scrolls; one inner region does', () => {
     expect(own(Sv3Main)).not.toContain('overflow-y: auto');
   });
 
-  it('adopts the scroller mixin exactly once across the rendered window', async () => {
+  it('adopts the scroller mixin exactly once across the populated window', async () => {
+    const saved = submitInSession(SV3_SESSIONS_EMPTY, 'Pending question', 1, 'ask', 'scroller-conversation');
     const el = await mount();
+    (el as SearchV3View).sessions = saved; await el.updateComplete;
     let found = 0;
     for (const tag of ['jf-sv3-sidebar', 'jf-sv3-main', 'jf-sv3-composer']) {
       const r = await region(el, tag);
