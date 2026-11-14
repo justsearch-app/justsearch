@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { setInstallState as firstMinutesInstall } from '../../state/aiStateStore.js';
-import { setShowDeveloperTools as firstMinutesDeveloper } from '../../state/developerToolsState.js';
+import { getShowDeveloperTools, setShowDeveloperTools as firstMinutesDeveloper } from '../../state/developerToolsState.js';
 
 /**
  * The composer's MODE control (tempdoc 852 S4, parity ledger row 12) — the visible affordance for a
@@ -154,7 +154,10 @@ const askDispatches = (): unknown[][] =>
 const searchRequests = (): unknown[][] =>
   fetchMock.mock.calls.filter((call) => String(call[0]).includes('/api/knowledge/search'));
 
+let previousDeveloperTools: boolean;
+
 beforeEach(() => {
+  previousDeveloperTools = getShowDeveloperTools();
   sessionStorage.clear();
   localStorage.clear();
   __resetConversationListForTest();
@@ -170,7 +173,7 @@ beforeEach(() => {
 afterEach(() => {
   for (const child of [...document.body.children]) child.remove();
   resetSearchState();
-  __resetAiStateForTest(); firstMinutesInstall(true, false); firstMinutesDeveloper(true);
+  __resetAiStateForTest(); firstMinutesDeveloper(previousDeveloperTools);
   vi.unstubAllGlobals();
 });
 
@@ -236,7 +239,13 @@ async function type(el: Mounted, draft: string): Promise<HTMLTextAreaElement> {
 /** Send through the primary control — the affordance the mode control governs. */
 async function pressSend(el: Mounted): Promise<void> {
   const composer = await region(el, 'jf-sv3-composer');
-  (await type(el, composer.shadowRoot!.querySelector<HTMLTextAreaElement>('textarea')!.value)).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  if ((el as SearchV3View).tier === 'search') {
+    (await type(el, composer.shadowRoot!.querySelector<HTMLTextAreaElement>('textarea')!.value)).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  } else {
+    const send = q<HTMLButtonElement>(composer, 'sv3-composer-send');
+    expect(send).not.toBeNull();
+    send!.click();
+  }
   await settle(el);
 }
 
@@ -283,7 +292,7 @@ describe('the mode the next send takes is on screen, not only in a chord', () =>
     const row = [
       ...(composer.shadowRoot?.querySelectorAll<HTMLElement>('.controls [data-testid]') ?? []),
     ].map((node) => node.dataset.testid);
-    expect(row).toContain('sv3-composer-tier');
+    expect(row[0]).toBe('sv3-composer-tier');
     expect(row).not.toContain('sv3-composer-effort');
   });
 

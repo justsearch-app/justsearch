@@ -51,9 +51,8 @@ afterEach(() => {
 
 /** One element applied twice — the sidebar with no threads, the surface with none. */
 describe('the empty states are one pattern in two regions', () => {
-  it('renders the sidebar variant before this window has searched anything', async () => {
-    // Phase A2: the sidebar's zero state is reached the real way — a window with no sessions yet —
-    // rather than through the retired `fixtures="empty"` dev handle.
+  it('renders the isolated sidebar zero state', async () => {
+    // R10/D6 omit the empty column from Search. Its reusable zero state remains a component check.
     const sidebar = document.createElement('jf-sv3-sidebar') as Sv3Sidebar; document.body.append(sidebar); await sidebar.updateComplete;
     const empty = sidebar.shadowRoot?.querySelector('[data-testid="sv3-sidebar-empty"]') as
       | (Sv3Empty & Mounted)

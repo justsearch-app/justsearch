@@ -20,7 +20,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import './SearchV3View.js';
-import { setShowDeveloperTools } from '../../state/developerToolsState.js';
+import { getShowDeveloperTools, setShowDeveloperTools } from '../../state/developerToolsState.js';
 import type { SearchV3View } from './SearchV3View.js';
 import { Sv3Composer } from './Sv3Composer.js';
 import { Sv3SessionRow } from './Sv3SessionRow.js';
@@ -93,7 +93,10 @@ function aiOnline(): void {
   __feedContactForTest();
 }
 
+let previousDeveloperTools: boolean;
+
 beforeEach(() => {
+  previousDeveloperTools = getShowDeveloperTools();
   sessionStorage.clear();
   localStorage.clear();
   __resetConversationListForTest();
@@ -112,6 +115,7 @@ afterEach(() => {
   for (const el of [...document.querySelectorAll('input.outsider')]) el.remove();
   resetSearchState();
   __resetAiStateForTest();
+  setShowDeveloperTools(previousDeveloperTools);
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });

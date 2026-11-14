@@ -81,6 +81,8 @@ it('x6 explicit invalid syntax stays visible and a correction resumes with one r
   await submit(view, '"'); await settle(view, 1500);
   expect(searches()).toHaveLength(1);
   expect(JSON.parse(String(searches()[0]?.[1]?.body)).querySyntax).toBe('search');
+  // Enter uses the backend's full default pipeline, never the retired quick-pass override.
+  expect(JSON.parse(String(searches()[0]?.[1]?.body)).pipeline).toBeUndefined();
   expect(getSearchState().error).toContain(reason);
   expect((await composer(view)).shadowRoot!.querySelector('[data-testid="sv3-search-error"]')).not.toBeNull();
   expect(getSearchState().isSearching).toBe(false);
@@ -110,7 +112,8 @@ it('x5 withholds prior counts and facets while the new query awaits its Engine c
   const results = main.shadowRoot!.querySelector('jf-sv3-results') as Mounted;
   await results.updateComplete;
   expect(results.shadowRoot!.querySelector('jf-results-card')).toBeNull();
-  expect(getSearchState().isSearching || getSearchState().isRefining).toBe(true);
+  expect(getSearchState().isRefining).toBe(true);
+  expect(getSearchState().isSearching).toBe(false);
   release(good('new')); await settle(view);
   expect(getSearchState().results[0]?.id).toBe('new');
 });
@@ -121,6 +124,7 @@ it('x6 a new submit supersedes an older success and an older error body', async 
   fetchMock.mockImplementation((url: unknown) => String(url).includes('/api/knowledge/search')
     ? new Promise(resolve => { release = resolve; }) : Promise.resolve(response({})));
   await submit(view, 'valid');
+  expect(searches()).toHaveLength(1);
   let releaseBody!: (value: unknown) => void;
   fetchMock.mockImplementation(async (url: unknown) => String(url).includes('/api/knowledge/search')
     ? { ...invalid(), json: () => new Promise(resolve => { releaseBody = resolve; }) } : response({}));
@@ -144,6 +148,7 @@ it('x5 explicit advanced results use the refined counts immediately', async () =
   expect(getSearchState().passStage).toBe('refined');
   expect(getSearchState().countsPending).toBe(false);
   expect(getSearchState().matchCount).toBe(1);
+  expect(getSearchState().facets).toBeNull();
   const main = view.shadowRoot!.querySelector('jf-sv3-main') as Mounted; await main.updateComplete;
   const results = main.shadowRoot!.querySelector('jf-sv3-results') as Mounted; await results.updateComplete;
   const card = results.shadowRoot!.querySelector('jf-results-card') as Mounted; await card.updateComplete;

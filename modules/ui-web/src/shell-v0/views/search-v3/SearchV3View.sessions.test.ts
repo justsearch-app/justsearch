@@ -18,6 +18,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import './SearchV3View.js';
+import { StatusPill } from '../../components/StatusPill.js';
+import { createAdvisoryStore } from '../../components/advisory/AdvisoryStore.js';
 import { EPHEMERAL_TOAST_EVENT } from '../../components/advisory/ephemeralToast.js';
 import type { SearchV3View } from './SearchV3View.js';
 import type { Sv3SessionRow } from './Sv3SessionRow.js';
@@ -249,9 +251,10 @@ const clickRow = async (row: Sv3SessionRow): Promise<void> => {
 };
 
 async function newSession(el: Mounted): Promise<void> {
-  if (!el.shadowRoot?.querySelector('jf-sv3-sidebar')) return;
   const sidebar = await region(el, 'jf-sv3-sidebar');
-  sidebar.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid="sv3-sidebar-new"]')?.click();
+  const button = sidebar.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="sv3-sidebar-new"]');
+  expect(button, 'New must be present in a conversation window').not.toBeNull();
+  button!.click();
   await el.updateComplete;
 }
 
@@ -784,7 +787,7 @@ describe('the row actions each change the state they name', () => {
     /** Three settled conversations; rows render newest-first, so this is ['third','second','first']. */
     async function threeConversations(el: Mounted): Promise<void> {
       for (const question of ['first', 'second', 'third']) {
-        await newSession(el);
+        if (question !== 'first') await newSession(el);
         await ask(el, question);
       }
     }
@@ -844,15 +847,24 @@ describe('the row actions each change the state they name', () => {
       const messages: string[] = [];
       const hear = (event: Event) => messages.push((event as CustomEvent).detail.message);
       document.addEventListener(EPHEMERAL_TOAST_EVENT, hear);
-      await ask(el, 'the only one');
-      const invoker = actionOf((await rowsOf(el))[0] as Sv3SessionRow, 'remove');
-      pressEnter(invoker);
-      await confirmDeletion(el, invoker);
-
-      expect(await rowsOf(el)).toHaveLength(0);
-      expect(focusedTestId(el)).toBe('sv3-composer-input');
-      expect(messages).toContain('Conversation deleted');
-      document.removeEventListener(EPHEMERAL_TOAST_EVENT, hear);
+      const store=createAdvisoryStore();
+      const pill=new StatusPill(); pill.store=store; document.body.append(pill);
+      try {
+        await pill.updateComplete;
+        await ask(el, 'the only one');
+        const invoker = actionOf((await rowsOf(el))[0] as Sv3SessionRow, 'remove');
+        pressEnter(invoker);
+        await confirmDeletion(el, invoker);
+        await pill.updateComplete;
+        expect(await rowsOf(el)).toHaveLength(0);
+        expect(focusedTestId(el)).toBe('sv3-composer-input');
+        expect(messages).toContain('Conversation deleted');
+        const spoken=[...pill.shadowRoot!.querySelectorAll('[role="status"][aria-live="polite"]')];
+        expect(spoken.some(region=>region.textContent === 'Conversation deleted')).toBe(true);
+        for (const region of spoken) expect(region.querySelectorAll('button,input,[role="button"]')).toHaveLength(0);
+      } finally {
+        pill.remove(); store.stop(); document.removeEventListener(EPHEMERAL_TOAST_EVENT, hear);
+      }
     });
 
     it('announces the deletion politely, and says WHICH conversation went', async () => {

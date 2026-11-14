@@ -7,10 +7,9 @@ author-session: codex-builder-fm-first-launch-20261114
 
 # Test-intent entries
 
-This changeset accounts for the forty modified product-test files in candidate
+The original inventory accounts for the forty modified product-test files in candidate
 0d5104a84e073d4173293a59f0a03097180d336c against origin/main
-d61d78ce4e35706bee0b2c44d303e84245c58285. Only this changeset is written by this
-builder. Every file's actual `git diff origin/main -- <file>` was read; the supplied
+d61d78ce4e35706bee0b2c44d303e84245c58285. The original documentation pass wrote only this changeset; the restoration pass below also changes tests. Every file's actual `git diff origin/main -- <file>` was read; the supplied
 `tmp/s4-evidence/test-expectations.txt` was a navigation aid, not authority for an
 expectation or independently verified execution evidence.
 
@@ -54,15 +53,15 @@ The six wholly new tests are not items in these entries:
 `modules/ui-web/src/shell-v0/`), and
 `modules/ui-web/src/utils/folderPicker.firstMinutes.test.ts`.
 Per-entry file/test pointers identify actual assertions read in them and delimit
-partial replacements; titles alone are not evidence. They were not run here,
-and no fail-before/pass-after or independent acceptance is claimed.
+partial replacements; titles alone are not evidence. They were initially read
+without execution; the builder runs below now exercise their relevant checks. Independent acceptance is not claimed.
 
 Coverage limits are findings for acceptance, not passes. In particular, broadening
 the offline-copy scanner exclusion to every test file has no supplied warrant;
-recents lose retained-preparation and some lock/423, exact-dedup, naming and
-keyboard/scroll checks; some assertions become narrower; and fixture helpers can
-hide absent controls. `checkLimits` names those gaps even where the file also has
-legitimate Obsolete changes. No class/source in this document purports to approve
+the restoration follow-through below resolves retained preparations, lock/423,
+exact dedup, accessible names, keyboard replay, scrolling and required controls.
+Removed UI obligations remain explicitly retired under their cited decisions.
+`checkLimits` records each final resolution and any narrower observation boundary. No class/source in this document purports to approve
 an unsupported weakening or prove exact new fallback copy came from owner words.
 The acceptor must resolve those limits against the real scenarios, rather than
 accept the candidate's output as its own intent.
@@ -72,6 +71,47 @@ these forty items; this changeset does not modify them or substitute a document
 changed in this PR for a source predating the candidate. Repository decision
 records were searched as described in each Obsolete entry; task records remain
 for the independent acceptor to inspect.
+
+Restoration follow-through (2026-11-14): the Y6 product defect is repaired.
+The slice moved conversations out of the canonical-list-backed Recent strip into
+an additive session cache in the column, while removing the strip's freshness
+flag. A render-only membership filter now uses canonical rows plus locally
+submitted turns without a record, keeps cached transcripts/drafts intact, and
+restores the unlock-refresh freshness guard. Locked columns still expose no titles.
+The original Y6 checks pass at d61d78ce4e in a shared clone with dependencies
+resolved from this worktree (no node_modules links). The restored column tests
+pass on the repair, including an unlock whose refresh is held, an empty refresh,
+423, profile ABA, and preservation/retirement of pending local turns. The running
+Shell's Chromium lock/unlock/empty-refresh check also passes.
+
+The coverage audit is complete in assertionChanges/checkLimits below. Native
+Enter/Space, named recents, the wide/narrow dark/light/forced-color flow and scroll
+matrix, preserved multiline bounds, native paste, final-deletion polite rendering,
+Ask/Structured pointer sends and fixture cleanup are checked. Filters typography
+captures are restored in dark/light through the existing docked Filters entry:
+158 surfaces, zero violations. Six removed Agent runs/Mode/Effort identities
+remain retired under D6, D3/C3 and D5. The two surviving Filters identities are
+asserted by name as well as by the total.
+
+Builder evidence so far: 807 unit files / 10,045 tests passed; the final touched
+unit run passed 27 files / 638 tests; 37 isolated source mutations each failed a
+relevant restored assertion and were restored byte-for-byte, followed by 243
+passing tests in the restored clone. Mutation IDs below identify these experiments;
+no acceptance, independent verification or committed-candidate gate is claimed.
+Six additional Chromium mutations fail the restored native Enter/Space, named
+region, in-flow headline bounds, native wheel scrolling, multiline bounds and
+native paste oracles; all mutated bytes are restored and the 14 browser tests
+pass afterward. Accessibility passes all 102 registered surfaces with no new or
+severe violations; lint, TypeScript and the dead-code gate (8 informational
+findings) pass. The first lockdown run passed 665/666 tests across 51/52 files;
+HealthSurface.outage-lockdown.test.ts then passed all 5 tests alone. The initial
+accessibility sweep had one Filters click capture timeout; its fresh full sweep
+passes. Dark and light Filters identity mutations each keep the 158-surface total but
+remove one required identity; both fail the named-inventory assertion. The script
+is restored byte-for-byte and its lockdown wrapper passes afterward. In total,
+45 source mutations fail relevant assertions and have byte-for-byte restoration
+evidence. The final stable-source lockdown rerun passes all 52 files / 667 tests. The source tree and all test changes remain uncommitted.
+Acceptance records are untouched.
 
 ```json
 {
@@ -134,11 +174,11 @@ for the independent acceptor to inspect.
       "assertionChanges": [
         {
           "oldAssertion": "The desktop-CSP typography audit must capture exactly 164 surfaces and report zero violations.",
-          "newAssertion": "It must capture exactly 156 surfaces and still report zero violations.",
-          "reason": "R7 and D3/D4/D5/C3 remove idle Search controls when unavailable, rather than requiring their disclosure states to exist. The supplied builder evidence identifies eight retired captures: dark/light search-idle-expanded-1/2/3/4. That is a proposed capture-inventory change, not authority to set the oracle to whatever count the candidate prints."
+          "newAssertion": "Exactly 158 surfaces and zero violations, with named passing dark/search-results-filters and light/search-results-filters captures containing rendered text.",
+          "reason": "Baseline d61d78ce4e was rerun in an isolated shared clone: 164 captured surfaces, zero violations. Its eight named states are dark/search-idle-expanded-1 (Agent runs), dark/search-idle-expanded-2 (Mode), dark/search-idle-expanded-3 (Effort), dark/search-idle-expanded-4 (Filters), light/search-idle-expanded-1 (Agent runs), light/search-idle-expanded-2 (Mode), light/search-idle-expanded-3 (Effort), light/search-idle-expanded-4 (Filters). D6 removes Agent runs with the empty column; D3/C3 remove the new-mode offer under this uninstalled fixture; D5 removes Search effort. Filters remains product UI and no quoted decision removes its typography obligation. The surviving Filters states are now reached through the existing results/docked control; no mode offer is forced into the unavailable first-launch fixture."
         }
       ],
-      "checkLimits": "Coverage reduction: eight capture states are no longer required. The exact 156 inventory and the builder-reported baseline 164/candidate 156 with zero violations were not rerun here; this entry alone does not prove which surfaces disappeared or that all surviving surfaces were audited. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.test.ts#S4-13 Search has a magnifier and headline label, with no prompt, send or effort and FirstMinutes.availability.test.ts#S4-14 developer tools reveal Structured/Delegate only with answers available cover control presence/availability, not typography, capture identity or the lost disclosure geometries. No replacement capture for those eight states is claimed."
+      "checkLimits": "Resolved: baseline 164/zero violations and candidate 158/zero violations were executed in owned headless Chromium. Six removed Agent runs/Mode/Effort states map to D6, D3/C3 and D5; two Filters states survive under explicit dark/search-results-filters and light/search-results-filters identities, each required to pass and contain text. This is browser typography/CSP coverage, not Engine behavior. Mutations filters-dark and filters-light preserve the surface count but replace the respective Filters identity; each fails the named-inventory assertion. The script is restored byte-for-byte; the full Chromium typography wrapper then passes."
     },
     {
       "items": [
@@ -257,7 +297,7 @@ for the independent acceptor to inspect.
           "reason": "R6/D8 replace checklist AI promotion with the first-launch folder action. This tests the adopted action rather than accepting the candidate's former AI placement."
         }
       ],
-      "checkLimits": "Deletions: checklist header/current step/Done/Under way, empty-folder Open Library, waiting-count text, visible Hide and Help reopen, and first-launch AI Brain reachability have no same-UI replacements because that UI is removed. State sharing is still checked through APIs, a narrower interaction path. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status and #S4-8 browser path entry has no Collection; acceptance focuses Search and reading count expires assert replacement launch/focus/count-lifetime behavior. Its S4-19 viewport/theme cases check Add reachability, not the retired AI action. Those new tests were read, not executed here. Existing cancellation, errors/retry, duplicate add, navigation/history and reload assertions remain."
+      "checkLimits": "R6/D7 retire the checklist and its pill/reopen UI; R6 retires the first-launch AI action. Deletions: checklist header/current step/Done/Under way, empty-folder Open Library, waiting-count text, visible Hide and Help reopen, and first-launch AI Brain reachability have no same-UI replacements because that UI is removed. State sharing is still checked through APIs, a narrower interaction path. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status and #S4-8 browser path entry has no Collection; acceptance focuses Search and reading count expires assert replacement launch/focus/count-lifetime behavior. Its S4-19 viewport/theme cases check Add reachability, not the retired AI action. Those replacement browser tests pass in the full lockdown run. Existing cancellation, errors/retry, duplicate add, navigation/history and reload assertions remain."
     },
     {
       "items": [
@@ -330,7 +370,7 @@ for the independent acceptor to inspect.
           "reason": "R6/D7 retire setup progress; R2/D1/D10/C9 make reading independent of legacy card visibility and prohibit a duplicate returning count."
         }
       ],
-      "checkLimits": "Numbered progress/current-step and hide-to-reveal-corpus assertions are removed, not preserved. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-8 browser path entry has no Collection; acceptance focuses Search and reading count expires checks focused Search and count expiry; #S4-1 first launch has one message/action and no field, checklist, sidebar or status checks replacement first launch with intercepted responses, not the Engine-backed obligation. This modified file remains the Engine-path check; no Engine run occurred here. Dropping recordFirstUseSearch from the AppWindow type is unused harness signature cleanup."
+      "checkLimits": "Numbered progress/current-step and hide-to-reveal-corpus assertions are removed, not preserved. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-8 browser path entry has no Collection; acceptance focuses Search and reading count expires checks focused Search and count expiry; #S4-1 first launch has one message/action and no field, checklist, sidebar or status checks replacement first launch with intercepted responses, not the Engine-backed obligation. Despite its historical Engine-path filename, this modified file intercepts fetch and is not an independent live Engine check; it passes in the lockdown run. Dropping recordFirstUseSearch from the AppWindow type is unused harness signature cleanup."
     },
     {
       "items": [
@@ -372,11 +412,11 @@ for the independent acceptor to inspect.
       "assertionChanges": [
         {
           "oldAssertion": "Typing a draft arms timers; summon preserves it, leaves a nonempty aria-label and allows the quick stage/timers to run.",
-          "newAssertion": "Typing and summon keep the shared search query empty before and after 200ms, preserve/focus the actual draft field, and accept aria-label or aria-labelledby.",
+          "newAssertion": "Typing and summon keep the shared query empty before and after 200ms, preserve/focus the draft field, and require its resolved accessible name to equal What are you looking for?.",
           "reason": "H4 explicitly says typing changes only the draft and Enter starts search. D5 names the hero field through the headline. Those sources supersede the quick-search timer expectation."
         }
       ],
-      "checkLimits": "Weaker accessible-name observation: a nonempty aria-label or aria-labelledby attribute does not prove that an ID resolves to text; no name computation is asserted here. Repeating the empty-query assertion twice adds no coverage. No assertion now proves timer scheduling/cancellation, and the new query observation alone does not rule out every network request. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.test.ts#S4-13 Search has a magnifier and headline label, with no prompt, send or effort separately checks the exact hero id and docked Search label, not a computed name. SearchV3View.searchMode.test.ts checks that typing issues no search and Enter does."
+      "checkLimits": "Restored and passing: resolve every aria-labelledby reference in the input shadow root (or aria-label) and require exact accessible text What are you looking for?. Mutation name-reference breaks the reference and fails this oracle. Draft/focus/no-submit checks remain. H4/D5 retire automatic quick-search timer scheduling/cancellation; this component test does not establish a native accessibility tree."
     },
     {
       "items": [
@@ -440,7 +480,7 @@ for the independent acceptor to inspect.
           "reason": "The card is removed by R6; D1/D10/C9 put only the partial own count on idle Search while live reading continues. The full-height harness is fixture-only support for that composer, not a new count oracle or a passing visibility check."
         }
       ],
-      "checkLimits": "The waiting/still-reading words are intentionally removed from this line; no same-line replacement is claimed. modules/ui-web/src/shell-v0/state/FirstMinutes.reading.test.ts#keeps live reading visible with unknown enrichment and queue %s checks reading:true/searchable:3 even when enrichment cannot confirm work; it is a state check, not a browser count rendering replacement. FirstMinutes.app-lockdown.test.ts#S4-8 browser path entry has no Collection; acceptance focuses Search and reading count expires checks the reading ring and count expiry, not this unknown-queue pair. No browser check was run here."
+      "checkLimits": "Resolved browser boundary: GettingStarted.reading-lockdown.test.ts executes the actual composer in owned Chromium for both omitted (null) and zero pendingJobs while indexState is INDEXING and requires exact rendered 3 files searchable so far. R2/D1/D10/C9 retire the waiting/still-reading suffix; the count and live-reading obligation are retained. State permutations remain in FirstMinutes.reading.test.ts."
     },
     {
       "items": [
@@ -518,12 +558,12 @@ for the independent acceptor to inspect.
       "assertionChanges": [
         {
           "oldAssertion": "A pending plugin walkthrough is discoverable in the first-use card; unregistering leaves the entire card text empty.",
-          "newAssertion": "Mount Help instead; retain saved step Two, plugin title, no Try a search and saved ids/progress. After unregistering, the walkthrough card must not contain Sample tour.",
+          "newAssertion": "Mount Help instead; retain saved step Two, plugin title, no Try a search and saved ids/progress. After unregistering, the entire plugin shadow text is empty and its card absent; the enclosing Help surface retains its other responsibilities.",
           "reason": "D7/C8 move resumable plugin walkthroughs to Help. Expecting the whole Help surface to become empty would contradict its other responsibilities; the new assertion addresses the removed plugin only."
         },
         {
           "oldAssertion": "Suggestions use jf-button; the watched Documents path must not occur anywhere in the host text.",
-          "newAssertion": "Select native suggestion buttons, still require two deduplicated suggestions, reseed roots after the AI reset, and require the Add Documents action to be absent.",
+          "newAssertion": "Select native suggestion buttons, still require two deduplicated suggestions, reseed roots after AI reset, and require both Add Documents absence and no literal /Documents anywhere in the host text.",
           "reason": "D8 uses immediate folder-add actions and excludes already watched suggestions. Native-button selection and reseeding are fixture/selector changes; the new absence-of-action check retains the exclusion purpose but is narrower than forbidding every path mention."
         },
         {
@@ -532,7 +572,7 @@ for the independent acceptor to inspect.
           "reason": "R6/D7 remove the checklist and C9 stops new progress writes. The Search composer, rather than this host, owns the transient count."
         }
       ],
-      "checkLimits": "Weakened observations: unregister no longer proves the whole host empty, and absence of Add Documents no longer proves absence of the literal /Documents path everywhere. No exact replacement for those broader text bans is demonstrated. Removed count/reload checks move in part to modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-8 browser path entry has no Collection; acceptance focuses Search and reading count expires and modified FirstUse.app-lockdown.test.ts#reloading during indexing rediscovers the folder and live count before offering search. modules/ui-web/src/shell-v0/views/HelpSurface.firstMinutes.test.ts#S4-21 resumes the saved plugin step and completes from Help (declared=false/true) and #S4-21 Next and Dismiss keep their saved progress in Help (declared=false/true) check both Help paths and interactive saved progress. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.test.ts#S4-3 native first-launch selection adds once immediately, without confirmation, #S4-4 native cancel restores focus; picker error exposes an actionable manual fallback, and #S4-20 Library selection still requires confirmation and keeps Collection check the changed folder flow/preservation; utils/folderPicker.firstMinutes.test.ts#S4-4 native success and cancel remain distinct from failure checks the picker outcome boundary. These are pointers to read tests, not execution evidence."
+      "checkLimits": "Restored and passing: after unregister, the walkthrough has no .card and its entire shadow text is empty; the surrounding Help host may remain populated under D7/C8. The watched /Documents path is forbidden throughout the first-launch host, alongside absence of its Add action. Mutations walkthrough-empty-text and watched-path-text fail these restored oracles. R6/D7 retire checklist Try a search, card counts and card reload UI; C9 retires progress writes. Launch and Help integration remain separately exercised."
     },
     {
       "items": [
@@ -592,11 +632,11 @@ for the independent acceptor to inspect.
       "assertionChanges": [
         {
           "oldAssertion": "From default Search, click a required mode switch while indexing is paused and assert Ask is enabled.",
-          "newAssertion": "Fixture-only change: set the window tier to Ask, settle, optionally click its switch, then keep the Ask-enabled assertion and Resume indexing observation.",
+          "newAssertion": "Fixture-only: select the existing Ask task, settle, require and click its mode switch, then retain Ask-enabled and Resume indexing assertions.",
           "reason": "C1 keeps existing Ask reachable even when new Ask would not be offered under D3/C3. D5 preserves the Ask composer. This no longer promises that a fresh Search always offers a switch."
         }
       ],
-      "checkLimits": "Coverage is narrower: directly setting tier bypasses the user entry route, and optional chaining removes the required trigger-existence observation. There is no equivalent pause-specific fresh-Search switch assertion. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.availability.test.ts#S4-14 live installed CUDA availability offers Search/Ask without losing text when readiness changes covers live offer gating, and FirstMinutes.test.ts#S4-14 restored ask always offers Search without discarding draft/schema covers the existing-mode escape; neither is a paused-indexing navigation replacement."
+      "checkLimits": "Restored and passing: existing Ask while indexing is paused must expose a non-null mode trigger before activation; Ask stays enabled and Resume stays visible. Mutation ask-mode-required removes that existing-task control and fails the required-element assertion. C1 preserves existing Ask; D3/C3 retire unconditional fresh-Search offers."
     },
     {
       "items": [
@@ -666,11 +706,11 @@ for the independent acceptor to inspect.
       "assertionChanges": [
         {
           "oldAssertion": "Calm setup state has the exact label Getting started · 1/2/3 of 3, including the default case.",
-          "newAssertion": "Each such label must not contain Getting started; unknown kind and needs/problems/running/finished precedence assertions stay.",
+          "newAssertion": "Calm default/steps 2 and 3 have the exact existing Up to date label; the unknown-verdict variant has the exact Checking search status · last seen just now · checking label. Unknown kind and urgent precedence remain.",
           "reason": "R6/D7 remove setup progress from the bar, independent of the legacy input still supplied to derivation."
         }
       ],
-      "checkLimits": "The exact positive calm label is replaced by a narrower forbidden-substring check: arbitrary other text could pass. No exact-label replacement for every step/unknown-verdict variant is demonstrated. frameStatus.optionalAi.test.ts checks two specific default labels; modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status bans Getting started text but does not check complete absence of every possible bar status. Urgent-state precedence is retained."
+      "checkLimits": "Restored and passing: exact Up to date labels for calm step 2, step 3, default and hidden variants, plus exact Checking search status · last seen just now · checking for an unknown verdict. Mutations calm-step2, calm-step3, calm-default, calm-hidden and checking-exact-label independently change those outputs and fail. R6/D7 retire only the Getting started override; the strings are existing-path expectations, not owner-prescribed new copy. Urgent precedence remains."
     },
     {
       "items": [
@@ -744,7 +784,7 @@ for the independent acceptor to inspect.
           "reason": "R6/D7 remove checklist visibility across those legacy states while retaining the records. Renaming suppress to _suppress marks the retired welcome-visibility discriminator; it is not evidence of preserved visibility semantics."
         }
       ],
-      "checkLimits": "All changed visibility assertions intentionally retire the checklist; no replacement is claimed for Help reopening that card. Legacy state preservation remains checked. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status checks the replacement screen, not every legacy projection permutation. C9 reading lifetime is separately tested in FirstMinutes.reading.test.ts#keeps live reading visible with unknown enrichment and queue %s; this file still checks legacy state facts."
+      "checkLimits": "R6/D7 retire the checklist and Help reopen action. All changed visibility assertions intentionally retire the checklist; no replacement is claimed for Help reopening that card. Legacy state preservation remains checked. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status checks the replacement screen, not every legacy projection permutation. C9 reading lifetime is separately tested in FirstMinutes.reading.test.ts#keeps live reading visible with unknown enrichment and queue %s; this file still checks legacy state facts."
     },
     {
       "items": [
@@ -841,11 +881,11 @@ for the independent acceptor to inspect.
       "assertionChanges": [
         {
           "oldAssertion": "Structured-mode suites rely on implicitly offered modes from an online/available snapshot without explicit install, CUDA or developer state.",
-          "newAssertion": "Fixture-only changes import install/developer setters, explicitly set install and developer flags after AI reset, feed cudaAvailable:true in online fixtures, and set those flags in teardown too. Expected outcomes are unchanged.",
+          "newAssertion": "Fixture-only changes import install/developer setters, explicitly set install and developer flags after AI reset, feed cudaAvailable:true in online fixtures, then reset AI/install observations and restore the previous developer preference in teardown. Expected outcomes are unchanged.",
           "reason": "R7/D3/C3 gate new mode offers on known installed/live CUDA readiness; D4 gates Structured/Delegate on developer tools. The new fixture supplies those prerequisites; it does not derive expected output from the candidate."
         }
       ],
-      "checkLimits": "Accepted structured output, incompatibility, transport/stream failure and request assertions are unchanged. Preconditions changed, so this is not claimed as an Adaptation retaining every old input. The fixture no longer covers offering those modes without known install/CUDA/developer state. Teardown sets flags true rather than restoring their previous value; cross-file state isolation was not run here. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.availability.test.ts#S4-14 developer tools reveal Structured/Delegate only with answers available checks positive mode visibility; its uninstalled, unknown-install, no-cuda, unknown-gpu, stale, off, failed and loading cases check that no new Ask is offered. Those checks do not prove this suite leaves no state behind."
+      "checkLimits": "Accepted structured output, incompatibility, transport/stream failure and request assertions are unchanged. Preconditions changed, so this is not claimed as an Adaptation retaining every old input. The fixture no longer covers offering those modes without known install/CUDA/developer state. Fixture cleanup is restored: reset AI/install observations and restore the previous developer preference after removing views. The touched and full unit suites pass. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.availability.test.ts#S4-14 developer tools reveal Structured/Delegate only with answers available checks positive mode visibility; its uninstalled, unknown-install, no-cuda, unknown-gpu, stale, off, failed and loading cases check that no new Ask is offered. Those checks do not prove this suite leaves no state behind."
     },
     {
       "items": [
@@ -1035,7 +1075,7 @@ for the independent acceptor to inspect.
       ],
       "change": "modified",
       "kind": "test-code",
-      "class": "Adaptation",
+      "class": "Obsolete",
       "sources": [
         {
           "kind": "owner-adopted-scenario",
@@ -1054,6 +1094,15 @@ for the independent acceptor to inspect.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Search mode: magnifier, one line (pasted newlines become spaces), Enter searches, no send arrow, no effort control, no placeholder prompt; the headline labels the field (aria-labelledby); when the headline is not shown (results docked) the field's name is \"Search\". Ask mode: today's Ask composer (multi-line, effort, send, stop, scope).",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "decision": "D6",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Left column only when a conversation exists (canonical conversation rows or locally submitted conversational turns, excluding synthetic unsent-draft rows; a deep-linked conversation counts while resolving). Agent runs goes with the column.",
+          "label": "agent choice"
         }
       ],
       "moved": [
@@ -1065,9 +1114,14 @@ for the independent acceptor to inspect.
           "oldAssertion": "An already explicit submit is represented by clicking sv3-composer-send.",
           "newAssertion": "The same explicit submit is encoded as an Enter keydown on sv3-composer-input. The invalid cutover-task test dispatches Enter on the input instead of clicking send. It still checks the original keep text, visible Invalid/Unknown/No readable refusal and zero dispatches.",
           "reason": "R7/D5 remove Search's send arrow and specify Enter. Inputs, fault injection, ownership/retention outcomes and refusal oracles of these explicit-submit cases are retained; they do not test automatic typing."
+        },
+        {
+          "oldAssertion": "Outgoing unsent conversation fixtures manufacture only a cached placeholder for previous, then navigate back through the column.",
+          "newAssertion": "Those four fixtures return previous from the canonical conversation list; retention, recovery-capacity, no-dispatch and navigation assertions are unchanged.",
+          "reason": "D6 and the repaired canonical membership filter require an existing conversation or submitted local turn to populate the column. An unsent cached placeholder alone is deliberately excluded."
         }
       ],
-      "checkLimits": "Input re-encoding only; no expected value/assertion is deleted. Pointer activation of the old Search send button is retired by R7. These synthetic Enter events do not prove a native browser key path or retain a pointer-send coverage claim."
+      "checkLimits": "All original outcomes remain; Search submit is re-encoded to Enter under R7/D5. Four outgoing-conversation fixtures now supply a canonical previous row so retained text/files and recovery-capacity checks exercise a real remaining column route. This is an explicit precondition change, not a claim that every old input is unchanged. All 67 tests pass; native keyboard replay is additionally checked in FirstMinutes.app-lockdown.test.ts."
     },
     {
       "items": [
@@ -1137,11 +1191,11 @@ for the independent acceptor to inspect.
         },
         {
           "oldAssertion": "The offline copy scanner excludes only SearchV3View.honesty.test.ts from all local .ts files.",
-          "newAssertion": "It excludes every *.test.ts file, still rejecting offline in the remaining production .ts files.",
-          "reason": "This is a real scan-domain reduction, not a selector update. None of R2/D6/D10/C9 authorizes reducing the test-source scan domain; no supplied source supports that part of the diff."
+          "newAssertion": "The scanner again excludes only SearchV3View.honesty.test.ts. The pressure-unloaded availability case retains its literal wire fixture and oracle in state/FirstMinutes.onDemand.test.ts.",
+          "reason": "No decision removed the scanner obligation. The original window-local scan domain is restored; a wire-state availability test is isolated outside it."
         }
       ],
-      "checkLimits": "Unwarranted weakening flagged: every other test file is newly exempt from the offline copy ban; no replacement is demonstrated, including in FirstMinutes.*.test.ts. Candidate FirstMinutes.availability.test.ts uses an offline fixture value, but making that file pass is not a source of intent. The corpus remedy copy/navigation checks are intentionally deleted with no same-route replacement; FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status checks the replacement first-launch action/absent sidebar, not Library navigation or this source scanner. This entry does not claim the unsupported weakening is justified."
+      "checkLimits": "Restored and passing: scan every local .ts file except this self-referential honesty test, including other test files. Mutation scan-test-files adds the forbidden copy token to SearchV3View.branch.test.ts and fails the scanner. The literal pressure-unloaded wire fixture moved unchanged to state/FirstMinutes.onDemand.test.ts outside this original scan directory. R2/D10/C9 retire duplicate Search corpus remedy/navigation; R10/D6 retire the empty column."
     },
     {
       "items": [
@@ -1273,7 +1327,7 @@ for the independent acceptor to inspect.
           "reason": "R10/D6 remove the empty conversation column. The existing pane ceiling is 560 and the existing main minimum is 640: without a sidebar, 1400 - 640 exceeds 560, so the existing ceiling binds. This arithmetic, not a candidate screenshot, supplies the expected value."
         }
       ],
-      "checkLimits": "The old 504 geometry is retired for a no-conversation fixture. Other two-boundary scenarios keep their assertions; this one no longer proves reservation of a sidebar that must be absent. FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status checks column absence, not pane dimensions. The nearby historical comment still describes the old 504 clamp and was not corrected in this documentation-only assignment."
+      "checkLimits": "The old 504 geometry is retired for a no-conversation fixture. Other two-boundary scenarios keep their assertions; this one no longer proves reservation of a sidebar that must be absent. FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status checks column absence, not pane dimensions. The geometry comment now names the no-column 560px automatic default; the other two-boundary assertions remain."
     },
     {
       "items": [
@@ -1347,21 +1401,21 @@ for the independent acceptor to inspect.
         },
         {
           "oldAssertion": "Y2/Y3 record explicit attempts with full exact-dedup/whitespace variants, palette inclusion, no automatic/facet/external-query additions and no duplicate on replay; arrows replay operators/current filters and the strip opens conversations without dispatch.",
-          "newAssertion": "Search rows retain exact-case/outer-space dedup examples and eight-item cap; typing alone sends nothing. A focused button is clicked to replay operators and current pdf filters once. Failed/invalid queries have no matches text; responses have a count and datetime; superseded attempts have no count.",
+          "newAssertion": "Search rows restore exact case/outer/internal-space dedup, eight-item cap, palette inclusion, no typing/facet/external-query records, replay promotion without duplication, operator/current-filter replay, failed/invalid/superseded count rules, exact rendered-header equality and response-completion time bounds. Pointer replay and independent native Enter/Space activations are tested with the current file-kind restriction.",
           "reason": "D2/C6 attach response metadata to explicit submitted attempts; D5 retires automatic Search. Removing conversation replay from this list follows the stated separation, not a candidate-derived count."
         },
         {
           "oldAssertion": "Y4/Y5/R5a Clear suppresses conversation backfill/rename/reactivation and delayed list rows, avoids writes, preserves storage-key sets, forgets searches across windows and rejects profile/workspace ABA results.",
-          "newAssertion": "Clear empties Search rows, leaves saved conversation ids and permits only search writes; late search completions cannot repopulate. A new window forgets searches but keeps the column. User-profile and workspace ABA drop recents and pending replies; registry-only edits retain rows; old workspace conversation rows are rejected.",
+          "newAssertion": "Clear empties Search rows without new writes or storage keys, keeps conversation ids and rejects late completions. New windows forget searches. User-profile and workspace ABA reject stale search/list replies, require fresh conversation labels and an empty shared query; registry edits preserve recents.",
           "reason": "D2 makes Clear search-only and memory-only; C6 explicitly invalidates completions after Clear/profile switch. Conversations remain owned by the separate store, so Clear no longer hides them."
         },
         {
           "oldAssertion": "Y3 retained Ask/Structured preparations survive both recent-search replay and conversation navigation. Y6 hides optimistic/legacy/untitled labels plus pre-lock list responses and handles a history 423 immediately.",
-          "newAssertion": "The retained-preparation test and history-423 test are removed. A new lock case forbids Secret/preview-secret in the column and Secret in search recents, then requires the title again on unlock. Plain search still preserves saved conversations, search-only writes and historical SEARCH projection.",
+          "newAssertion": "Retained Ask/Structured preparations survive search replay and column navigation without dispatch. History 423 hides rows immediately. Lock hides optimistic/legacy/untitled rows and stale responses; unlock keeps them suppressed while its refresh is held, then renders exactly Refreshed, and an empty refresh removes the column. Canonical membership retains only unrecorded local turns alongside canonical rows without deleting cache/draft/transcript state.",
           "reason": "R10/D2 remove conversations from recents; that warrants retiring their list presentation and Clear-hiding behavior, but does not itself waive retained preparations or confidentiality at a remaining navigation boundary."
         }
       ],
-      "checkLimits": "Unreplaced/weaker checks are explicit: (1) the new pointer-and-native-keyboard test focuses a button then calls click(); it never dispatches native Enter/Space, so it is not keyboard-activation evidence. (2) The retired list naming/theme/docked/narrow matrix, overflow isolation, Escape focus return, empty-Enter no-search and IME/modifier paths are not replaced in this file. focusEmpty forces hero state, bypassing the natural return-to-idle transition. (3) Exact dedup loses internal-double-space distinctions; palette inclusion, facet/external-query non-recording, replay promotion/no-duplication and storage-key equality assertions are deleted. Search-only writes are retained but do not prove no local/session persistence. (4) The retained-preparation search-replay branch is still relevant and has no replacement demonstrated; removing conversation entries does not justify losing it. Conversation replay/history-no-dispatch is removed from this strip by design, but no exact moved test was established. (5) Optimistic/legacy/untitled labels, pending pre-lock response suppression, history 423 and post-unlock empty-list handling lose their specific checks; the new ordinary lock/unlock case is narrower. (6) The user-profile ABA case loses its stale-conversation-list response check; workspace ABA retains one; fresh workspace labels and final shared-query-empty assertion are deleted. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.test.ts#S4-11 recents are an in-flow list of searches with count/time, keyboard reachable, never empty chrome checks 1,000+ text, a time node and lack of tabindex=-1, but no actual keyboard activation, geometric in-flow predicate, response-to-header equality or timestamp bound proving completion time rather than submission time. #S4-13 newlines are stopped in Search, modifier chords never silently Delegate; restored drafts survive checks modifier/IME submission and a retained multiline draft, not recents-specific retention or copy/lock cases. No exempt new file demonstrates replacements for the remaining lost obligations. These are disclosed gaps, not accepted weakening."
+      "checkLimits": "Restored and passing: exact internal/outer/case dedup, palette inclusion, facet/external-query non-recording, replay promotion/no duplication, Clear storage-key and write equality, retained Ask/Structured preparations, history/no-dispatch, history-423, empty/IME/modifier Enter (also with nonempty text), profile/workspace ABA stale-list rejection before later replies can overwrite it, fresh labels and empty shared query, exact rendered-header metadata and completion-time bounds. Mutations recent-internal-spaces, recent-palette, recent-facet-not-recorded, recent-external-not-recorded, recent-replay-promotion, clear-no-storage, clear-no-write, retained-preparations, column-canonical-membership, unlock-awaits-refresh, history-423-lock, recent-modifier-enter, profile-aba-stale-lists, header-exact-text, completion-time and pending-local-membership fail their corresponding oracles. All 18 cases pass; both original Y6 cases pass on baseline d61d78ce4e. FirstMinutes.app-lockdown.test.ts covers native Enter/Space with current restrictions, named list/Tab order, no active descendant, in-flow/no-overlap/width bounds and hero scrolling without workspace ancestor movement at 1280x700 and 360x400 in dark/light/forced colors; docked recents are absent. D2 deliberately retires the overlay listbox/active-descendant/arrows/Escape and the separately scrolling 13-row geometry, not keyboard reachability. D6 moves conversation navigation to the canonical column. Chromium mutations native-enter-space, recent-accessible-name, recent-in-flow and recent-wheel-scroll fail the corresponding real-browser oracles; the restored 14-test browser suite passes. Both native keys are separate cases. Headline top bounds are checked at scroll position zero, and wheel scrolling is verified with native wheel input."
     },
     {
       "items": [
@@ -1435,7 +1489,7 @@ for the independent acceptor to inspect.
           "reason": "R10/D6 reserve the column for actual canonical or locally submitted conversations, so these downstream interaction checks now supply that prerequisite. Their expected downstream results have not changed."
         }
       ],
-      "checkLimits": "Precondition change, not proof of the former empty-window behavior: these cases now cover existing-conversation windows. No assertion is deleted. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status checks the opposite empty-column case. That launch test does not replace these geometry/storage/focus checks or prove deep-linked and synthetic-draft edge cases."
+      "checkLimits": "Precondition change, not proof of the former empty-window behavior: these cases now cover existing-conversation windows. No assertion is deleted. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status checks the opposite empty-column case. That launch test does not replace these geometry/storage/focus checks or prove deep-linked and synthetic-draft edge cases. Its geometry precondition now uses a genuinely submitted local turn rather than an empty cached row; assertions remain unchanged."
     },
     {
       "items": [
@@ -1545,7 +1599,7 @@ for the independent acceptor to inspect.
           "reason": "D3/D4/C3 gate new modes and D5 supplies Search Enter. C1 preserves existing task modes. These changes prepare the intended test state rather than relaxing load-anyway outcomes."
         }
       ],
-      "checkLimits": "No assertion is deleted. The changed fixtures no longer assert offers under unknown install/CUDA/developer conditions. Teardown sets flags true, so isolation is unverified. Enter replaces pointer-send coverage at those sites; direct browser key input is not exercised. FirstMinutes.availability.test.ts#S4-14 pressure-unloaded chat remains offerable through the existing on-demand availability covers the gate for on-demand chat, not these same-mode load ownership races."
+      "checkLimits": "No assertion is deleted. The changed fixtures no longer assert offers under unknown install/CUDA/developer conditions. Fixture cleanup resets AI/install observations and restores the previous developer preference; touched and full unit suites pass. Pointer send is restored for the existing Ask pressure-refusal path; only the Search preparation uses Enter. Mutation ask-pointer-send disables conversational pointer submit and fails both pending-Load cases. Native browser key input for those load races is outside this test. FirstMinutes.availability.test.ts#S4-14 pressure-unloaded chat remains offerable through the existing on-demand availability covers the gate for on-demand chat, not these same-mode load ownership races."
     },
     {
       "items": [
@@ -1664,7 +1718,7 @@ for the independent acceptor to inspect.
           "reason": "H4/D5 separate draft editing from submitted search state. Alpha remains the last submitted query when no new search is requested; this is a derived consequence of explicit-submit behavior, not a request to label alpha as results of the empty draft."
         }
       ],
-      "checkLimits": "Changed oracle: preserving alpha results on a cleared unsubmitted draft replaces the former cancellation/empty-results assertion; it does not verify every stale-result/draft distinction or new-query label. The chatUnavailable helper now feeds cudaAvailable:true even though its historical no-GPU comment remains; it tests unavailable chat with CUDA, not CPU hardware. Teardown sets install/developer true; isolation is unverified. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.test.ts#S4-13 Search has a magnifier and headline label, with no prompt, send or effort checks replacement anatomy/name; #S4-13 newlines are stopped in Search, modifier chords never silently Delegate; restored drafts survive checks preserved multiline drafts and ignored modifier/IME Enter events (it does not actually paste or assert newlines cannot enter); #S4-14 restored ask always offers Search without discarding draft/schema checks existing-mode recovery. FirstMinutes.availability.test.ts covers true no-CUDA/uninstalled/unknown gating. No native-paste or actual single-line visual behavior is proved by these pointers."
+      "checkLimits": "Changed oracle: preserving alpha results on a cleared unsubmitted draft replaces the former cancellation/empty-results assertion; it does not verify every stale-result/draft distinction or new-query label. chatUnavailable explicitly documents unavailable chat with CUDA; true no-CUDA gating stays in FirstMinutes.availability.test.ts. Teardown resets AI/install state and restores the prior developer preference; full and touched unit runs pass. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.test.ts#S4-13 Search has a magnifier and headline label, with no prompt, send or effort checks replacement anatomy/name; #S4-13 newlines are stopped in Search, modifier chords never silently Delegate; restored drafts survive checks preserved multiline drafts and ignored modifier/IME Enter events (it does not actually paste or assert newlines cannot enter); #S4-14 restored ask always offers Search without discarding draft/schema checks existing-mode recovery. FirstMinutes.availability.test.ts covers true no-CUDA/uninstalled/unknown gating. FirstMinutes.app-lockdown.test.ts now uses native clipboard paste and requires newlines to become spaces without dispatch; a restored multiline draft keeps its exact bytes and fits its existing bounded geometry. The restored legacy multiline case is not claimed to be a newly typed single-line draft."
     },
     {
       "items": [
@@ -1697,11 +1751,11 @@ for the independent acceptor to inspect.
       "assertionChanges": [
         {
           "oldAssertion": "The action named typing emits sv3-composer-draft and exercises automatic Search plus first/second attachment acknowledgement failures.",
-          "newAssertion": "That branch sets composer.draft and emits sv3-composer-submit, just like an explicit submit; every storage fault, dispatch count, result and retained-draft assertion remains.",
+          "newAssertion": "The action is named edit then Enter and dispatches actual input and Enter keydown events. A failed edit retention and failed submit retention must each be observed; all storage faults, zero dispatch, retained draft/owner and second-ack refusal oracles remain.",
           "reason": "H4/D5 retire automatic Search on typing. The branch now applies the same retention obligations to an explicit request, not to a keystroke."
         }
       ],
-      "checkLimits": "Coverage reduction/redundancy: the parameter is still named typing but no longer sends a draft event and duplicates explicit-submit coverage. There is no test of failed-acknowledgement behavior on mere typing after this change, and it must not be reported as one. SearchV3View.searchMode.test.ts#sends the quick pass while typing and the refined pass on settle, through the one intent seam (historical title) now checks zero search requests until Enter, but does not cover every storage fault on edit. No new exempt file replaces the lost typing/storage combination."
+      "checkLimits": "Restored and passing: edit then Enter uses a genuine input event followed by keyboard Enter, distinct from direct submit and palette. Faults must intercept edit and submit acknowledgements exactly twice, while dispatch remains zero and retained text, storage ownership and second-ack refusal assertions remain. Mutation edit-input-ack suppresses the input notification and fails all three edit-path interception-count assertions. H4/D5 retire search-on-edit timers; no automatic-search-on-typing oracle is claimed."
     },
     {
       "items": [
@@ -1743,7 +1797,7 @@ for the independent acceptor to inspect.
       "assertionChanges": [
         {
           "oldAssertion": "The shared send helper assumes the default tier can send conversational text; helpers assume the sidebar always exists.",
-          "newAssertion": "Fixture-only: set Ask before conversational sends; absent-sidebar row/group readers return empty and New returns early. Conversation assertions otherwise continue.",
+          "newAssertion": "Fixture-only: select Ask for conversational sends. Absent-sidebar row/group readers return empty; New requires and activates a real control. The three-conversation fixture creates its first conversation before using New.",
           "reason": "D5 distinguishes Search from Ask, and R10/D6 remove the column in empty windows. Helper fallbacks avoid treating an absent column as a missing required element in those cases."
         },
         {
@@ -1752,7 +1806,7 @@ for the independent acceptor to inspect.
           "reason": "R10/D6 remove the final empty column, requiring a focus destination that survives. A surviving conversation is a legitimate precondition for retaining the separate repeated live-announcement test; the exact new toast text is not prescribed by those sources."
         }
       ],
-      "checkLimits": "Weaker helpers: missing sidebar now silently counts as zero rows/groups, and New may perform no action; those helpers alone cannot prove a New control was present/activated. The repeated-announcement case no longer covers removal of the final conversation; the separate last-row case covers focus plus a toast event. Listening for an event containing Conversation deleted does not by itself prove a rendered polite live region. No new exempt test replaces the last-row live-announcement requirement. FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status covers initial absence only. The exact toast wording and focus fallback are implementation accommodations, not verbatim owner requirements; this provenance limit remains explicit."
+      "checkLimits": "Restored and passing: New requires a sidebar and a non-null real New control; its fixture creates the first conversation before requesting New. Mutation new-required-control removes the control and fails this obligation. Empty sidebar readers remain absence-only observations. Final deletion focuses the surviving composer and renders Conversation deleted through the real AdvisoryStore/StatusPill polite leaf region, with no controls inside it; mutation final-deletion-polite changes that region to assertive and fails. The separate survivor fixture retains repeated live-region mutations. R10/D6 retire the empty-column focus destination."
     },
     {
       "items": [
@@ -1789,7 +1843,7 @@ for the independent acceptor to inspect.
           "reason": "R10/D6 reserve the column for actual canonical or locally submitted conversations, so these downstream interaction checks now supply that prerequisite. Their expected downstream results have not changed."
         }
       ],
-      "checkLimits": "Precondition change, not proof of the former empty-window behavior: these cases now cover existing-conversation windows. No assertion is deleted. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status checks the opposite empty-column case. That launch test does not replace these geometry/storage/focus checks or prove deep-linked and synthetic-draft edge cases."
+      "checkLimits": "Precondition change, not proof of the former empty-window behavior: these cases now cover existing-conversation windows. No assertion is deleted. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status checks the opposite empty-column case. That launch test does not replace these geometry/storage/focus checks or prove deep-linked and synthetic-draft edge cases. The fixture now supplies a genuinely submitted local turn, retaining the existing width, focus and storage oracles without relying on a cached placeholder."
     },
     {
       "items": [
@@ -1826,7 +1880,7 @@ for the independent acceptor to inspect.
           "reason": "R10/D6 reserve the column for actual canonical or locally submitted conversations, so these downstream interaction checks now supply that prerequisite. Their expected downstream results have not changed."
         }
       ],
-      "checkLimits": "Precondition change, not proof of the former empty-window behavior: these cases now cover existing-conversation windows. No assertion is deleted. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status checks the opposite empty-column case. That launch test does not replace these geometry/storage/focus checks or prove deep-linked and synthetic-draft edge cases."
+      "checkLimits": "Precondition change, not proof of the former empty-window behavior: these cases now cover existing-conversation windows. No assertion is deleted. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status checks the opposite empty-column case. That launch test does not replace these geometry/storage/focus checks or prove deep-linked and synthetic-draft edge cases. The fixture now supplies a genuinely submitted local turn, retaining the existing width, focus and storage oracles without relying on a cached placeholder."
     },
     {
       "items": [
@@ -1863,7 +1917,7 @@ for the independent acceptor to inspect.
           "reason": "R10/D6 reserve the column for actual canonical or locally submitted conversations, so these downstream interaction checks now supply that prerequisite. Their expected downstream results have not changed."
         }
       ],
-      "checkLimits": "Precondition change, not proof of the former empty-window behavior: these cases now cover existing-conversation windows. No assertion is deleted. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status checks the opposite empty-column case. That launch test does not replace these geometry/storage/focus checks or prove deep-linked and synthetic-draft edge cases."
+      "checkLimits": "Precondition change, not proof of the former empty-window behavior: these cases now cover existing-conversation windows. No assertion is deleted. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status checks the opposite empty-column case. That launch test does not replace these geometry/storage/focus checks or prove deep-linked and synthetic-draft edge cases. The backend fixture now returns an existing canonical conversation throughout the New/retained-results tests; no outcome assertion is weakened."
     },
     {
       "items": [
@@ -1923,11 +1977,11 @@ for the independent acceptor to inspect.
       "assertionChanges": [
         {
           "oldAssertion": "Structured-mode suites rely on implicitly offered modes from an online/available snapshot without explicit install, CUDA or developer state.",
-          "newAssertion": "Fixture-only changes import install/developer setters, explicitly set install and developer flags after AI reset, feed cudaAvailable:true in online fixtures, and set those flags in teardown too. Expected outcomes are unchanged.",
+          "newAssertion": "Fixture-only changes import install/developer setters, explicitly set install and developer flags after AI reset, feed cudaAvailable:true in online fixtures, then reset AI/install observations and restore the previous developer preference in teardown. Expected outcomes are unchanged.",
           "reason": "R7/D3/C3 gate new mode offers on known installed/live CUDA readiness; D4 gates Structured/Delegate on developer tools. The new fixture supplies those prerequisites; it does not derive expected output from the candidate."
         }
       ],
-      "checkLimits": "The chat-unavailable case also restores install/developer flags after reset, without feeding live CUDA/chat availability; its schema/instruction retention and zero-dispatch assertions remain. The fixture still exercises unavailable chat, not a new successful Ask offer. Preconditions changed, so this is not claimed as an Adaptation retaining every old input. The fixture no longer covers offering those modes without known install/CUDA/developer state. Teardown sets flags true rather than restoring their previous value; cross-file state isolation was not run here. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.availability.test.ts#S4-14 developer tools reveal Structured/Delegate only with answers available checks positive mode visibility; its uninstalled, unknown-install, no-cuda, unknown-gpu, stale, off, failed and loading cases check that no new Ask is offered. Those checks do not prove this suite leaves no state behind."
+      "checkLimits": "The chat-unavailable case also restores install/developer flags after reset, without feeding live CUDA/chat availability; its schema/instruction retention and zero-dispatch assertions remain. The fixture still exercises unavailable chat, not a new successful Ask offer. Preconditions changed, so this is not claimed as an Adaptation retaining every old input. The fixture no longer covers offering those modes without known install/CUDA/developer state. Fixture cleanup is restored: reset AI/install observations and restore the previous developer preference after removing views. The touched and full unit suites pass. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.availability.test.ts#S4-14 developer tools reveal Structured/Delegate only with answers available checks positive mode visibility; its uninstalled, unknown-install, no-cuda, unknown-gpu, stale, off, failed and loading cases check that no new Ask is offered. Those checks do not prove this suite leaves no state behind. Structured extraction uses its surviving pointer send and requires the send control; the schema-field modifier-key check remains."
     },
     {
       "items": [
@@ -1987,11 +2041,11 @@ for the independent acceptor to inspect.
       "assertionChanges": [
         {
           "oldAssertion": "Structured-mode suites rely on implicitly offered modes from an online/available snapshot without explicit install, CUDA or developer state.",
-          "newAssertion": "Fixture-only changes import install/developer setters, explicitly set install and developer flags after AI reset, feed cudaAvailable:true in online fixtures, and set those flags in teardown too. Expected outcomes are unchanged.",
+          "newAssertion": "Fixture-only changes import install/developer setters, explicitly set install and developer flags after AI reset, feed cudaAvailable:true in online fixtures, then reset AI/install observations and restore the previous developer preference in teardown. Expected outcomes are unchanged.",
           "reason": "R7/D3/C3 gate new mode offers on known installed/live CUDA readiness; D4 gates Structured/Delegate on developer tools. The new fixture supplies those prerequisites; it does not derive expected output from the candidate."
         }
       ],
-      "checkLimits": "Structured partial/terminal outcome and extraction-scope assertions are unchanged. Preconditions changed, so this is not claimed as an Adaptation retaining every old input. The fixture no longer covers offering those modes without known install/CUDA/developer state. Teardown sets flags true rather than restoring their previous value; cross-file state isolation was not run here. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.availability.test.ts#S4-14 developer tools reveal Structured/Delegate only with answers available checks positive mode visibility; its uninstalled, unknown-install, no-cuda, unknown-gpu, stale, off, failed and loading cases check that no new Ask is offered. Those checks do not prove this suite leaves no state behind."
+      "checkLimits": "Structured partial/terminal outcome and extraction-scope assertions are unchanged. Preconditions changed, so this is not claimed as an Adaptation retaining every old input. The fixture no longer covers offering those modes without known install/CUDA/developer state. Fixture cleanup is restored: reset AI/install observations and restore the previous developer preference after removing views. The touched and full unit suites pass. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.availability.test.ts#S4-14 developer tools reveal Structured/Delegate only with answers available checks positive mode visibility; its uninstalled, unknown-install, no-cuda, unknown-gpu, stale, off, failed and loading cases check that no new Ask is offered. Those checks do not prove this suite leaves no state behind."
     },
     {
       "items": [
@@ -2029,11 +2083,11 @@ for the independent acceptor to inspect.
         },
         {
           "oldAssertion": "Typing an advanced query immediately sets isSearching and removes old cards/counts; quick advanced results keep facets/counts pending until refinement.",
-          "newAssertion": "Hold an explicit request to inspect pending counts/absence of old cards; accept isSearching or isRefining, then assert new results. An explicit advanced result is refined immediately, has matchCount:1, no counts-pending text, and still only one request after a delay.",
+          "newAssertion": "Hold an explicit request to observe pending data and exact isRefining:true/isSearching:false, then assert new results. Advanced explicit completion has refined stage, matchCount:1, facets:null, no pending-count copy and one request after delay.",
           "reason": "The source requires Enter; the existing explicit/refined request path determines the stage and count oracle. A held-response fixture is necessary to observe the unchanged pending-data obligation rather than sample a completed request."
         }
       ],
-      "checkLimits": "Weakened/deleted details: isSearching alone becomes a disjunction, so this test no longer pins that specific phase flag. The pipeline.sparseEnabled:true assertion is replaced by querySyntax:search, which does not check that pipeline property. The quick-stage facets:null assertion is deleted with the obsolete quick stage; no equivalent facet expectation after an explicit advanced completion is added. The initial one-request assertion in the stale-response test is removed, though final three-request total remains. No new exempt file replaces these exact pipeline/phase/facet checks. Existing other explicit-invalid and URL-restoration assertions remain; source intent supports Enter, not arbitrary engine-pipeline changes."
+      "checkLimits": "Restored and passing: exact isRefining:true/isSearching:false on the held explicit refined request, initial one-request count during supersession, facets:null when advanced completion omits facets, querySyntax:search and no pipeline override. Mutations syntax-no-quick-pipeline, syntax-refining-searching, syntax-first-request and syntax-facets-null fail those exact oracles. H4/D5 retire the automatic BM25 quick-pass override and quick-stage pending-facet contract; explicit Enter already uses the default refined pipeline."
     },
     {
       "items": [
@@ -2153,11 +2207,11 @@ for the independent acceptor to inspect.
         },
         {
           "oldAssertion": "Recents have one bounded scrollable listbox with min-block-size:0, overflow-y:auto, overscroll containment and a constrained band; the global overflow ban permits only that rule.",
-          "newAssertion": "Require the listbox rule absent, require hero host overflow-y:auto, and exempt that host plus .search-field textarea rules from the overflow ban. The mixin count loop excludes the absent sidebar and keeps its exact count across main/composer.",
+          "newAssertion": "Require no listbox rule, a scrolling hero host and the exact Search textarea overflow rule. The rendered one-scroller count includes sidebar, main and composer in a populated conversation window. Browser recents flow/scroll/width bounds and preserved multiline bounds are checked in the real Shell in FirstMinutes.app-lockdown.test.ts.",
           "reason": "H4/D2 replace an overlay listbox with a list in the page flow; the hero page must scroll. The loop's empty-window sidebar exclusion follows R10, not a claim about sidebar scrollers in populated windows."
         }
       ],
-      "checkLimits": "Coverage reductions: listbox min-size/overscroll/band bounds are deleted; the new hero-rule presence check does not assert recents actually remain in flow or cannot overlap other content. The textarea regex is a new overflow allowance with no positive assertion of its exact contents or restored-multiline geometry. Excluding sidebar from the rendered mixin count no longer enforces one scroller across all three populated regions. FirstMinutes.test.ts#S4-11 recents are an in-flow list of searches with count/time, keyboard reachable, never empty chrome checks count/time/button tab order but contains no geometry/position assertion; its title is not proof of in-flow layout. #S4-13 Search has a magnifier and headline label, with no prompt, send or effort checks the replacement anatomy; FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status checks absent column. No exact replacement for the removed overflow/containment predicates is demonstrated."
+      "checkLimits": "Restored and passing: the exact Search textarea overflow rule (white-space:pre, overflow:auto, resize:none) is required; the one-scroller integration count includes sidebar, main and composer in a populated local-turn window. Mutations textarea-overflow-rule and populated-scroller-inventory fail these oracles. Browser flow/no-overlap/scroll/name/theme and restored-multiline/native-paste checks are in FirstMinutes.app-lockdown.test.ts. D2 retires overlay-listbox min-size/overscroll/band bounds and D6 retires a fresh empty sidebar; those removed-UI predicates remain deliberately absent. Chromium mutations recent-in-flow, recent-wheel-scroll, restored-multiline-geometry and native-paste each fail their relevant browser assertions, then all 14 browser tests pass with the original bytes restored."
     },
     {
       "items": [
@@ -2226,7 +2280,7 @@ for the independent acceptor to inspect.
       "assertionChanges": [
         {
           "oldAssertion": "Search control row begins with tier then effort; Search send has a Search hint; Ctrl+Enter delegates and calls the controller once.",
-          "newAssertion": "The row contains tier and lacks effort; Search send is absent; Ctrl+Enter emits no submit and never calls Delegate/Ask. Existing Ask send-hint assertions remain.",
+          "newAssertion": "Search's first control is tier and effort/send are absent; Ctrl+Enter emits no submit and never invokes Delegate/Ask. Existing Ask send-hint assertions remain.",
           "reason": "R7/D5 remove Search effort/send and require intentional Search Enter, rather than a hidden Delegate chord."
         },
         {
@@ -2235,7 +2289,7 @@ for the independent acceptor to inspect.
           "reason": "D3/D4/C3 govern new-mode offers, C1 keeps existing unavailable tasks recoverable, and D5 retains effort/send in Ask."
         }
       ],
-      "checkLimits": "Weaker row observation: membership does not preserve the original first-two position/order assertion. The removed Search send hint has no replacement because the control is removed. Existing-unavailable Ask is assigned directly, so that case no longer verifies user selection from fresh Search. Enter-only helper no longer exercises pointer sends at its call sites; teardown leaves install/developer flags true, with isolation unverified. FirstMinutes.test.ts#S4-13 newlines are stopped in Search, modifier chords never silently Delegate; restored drafts survive supplies modifier-submit and preserved-draft checks; #S4-14 restored ask always offers Search without discarding draft/schema checks the existing-task escape. FirstMinutes.availability.test.ts#S4-14 live installed CUDA availability offers Search/Ask without losing text when readiness changes and its negative cases check offer gating, not row order."
+      "checkLimits": "Restored and passing: mode is the first data-testid in the Search control row; effort is absent. Mutation mode-first-control inserts an earlier control and fails the exact order assertion. Conversational pressSend uses and requires its pointer button; Search uses Enter because R7/D5 retire its send and pointer hint. Existing Ask send hints and direct Enter routing remain. Cleanup resets AI/install observations and restores the previous developer preference; full and touched unit runs pass. C1 preserves unavailable existing tasks; D3/D4/C3 govern new offers."
     },
     {
       "items": [
@@ -2272,7 +2326,7 @@ for the independent acceptor to inspect.
           "reason": "R10/D6 prohibit an empty Search window from mounting the sidebar. Isolated component testing can preserve its internal oracle without claiming that composition is still offered at first launch."
         }
       ],
-      "checkLimits": "Observation boundary is narrower: these three tests no longer prove integration of the zero-state into Search or the real shell heading outline. The component predicates are unchanged. FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status covers the replacement absent-sidebar composition, not populated-window component composition or whole-shell heading accessibility. Historical test names/comments still refer to the old full-window path."
+      "checkLimits": "Observation boundary is narrower: these three tests no longer prove integration of the zero-state into Search or the real shell heading outline. The component predicates are unchanged. FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status covers the replacement absent-sidebar composition, not populated-window component composition or whole-shell heading accessibility. The sidebar zero-state name/comment now explicitly describes the isolated component; no full-window zero-column integration claim is made."
     },
     {
       "items": [
@@ -2318,7 +2372,35 @@ for the independent acceptor to inspect.
           "reason": "D4 makes developer offers explicit; R7/D5 retain the model-label conversational anatomy in Ask rather than Search."
         }
       ],
-      "checkLimits": "No assertion is deleted. This no longer tests a model label on fresh Search. Setting Ask directly bypasses mode-switch activation, and developer state is not restored in the shown diff; isolation was not checked here."
+      "checkLimits": "No assertion is removed. The model-label focus case explicitly uses existing Ask under R7/D5; direct assignment does not prove mode-switch activation. Developer preference is captured before setup and restored after removing the views, alongside the existing AI reset. Full and touched unit suites pass."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.export.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "decision": "D6",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Left column only when a conversation exists (canonical conversation rows or locally submitted conversational turns, excluding synthetic unsent-draft rows; a deep-linked conversation counts while resolving). Agent runs goes with the column.",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict: none found in docs/decisions for getting started, first launch, recent, search-as-you-type, typeahead, debounce, corpus, Draft kept, Ctrl+Enter, Search / Ask, Structured and Delegate. Matches concern engine query/metadata contracts (ADR-0016/0020), inference/model and context policy (ADR-0019/0047), scoped paths (ADR-0028), primitives (ADR-0031), streams and resource categories (ADR-0036/0037), rather than the superseded UI expectations. Private task records were not read in this builder session; the acceptor must confirm the supplied adoption and delegation turns and scope. This search does not supply missing intent for a coverage reduction flagged in checkLimits.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "The export fixture installs a local cached session with recorded turns, while its canonical list response is empty.",
+          "newAssertion": "The fixture also supplies that session through the real canonical list load; export identity, copy/download, error, lock, lifecycle and modal/focus assertions remain unchanged.",
+          "reason": "D6 and the repaired column membership require canonical conversations or pending local turns, rather than a stale cached transcript, for a visible column export action."
+        }
+      ],
+      "checkLimits": "Fixture-only repair of the remaining export interface; all export tests pass in the full unit suite. The test still stubs its HTTP boundary; independent Engine export verification is not claimed."
     }
   ]
 }

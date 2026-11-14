@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { setInstallState as firstMinutesInstall } from '../../state/aiStateStore.js';
-import { setShowDeveloperTools as firstMinutesDeveloper } from '../../state/developerToolsState.js';
+import { getShowDeveloperTools, setShowDeveloperTools as firstMinutesDeveloper } from '../../state/developerToolsState.js';
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import './SearchV3View.js';
@@ -64,7 +64,10 @@ async function type(view: SearchV3View, id: string, value: string): Promise<void
   const field = control<HTMLTextAreaElement>(composer(view), id);
   field.value = value; field.dispatchEvent(new Event('input')); await settle(view);
 }
+let previousDeveloperTools: boolean;
+
 beforeEach(() => {
+  previousDeveloperTools = getShowDeveloperTools();
   registerCoreStores(); resetInspectorState(); sessionStorage.clear(); localStorage.clear();
   __resetConversationListForTest(); __resetDraftProvidersForTest(); __resetDraftKeptForTest(); __resetAiStateForTest(); firstMinutesInstall(true, false); firstMinutesDeveloper(true);
   __feedForTest({ inference: { gpu: { cudaAvailable: true }, mode: 'online', available: true } as never,
@@ -77,7 +80,7 @@ beforeEach(() => {
 });
 afterEach(async () => {
   deactivateProjection(); takePendingSelection(); document.body.replaceChildren(); await new Promise<void>(resolve => setTimeout(resolve, 0));
-  resetSearchState(); __resetAiStateForTest(); firstMinutesInstall(true, false); firstMinutesDeveloper(true); __resetAgentSessionStore();
+  resetSearchState(); __resetAiStateForTest(); firstMinutesDeveloper(previousDeveloperTools); __resetAgentSessionStore();
   vi.unstubAllGlobals(); vi.restoreAllMocks();
 });
 
@@ -92,7 +95,7 @@ it.each(['pointer', 'keyboard'] as const)('pending Load anyway survives shown As
         reason: 'GPU_BUSY', forceAllowed: true, retryAfterMs: 1 }), { status: 503 }) : done();
     return new Response('{}');
   });
-  control<HTMLTextAreaElement>(composer(view), 'sv3-composer-input').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await settle(view);
+  control(composer(view), 'sv3-composer-send').click(); await settle(view);
   expect(dispatches()).toHaveLength(1); expect(dispatches()[0]).toMatchObject({ question, shapeId: 'core.rag-ask' });
   control(view, 'sv3-residency-force').click(); await settle(view);
   expect(http.mock.calls.filter(c => String(c[0]).includes('/api/chat/load-anyway'))).toHaveLength(1);

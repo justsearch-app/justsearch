@@ -35,6 +35,7 @@ import type { StatusSnapshot } from '../../utils/statusPoll.js';
 import { SearchV3View } from './SearchV3View.js';
 import { Sv3Sidebar } from './Sv3Sidebar.js';
 import { Sv3Main } from './Sv3Main.js';
+import { submitInSession, SV3_SESSIONS_EMPTY } from './sv3-sessions.js';
 import { Sv3Composer } from './Sv3Composer.js';
 import { createCorePluginManifest } from '../../plugin-api/CorePlugin.js';
 import { isLazySurface } from '../lazySurfaceRegistry.js';
@@ -631,6 +632,9 @@ describe('the window never scrolls; one inner region does', () => {
     expect(own(Sv3Composer)).not.toContain('.recents [role="listbox"]');
     const idleScrollerRule = own(Sv3Composer).match(/:host\(\[state='hero'\]\) \{ overflow-y: auto; \}/)?.[0];
     expect(idleScrollerRule).toBeTruthy();
+    const searchTextRules = own(Sv3Composer).match(/\.search-field textarea \{[^}]*\}/g) ?? [];
+    expect(searchTextRules).toHaveLength(1);
+    expect(searchTextRules[0]).toBe('.search-field textarea { min-height: 0; height: auto; min-block-size: 1.5em; padding: 0; line-height: 1.5; white-space: pre; overflow: auto; resize: none; }');
     const recoveryRules = own(SearchV3View).match(/^\s*\.column > \.recovery-notice\s*\{[^}]*\}/gm) ?? [];
     expect(recoveryRules).toHaveLength(1);
     const recoveryRule = recoveryRules[0]!;
@@ -659,10 +663,12 @@ describe('the window never scrolls; one inner region does', () => {
     expect(own(Sv3Main)).not.toContain('overflow-y: auto');
   });
 
-  it('adopts the scroller mixin exactly once across the rendered window', async () => {
+  it('adopts the scroller mixin exactly once across the populated window', async () => {
+    const saved = submitInSession(SV3_SESSIONS_EMPTY, 'Pending question', 1, 'ask', 'scroller-conversation');
     const el = await mount();
+    (el as SearchV3View).sessions = saved; await el.updateComplete;
     let found = 0;
-    for (const tag of ['jf-sv3-main', 'jf-sv3-composer']) {
+    for (const tag of ['jf-sv3-sidebar', 'jf-sv3-main', 'jf-sv3-composer']) {
       const r = await region(el, tag);
       found += r.shadowRoot?.querySelectorAll('.sv3-scroller').length ?? 0;
     }

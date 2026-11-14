@@ -79,6 +79,7 @@ export class Sv3SessionsDomain {
 
   /** These are the store's recent rows, not another session projection. */
   conversations: readonly Conversation[] = [];
+  conversationRowsReady = true;
   private recentSearches: readonly Sv3RecentItem[] = [];
   private recentEpoch = 0;
   private convListUnsubscribe: (() => void) | null = null;
@@ -93,6 +94,7 @@ export class Sv3SessionsDomain {
       this.host.invalidateForkReads(state.loading, state.loading || this.conversations !== state.conversations);
       this.host.requestUpdate();
       this.forgetDeletedConversations(state.deletedIds);
+      if (!state.loading && !this.historyLocked && this.conversations !== state.conversations) this.conversationRowsReady = true;
       this.sessions = mergeStoreConversations(this.sessions, state.conversations);
       this.conversations = state.conversations;
       // Only restoration follows another caller. A shared claim belongs to its own window, and an
@@ -121,7 +123,7 @@ export class Sv3SessionsDomain {
     this.host.resetProfilePresentation();
     void this.refreshRecents();
   }
-  invalidateRecentEpoch(): void { this.recentEpoch += 1; }
+  invalidateRecentEpoch(): void { this.recentEpoch += 1; this.conversationRowsReady = false; }
   refreshUnlockedRecents(): void {
     this.host.requestUpdate();
     void this.refreshRecents();
@@ -414,6 +416,7 @@ export class Sv3SessionsDomain {
     const epoch = this.recentEpoch;
     const loaded = await this.transport.loadConversations();
     if (loaded && epoch === this.recentEpoch && !this.historyLocked) {
+      this.conversationRowsReady = true;
       this.host.requestUpdate();
     }
   }

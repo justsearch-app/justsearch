@@ -7,7 +7,7 @@ import type { Control } from '../../components/Control.js';
 import type { Sv3Session, Sv3Turn } from './sv3-sessions.js';
 import { projectSv3RecordTurns } from './sv3-record.js';
 import type { ThreadEvent } from '../unifiedThreadProjection.js';
-import { __resetConversationListForTest } from '../../state/conversationListStore.js';
+import { loadConversations, __resetConversationListForTest } from '../../state/conversationListStore.js';
 import { __resetAiStateForTest, __feedForTest } from '../../state/aiStateStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetModalityForTest } from '../../primitives/modality.js';
@@ -54,7 +54,10 @@ async function settle(el: { updateComplete: Promise<unknown> }): Promise<void> {
 }
 async function mount(value = session()): Promise<SearchV3View> {
   const view = document.createElement('jf-sv3-window'); document.body.append(view); await settle(view);
-  view.sessions = { activeId: value.id, sessions: [value] }; await settle(view); return view;
+  view.sessions = { activeId: value.id, sessions: [value] };
+  vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ sessions: [{ sessionId:value.id, title:value.title,
+    titleSource:'user', firstUserMessage:'', createdAtMs:0, lastActiveAtMs:0, messageCount:2, shapeId:'core.rag-ask' }] })));
+  await loadConversations(); await settle(view); return view;
 }
 async function open(view: SearchV3View): Promise<ExportElement> {
   const sidebar = view.shadowRoot!.querySelector('jf-sv3-sidebar')!; await sidebar.updateComplete;

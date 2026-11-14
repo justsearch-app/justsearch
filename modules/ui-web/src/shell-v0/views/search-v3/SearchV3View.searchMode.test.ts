@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { setInstallState as firstMinutesInstall } from '../../state/aiStateStore.js';
-import { setShowDeveloperTools as firstMinutesDeveloper } from '../../state/developerToolsState.js';
+import { getShowDeveloperTools, setShowDeveloperTools as firstMinutesDeveloper } from '../../state/developerToolsState.js';
 
 /**
  * Search mode in Search v3 (WP1.1) — end to end against a fake backend.
@@ -313,7 +313,7 @@ function aiOnline(): void {
   __feedContactForTest();
 }
 
-/** The no-GPU install: a reachable backend, documents indexed, and no chat model at all. */
+/** Reachable backend and CUDA, with documents indexed but no available chat model. */
 function chatUnavailable(): void {
   __feedForTest({
     inference: { gpu: { cudaAvailable: true }, mode: 'unknown', available: false } as never,
@@ -322,7 +322,10 @@ function chatUnavailable(): void {
   __feedContactForTest();
 }
 
+let previousDeveloperTools: boolean;
+
 beforeEach(() => {
+  previousDeveloperTools = getShowDeveloperTools();
   __seedForTest(Object.fromEntries(readFileSync('../app-api/src/main/resources/messages/registry-surface.en.properties', 'utf8')
     .split(/\r?\n/).filter(line => line.startsWith('search.')).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)])));
   sessionStorage.clear();
@@ -359,7 +362,7 @@ afterEach(() => {
   resetSearchState();
   clearScopeChips();
   __resetSearchFiltersForTest();
-  __resetAiStateForTest(); firstMinutesInstall(true, false); firstMinutesDeveloper(true);
+  __resetAiStateForTest(); firstMinutesDeveloper(previousDeveloperTools);
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();

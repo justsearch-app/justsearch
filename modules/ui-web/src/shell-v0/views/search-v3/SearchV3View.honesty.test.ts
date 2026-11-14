@@ -1153,7 +1153,7 @@ describe('this window re-splits no word the product has already settled', () => 
     const offenders = readdirSync(here)
       .filter((name) => name.endsWith('.ts'))
       // This file writes the token in order to forbid it — the one allowed mention.
-      .filter((name) => !name.endsWith('.test.ts'))
+      .filter((name) => name !== 'SearchV3View.honesty.test.ts')
       .filter((name) =>
         readFileSync(join(here, name), 'utf8')
           // Comments are not copy, and the gate strips them before scanning; do the same here.

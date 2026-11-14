@@ -794,8 +794,7 @@ describe('the two boundaries leave the main column its 640', () => {
   it('reopens at a remembered width the current box still allows', async () => {
     localStorage.setItem(sv3BoundaryStorageKeys.paneWidth, '900');
     const el = await mount(1400);
-    // 1400 − 256 − 640 = 504: a width remembered from a wider window is not restored into a box that
-    // rejects it.
+    // With no conversation column, this fixture reopens at the 560px automatic default.
     expect(el.paneWidthPx).toBe(560); // No conversation column occupies the empty Search window.
     expect(el.paneWidthPx).toBeGreaterThanOrEqual(SV3_PANE_MIN_PX);
   });

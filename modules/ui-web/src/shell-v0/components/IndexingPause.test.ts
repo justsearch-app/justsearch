@@ -267,7 +267,9 @@ describe('WP3.7 shared pause surfaces', () => {
     const composer = el.shadowRoot!.querySelector('jf-sv3-composer') as Mounted;
     await composer.updateComplete;
     (el as unknown as {tier: string}).tier = 'ask'; await settle(el);
-    composer.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="sv3-composer-tier"]')?.click();
+    const trigger = composer.shadowRoot!.querySelector<HTMLElement>('[data-testid="sv3-composer-tier"]');
+    expect(trigger, 'existing Ask keeps its mode switch while indexing is paused').not.toBeNull();
+    trigger!.click();
     await composer.updateComplete;
     const ask = composer.shadowRoot!.querySelector<HTMLButtonElement>('[data-tier="ask"]')!;
     expect(ask.disabled).toBe(false);

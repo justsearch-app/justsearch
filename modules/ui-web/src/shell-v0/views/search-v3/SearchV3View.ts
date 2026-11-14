@@ -919,9 +919,17 @@ export class SearchV3View extends JfElement {
 
   private readonly syntheticDraftRows = new Set<string>();
 
+  private get columnSessions(): Sv3SessionList {
+    const canonical = new Set(this.sessionsDomain.conversationRowsReady
+      ? this.sessionsDomain.conversations.map(conversation => conversation.id) : []);
+    // The local cache also holds old titles and loaded transcripts. Only the canonical list
+    // and turns not yet represented in a record establish membership in the column.
+    return { ...this.sessions, sessions: this.sessions.sessions.filter(session => canonical.has(session.id)
+      || session.turns.some(turn => turn.recordId === null)) };
+  }
+
   private get hasConversations(): boolean {
-    return this.sessionsDomain.conversations.length > 0
-      || this.sessions.sessions.some(session => session.turns.length > 0 || !this.syntheticDraftRows.has(session.id))
+    return this.sessionsDomain.conversations.length > 0 || this.columnSessions.sessions.length > 0
       || getConversationListState().activeId !== null && !this.syntheticDraftRows.has(getConversationListState().activeId!);
   }
 
@@ -2701,7 +2709,7 @@ export class SearchV3View extends JfElement {
     });
     // Relative timestamps are computed HERE, on render, and never ticked: a sidebar that re-renders
     // itself every second is continuous motion at rest, which the spec's duty-cycle law rules out.
-    const sessionGroups = projectSv3Sessions(this.sessions, {
+    const sessionGroups = projectSv3Sessions(this.columnSessions, {
       ...this.runGate(run),
       now: Date.now(),
     });

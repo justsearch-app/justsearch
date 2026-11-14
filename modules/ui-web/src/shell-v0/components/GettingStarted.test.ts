@@ -68,7 +68,9 @@ describe('Getting started interactions', () => {
     expect(plugin?.shadowRoot?.textContent).toContain('Two');
     expect(card.shadowRoot?.textContent).not.toContain('Try a search');
     unregisterWalkthrough('sample.tour'); await pump(card);
-    expect(card.shadowRoot?.querySelector('jf-walkthrough-card')?.shadowRoot?.textContent).not.toContain('Sample tour');
+    expect(plugin?.shadowRoot?.querySelector('.card')).toBeNull();
+    expect(plugin?.shadowRoot?.textContent?.trim()).toBe('');
+    expect(card.shadowRoot?.textContent).not.toContain('Sample tour');
     expect(getWalkthroughProgress('sample.tour')).toMatchObject({ activeStepIndex: 1, completedStepIds: ['one'] });
   });
   it('suggestions are deduplicated and watched paths are excluded even without a worker', async () => {
@@ -82,6 +84,7 @@ describe('Getting started interactions', () => {
     __resetAiStateForTest(); await pump(card);
     state?.setFirstUseRoots([{ pathHash: 'documents' }], new Map([['documents', '/Documents']])); await pump(card);
     expect(card.shadowRoot?.querySelector('button[aria-label="Add Documents"]')).toBeNull();
+    expect(card.shadowRoot?.textContent).not.toContain('/Documents');
     expect(success).not.toHaveBeenCalled();
   });
   for (const payload of [[], null]) it(`missing suggestions (${payload === null ? 'failure' : 'empty'}) leave Add a folder usable`, async () => {

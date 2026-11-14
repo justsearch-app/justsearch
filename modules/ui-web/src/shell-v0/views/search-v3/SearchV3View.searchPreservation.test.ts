@@ -30,7 +30,11 @@ async function mount(): Promise<SearchV3View> {
 const searches = () => http.mock.calls.filter(call => String(call[0]).includes('/api/knowledge/search'));
 function runSearch(view: SearchV3View, action: string): void {
   if (action === 'Enter') emit(view, 'sv3-composer-submit', { tier: 'search', query: 'current draft' });
-  if (action === 'typing') { composer(view).draft = 'current draft'; emit(view, 'sv3-composer-submit', { tier: 'search', query: 'current draft' }); }
+  if (action === 'edit then Enter') {
+    const field = composer(view).shadowRoot!.querySelector('textarea')!;
+    field.value = 'current draft'; field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true, cancelable: true }));
+  }
   // The app palette's "Search everything": the action this window registers under its id.
   if (action === 'palette') void invokeCommandWithResult('cmd-everything');
 }
@@ -46,7 +50,7 @@ async function card(view: SearchV3View): Promise<ResultsCard> {
   const found = results.shadowRoot!.querySelector<ResultsCard>('jf-results-card')!;
   await found.updateComplete; return found;
 }
-async function refuseStorage(fault: 'write' | 'stale' | 'readback', run: () => Promise<void>): Promise<void> {
+async function refuseStorage(fault: 'write' | 'stale' | 'readback', run: () => Promise<void>, expectedInterceptions = 1): Promise<void> {
   const storage = sessionStorage;
   const get = storage.getItem.bind(storage), set = storage.setItem.bind(storage);
   const descriptors = [
@@ -66,7 +70,7 @@ async function refuseStorage(fault: 'write' | 'stale' | 'readback', run: () => P
     }
     return get(candidate);
   } });
-  try { await run(); expect(interceptions).toBe(1); } finally {
+  try { await run(); expect(interceptions).toBe(expectedInterceptions); } finally {
     ['getItem', 'setItem'].forEach((name, i) => {
       Object.defineProperty(storage, name, descriptors[i]!);
     });
@@ -91,7 +95,7 @@ afterEach(() => {
   vi.unstubAllGlobals(); vi.restoreAllMocks();
 });
 
-it.each(['Enter', 'typing', 'palette'].flatMap(action =>
+it.each(['Enter', 'edit then Enter', 'palette'].flatMap(action =>
   (['write', 'stale', 'readback'] as const).map(fault => ({ action, fault }))))(
   '$action refuses Search when attachment acknowledgement fails ($fault)', async ({ action, fault }) => {
     const view = await mount(); composer(view).draft = 'current draft'; await settle(view);
@@ -99,7 +103,7 @@ it.each(['Enter', 'typing', 'palette'].flatMap(action =>
     await refuseStorage(fault, async () => {
       runSearch(view, action);
       await settle(view); await new Promise(resolve => setTimeout(resolve, 230));
-    });
+    }, action === 'edit then Enter' ? 2 : 1);
     expect(view.sessions.activeId).toBe(place);
     expect(composer(view).draft).toBe('current draft');
     expect(view.shadowRoot!.querySelector('jf-sv3-main')!.shadowRoot!.querySelector('jf-sv3-results')).toBeNull();
@@ -108,7 +112,7 @@ it.each(['Enter', 'typing', 'palette'].flatMap(action =>
     if (fault === 'stale') expect(sessionStorage.getItem(key)).toBe('another owner keeps these bytes');
   });
 
-it.each(['Enter', 'typing', 'palette'])('%s searches when attachment storage is writable', async action => {
+it.each(['Enter', 'edit then Enter', 'palette'])('%s searches when attachment storage is writable', async action => {
   const view = await mount(); composer(view).draft = 'current draft'; await settle(view);
   runSearch(view, action);
   await settle(view); await new Promise(resolve => setTimeout(resolve, 230));
@@ -117,7 +121,7 @@ it.each(['Enter', 'typing', 'palette'])('%s searches when attachment storage is 
   expect(composer(view).draft).toBe('current draft');
 });
 
-it.each(['Enter', 'typing'] as const)('entering results from %s refuses a failed second attachment acknowledgement', async action => {
+it.each(['Enter', 'edit then Enter'] as const)('entering results from %s refuses a failed second attachment acknowledgement', async action => {
   const view = await mount(); composer(view).draft = 'current draft'; await settle(view);
   const place = view.sessions.activeId;
   const storage = sessionStorage, set = storage.setItem.bind(storage);

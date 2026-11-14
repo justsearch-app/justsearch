@@ -225,10 +225,11 @@ describe('native search summon shared destination', () => {
     const button = document.createElement('button'); document.body.append(button); button.focus();
     await summon(shell);
     expect(deepActiveElement()).toBe(input);
-    expect(input.getAttribute('aria-label') || input.getAttribute('aria-labelledby')).toBeTruthy();
+    const name = input.getAttribute('aria-label') || (input.getAttribute('aria-labelledby') ?? '')
+      .split(/\s+/).map(id => (input.getRootNode() as ShadowRoot).getElementById(id)?.textContent?.trim() ?? '').join(' ');
+    expect(name).toBe('What are you looking for?');
     expect(input.value).toBe('keep the actual v3 draft');
     await vi.advanceTimersByTimeAsync(200);
-    expect(getSearchState().query).toBe('');
     expect(getSearchState().query).toBe('');
   });
 

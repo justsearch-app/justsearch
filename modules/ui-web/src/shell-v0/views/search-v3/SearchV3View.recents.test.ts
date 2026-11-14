@@ -2,14 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import './SearchV3View.js';
+import { submitInSession, startNewSession } from './sv3-sessions.js';
 import type { SearchV3View } from './SearchV3View.js';
 import type { Sv3Composer } from './Sv3Composer.js';
-import { takeSearchV3Handoff } from '../../utils/compose.js';
-import { __resetConversationListForTest, loadConversations, getConversationListState } from '../../state/conversationListStore.js';
+import { invokeCommandWithResult } from '../../commands/CommandRegistry.js';
+import { parkSearchV3Handoff, takeSearchV3Handoff } from '../../utils/compose.js';
+import { __resetConversationListForTest, loadConversations, setConversationTitle, getConversationListState } from '../../state/conversationListStore.js';
 import { __resetAiStateForTest, __feedForTest, __feedContactForTest } from '../../state/aiStateStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
-import { resetSearchState, getSearchState } from '../../state/searchState.js';
+import { resetSearchState, getSearchState, setQuery, submitSearch } from '../../state/searchState.js';
 import { __resetSearchFiltersForTest, toggleFacetValue } from '../../state/searchFiltersState.js';
 import { __resetUserStateForTest, createProfile, setActiveProfileId, getActiveProfileId } from '../../state/UserStateDocument.js';
 import { __resetProfilesForTest, createProfileFromCurrent, activateProfile, getActiveProfileId as getWorkspaceProfileId } from '../../substrates/profiles/index.js';
@@ -24,6 +26,7 @@ let heldLists: (() => void)[];
 let holdSearches: boolean;
 let heldSearches: (() => void)[];
 let historyStatus: number;
+let responseBody: Record<string, unknown>;
 const json = (data: unknown, status = 200): Response => new Response(JSON.stringify(data), { status });
 const row = (id: string, at = 100, title: string | null = id): Record<string, unknown> => ({
   sessionId: id, title, createdAtMs: 1, lastActiveAtMs: at, firstUserMessage: `preview-${id}`, shapeId: 'core.rag-ask', messageCount: 2,
@@ -65,13 +68,14 @@ beforeEach(async () => {
   localStorage.clear(); sessionStorage.clear(); __resetConversationListForTest(); __resetUserStateForTest();
   __resetDraftProvidersForTest(); __resetDraftKeptForTest(); __resetAiStateForTest(); __resetSearchFiltersForTest(); resetSearchState();
   rows = []; searches = []; heldLists = []; holdLists = false; heldSearches = []; holdSearches = false; historyStatus = 200;
+  responseBody = { results: [], totalHits: 0 };
   __seedForTest({ 'search.recent': 'Recent', 'search.clear-recent': 'Clear recent',
     'search.conversations-locked': 'Conversations are locked', 'search.untitled-conversation': 'Untitled conversation' });
   http = vi.fn(async (url: unknown, init?: RequestInit) => {
     const href = String(url);
     if (href.includes('/api/knowledge/search')) {
       const body = JSON.parse(String(init?.body)); searches.push(body);
-      const answer = () => json(body.query === 'failed' ? { error: 'Unavailable' } : body.query === '"' ? { error: 'Invalid query' } : { results: [], totalHits: 0 }, body.query === 'failed' ? 503 : body.query === '"' ? 400 : 200);
+      const answer = () => json(body.query === 'failed' ? { error: 'Unavailable' } : body.query === '"' ? { error: 'Invalid query' } : responseBody, body.query === 'failed' ? 503 : body.query === '"' ? 400 : 200);
       return holdSearches ? new Promise<Response>(resolve => heldSearches.push(() => resolve(answer()))) : answer();
     }
     if (href.includes('/history')) return json({ sessionId: href.split('/conversations/')[1]!.split('/')[0], messages: [] }, historyStatus);
@@ -98,7 +102,7 @@ it('S4-11 empty recents render nothing; successful responses have exact header c
   expect(field(el).hasAttribute('aria-activedescendant')).toBe(false);
   expect(options(el)[0]!.tabIndex).toBe(0);
 });
-it('S4-12 pointer and native keyboard activation replay the query with current restrictions', async () => {
+it('S4-12 pointer activation replay the query with current restrictions', async () => {
   const el = await mount(); const query = 'title:"budget review" -draft author:Ada';
   await search(el, query); toggleFacetValue('file_kind', 'pdf'); await settle(el); await focusEmpty(el);
   const before = searches.length; options(el)[0]!.focus(); options(el)[0]!.click(); await settle(el);
@@ -114,15 +118,27 @@ it('S4-11 exact dedup and eight-item cap apply only to explicit attempts; typing
   const el = await mount();
   for (const query of ['one','two','three','four','five','six','seven','eight','nine']) await search(el,query);
   await focusEmpty(el); expect(labels(el)).toEqual(['nine','eight','seven','six','five','four','three','two']);
-  await search(el,'  three  '); await search(el,'Three'); await focusEmpty(el);
-  expect(labels(el).slice(0,2)).toEqual(['Three','three']);
-  const before=searches.length; await type(el,'draft'); await new Promise(resolve=>setTimeout(resolve,750));
+  await search(el,'  three  '); await search(el,'Three');
+  await search(el,'three  words'); await search(el,'three words');
+  await type(el,'palette'); await invokeCommandWithResult('cmd-everything'); await settle(el); await focusEmpty(el);
+  expect(labels(el).slice(0,5)).toEqual(['palette','three words','three  words','Three','three']);
+  const before=searches.length; const saved = labels(el); await type(el,'draft'); await new Promise(resolve=>setTimeout(resolve,750));
   expect(searches).toHaveLength(before);
+  toggleFacetValue('file_kind','pdf'); await settle(el);
+  setQuery('restored or plugin'); submitSearch(); await settle(el); await focusEmpty(el);
+  expect(labels(el)).toEqual(saved);
+  options(el)[2]!.click(); await settle(el); await focusEmpty(el);
+  expect(labels(el)).toEqual([saved[2], ...saved.filter((_,i)=>i !== 2)]);
 });
 it('S4-12 Clear empties only searches and a delayed completion cannot repopulate it', async () => {
   rows=[row('saved')]; const el=await mount(); await search(el,'one'); await focusEmpty(el);
   holdSearches=true; await search(el,'pending'); el.composerState='hero'; await settle(el);
-  clear(el); await settle(el); heldSearches.splice(0).forEach(release=>release()); await settle(el);
+  const storageKeys = [Object.keys(localStorage).sort(), Object.keys(sessionStorage).sort()];
+  const beforeClear = writes().length;
+  clear(el); await settle(el);
+  expect(writes()).toHaveLength(beforeClear);
+  expect([Object.keys(localStorage).sort(), Object.keys(sessionStorage).sort()]).toEqual(storageKeys);
+  heldSearches.splice(0).forEach(release=>release()); await settle(el);
   expect(list(el)).toBeNull(); expect(getConversationListState().conversations.map(c=>c.id)).toEqual(['saved']);
   expect(writes().every(c=>String(c[0]).includes('/api/knowledge/search'))).toBe(true);
 });
@@ -141,9 +157,17 @@ it('S4-12 new windows forget searches; conversations remain only in the column',
 it('S4-12 profile ABA discards searches and pre-switch completions', async () => {
   createProfile('work','Work'); const initial=getActiveProfileId(); const el=await mount();
   await search(el,'private'); holdSearches=true; await search(el,'pending');
+  rows=[row('stale profile')]; holdLists=true; const pending=loadConversations(); await settle(el);
+  const oldLists=heldLists.splice(0);
   setActiveProfileId('work'); setActiveProfileId(initial); await settle(el);
+  oldLists.forEach(release=>release()); await pending; await settle(el);
+  expect(getConversationListState().conversations.map(c=>c.id)).not.toContain('stale profile');
+  expect(await conversationLabels(el)).not.toContain('stale profile');
+  holdLists=false; rows=[row('fresh profile')]; await loadConversations();
+  heldLists.splice(0).forEach(release=>release());
   holdSearches=false; heldSearches.splice(0).forEach(release=>release()); await settle(el); await focusEmpty(el);
   expect(list(el)).toBeNull(); expect(getSearchState().query).toBe('');
+  expect(await conversationLabels(el)).toEqual(['fresh profile']);
 });
 it('S4-12 workspace profile switches discard pending recents and cached conversation rows', async () => {
   createProfileFromCurrent('workspace-a','A'); await activateProfile('workspace-a');
@@ -152,10 +176,16 @@ it('S4-12 workspace profile switches discard pending recents and cached conversa
   rows=[row('old')]; holdLists=true; const pending=loadConversations(); await settle(el);
   const releases=heldLists.splice(0); rows=[]; holdSearches=true; await search(el,'pending');
   await activateProfile('workspace-b'); await activateProfile('workspace-a'); await settle(el);
-  releases.forEach(release=>release()); await pending; heldLists.splice(0).forEach(release=>release());
+  releases.forEach(release=>release()); await pending; await settle(el);
+  expect(getConversationListState().conversations.map(c=>c.id)).not.toContain('old');
+  expect(await conversationLabels(el)).not.toContain('old');
+  heldLists.splice(0).forEach(release=>release());
   holdLists=false; holdSearches=false; heldSearches.splice(0).forEach(release=>release()); await settle(el); await focusEmpty(el);
   expect(getWorkspaceProfileId()).toBe('workspace-a'); expect(list(el)).toBeNull();
   expect(getConversationListState().conversations.map(c=>c.id)).not.toContain('old');
+  rows=[row('fresh workspace')]; await loadConversations(); await settle(el);
+  expect(await conversationLabels(el)).toEqual(['fresh workspace']);
+  expect(getSearchState().query).toBe('');
 });
 it('S4-16 locked conversation labels never leak into recents or the column', async () => {
   rows=[row('secret',100,'Secret')]; const el=await mount(); await search(el,'public search'); await focusEmpty(el);
@@ -175,4 +205,115 @@ it('S4-16 a plain search never creates or mutates a saved conversation or histor
   expect(writes().every(c=>String(c[0]).includes('/api/knowledge/search'))).toBe(true);
   const {projectUnifiedThread}=await import('../unifiedThreadProjection.js');
   expect(projectUnifiedThread([{id:'historic',kind:'SEARCH',occurredAt:'2026-01-01T00:00:00Z',originator:'user',content:'',attributes:{query:'historical query'}}])[0]).toMatchObject({id:'historic',kind:'progress',attributes:{query:'historical query',searchEvent:true}});
+});
+
+async function conversationLabels(el: SearchV3View): Promise<string[]> {
+  const sidebar = el.shadowRoot!.querySelector('jf-sv3-sidebar');
+  if (!sidebar) return [];
+  await sidebar.updateComplete;
+  const rows = [...sidebar.shadowRoot!.querySelectorAll('jf-sv3-session-row')];
+  await Promise.all(rows.map(row => row.updateComplete));
+  return rows.map(row => row.label);
+}
+async function openConversation(el: SearchV3View): Promise<void> {
+  const sidebar = el.shadowRoot!.querySelector('jf-sv3-sidebar')!; await sidebar.updateComplete;
+  const row = sidebar.shadowRoot!.querySelector('jf-sv3-session-row')!; await row.updateComplete;
+  const button = row.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="sv3-session-row-button"]');
+  expect(button).not.toBeNull(); button!.click(); await settle(el);
+}
+it.each(['retained question', ''])('Y3 protects retained preparation %j on search replay and column navigation', async text => {
+  const path = text === '' ? 'retained-schema.md' : 'retained-alpha.md';
+  const older = { place: null, text, preparation: text === ''
+    ? { kind: 'structured', schema: '', scope: { kind: 'files', paths: [path] } }
+    : { kind: 'ask', scope: { kind: 'files', paths: [path] } } };
+  const key = 'justsearch.draft.attachment.v1.search-v3.main';
+  rows = [row('destination')]; const el = await mount(); await search(el,'replay'); await focusEmpty(el);
+  parkSearchV3Handoff({ query: text, forceShapeId: text === '' ? 'core.extract' : 'core.rag-ask', docIds: [path] });
+  await settle(el); parkSearchV3Handoff({ query: '' }); await settle(el); await focusEmpty(el);
+  expect(labels(el)).toEqual(['replay']); options(el)[0]!.click(); await settle(el);
+  expect(JSON.parse(sessionStorage.getItem(key)!).payload.drafts).toEqual(expect.arrayContaining([older]));
+  await openConversation(el);
+  expect(JSON.parse(sessionStorage.getItem(key)!).payload.drafts).toEqual(expect.arrayContaining([older]));
+  expect(http.mock.calls.some(c=>String(c[0]).includes('/destination/history'))).toBe(true);
+  expect(http.mock.calls.some(c=>String(c[0]).includes('/dispatch'))).toBe(false);
+});
+it('Y6 lock hides optimistic, legacy and untitled rows and rejects pre-lock responses until refresh', async () => {
+  localStorage.setItem('jf-conversation-titles',JSON.stringify({ legacy:'Legacy secret' }));
+  rows=[row('named',100,'Secret'),row('legacy',99,null),{...row('untitled',98,null),firstUserMessage:''}];
+  const el=await mount();
+  expect(await conversationLabels(el)).toContain('Secret');
+  expect(await conversationLabels(el)).toContain('Untitled conversation');
+  await setConversationTitle('named','Optimistic secret'); await settle(el);
+  expect(await conversationLabels(el)).toContain('Optimistic secret');
+  holdLists=true; const pending=loadConversations(); lock('locked'); await settle(el);
+  expect(await conversationLabels(el)).toEqual([]);
+  heldLists.splice(0).forEach(release=>release()); await pending; await settle(el);
+  expect(await conversationLabels(el)).toEqual([]);
+  const sidebar=el.shadowRoot!.querySelector('jf-sv3-sidebar');
+  expect(sidebar?.shadowRoot!.textContent ?? '').not.toMatch(/Secret|secret|preview|Legacy|Untitled/);
+  rows=[row('unlocked',200,'Refreshed')]; lock('unlocked'); await settle(el);
+  expect(await conversationLabels(el)).toEqual([]);
+  holdLists=false; heldLists.splice(0).forEach(release=>release()); await settle(el);
+  expect(getConversationListState().conversations.map(c=>c.id)).toEqual(['unlocked']);
+  expect(await conversationLabels(el)).toEqual(['Refreshed']);
+  rows=[]; await loadConversations(); await settle(el);
+  expect(await conversationLabels(el)).toEqual([]); expect(el.shadowRoot!.querySelector('jf-sv3-sidebar')).toBeNull();
+});
+it('Y6 history 423 immediately suppresses disclosure through the remaining column route', async () => {
+  rows=[row('locked-on-open',1,'Sensitive')]; const el=await mount();
+  expect(await conversationLabels(el)).toEqual(['Sensitive']); historyStatus=423;
+  await openConversation(el);
+  expect(await conversationLabels(el)).toEqual([]);
+  expect(el.shadowRoot!.textContent).not.toContain('Sensitive');
+});
+it('Y1 empty Enter and IME or modified Enter never search from visible recents', async () => {
+  const el=await mount(); await search(el,'saved'); await focusEmpty(el);
+  const before=searches.length;
+  for(const modifiers of [{},{isComposing:true},{shiftKey:true},{ctrlKey:true},{metaKey:true}]) {
+    await key(el,'Enter',modifiers); expect(searches).toHaveLength(before);
+    expect(labels(el)).toEqual(['saved']);
+  }
+  await type(el,'new draft');
+  for(const modifiers of [{isComposing:true},{shiftKey:true},{ctrlKey:true},{metaKey:true}]) {
+    await key(el,'Enter',modifiers); expect(searches).toHaveLength(before);
+    expect(labels(el)).toEqual(['saved']);
+  }
+});
+it('S4-11 recent count equals the rendered header and time belongs to response completion', async () => {
+  const el=await mount();
+  responseBody={results:[{id:'one',fields:{path:'/one.md'}}],totalHits:1000,matchCount:1000,totalHitsRelation:'gte'};
+  holdSearches=true; await search(el,'bounded');
+  const afterSubmit=Date.now(); await new Promise(resolve=>setTimeout(resolve,25));
+  const beforeCompletion=Date.now(); heldSearches.splice(0).forEach(release=>release()); await settle(el);
+  const afterCompletion=Date.now();
+  const main=el.shadowRoot!.querySelector('jf-sv3-main')!; await main.updateComplete;
+  const results=main.shadowRoot!.querySelector('jf-sv3-results')!; await results.updateComplete;
+  const card=results.shadowRoot!.querySelector<HTMLElement & {updateComplete: Promise<unknown>}>('jf-results-card')!; await card.updateComplete;
+  const header=card.shadowRoot!.querySelector('.meta-info')!.textContent!.replace(/\s+/g,' ').trim().replace(/ · found in \S+$/,'');
+  await focusEmpty(el);
+  const meta=options(el)[0]!.querySelector('.recent-meta')!;
+  expect(meta.textContent!.split(' · ')[0]!.trim()).toBe(header);
+  const at=Date.parse(meta.querySelector('time')!.getAttribute('datetime')!);
+  expect(at).toBeGreaterThan(afterSubmit); expect(at).toBeGreaterThanOrEqual(beforeCompletion); expect(at).toBeLessThanOrEqual(afterCompletion);
+});
+
+it('the column reconciles canonical rows without losing pending local turns or cached transcripts', async () => {
+  rows=[row('stored',100,'Canonical')]; const el=await mount();
+  const withPending=submitInSession(startNewSession(el.sessions),'Pending local question',200,'ask','local');
+  const loaded=submitInSession(startNewSession(withPending),'Loaded old question',100,'ask','loaded');
+  el.sessions={ ...loaded, sessions:loaded.sessions.map(session => session.id !== 'loaded' ? session
+    : { ...session, turns: session.turns.map(turn => ({ ...turn, recordId:'saved-user-message', status:'complete' as const })) }) };
+  await settle(el);
+  expect(await conversationLabels(el)).toEqual(['Pending local question','Canonical']);
+  rows=[]; await loadConversations(); await settle(el);
+  expect(await conversationLabels(el)).toEqual(['Pending local question']);
+  expect(el.sessions.sessions.map(session=>session.id)).toEqual(['loaded','local','stored']);
+  lock('locked'); await settle(el); expect(await conversationLabels(el)).toEqual([]);
+  lock('unlocked'); await settle(el); expect(await conversationLabels(el)).toEqual(['Pending local question']);
+  rows=[row('local',200,'Saved local question')]; await loadConversations(); await settle(el);
+  expect(await conversationLabels(el)).toEqual(['Saved local question']);
+  el.sessions={ ...el.sessions, sessions: el.sessions.sessions.map(session=>session.id !== 'local' ? session
+    : { ...session, turns:session.turns.map(turn=>({ ...turn, recordId:'now-saved', status:'complete' as const })) }) };
+  rows=[]; await loadConversations(); await settle(el);
+  expect(await conversationLabels(el)).toEqual([]);
 });

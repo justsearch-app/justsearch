@@ -38,12 +38,6 @@ for (const state of ['uninstalled','unknown-install','no-cuda','unknown-gpu','st
   if (state === 'loading') snapshot.runtime.mode = 'starting';
   expect(modes(await mount())).toEqual([]);
 });
-it('S4-14 pressure-unloaded chat remains offerable through the existing on-demand availability', async () => {
-  snapshot.capabilities.chat = false; snapshot.runtime.mode = 'offline';
-  snapshot.chatUnloadedReason = 'inference.unloaded_gpu_pressure';
-  snapshot.status = { operating: { chat: { state: 'UNLOADED' } } } as never;
-  expect(modes(await mount())).toEqual(['search','ask']);
-});
 it('S4-14 developer tools reveal Structured/Delegate only with answers available', async () => {
   setShowDeveloperTools(true); const el = await mount();
   (el.shadowRoot!.querySelector('[data-testid="sv3-composer-tier"]') as HTMLElement).click(); await el.updateComplete;

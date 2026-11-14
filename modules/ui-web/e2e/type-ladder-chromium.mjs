@@ -282,6 +282,11 @@ try {
       await page.locator('[data-testid="sv3-composer-input"]').press('Enter');
       await page.locator('[data-testid="search-result-row"]').first().waitFor();
     });
+    await capture(page, theme, 'search-results-filters', async () => {
+      await page.locator('[data-testid="sv3-filters-trigger"]').click();
+      await page.locator('jf-sv3-filters[open]').waitFor();
+    });
+    await page.locator('[data-testid="sv3-filters-trigger"]').click();
     await capture(page, theme, 'search-side-pane', async () => {
       await page.locator('[data-testid="search-result-row"]').first().click();
       await page.locator('jf-sv3-pane jf-document-pane').waitFor();
