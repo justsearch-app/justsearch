@@ -325,6 +325,9 @@ public class InferenceLifecycleManager
   // Configuration constants
   private static final Duration HTTP_CLIENT_CONNECT_TIMEOUT = Duration.ofSeconds(10);
 
+  /** How long a failed picture-reading request waits to see its server's exit observed. */
+  private static final Duration VDU_EXIT_OBSERVATION = Duration.ofSeconds(2);
+
   // ==================== Constructors ====================
 
   public InferenceLifecycleManager(
@@ -569,13 +572,46 @@ public class InferenceLifecycleManager
       LlamaServerOps.ManagedFailure failure =
           failed == null ? null : serverOps.managedFailureOf(failed).orElse(null);
       tokenOps.clearCaches();
-      // Spec A step 7: the failure is classified and latched before the OFFLINE landing is
-      // published, so the projection of that landing names the classified failure.
-      ChatCrashPolicy.Decision decision = decideCrash(failed, same, failure);
-      runner.runForceOffline(TransitionReason.CRASH_RECOVERY, null);
-      followUp = decision == null ? null : crashFollowUp(failed, same, failure, decision);
+      if (failed != null && failed.context().inference().vduMode()) {
+        // The picture-reading server failed: an engine failure of that pass, which the automatic
+        // pass breaker paces. Chat is not latched FAILED and no chat restart is spent; the pass's
+        // own exit restores the chat configuration.
+        followUp = visionFailure(failed, same, failure);
+        runner.runForceOffline(TransitionReason.CRASH_RECOVERY, null);
+      } else {
+        // Spec A step 7: the failure is classified and latched before the OFFLINE landing is
+        // published, so the projection of that landing names the classified failure.
+        ChatCrashPolicy.Decision decision = decideCrash(failed, same, failure);
+        runner.runForceOffline(TransitionReason.CRASH_RECOVERY, null);
+        followUp = decision == null ? null : crashFollowUp(failed, same, failure, decision);
+      }
     }
     if (followUp != null) submitCrashFollowUp(followUp);
+  }
+
+  /**
+   * A failure of the server running the VDU configuration: reported (device loss included), never
+   * latched and never relaunched. Only a hung process is left for the controller to stop.
+   */
+  private CrashFollowUp visionFailure(
+      LlamaServerOps.StartResult failed,
+      LlamaServerOps.StartRequest request,
+      LlamaServerOps.ManagedFailure failure) {
+    if (failure == null) {
+      LOG.error("Picture-reading server failed while READY; the pass ends as an engine failure");
+      return null;
+    }
+    LOG.error(
+        "Picture-reading server failed while READY: class={} readyFor={}s hang={}; the pass ends"
+            + " as an engine failure",
+        failure.classification().crashClass(),
+        failure.readyFor().toSeconds(),
+        failure.hang());
+    reportLlamaDeviceLoss(failure.classification());
+    if (!failure.hang() || request == null) return null;
+    return new CrashFollowUp(failed, request, failure,
+        ChatCrashPolicy.Decision.fail(failure.classification().failedCode(), "vision"), true,
+        runner.generation());
   }
 
   /**
@@ -585,6 +621,7 @@ public class InferenceLifecycleManager
    * @param request the exact request that started it, relaunched as is (or one rung lower)
    * @param failure the classified failure
    * @param decision what the crash policy decided
+   * @param vision the server ran the VDU configuration: it is only stopped, never relaunched
    * @param generation the runner generation the failure was handled at; any later transition
    *     supersedes this follow-up
    */
@@ -593,6 +630,7 @@ public class InferenceLifecycleManager
       LlamaServerOps.StartRequest request,
       LlamaServerOps.ManagedFailure failure,
       ChatCrashPolicy.Decision decision,
+      boolean vision,
       long generation) {}
 
   /** Classifies a READY failure and latches its FAILED code; null when nothing can relaunch it. */
@@ -631,7 +669,7 @@ public class InferenceLifecycleManager
       LlamaServerOps.ManagedFailure failure,
       ChatCrashPolicy.Decision decision) {
     if (decision.action() == ChatCrashPolicy.Action.FAIL && !failure.hang()) return null;
-    return new CrashFollowUp(failed, request, failure, decision, runner.generation());
+    return new CrashFollowUp(failed, request, failure, decision, false, runner.generation());
   }
 
   /** Hands the follow-up to the chat controller; inline routers run it on this thread. */
@@ -663,7 +701,7 @@ public class InferenceLifecycleManager
         return;
       }
       // Keep the exact request for an operator retry once the failed owner is gone.
-      serverOps.reserveRecoveryStart(followUp.request());
+      if (!followUp.vision()) serverOps.reserveRecoveryStart(followUp.request());
       if (followUp.decision().action() == ChatCrashPolicy.Action.STEP_DOWN) {
         serverOps.stepDownAfterFailure(followUp.failure());
       }
@@ -1427,6 +1465,20 @@ public class InferenceLifecycleManager
     public boolean idleForAutomaticVdu() {
       return runner.currentMode() == Mode.ONLINE && !serverOps.isExternalServerActive()
           && generation.idleForAutomaticVdu();
+    }
+
+    @Override
+    public boolean vduServerLost() throws InterruptedException {
+      // A crash closes the server's connections before its exit is observed: wait a moment for it.
+      long deadline = System.nanoTime() + VDU_EXIT_OBSERVATION.toNanos();
+      while (configuredInference().vduMode()) {
+        if (runner.currentMode() != Mode.ONLINE || !serverOps.activeManagedServerServing()) {
+          return true;
+        }
+        if (System.nanoTime() - deadline >= 0) return false;
+        Thread.sleep(10);
+      }
+      return false;
     }
 
     @Override
