@@ -759,3 +759,13 @@ a source that predates this candidate.
   "note": "Unsupported weakening: StatusPill.design.test.ts replaces the calm dot glyph assertion with empty symbol text without any assertion that a visible dot remains. R9/H3 still require a calm dot; delegated choice 3 preserves that obligation, and StatusPill.calmDot.test.ts supplies no replacement drawing assertion."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-fm-top-bar-02zv5a59",
+  "verdict": "accept",
+  "digest": "sha256:2a80c111f17bd13d7448036147f02da480b496452c08a2de3e06e1fcdccf5a3b"
+}
+```
