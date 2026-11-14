@@ -251,7 +251,7 @@ export class IndexingRulesEditor extends JfElement {
     .indexing-days[hidden] { display: none; }
     input { font: inherit; color: var(--text-primary); accent-color: var(--text-secondary); max-width: 100%; }
     input[type=time] { background: transparent; border: 0; border-bottom: 1px dotted var(--border-subtle); padding: .1rem; color-scheme: inherit; }
-    button { font: inherit; font-size: var(--font-size-sm); background: transparent; border: 0; color: var(--text-primary); padding: .4rem 0; cursor: pointer; }
+    button { font: inherit; font-size: var(--font-size-sm); font-weight: 500; background: transparent; border: 0; color: var(--text-primary); padding: .4rem 0; cursor: pointer; }
     button[aria-disabled=true] { opacity: .65; cursor: default; }
     button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
     p, details { margin: .5rem 0; color: var(--text-secondary); font-size: var(--font-size-xs); overflow-wrap: anywhere; }

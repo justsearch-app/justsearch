@@ -826,7 +826,8 @@ export class ResultsCard extends JfElement {
         background: transparent;
         border: 1px solid var(--border-subtle);
         border-radius: 0.25rem;
-        color: var(--text-secondary);
+        color: var(--text-primary);
+        font-weight: 500;
         font-size: var(--font-size-xs);
         cursor: pointer;
         font-family: inherit;
