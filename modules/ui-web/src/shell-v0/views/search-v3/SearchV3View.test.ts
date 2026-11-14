@@ -33,7 +33,6 @@ import {
 } from '../../state/aiStateStore.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
 import { SearchV3View } from './SearchV3View.js';
-import { Sv3Topbar } from './Sv3Topbar.js';
 import { Sv3Sidebar } from './Sv3Sidebar.js';
 import { Sv3Main } from './Sv3Main.js';
 import { Sv3Composer } from './Sv3Composer.js';
@@ -121,36 +120,23 @@ function own(ctor: { styles?: unknown }): string {
   return sheets[sheets.length - 1]?.cssText ?? '';
 }
 
-describe('the window mounts with its five regions', () => {
-  it('renders sidebar, topbar, main and composer inside the window host', async () => {
+describe('the window mounts below the frame bar', () => {
+  it('renders sidebar, main and composer without a second title band', async () => {
     const el = await mount();
     const root = el.shadowRoot;
     expect(root?.querySelector('jf-sv3-sidebar')).toBeTruthy();
     expect(root?.querySelector('.column')).toBeTruthy();
-    expect(root?.querySelector('jf-sv3-topbar')).toBeTruthy();
+    expect(root?.querySelector('jf-sv3-topbar')).toBeNull();
     expect(root?.querySelector('jf-sv3-main')).toBeTruthy();
     expect(root?.querySelector('jf-sv3-composer')).toBeTruthy();
   });
 
-  it('names the window in the topbar and carries ONLY controls that do something', async () => {
-    // Phase F9: the two slice-1 placeholders (`Window settings` / `Window layout`) are gone. They
-    // were 2 of the window's 16 resting interactive elements with no handler and no consumer, and
-    // an affordance the reader can press that answers nothing is chrome spent on a lie. The palette
-    // control is the topbar's one live act, so the band ends at one button.
+  it('has no second title band or palette glyph', async () => {
     const el = await mount();
-    const topbar = await region(el, 'jf-sv3-topbar');
-    expect(topbar.shadowRoot?.querySelector('[data-testid="sv3-topbar-title"]')?.textContent).toBe(
-      'Search',
-    );
-    expect(topbar.shadowRoot?.querySelectorAll('[data-testid="sv3-topbar-control"]')).toHaveLength(
-      0,
-    );
-    const live = [...(topbar.shadowRoot?.querySelectorAll('button') ?? [])];
-    expect(live).toHaveLength(1);
-    expect(live[0]?.getAttribute('data-testid')).toBe('sv3-topbar-palette');
+    expect(el.shadowRoot?.querySelector('jf-sv3-topbar, [data-testid="sv3-topbar-palette"]')).toBeNull();
   });
 
-  it('W7 renders Search in the title band and the top bar switcher using the real catalog message bundle', async () => {
+  it('W7 renders Search in the top bar switcher using the real catalog message bundle', async () => {
     const contribution = createCorePluginManifest().capabilities.surfaces!
       .find(s => s.id === 'core.search-v3-surface')!;
     // Read the shipped bundle rather than inventing a translation in a test fixture. The
@@ -180,10 +166,7 @@ describe('the window mounts with its five regions', () => {
       primitive: 'Surface', entries: [surface] });
     expect(present({ kind: 'surface', id: surface.id }).label).toBe('Search');
 
-    const el = await mount();
-    const topbar = await region(el, 'jf-sv3-topbar');
-    expect(topbar.shadowRoot?.querySelector('[data-testid="sv3-topbar-title"]')?.textContent)
-      .toBe('Search');
+    await mount();
     // Shell slice 2 — the window's frame entry is the top bar's switcher segment (was the rail
     // button); it carries the same catalog label, as visible text and accessible name, and its
     // tooltip adds the shortcut ("Search · Ctrl+1", design-system §2).
@@ -672,7 +655,7 @@ describe('the window never scrolls; one inner region does', () => {
     expect(recovery?.querySelector('jf-sv3-main, .dock, .sv3-scroller')).toBeNull();
     expect(main.parentElement?.previousElementSibling).toBe(recovery);
     expect(el.shadowRoot!.querySelector('.dock')?.contains(recovery)).toBe(false);
-    for (const ctor of [SearchV3View, Sv3Sidebar, Sv3Topbar, Sv3Composer]) {
+    for (const ctor of [SearchV3View, Sv3Sidebar, Sv3Composer]) {
       const styles = own(ctor).replace(ctor === Sv3Composer ? schemaRule ?? '' : '', '')
         .replace(ctor === SearchV3View ? recoveryRule : '', '')
         .replace(ctor === Sv3Composer ? recentRule : '', '');
@@ -687,7 +670,7 @@ describe('the window never scrolls; one inner region does', () => {
   it('adopts the scroller mixin exactly once across the rendered window', async () => {
     const el = await mount();
     let found = 0;
-    for (const tag of ['jf-sv3-sidebar', 'jf-sv3-topbar', 'jf-sv3-main', 'jf-sv3-composer']) {
+    for (const tag of ['jf-sv3-sidebar', 'jf-sv3-main', 'jf-sv3-composer']) {
       const r = await region(el, tag);
       found += r.shadowRoot?.querySelectorAll('.sv3-scroller').length ?? 0;
     }

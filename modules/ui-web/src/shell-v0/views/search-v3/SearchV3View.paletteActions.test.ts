@@ -3,7 +3,7 @@
 /**
  * Shell S6 SP7 — Search's own palette is retired. Its two working commands are actions in the app's
  * one palette, under their ids, with exactly one owning Search window; the seven inert entries are
- * gone; the topbar button asks the app's one toggle.
+ * gone; Ctrl+K reaches the app's one palette.
  */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import './SearchV3View.js';
@@ -12,7 +12,7 @@ import type { SearchV3View } from './SearchV3View.js';
 import type { Sv3Composer } from './Sv3Composer.js';
 import type { CommandPalette } from '../../commands/CommandPalette.js';
 import { getAction } from '../../substrates/actions/index.js';
-import { invokeCommandWithResult, onCommandInvoked } from '../../commands/CommandRegistry.js';
+import { invokeCommandWithResult } from '../../commands/CommandRegistry.js';
 import { __feedContactForTest, __feedForTest, __resetAiStateForTest } from '../../state/aiStateStore.js';
 import type { StatusSnapshot } from '../../utils/statusPoll.js';
 import { __resetConversationListForTest } from '../../state/conversationListStore.js';
@@ -81,17 +81,9 @@ it('SP7 Search\'s working commands are app palette actions under their ids; the 
   expect(view.shadowRoot!.querySelector('jf-sv3-palette, [role="dialog"], [role="combobox"]')).toBeNull();
 });
 
-it('SP7 the topbar button asks the app\'s one toggle action, once per press', async () => {
+it('SP7 Search has no second title band or palette toggle button', async () => {
   const view = await mount();
-  const invoked: string[] = [];
-  const stop = onCommandInvoked(id => invoked.push(id));
-  try {
-    const topbar = view.shadowRoot!.querySelector('jf-sv3-topbar')!;
-    await (topbar as unknown as { updateComplete: Promise<unknown> }).updateComplete;
-    topbar.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="sv3-topbar-palette"]')!.click();
-    await settle(view);
-    expect(invoked).toEqual(['shell.toggle-palette']);
-  } finally { stop(); }
+  expect(view.shadowRoot!.querySelector('jf-sv3-topbar, [data-testid="sv3-topbar-palette"]')).toBeNull();
 });
 
 it('SP7 exactly one owner across departure, retained return, split-layout re-parenting and previews; teardown removes only its own', async () => {

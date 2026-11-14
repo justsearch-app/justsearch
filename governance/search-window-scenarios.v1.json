@@ -2865,7 +2865,7 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/chrome/Shell.palette.test.ts",
-          "test": "SP1 the Search topbar button opens the same palette through the toggle action"
+          "test": "SP1 Ctrl+K opens the one palette from Search after the title band retires"
         }
       ]
     },

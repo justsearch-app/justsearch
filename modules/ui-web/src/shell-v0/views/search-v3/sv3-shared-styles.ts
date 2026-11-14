@@ -17,8 +17,7 @@ import { css } from 'lit';
 
 export const sv3Shared = css`
   /* Every geometry token names a TOTAL: --sidebar-width is the whole 256px region, with the 8px
-     panel inset and the 10px row inset living inside it; --workspace-topbar-height is the whole
-     52px band including its rule. Under the default content-box, a host's padding and border would
+     panel inset and the 10px row inset living inside it. Under the default content-box, a host's padding and border would
      be added OUTSIDE that number and every token would silently mean "at least" — measured 273px
      and 53px. Border-box makes the token the total it claims to be. */
   :host,

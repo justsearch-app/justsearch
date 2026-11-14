@@ -3,7 +3,7 @@
  * `<jf-top-bar>` — the app frame's one bar (shell slice 2, design-system §2 and §7).
  *
  * Left: the brand. Centre: the switcher between the three areas (Search, Library, AI Brain).
- * Right: the status pill (slotted by the Shell, which owns it), Settings and the More (⋯) menu.
+ * Right: the status pill (slotted by the Shell, which owns it) and the Menu (⋯) button.
  *
  * The bar owns presentation and pointer/keyboard interaction only; every choice is reported to the
  * Shell as a `top-bar-select` event and the Shell navigates through the one intent router, so the
@@ -11,9 +11,9 @@
  * `data-surface-id` (the harness and saved selectors address windows by it; one element per id).
  *
  * Sizes, read from the bar's own room (after the desktop window controls) in rem, so enlarged text
- * counts: below 62.5rem only the active area keeps its visible label (the others keep their name as
+ * counts: below 56rem only the active area keeps its visible label (the others keep their name as
  * the accessible name and tooltip); below 45rem the minimal bar shows the brand dot, one button
- * naming the active area that opens the area menu, the pill as an icon, Settings and More; below
+ * naming the active area that opens the area menu, the pill as an icon, Menu; below
  * 30rem that button keeps only its icon and the switcher leaves the centre.
  *
  * Desktop: the bar's background moves the window (Tauri drag region) and its end keeps room for the
@@ -27,7 +27,7 @@ import { icon, type IconName } from '../components/Icon.js';
 import { hasWindowLayer } from '../../utils/windowLayer.js';
 import { cssLength, shiftIntoWindow } from './menuPlacement.js';
 
-/** One place the bar can open: an area in the switcher, or a window listed in the More menu. */
+/** One place the bar can open: an area in the switcher, or a window listed in Menu. */
 export interface TopBarDestination {
   readonly id: string;
   readonly label: string;
@@ -114,44 +114,44 @@ export class TopBar extends JfElement {
       min-width: 0;
       height: var(--frame-topbar-height);
       padding-inline-end: var(--window-controls-inline, 0rem);
-      background: var(--surface-1);
+      background: var(--surface-0);
       border-bottom: var(--frame-hairline) solid var(--border-subtle);
       color: var(--text-secondary);
       font-size: var(--font-size-sm);
     }
     /* Equal side tracks keep the switcher centred; the status notice gives way inside its track. */
     .bar {
-      --top-bar-padding: var(--jf-space-6);
+      --top-bar-padding: var(--jf-space-4);
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
       align-items: center;
-      gap: var(--jf-space-3);
+      gap: var(--jf-space-4);
       box-sizing: border-box;
       height: 100%;
       padding-inline: var(--top-bar-padding);
     }
     .start, .end { display: flex; align-items: center; min-width: 0; }
     .start { gap: var(--jf-space-3); }
-    .end { justify-content: flex-end; gap: var(--jf-space-2); }
-    .brand { display: inline-flex; align-items: center; gap: var(--jf-space-3); flex: none;
-      color: var(--text-primary); font-size: var(--font-size-md); font-weight: var(--jf-weight-semibold); white-space: nowrap; }
+    .end { justify-content: flex-end; gap: calc(var(--jf-space-1) / 2); }
+    .brand { display: inline-flex; align-items: center; gap: var(--jf-space-2); flex: none;
+      color: var(--text-secondary); font-size: var(--font-size-sm); font-weight: var(--jf-weight-medium); white-space: nowrap; }
     .dot { inline-size: var(--frame-brand-dot); block-size: var(--frame-brand-dot); border-radius: var(--frame-pill-radius);
-      background: var(--text-secondary); box-shadow: 0 0 0 var(--frame-brand-halo) var(--surface-active); flex: none; }
+      background: var(--text-secondary); flex: none; }
     nav { display: flex; align-items: center; justify-content: center; }
     nav[hidden] + .end { grid-column: 3; }
-    .segments { display: flex; align-items: center; gap: var(--frame-hairline); padding: var(--jf-space-1);
+    .segments { display: flex; align-items: center; gap: var(--frame-hairline); padding: calc(var(--jf-space-1) / 2); background: var(--surface-1);
       border: var(--frame-hairline) solid var(--border-subtle); border-radius: var(--frame-pill-radius); }
     button { font: inherit; color: inherit; background: transparent; border: 0; cursor: pointer; }
     button:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); outline-offset: var(--frame-hairline); }
     .segment, .area-trigger { display: inline-flex; align-items: center; gap: var(--jf-space-2);
-      padding: var(--jf-space-2) var(--jf-space-4); border-radius: var(--frame-pill-radius);
+      padding: var(--jf-space-1) calc(var(--jf-space-4) - var(--jf-space-1) / 2); border-radius: var(--frame-pill-radius);
       font-weight: var(--jf-weight-medium); white-space: nowrap; }
     .segment:hover { color: var(--text-primary); }
     .segment[aria-current='page'], .area-trigger { background: var(--surface-2); color: var(--text-primary); }
     .segment[aria-current='page'] svg, .area-trigger svg { color: var(--text-secondary); }
     .area-trigger { display: none; }
-    .icon-button { display: inline-grid; place-items: center; inline-size: var(--frame-control-size);
-      block-size: var(--frame-control-size); border-radius: var(--frame-control-radius); flex: none; }
+    .icon-button { display: inline-grid; place-items: center; inline-size: 1.875rem;
+      block-size: 1.875rem; border-radius: var(--frame-control-radius); flex: none; }
     .icon-button:hover, .icon-button[aria-expanded='true'] { background: var(--surface-2); color: var(--text-primary); }
     /* The pill may give way only through the notice beside it (which wraps); its own words never shrink. */
     ::slotted([slot='status']) { flex: 0 1 auto; min-width: 0; }
@@ -183,15 +183,15 @@ export class TopBar extends JfElement {
     .visually-hidden { position: absolute; inline-size: var(--frame-hairline); block-size: var(--frame-hairline);
       overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     [hidden] { display: none !important; }
-    /* Below 1000 px of room (62.5rem) only the active area keeps its visible label. */
-    @container (max-width: 62.4375rem) {
+    /* Below 896 px of room (56rem) only the active area keeps its visible label. */
+    @container (max-width: 55.9375rem) {
       .bar { --top-bar-padding: var(--jf-space-4); }
       .segment:not([aria-current='page']) .label { position: absolute; inline-size: var(--frame-hairline);
         block-size: var(--frame-hairline); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
       .segment:not([aria-current='page']) { padding-inline: var(--jf-space-3); }
     }
     /* Minimal bar below 720 px of room (45rem; 600 × 400): brand dot, the active area as a menu, pill
-       icon, Settings, More. */
+       icon, Menu. */
     @container (max-width: 44.9375rem) {
       .bar { gap: var(--jf-space-2); --top-bar-padding: var(--jf-space-3); }
       .brand .name { position: absolute; inline-size: var(--frame-hairline); block-size: var(--frame-hairline);
@@ -357,8 +357,13 @@ export class TopBar extends JfElement {
 
   private renderMoreMenu(): TemplateResult {
     const primary = [this.system, this.help, this.about].filter((d): d is TopBarDestination => d !== null);
-    return html`<div class="menu more" role="menu" aria-label="More" data-tauri-drag-region=${this.noDrag} @keydown=${this.onMenuKeydown}>
-      <div class="group" role="group" aria-label="App">${primary.map(d => this.menuRow(d, 'window'))}</div>
+    return html`<div class="menu more" role="menu" aria-label="Menu" data-tauri-drag-region=${this.noDrag} @keydown=${this.onMenuKeydown}>
+      <div class="group" role="group" aria-label="App">
+        <button type="button" role="menuitem" tabindex="-1" data-surface-id="core.settings-surface"
+          aria-label="Settings" aria-keyshortcuts=${isMac() ? 'Meta+,' : 'Control+,'} aria-haspopup="dialog"
+          @click=${() => this.select({ kind: 'settings' })}>${icon({ name: 'settings', size: 16 })}<span class="item-label">Settings</span>
+          <kbd aria-hidden="true">${isMac() ? '⌘+,' : 'Ctrl+,'}</kbd></button>
+        ${primary.map(d => this.menuRow(d, 'window'))}</div>
       ${this.windows.length ? html`<div class="group" role="group" aria-labelledby="more-windows-label">
         <div class="group-label" id="more-windows-label">More</div>
         ${this.windows.map(d => this.menuRow(d, 'window'))}</div>` : nothing}
@@ -395,11 +400,8 @@ export class TopBar extends JfElement {
       </nav>
       <div class="end">
         <slot name="status" data-tauri-drag-region=${this.noDrag}></slot>
-        <button type="button" class="icon-button settings-trigger" data-surface-id="core.settings-surface"
-          aria-label="Settings" title=${isMac() ? 'Settings · ⌘+,' : 'Settings · Ctrl+,'} aria-keyshortcuts=${isMac() ? 'Meta+,' : 'Control+,'} aria-haspopup="dialog"
-          @click=${() => this.select({ kind: 'settings' })}>${icon({ name: 'settings', size: 18 })}</button>
         <span class="menu-anchor">
-          <button type="button" class="icon-button more-trigger" aria-label="More" title="More"
+          <button type="button" class="icon-button more-trigger" aria-label="Menu" title="Menu"
             aria-haspopup="menu" aria-expanded=${String(this.openMenu === 'more')}
             @click=${() => this.toggleMenu('more')}>${icon({ name: 'more-horizontal', size: 18 })}</button>
           ${this.openMenu === 'more' ? this.renderMoreMenu() : nothing}

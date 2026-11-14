@@ -130,18 +130,17 @@ describe('SP1 one chord, one palette', () => {
     } finally { stop(); }
   });
 
-  it('SP1 the Search topbar button opens the same palette through the toggle action', async () => {
+  it('SP1 Ctrl+K opens the one palette from Search after the title band retires', async () => {
     const shell = await mount();
-    const topbar = search(shell).shadowRoot!.querySelector('jf-sv3-topbar') as HTMLElement & { updateComplete: Promise<unknown> };
-    await topbar.updateComplete;
-    const button = topbar.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="sv3-topbar-palette"]')!;
-    button.focus(); button.click(); await settle(shell);
+    expect(search(shell).shadowRoot!.querySelector('jf-sv3-topbar')).toBeNull();
+    const field = await composerField(shell);
+    field.focus(); chord(field); await settle(shell);
     expect(palette(shell).open).toBe(true);
     expect(openPalettes(shell)).toBe(1);
     palette(shell).shadowRoot!.querySelector('input')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true, cancelable: true }));
     await settle(shell);
     expect(palette(shell).open).toBe(false);
-    expect(topbar.shadowRoot!.activeElement).toBe(button);
+    expect(field.getRootNode() instanceof ShadowRoot && (field.getRootNode() as ShadowRoot).activeElement).toBe(field);
   });
 
   it('SP1 under Settings, a confirmation or any other modal, the chord and the toggle action leave that dialog in control', async () => {

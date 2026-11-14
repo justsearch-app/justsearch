@@ -62,6 +62,8 @@ function agent(id: string) {
     reject: async () => {}, refresh: async () => ({ operationId: 'core.ingest-files', argsSummary: 'x', requestedBy: 'Claude Desktop' }) });
 }
 async function openSettings(shell: Shell): Promise<void> {
+  shell.shadowRoot!.querySelector('jf-top-bar')!.shadowRoot!.querySelector<HTMLButtonElement>('.more-trigger')!.click();
+  await settle(shell);
   shell.shadowRoot!.querySelector('jf-top-bar')!.shadowRoot!.querySelector<HTMLButtonElement>(`[data-surface-id="${SETTINGS}"]`)!.click();
   await settle(shell);
   expect(settingsOf(shell).open).toBe(true);

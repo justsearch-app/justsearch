@@ -68,7 +68,7 @@ import { JfElement } from '../../primitives/JfElement.js';
 import { FrameLatch } from '../../primitives/frameLatch.js';
 import { sv3Tokens } from './sv3-tokens.css.js';
 import { sv3Shared } from './sv3-shared-styles.js';
-import { COMPOSER_STATE_DEFAULT, WINDOW_TITLE, type Sv3ComposerState } from './fixtures.js';
+import { COMPOSER_STATE_DEFAULT, type Sv3ComposerState } from './fixtures.js';
 import { resetSearchState, setSearchApiBase } from '../../state/searchState.js';
 import { clearFilters, getFilters, hasActiveFilter } from '../../state/searchFiltersState.js';
 import {
@@ -289,7 +289,6 @@ import {
   SV3_DRAFT_KEY,
   SV3_SURFACE_KEY,
 } from './fixtures.js';
-import './Sv3Topbar.js';
 import './Sv3Sidebar.js';
 import './Sv3Main.js';
 import './Sv3ContextBar.js';
@@ -2766,7 +2765,6 @@ export class SearchV3View extends JfElement {
         @sv3-branch-action=${this.onBranchAction}
         @sv3-version-select=${this.onVersionSelect}
       >
-        <jf-sv3-topbar window-title=${WINDOW_TITLE} data-testid="sv3-topbar"></jf-sv3-topbar>
         ${indexing.pause?.waiting || !indexing.activity.confirmed || this.shadowRoot?.querySelector('jf-indexing-controls:focus-within')
           ? html`<div class="indexing-pause-note" data-testid="sv3-indexing-pause">
           ${indexing.pause?.waiting ? html`<p>${indexing.activity.summary} — ${indexing.activity.detail} Existing indexed files remain searchable.</p>` : nothing}

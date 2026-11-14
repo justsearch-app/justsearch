@@ -184,6 +184,7 @@ async function area(page: Page, id: string): Promise<void> {
 }
 
 async function openSettings(page: Page): Promise<void> {
+  await page.locator('jf-top-bar .more-trigger').click();
   await page.locator('jf-top-bar [data-surface-id="core.settings-surface"]').click();
   await settle(page, 400);
 }
@@ -680,7 +681,7 @@ it('SG9 real Gallery and Editor keep sibling instances and editor drafts on appl
 
 it('SD1 SD3 SG6 developer tools update Settings and More live and Logs opens the System member', async () => {
   const page = await open();
-  await page.locator('jf-top-bar .settings-trigger').click();
+  await openSettings(page);
   const settings = page.locator('jf-settings-surface');
   await settings.locator('jf-settings-nav [data-settings-category="advanced"]').click();
   const tools = settings.getByRole('switch', { name: 'Show developer tools' });
@@ -709,7 +710,7 @@ it('SD1 SD3 SG6 developer tools update Settings and More live and Logs opens the
   await settle(page);
   expect((await where(page)).address).toContain('core.system-surface');
   expect((await where(page)).address).toContain('core.logs-surface');
-  await page.locator('jf-top-bar .settings-trigger').click();
+  await openSettings(page);
   await tools.uncheck();
   await page.locator('jf-settings-window button.close').click();
   await page.locator('jf-top-bar .more-trigger').click();
@@ -718,7 +719,7 @@ it('SD1 SD3 SG6 developer tools update Settings and More live and Logs opens the
 
 it('SD3 another browser window updates open Settings and an already open More menu', async () => {
   const first = await open();
-  await first.locator('jf-top-bar .settings-trigger').click();
+  await openSettings(first);
   await first.locator('jf-settings-nav [data-settings-category="advanced"]').click();
   const firstTools = first.locator('jf-settings-surface').getByRole('switch', { name: 'Show developer tools' });
   await settle(first);
@@ -729,7 +730,7 @@ it('SD3 another browser window updates open Settings and an already open More me
   await second.locator('jf-top-bar').waitFor();
   await settle(second);
   // The new window may restore the first window's open Settings from the journal.
-  if (!(await where(second)).settings) await second.locator('jf-top-bar .settings-trigger').click();
+  if (!(await where(second)).settings) await openSettings(second);
   await second.locator('jf-settings-nav [data-settings-category="advanced"]').click();
   const secondTools = second.locator('jf-settings-surface').getByRole('switch', { name: 'Show developer tools' });
   await secondTools.check();
@@ -740,7 +741,7 @@ it('SD3 another browser window updates open Settings and an already open More me
   await secondTools.uncheck();
   await first.locator('jf-top-bar #developer-label').waitFor({ state: 'detached' });
   await first.locator('jf-top-bar .more-trigger').click();
-  await first.locator('jf-top-bar .settings-trigger').click();
+  await openSettings(first);
   expect(await firstTools.isChecked()).toBe(false);
 }, 30_000);
 

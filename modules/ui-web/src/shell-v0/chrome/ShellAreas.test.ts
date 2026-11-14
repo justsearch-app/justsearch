@@ -168,12 +168,12 @@ describe('Shell — userConfig-driven rail (slice 472)', () => {
     expect(ids).not.toContain('core.settings-surface');
   });
 
-  it('renders exactly ONE settings button — the top bar\'s gear, never a catalog slot (855 S1)', async () => {
+  it('renders exactly ONE settings button — the Menu\'s first entry, never a catalog slot (855 S1)', async () => {
     seedFiveCoreSurfaces();
     const shell = await renderShell();
     // Shell slice 2 — the pinned affordance moved from the rail foot to the top bar; a stale catalog
-    // declaring Settings RAIL must still not add a second one (in the switcher or the More menu).
-    expect(await moreMenuIds(shell)).not.toContain('core.settings-surface');
+    // declaring Settings RAIL must still not add a second one to the switcher or menu.
+    expect(await moreMenuIds(shell)).toContain('core.settings-surface');
     const buttons = await topBarButtonsFor(shell, 'core.settings-surface');
     expect(buttons).toHaveLength(1);
     // The survivor is the pinned MODAL affordance: it opens a window, so it declares

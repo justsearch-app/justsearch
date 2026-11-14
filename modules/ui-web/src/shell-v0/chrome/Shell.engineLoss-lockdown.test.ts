@@ -188,7 +188,7 @@ const layout = (page: Page) => page.evaluate(() => {
   walk(shell.querySelector('jf-top-bar')!.shadowRoot!);
   const buttons = [...shell.querySelector('jf-engine-loss')!.shadowRoot!.querySelectorAll('jf-button')].map(b => b.getBoundingClientRect());
   const overlaps = buttons.some((a, i) => buttons.some((b, j) => j > i && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1));
-  const gear = shell.querySelector('jf-top-bar')!.shadowRoot!.querySelector<HTMLElement>('[data-surface-id="core.settings-surface"]');
+  const gear = shell.querySelector('jf-top-bar')!.shadowRoot!.querySelector<HTMLElement>('.more-trigger');
   const box = gear?.getBoundingClientRect();
   let hit: Element | null = box ? document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2) : null;
   while (hit?.shadowRoot) {

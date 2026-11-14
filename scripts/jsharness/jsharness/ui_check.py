@@ -383,6 +383,11 @@ async def _type_and_search(page, query: str = "justsearch") -> None:
     await page.locator(S.CSS_SV3_RESULT_ROW).first.wait_for(state="visible", timeout=30_000)
 
 
+async def _open_settings_menu(page) -> None:
+    await page.locator("jf-top-bar").get_by_role("button", name="Menu", exact=True).click()
+    await page.locator("jf-top-bar").get_by_role("menuitem", name="Settings", exact=True).click()
+
+
 async def _check_legacy_token_plugin(page) -> None:
     """Legacy authoring-token compatibility only, through untrusted-plugin installation."""
     origin = urlparse(page.url)
@@ -398,7 +403,7 @@ async def _check_legacy_token_plugin(page) -> None:
 
     await page.route(source_url, source)
     await page.route(lambda url: urlparse(url).path == "/api/plugins/verify", verify)
-    await page.locator(S.rail_css(S.RAIL_SURFACE_SETTINGS)).click()
+    await _open_settings_menu(page)
     settings = page.locator(S.CSS_SETTINGS_WINDOW_CONTENT)
     await page.locator(S.CSS_SETTINGS_WINDOW_DIALOG).wait_for(state="visible", timeout=10_000)
     await settings.first.wait_for(state="attached", timeout=10_000)
@@ -439,7 +444,7 @@ async def _check_legacy_token_plugin(page) -> None:
         raise AssertionError(f"legacy-token construction changed trust/provenance: {ownership!r}")
 
     # Installation must never promote this negative-verdict contribution to CORE/TRUSTED.
-    await page.locator(S.rail_css(S.RAIL_SURFACE_SETTINGS)).click()
+    await _open_settings_menu(page)
     await settings.locator('[data-settings-category="plugins"]').click()
     await row.locator("jf-status-badge").get_by_text("untrusted", exact=True).wait_for(state="visible")
     await page.get_by_test_id("settings-window-close").click()
@@ -461,7 +466,7 @@ async def _set_detail_level_in_settings(page, label: str) -> None:
     # Shell slice 2 retired the title bar's Simple/Detailed toggle (FR4); Settings › Appearance ›
     # Interface holds the one control, a radio group named "Detail level" whose radios name
     # their option ("Simple …", "Detailed …"). Same POST, same witnessed receipt.
-    await page.locator(S.rail_css(S.RAIL_SURFACE_SETTINGS)).first.click()
+    await _open_settings_menu(page)
     settings = page.locator(S.CSS_SETTINGS_WINDOW_CONTENT)
     await page.locator(S.CSS_SETTINGS_WINDOW_DIALOG).wait_for(state="visible", timeout=10_000)
     await settings.first.wait_for(state="attached", timeout=10_000)
@@ -978,7 +983,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         # normal Library design; OS forced colors has its own explicit camera below.
         if "high-contrast" not in (await page.locator("html").get_attribute("class") or ""):
             return
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SETTINGS)).click()
+        await _open_settings_menu(page)
         await page.locator('[data-settings-category="appearance"]').click()
         await page.locator('jf-settings-nav [data-settings-anchor="accessibility"]').click()
         await page.get_by_role("switch", name="High contrast", exact=True).click()
@@ -1008,9 +1013,12 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                 # tempdoc 615 §6.1b: off-rail DEEPLINK surfaces (Health/Help) have no main-rail button,
                 # so fall back to the shell's surface hash route (`#justsearch://surface/<id>`).
                 try:
-                    btn = page.locator(S.rail_css(surface_id))
-                    await btn.scroll_into_view_if_needed(timeout=2_000)
-                    await btn.click()
+                    if surface_id == S.RAIL_SURFACE_SETTINGS:
+                        await _open_settings_menu(page)
+                    else:
+                        btn = page.locator(S.rail_css(surface_id))
+                        await btn.scroll_into_view_if_needed(timeout=2_000)
+                        await btn.click()
                 except Exception:
                     await page.evaluate(
                         "(id) => { location.hash = `justsearch://surface/${id}`; }", surface_id
@@ -1068,6 +1076,9 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     async def _goto_surface(page, surface_id: str):
         """Navigate to a surface via its rail button, with the surface-hash route as fallback."""
+        if surface_id == S.RAIL_SURFACE_SETTINGS:
+            await _open_settings_menu(page)
+            return
         try:
             btn = page.locator(S.rail_css(surface_id))
             await btn.scroll_into_view_if_needed(timeout=2_000)
@@ -1463,11 +1474,9 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await _settle_focus_marks(page)
 
     async def setup_palette_forced_colors(page):
-        # The app's one palette, opened from Search's topbar button (the same toggle as the chord).
+        # The app's one palette, opened by its keyboard shortcut.
         await _open_sv3_window(page)
-        await page.locator(S.CSS_SV3_WINDOW).get_by_role(
-            "button", name="Open command palette", exact=True
-        ).click()
+        await page.keyboard.press("Control+k")
         await page.locator(S.CSS_PALETTE).get_by_role("option").first.wait_for(
             state="visible", timeout=10_000
         )
@@ -1886,10 +1895,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             await page.evaluate(
                 "(id) => { location.hash = `justsearch://surface/${id}`; }", S.RAIL_SURFACE_LIBRARY
             )
-        # Both sides of the relation must actually be on screen before measuring.
-        await page.locator(S.rail_css(S.RAIL_SURFACE_SETTINGS)).first.wait_for(
-            state="visible", timeout=15_000
-        )
+        # The frame's remaining menu control must be on screen before measuring.
         await page.locator("jf-top-bar button.more-trigger").first.wait_for(state="visible", timeout=15_000)
         # Frame status S1: the bottom-left task tray retired; its indexing aggregate is the status
         # panel's indexing row, opened from the title-bar pill. Wait on the row itself, not the

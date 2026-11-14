@@ -187,14 +187,16 @@ describe('ST6 durable operations finish with the backend, not on invocation retu
 });
 
 describe('ST1/ST9 calm pill', () => {
-  it('keeps the "Up to date" accessible name (the label hides by width only) and counts plugin items', async () => {
+  it('keeps the "Up to date" accessible name on its dot and keeps plugin items in the panel', async () => {
     await observe({});
     const trigger = pill.shadowRoot!.querySelector('.trigger')!;
     expect(trigger.getAttribute('aria-label')).toBe('Up to date');
-    expect(trigger.querySelector('.label')!.textContent).toContain('Up to date');
+    expect(trigger.querySelector('.label')).toBeNull();
+    expect(trigger.getAttribute('title')).toBe('Up to date');
     registerStatusBarItem({ id: 'plugin.timer', source: 'plugin', provenance: CORE_PROVENANCE, priority: 1, position: 'right', render: () => 'Timer' });
     await flush();
-    expect(trigger.querySelector('[aria-label="Plugin status items"]')!.textContent).toBe('1');
+    expect(trigger.querySelector('[aria-label="Plugin status items"]')).toBeNull();
+    expect(panel().plugins.map(item => item.id)).toEqual(['plugin.timer']);
     pill.pluginsVisible = false; await flush();
     expect(trigger.querySelector('[aria-label="Plugin status items"]')).toBeNull();
     expect(trigger.getAttribute('aria-label')).toBe('Up to date');
