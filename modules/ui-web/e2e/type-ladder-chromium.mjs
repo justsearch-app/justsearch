@@ -283,16 +283,19 @@ try {
       await page.locator('[data-testid="search-result-row"]').first().waitFor();
     });
     await capture(page, theme, 'search-results-filters', async () => {
-      await page.locator('[data-testid="sv3-filters-trigger"]').click();
+      await page.locator('[data-testid="more-filters"]').click();
       await page.locator('jf-sv3-filters[open]').waitFor();
     });
-    await page.locator('[data-testid="sv3-filters-trigger"]').click();
+    await page.locator('[data-testid="more-filters"]').click();
     await capture(page, theme, 'search-side-pane', async () => {
       await page.locator('[data-testid="search-result-row"]').first().click();
       await page.locator('jf-sv3-pane jf-document-pane').waitFor();
       await page.locator('jf-document-pane').getByText('Typography fixture document text.', { exact: false }).first().waitFor();
     });
+    await click('Developer tools');
+    await page.locator('jf-document-pane [role="radio"]').first().waitFor();
     for (const mode of await page.locator('jf-document-pane [role="radio"]').all()) await capture(page, theme, `search-document-${await mode.textContent().then(t => t.trim().toLowerCase())}`, () => mode.click());
+    await click('Developer tools');
     await capture(page, theme, 'library', async () => { await click('Library'); await page.locator('jf-library-surface h2').first().waitFor(); });
     await visitTabs(page, theme, 'library', page.locator('jf-library-surface'));
     await capture(page, theme, 'library-browse', async () => {

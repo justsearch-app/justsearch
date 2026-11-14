@@ -191,7 +191,7 @@ export class DetailsPane extends JfElement {
                   title=${name}
                   @click=${() => this.select(tab.id)}>
                   ${tab.number === undefined
-                    ? html`<span class="label">${tab.label}</span>`
+                    ? html`${tab.id === 'document' ? icon({ name: 'file-text', size: 16 }) : nothing}<span class="label">${tab.label}</span>`
                     : html`<span class="number">${tab.number}</span>`}
                 </button>`;
               })}
@@ -290,9 +290,11 @@ export class DetailsPane extends JfElement {
       color: var(--text-secondary);
       font: inherit;
       font-size: var(--font-size-sm);
+      font-weight: 500;
       white-space: nowrap;
       cursor: pointer;
     }
+    .tab[data-tab='document'] { max-inline-size: 100%; }
     .tab.numbered { padding-inline: var(--jf-space-1); }
     .tab:hover { color: var(--text-primary); }
     .tab[aria-selected='true'] {
@@ -313,7 +315,7 @@ export class DetailsPane extends JfElement {
       background: var(--surface-active);
       color: var(--text-secondary);
       font-size: var(--font-size-xs);
-      font-weight: 600;
+      font-weight: 500;
       font-variant-numeric: tabular-nums;
       text-align: center;
     }
@@ -325,7 +327,7 @@ export class DetailsPane extends JfElement {
       padding: var(--jf-space-2) var(--jf-space-4);
       border-block-end: var(--frame-hairline) solid var(--border-subtle);
       font-size: var(--font-size-sm);
-      font-weight: 600;
+      font-weight: 500;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -351,7 +353,8 @@ export class DetailsPane extends JfElement {
     /* Below the window's 980 px: a sheet over the window, dimming its box and nothing of the frame. */
     :host([overlay]) {
       position: absolute;
-      inset: 0;
+      inset: var(--details-overlay-top, 0px) 0 0;
+      block-size: auto;
       z-index: var(--z-details-sheet);
     }
     :host([overlay]) .backdrop {

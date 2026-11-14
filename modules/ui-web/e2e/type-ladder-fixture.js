@@ -12,6 +12,7 @@ import '/src/shell-v0/components/EngineRecovery.ts';
 import '/src/shell-v0/components/chat/MarkdownBlock.ts';
 import '/src/boot/factoryReset.ts';
 import { resolveBootWithRecovery } from '/src/boot/desktopRecovery.ts';
+import { getShowDeveloperTools, setShowDeveloperTools } from '/src/shell-v0/state/developerToolsState.ts';
 import { __seedForTest } from '/src/api/registry/SurfaceCatalogClient.ts';
 
 const entries = ['library', 'browse', 'system', 'health', 'presentation-gallery', 'presentation-editor', 'security'].map(name => ({
@@ -52,5 +53,7 @@ connection.onclick = async () => {
   await resolveBootWithRecovery(root);
 };
 nav.append(connection);
+const developer = document.createElement('button'); developer.textContent = 'Developer tools';
+developer.onclick = () => setShowDeveloperTools(!getShowDeveloperTools()); nav.append(developer);
 nav.querySelectorAll('button')[3].click();
 document.body.dataset.typeLadderReady = 'true';

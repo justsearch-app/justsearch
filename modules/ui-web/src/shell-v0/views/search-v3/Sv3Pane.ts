@@ -123,6 +123,7 @@ export class Sv3Pane extends JfElement {
 
   static properties = {
     docPath: { attribute: false },
+    sizeBytes: { attribute: false },
     citation: { attribute: false },
     highlightRange: { attribute: false },
     citationHeader: { attribute: false },
@@ -140,6 +141,7 @@ export class Sv3Pane extends JfElement {
    * reaches this pane is a property write from the window.
    */
   declare docPath: string | null;
+  declare sizeBytes: number | undefined;
   /**
    * The cited passage, addressed by the CHARACTER offsets its producer computed (tempdoc 849 §3).
    * Null when the citation carried no span. The reader derives its own line coordinates from this;
@@ -226,6 +228,7 @@ export class Sv3Pane extends JfElement {
               <jf-document-pane
                 data-testid="sv3-pane-document"
                 .docPath=${this.docPath}
+                .sizeBytes=${this.sizeBytes}
                 .highlightRange=${this.highlightRange}
                 .citation=${this.citation}
                 .citationHeader=${this.citationHeader}

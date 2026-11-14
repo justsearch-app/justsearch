@@ -1765,29 +1765,39 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
     def setup_sv3_filters(state, narrow, viewport=None):
         async def setup(page):
             await setup_sv3_recents(state, narrow, viewport)(page)
+            if state != "hero":
+                # Recents setup empties the draft. Keep the displayed query while editing result
+                # filters so commits can rerun it; an empty draft deliberately leaves them stale.
+                await page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first.fill("latest")
             # The fresh search document seeds profile preferences during setup.
             await _enable_developer_tools(page)
-            await page.locator('[data-testid="sv3-filters-trigger"]').click()
+            trigger = page.locator('[data-testid="more-filters"]:visible, [data-testid="sv3-filters-trigger"]:visible').first
+            await trigger.click()
+            panel = page.locator('jf-sv3-filters[open]:visible').first
             for key, value in (("folder", "/inside"), ("from", "2026-03-29"), ("to", "2026-03-29"),
                                ("minimum", "0"), ("maximum", "2")):
-                control = page.locator(f'[data-filter-input="{key}"]')
+                control = panel.locator(f'[data-filter-input="{key}"]')
                 await control.fill(value)
                 await control.press("Enter")
             # Keep the active folder chip while exposing its validation and association.
-            await page.locator('[data-filter-input="folder"]').fill("relative/path")
-            await page.locator('[data-filter-input="folder"]').press("Enter")
-            panel = page.locator('jf-sv3-filters')
+            await panel.locator('[data-filter-input="folder"]').fill("relative/path")
+            await panel.locator('[data-filter-input="folder"]').press("Enter")
             assert await panel.locator('[data-filter]').count() == 3
-            assert await page.locator('[data-filter-input="folder"]').get_attribute('aria-invalid') == 'true'
+            assert await panel.locator('[data-filter-input="folder"]').get_attribute('aria-invalid') == 'true'
             # Every field, note and error is reachable inside the bounded panel; the window
             # and bar keep their places while only the panel's contents scroll.
             for selector in ('[data-filter-input="folder"]', '[data-filter-input="from"]',
                              '[data-filter-input="to"]', '[data-filter-input="minimum"]',
                              '[data-filter-input="maximum"]', '#folder-error', '.notes'):
                 control = panel.locator(selector).first
+                if await control.evaluate("el => el.matches('input,select,button')"):
+                    await control.focus()
                 await control.scroll_into_view_if_needed()
+                assert await control.evaluate("el => { const r=el.getBoundingClientRect(); return r.top>=44 && r.bottom<=innerHeight+1 && r.left>=0 && r.right<=innerWidth+1; }"), f"F16 clipped {selector}"
                 assert await control.is_visible(), f"F16 unreachable {selector}"
             await panel.evaluate('el => { el.scrollTop = 0; }')
+            await trigger.focus()
+            await trigger.scroll_into_view_if_needed()
             await assert_recents_fit(page, state)
             await _settle_focus_marks(page)
         return setup
@@ -2252,6 +2262,38 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                 await asyncio.sleep(cooldown_ms / 1000)
         return setup
 
+    def first_minutes_results_setup(state, narrow=False):
+        async def setup(page):
+            await page.set_viewport_size({"width": 600, "height": 400} if narrow else {"width": 1024, "height": 700})
+            await page.goto(demo, wait_until="domcontentloaded", timeout=timeout_ms)
+            await _await_app_ready(page)
+            await _library_appearance(page)
+            composer = page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first
+            await composer.fill("boat repair invoice" if state == "empty" else "inspection")
+            await composer.press("Enter")
+            if state == "empty":
+                await page.get_by_text("No file contains these words", exact=True).wait_for()
+                await page.get_by_role("button", name="Open AI Brain", exact=True).wait_for()
+                await page.get_by_text("8 files in 1 folder can be searched", exact=True).wait_for()
+            else:
+                rows = page.locator(S.CSS_SV3_RESULT_ROW)
+                await rows.nth(4).wait_for()
+                assert await composer.evaluate("""el => {
+                    const window = el.getRootNode().host.getRootNode().host;
+                    const main = window.shadowRoot.querySelector('jf-sv3-main');
+                    const results = main.shadowRoot.querySelector('jf-sv3-results');
+                    const card = results.shadowRoot.querySelector('jf-results-card');
+                    return el.getBoundingClientRect().bottom <= card.getBoundingClientRect().top;
+                }"""), "The mounted Search field must be above results"
+                if state == "pane":
+                    await rows.filter(has_text="scanned-delivery.pdf").click()
+                    await page.get_by_text("Read from a scan. A few words may be wrong.", exact=True).wait_for()
+                    await page.get_by_role("button", name="Open file", exact=True).wait_for()
+                    assert await page.get_by_role("button", name="Show in folder", exact=True).count() == 0
+            if cooldown_ms > 0:
+                await asyncio.sleep(cooldown_ms / 1000)
+        return setup
+
     views = [
         "home",
         "search",
@@ -2268,6 +2310,11 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
     ]
 
     steps = [
+        *[Step(f"fm-{state}-{theme}", setup=first_minutes_results_setup(state), isolated=True,
+               fixtures_variant="fm-empty" if state == "empty" else "fm-results", color_scheme=theme)
+          for state in ("results", "pane", "empty") for theme in ("dark", "light")],
+        *[Step(f"fm-pane-narrow-{theme}", setup=first_minutes_results_setup("pane", narrow=True),
+               isolated=True, fixtures_variant="fm-results", color_scheme=theme) for theme in ("dark", "light")],
         Step("first-use", setup=first_use_setup(), isolated=True, fixtures_variant="first-use"),
         Step("first-use-reading", setup=first_use_setup(True), isolated=True, fixtures_variant="first-use-reading"),
         Step("engine-recovery", setup=setup_engine_recovery, isolated=True),

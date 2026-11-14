@@ -226,6 +226,14 @@
       "guard": "exempt:consumer reads the canonical type; no projection law to mutate-guard"
     },
     {
+      "id": "fe-search-execution",
+      "kind": "projection",
+      "lang": "ts",
+      "path": "modules/ui-web/src/shell-v0/components/searchResults/searchExecution.ts",
+      "guard": "test:ResultsCard.searchTrace.test",
+      "note": "Projects canonical SearchTrace stage execution to words/meaning/unknown for the shared result summary and empty state; missing learned-leg evidence stays unknown."
+    },
+    {
       "id": "fe-results-card",
       "kind": "projection",
       "lang": "ts",

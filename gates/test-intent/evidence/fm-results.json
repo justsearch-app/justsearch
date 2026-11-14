@@ -1,0 +1,523 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-14T20:58:06.177Z",
+  "revision": "820f93903cec4726fa9d1933adc1d354d02741b9",
+  "tree": "fc6ee1f5e912b3236608e05a8aa45402080d7ccb",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts\" \"src/shell-v0/views/first-minutes-page-break.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cusc8iw6/tmp/test-intent-vitest-2041658-1794689880099.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1727
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:8e13c18d4f8c08ae385716b31d443efea825078e2e266f9a62b7458b7d4db927",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S5-1 shows files mode and seconds in that order from executed legs",
+          "status": "passed"
+        },
+        {
+          "name": "S5-1 retains available versus displayed and capped counts as files",
+          "status": "passed"
+        },
+        {
+          "name": "S5-2 cleans Markdown before display and preserves raw source and code punctuation",
+          "status": "passed"
+        },
+        {
+          "name": "S5-2 keeps copy and explanation out of the default row and exposes a date",
+          "status": "passed"
+        },
+        {
+          "name": "S5-3 uses known library roots to hide a redundant folder trail",
+          "status": "passed"
+        },
+        {
+          "name": "S5-5 shows All and Type as text and keeps other facets behind More filters",
+          "status": "passed"
+        },
+        {
+          "name": "S5-5 pending responses retain known Type values without old counts",
+          "status": "passed"
+        },
+        {
+          "name": "S5-5 date presets use local day boundaries and clear the opposite bound",
+          "status": "passed"
+        },
+        {
+          "name": "S5-6 row md copy keeps raw text chosen files and focus",
+          "status": "passed"
+        },
+        {
+          "name": "S5-6 row json copy keeps raw text chosen files and focus",
+          "status": "passed"
+        },
+        {
+          "name": "S5-16 Markdown is cleaned before truncation and raw export inputs stay untouched",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c2a5f4e9388fa3d684d14f7ca11467d715510b0574d58edb76463f875263f5de",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S5-8 restored Context outside Ask falls back without changing saved memory: /saved.md",
+          "status": "passed"
+        },
+        {
+          "name": "S5-8 restored Context outside Ask falls back without changing saved memory: ",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d4e0d29000439ba94a32c156d6dc4ec588c355b37a71bce0811411eeee45c4ea",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S5-12 literal-only empty screen explains words without repeating the query",
+          "status": "passed"
+        },
+        {
+          "name": "S5-12 unknown execution uses the general empty message and no AI advice",
+          "status": "passed"
+        },
+        {
+          "name": "S5-5 empty filtered results retain removable restrictions and offer Clear filters",
+          "status": "passed"
+        },
+        {
+          "name": "S5-12 known optional models show navigation only, installing=false",
+          "status": "passed"
+        },
+        {
+          "name": "S5-12 known optional models show navigation only, installing=true",
+          "status": "passed"
+        },
+        {
+          "name": "S5-12 ready models or learned execution suppress AI advice as availability changes",
+          "status": "passed"
+        },
+        {
+          "name": "S5-15 loading never presents nothing found",
+          "status": "passed"
+        },
+        {
+          "name": "S5-15 unreachable never presents nothing found",
+          "status": "passed"
+        },
+        {
+          "name": "S5-15 idle never presents nothing found",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e1a966117b33167442500a0491cbea19aabddbaf10636daa81865591c5b15f83",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S5-4 Search results move the mounted editor to the top and Ask keeps its dock",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c8ebf6cead0211980f8410620392910f89786a48e93ff88067745880a3b3efbc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S5-8 hides Show in folder in a browser",
+          "status": "passed"
+        },
+        {
+          "name": "S5-8 default reader omits source controls and extraction diagnostics",
+          "status": "passed"
+        },
+        {
+          "name": "S5-8 reader shows full folder pages size and one scan note with document text",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b937d7ae2bc707754997427a7b290dbd5fbf8ac7909044b443934f996d06ba53",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "date is a named text action using the shared keyboard menu and preserves custom bounds until chosen",
+          "status": "passed"
+        },
+        {
+          "name": "dates keep the year outside this year and use day then localized short month",
+          "status": "passed"
+        },
+        {
+          "name": "cleans extracted Markdown in docx only for display",
+          "status": "passed"
+        },
+        {
+          "name": "cleans extracted Markdown in pdf only for display",
+          "status": "passed"
+        },
+        {
+          "name": "cleans extracted Markdown in eml only for display",
+          "status": "passed"
+        },
+        {
+          "name": "cleans extracted Markdown in xlsx only for display",
+          "status": "passed"
+        },
+        {
+          "name": "cleans extracted Markdown in html only for display",
+          "status": "passed"
+        },
+        {
+          "name": "cleans extracted Markdown in md only for display",
+          "status": "passed"
+        },
+        {
+          "name": "keeps ts punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps tsx punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps js punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps jsx punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps py punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps java punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps kt punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps go punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps rs punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps c punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps cc punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps cpp punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps h punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps hpp punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps cs punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps rb punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps php punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps swift punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps scala punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps sql punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps sh punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps ps1 punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps yml punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps yaml punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps json punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps xml punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps toml punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps ini punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps gradle punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps properties punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps txt punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps log punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps csv punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dd090b3d68421412985c954ccc190e669e0cbe1cbab46f54f39ad4acef5df481",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "top field precedes filters and results in DOM without replacing the editor on Search and Ask moves",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:324c979cce5b1fd3a557d238fd203acbbfa19dd8cc5f36d91e8ea8e646e04fa5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "'failed' withholds the card, count and filters",
+          "status": "passed"
+        },
+        {
+          "name": "'syntax invalid' withholds the card, count and filters",
+          "status": "passed"
+        },
+        {
+          "name": "'stale response' withholds the card, count and filters",
+          "status": "passed"
+        },
+        {
+          "name": "a temporary pending response removes result chrome and restores the same open filter editor and draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0d6dcc6c725b03268ad8fc3c9693c75bbc014593132287a280c059c72bc6b1b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "new result lists start at the top; layout and pane updates preserve the reader position",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/first-minutes-page-break.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/first-minutes-page-break.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4e7e3fb1117b4ed7ace0f46b39363e69f77d6f1f87073f1c8d5e4a94771d8396",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "drops page-break rules from pdf rows, on their own line or flattened",
+          "status": "passed"
+        },
+        {
+          "name": "drops page-break rules from docx rows, on their own line or flattened",
+          "status": "passed"
+        },
+        {
+          "name": "drops page-break rules from md rows, on their own line or flattened",
+          "status": "passed"
+        },
+        {
+          "name": "keeps \"---\" in ts rows",
+          "status": "passed"
+        },
+        {
+          "name": "keeps \"---\" in txt rows",
+          "status": "passed"
+        },
+        {
+          "name": "keeps \"---\" in csv rows",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "eea268db53",
+    "revision": "eea268db53344383e65e85752ffa3a546d6a1753",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts\" \"src/shell-v0/views/first-minutes-page-break.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cusc8iw6/tmp/test-intent-vitest-2041658-1794689884306.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1685,
+        "output": "JSON report written to /home/elias/.cache/am/cusc8iw6/tmp/test-intent-vitest-2041658-1794689884306.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts",
+        "classification": "assertion",
+        "detail": "S5-1 shows files mode and seconds in that order from executed legs:  AssertionError: expected '1 match · found in 0.04s · exact-word…' to be '1 file · by words · 0.04 s' // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts:30:6\n    at processTick | S5-1 retains available versus displayed and capped counts as files:  AssertionError: expected '\\n        Top 1 of 100+ matches ·"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts",
+        "classification": "assertion",
+        "detail": "S5-8 restored Context outside Ask falls back without changing saved memory: /saved.md:  AssertionError: expected 'context' to be 'document' // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts:20:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s5/module | S5-8 restored Context outside Ask falls back without changing saved memory: :  AssertionError: expected 'cont"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts",
+        "classification": "assertion",
+        "detail": "S5-12 literal-only empty screen explains words without repeating the query:  AssertionError: expected '\\n      \\n        Results for “privat…' to contain 'No file contains these words'\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts:20:38\n    at processTicksAndRejections (node: | S5-12 unknown execution uses the general empty message and no AI advice:  AssertionError: expected '\\n      \\n        Re"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts",
+        "classification": "assertion",
+        "detail": "S5-4 Search results move the mounted editor to the top and Ask keeps its dock:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts:21:47\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts",
+        "classification": "assertion",
+        "detail": "S5-8 hides Show in folder in a browser:  AssertionError: expected <jf-button …(4)>…(1)</jf-button> to be null\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts:13:84\n    at processTicksAndRejections (node:internal/process/task_queues:104:5) | S5-8 default reader omits source controls and extraction diagnostics:  AssertionError: expected <div class=\"toggle-group\" …(2)>…(2)</div> to be null\n    at /home"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts",
+        "classification": "assertion",
+        "detail": "date is a named text action using the shared keyboard menu and preserves custom bounds until chosen:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts:18:23\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:/ | dates keep the year outside this year and use day then localized short month:  AssertionError: "
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts",
+        "classification": "assertion",
+        "detail": "top field precedes filters and results in DOM without replacing the editor on Search and Ask moves:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts:21:47\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts",
+        "classification": "assertion",
+        "detail": "'failed' withholds the card, count and filters:  AssertionError: expected <div class=\"filters\" …(3)>…(1)</div> to be null\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts:18:84\n    at processTicksAndRejections (node:internal/process/task_queues:104: | 'syntax invalid' withholds the card, count and filters:  AssertionError: expected <div class=\"filters\" …(3)>…(1)</div> to be null\n    at /home/elias"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts",
+        "classification": "assertion",
+        "detail": "new result lists start at the top; layout and pane updates preserve the reader position:  AssertionError: expected 2000 to be +0 // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts:13:30\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at fil"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/first-minutes-page-break.test.ts",
+        "classification": "assertion",
+        "detail": "drops page-break rules from pdf rows, on their own line or flattened:  AssertionError: expected 'harbour-scan\\n\\n---\\n\\nHarbour lighth…' to be 'harbour-scan Harbour lighthouse logbo…' // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/first-minutes-page-break.test.ts:9:44\n    at file:///home/elias | drops page-break rules from docx rows, on their own line or flattened:  AssertionError: expected 'harbour-scan\\n\\n---\\n\\nHarbo"
+      }
+    ]
+  },
+  "digest": "sha256:d928499e0728d61560ec76788c7ef223bf52eaafa65358aa5e92fcf2b35212de"
+}

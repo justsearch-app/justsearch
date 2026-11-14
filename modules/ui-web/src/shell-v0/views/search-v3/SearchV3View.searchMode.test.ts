@@ -1011,6 +1011,7 @@ describe('S1.9 — an older query’s results are never shown as the current one
     await pressEnter(el);
     await passTime(el, 50);
     expect(await rowTitles(el)).toEqual(['alpha.md']);
+    backend.holdSearches = true;
     await type(el, 'beta');
     await pressEnter(el);
     expect(await rowTitles(el)).toEqual([]);
@@ -1042,7 +1043,7 @@ describe('S1.9 — an older query’s results are never shown as the current one
     const said = (node: Element | null): string =>
       `${node?.getAttribute('heading') ?? ''} ${node?.textContent ?? ''}`;
     const empty = q(host as Element, 'sv3-results-empty');
-    expect(said(empty)).toMatch(/No documents matched/i);
+    expect(said(empty)).toMatch(/Nothing matches this search/i);
 
     fetchMock.mockImplementationOnce(async () => {
       throw new Error('Failed to fetch');
@@ -1119,9 +1120,13 @@ async function reenter(el: Mounted): Promise<void> {
   await settle(el);
 }
 
-async function headingOf(el: Mounted): Promise<string | null> {
+async function answeredQueryOf(el: Mounted): Promise<string | null> {
   const host = await results(el);
-  return host === null ? null : (q(host, 'sv3-results-heading')?.textContent ?? null);
+  if (host === null) return null;
+  expect(q(host, 'sv3-results-heading')).toBeNull();
+  const card = host.shadowRoot!.querySelector<import('../../components/searchResults/ResultsCard.js').ResultsCard>('jf-results-card');
+  await card?.updateComplete;
+  return card?.snapshot?.query ?? null;
 }
 
 describe('S1.10 — the composer, the heading and the rows describe the one shared query', () => {
@@ -1138,7 +1143,7 @@ describe('S1.10 — the composer, the heading and the rows describe the one shar
     await reenter(el);
 
     expect((await fieldOf(el)).value).toBe('cobalt');
-    expect(await headingOf(el)).toBe('Results for “cobalt”');
+    expect(await answeredQueryOf(el)).toBe('cobalt');
     expect(await rowTitles(el)).toEqual(['c.md']);
   });
 
@@ -1152,7 +1157,7 @@ describe('S1.10 — the composer, the heading and the rows describe the one shar
 
     expect(el.tier).toBe('search');
     expect((await fieldOf(el)).value).toBe('cobalt');
-    expect(await headingOf(el)).toBe('Results for “cobalt”');
+    expect(await answeredQueryOf(el)).toBe('cobalt');
     expect(await rowTitles(el)).toEqual(['c.md']);
     // Showing the shared list is not running a search of its own.
     expect(backend.searches.length).toBe(searched);
@@ -1181,7 +1186,7 @@ describe('S1.10 — the composer, the heading and the rows describe the one shar
     await settle(el);
     expect(el.tier).toBe('search');
     expect((await fieldOf(el)).value).toBe('cobalt');
-    expect(await headingOf(el)).toBe('Results for “cobalt”');
+    expect(await answeredQueryOf(el)).toBe('cobalt');
     expect(await rowTitles(el)).toEqual(['c.md']);
   });
 
@@ -1216,7 +1221,7 @@ describe('S1.10 — the composer, the heading and the rows describe the one shar
     await chooseTier(el, 'search');
     await pressEnter(el); await settle(el);
     expect((await fieldOf(el)).value).toBe('what is the rent?');
-    expect(await headingOf(el)).toBe('Results for “what is the rent?”');
+    expect(await answeredQueryOf(el)).toBe('what is the rent?');
     // The staged quick pass, once its debounce has run.
     await vi.waitFor(async () => expect(await rowTitles(el)).toEqual(['rent.md']));
   });
@@ -1437,13 +1442,20 @@ it('X8 Delegate sends operator characters without a Search syntax claim', async 
 });
 
 /* WP2.3b: production view, controls, shared Search store and dispatch boundary. */
+async function filterOwner(el: Mounted): Promise<{ owner: Mounted; trigger: HTMLButtonElement }> {
+  const host = await results(el);
+  const card = host?.shadowRoot!.querySelector('jf-results-card') as Mounted | null;
+  const owner = card ?? await region(el, 'jf-sv3-composer');
+  await owner.updateComplete;
+  const trigger = q<HTMLButtonElement>(owner, card ? 'more-filters' : 'sv3-filters-trigger');
+  expect(trigger, 'Filters entry exists beside results or in the Ask composer').not.toBeNull();
+  return { owner, trigger: trigger! };
+}
 async function filtersOf(el: Mounted): Promise<Mounted> {
-  const composer = await region(el, 'jf-sv3-composer');
-  const trigger = q<HTMLButtonElement>(composer, 'sv3-filters-trigger');
-  expect(trigger, 'F1 Filters entry exists in the production composer').not.toBeNull();
-  if (trigger!.getAttribute('aria-expanded') !== 'true') trigger!.click();
-  await composer.updateComplete;
-  const filters = composer.shadowRoot!.querySelector('jf-sv3-filters') as Mounted | null;
+  const { owner, trigger } = await filterOwner(el);
+  if (trigger.getAttribute('aria-expanded') !== 'true') trigger.click();
+  await owner.updateComplete;
+  const filters = owner.shadowRoot!.querySelector('jf-sv3-filters') as Mounted | null;
   expect(filters, 'Filter controls are mounted').not.toBeNull();
   await filters!.updateComplete;
   return filters!;
@@ -1571,7 +1583,8 @@ it('F8 same-query filter commits cancel stale rows counts facets and chosen-file
   aiOnline(); backend.corpus.needle = [wireHit('old', '/outside/old.md')]; const el = await mount(); await filtersOf(el); await searchFor(el, 'needle');
   await clickRow(el, 'old.md', { ctrlKey: true }); backend.holdSearches = true; await filterEdit(el, 'folder', '/first');
   const old = backend.held.splice(0); backend.corpus.needle = [wireHit('new', '/new/new.md')];
-  await filterEdit(el, 'folder', '/new');
+  expect((await results(el))!.shadowRoot!.querySelector('jf-results-card')).toBeNull();
+  setFilters({ ...getFilters(), pathPrefix: '/new' }); await settle(el);
   expect(await rows(el)).toHaveLength(0); expect(q((await results(el))!, 'sv3-results-ask')).toBeNull();
   backend.held.splice(0).forEach(release => release()); await settle(el); old.forEach(release => release()); await settle(el);
   expect(await rowTitles(el)).toEqual(['new.md']); expect((await results(el))!.shadowRoot!.textContent).not.toContain('/first');
@@ -1639,14 +1652,15 @@ it('F12 navigation keeps session filters and both profile signals clear and canc
 
 it('F16 controls chips notes and inline errors have accessible names and Escape returns focus', async () => {
   aiOnline(); const el = await mount(); await allRestrictions(el); await filterEdit(el, 'folder', 'relative');
-  const composer = await region(el, 'jf-sv3-composer'); const filters = await filtersOf(el);
+  const filters = await filtersOf(el);
   for (const control of filters.shadowRoot!.querySelectorAll('input,select')) expect(control.getAttribute('aria-label')).toBeTruthy();
   expect(filters.shadowRoot!.querySelector('[data-filter-input=folder]')!.getAttribute('aria-describedby')).toContain('folder-error');
   expect(filters.shadowRoot!.querySelector('[role=alert]')!.textContent).toContain('absolute');
   expect(filters.shadowRoot!.textContent).toContain('Earlier answers in this conversation are not changed');
   filters.shadowRoot!.querySelector('input')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true }));
-  await settle(el); expect(q(composer, 'sv3-filters-trigger')!.getAttribute('aria-expanded')).toBe('false');
-  expect(composer.shadowRoot!.activeElement).toBe(q(composer, 'sv3-filters-trigger'));
+  await settle(el); const { owner, trigger } = await filterOwner(el);
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(owner.shadowRoot!.activeElement).toBe(trigger);
 });
 
 it('F18 restricted follow-up carries new restrictions while earlier answer remains in context', async () => {
@@ -1663,10 +1677,15 @@ it('F5 Engine 400 errors appear next to Search and Ask controls with the entered
   const normal = fetchMock.getMockImplementation()! as (...args: unknown[]) => unknown;
   fetchMock.mockImplementation(async (url: unknown, init: unknown) => String(url).includes('/api/knowledge/search') || String(url).includes('/api/chat/dispatch')
     ? json({ errorCode: 'INVALID_REQUEST', error: 'pathPrefix: rejected by Engine' }, 400) : normal(url, init));
-  await searchFor(el, 'needle'); let filters = await filtersOf(el);
-  expect(filters.shadowRoot!.querySelector('#folder-error')!.textContent).toContain('pathPrefix: rejected by Engine');
+  await searchFor(el, 'needle');
+  const failed = (await results(el))!;
+  expect(failed.shadowRoot!.querySelector('jf-results-card')).toBeNull();
+  expect(q(failed, 'sv3-results-failure-detail')!.textContent).toContain('pathPrefix: rejected by Engine');
+  expect(getFilters().pathPrefix).toBe('/inside');
+  await chooseTier(el, 'ask');
+  let filters = await filtersOf(el);
   expect(filters.shadowRoot!.querySelector<HTMLInputElement>('[data-filter-input=folder]')!.value).toBe('/inside');
-  await chooseTier(el, 'ask'); await askNow(el, 'needle'); filters = await filtersOf(el);
+  await askNow(el, 'needle'); filters = await filtersOf(el);
   expect(filters.shadowRoot!.querySelector('#folder-error')!.textContent).toContain('pathPrefix: rejected by Engine');
   expect(backend.streams).toHaveLength(0);
 });
@@ -1723,6 +1742,8 @@ it('XFilters syntax errors show the Engine syntax message and preserve active fi
   expect(q(composer, 'sv3-search-error')?.textContent).toBe(reason);
   expect((await fieldOf(el)).value).toBe('"');
   expect(getFilters()).toEqual(original);
+  expect((await results(el))!.shadowRoot!.querySelector('jf-results-card')).toBeNull();
+  await chooseTier(el, 'ask');
   expect((await filtersOf(el)).shadowRoot!.querySelectorAll('[data-filter]')).toHaveLength(3);
   expect((await filtersOf(el)).shadowRoot!.textContent).not.toContain(reason);
   expect(getSearchState().results).toEqual([]);
@@ -1734,7 +1755,9 @@ it('XFilters changing a restriction during syntax Search drops the old response 
   backend.holdSearches = true; await searchFor(el, query);
   expect(backend.searches.at(-1)?.querySyntax).toBe('search');
   const old = backend.held.splice(0);
-  backend.corpus[query] = [wireHit('new', '/next/new.md')]; await filterEdit(el, 'folder', '/next');
+  backend.corpus[query] = [wireHit('new', '/next/new.md')];
+  expect((await results(el))!.shadowRoot!.querySelector('jf-results-card')).toBeNull();
+  setFilters({ ...getFilters(), pathPrefix: '/next' }); await settle(el);
   backend.held.splice(0).forEach(release => release()); await settle(el);
   old.forEach(release => release()); await settle(el);
   expect(await rowTitles(el)).toEqual(['new.md']);
@@ -1746,7 +1769,7 @@ it('XFilters changing a restriction during syntax Search drops the old response 
     ? { ok: false, status: 400, json: () => new Promise(resolve => { releaseBody = resolve; }) } : normal(url, init));
   await searchFor(el, query);
   fetchMock.mockImplementation(normal);
-  await filterEdit(el, 'folder', '/current');
+  setFilters({ ...getFilters(), pathPrefix: '/current' }); await settle(el);
   releaseBody({ errorCode: 'SEARCH_SYNTAX_INVALID', error: 'obsolete syntax reason' }); await settle(el);
   expect(getSearchState().error).toBeNull();
   expect(await rowTitles(el)).toEqual(['new.md']);
@@ -1763,8 +1786,9 @@ it('XFilters restriction errors on syntax queries retain the Engine restriction 
   await searchFor(el, query);
   const request = fetchMock.mock.calls.filter(call => String(call[0]).includes('/api/knowledge/search')).at(-1);
   expect(JSON.parse(String((request?.[1] as RequestInit).body))).toMatchObject({ query, querySyntax: 'search', filters: wireRestrictions() });
-  const filters = await filtersOf(el);
-  expect(filters.shadowRoot!.querySelector('#folder-error')?.textContent).toBe(reason);
+  const failed = (await results(el))!;
+  expect(failed.shadowRoot!.querySelector('jf-results-card')).toBeNull();
+  expect(q(failed, 'sv3-results-failure-detail')!.textContent).toBe(`${reason} Open Health to check the connection and service status before trying again.`);
   expect(q(await region(el, 'jf-sv3-composer'), 'sv3-search-error')).toBeNull();
   expect(getFilters()).toEqual(original); expect((await fieldOf(el)).value).toBe(query);
 });

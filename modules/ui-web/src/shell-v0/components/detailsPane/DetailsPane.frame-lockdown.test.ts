@@ -47,8 +47,8 @@ if (params.get('mode') === 'window') {
   const results = document.createElement('jf-sv3-results');
   results.style.cssText = 'display: block; width: 100%';
   const hit = (id, title) => ({ id, title, path: 'C:/Docs/' + title, snippet: 'A snippet about heating. '.repeat(6), score: 1 });
-  results.view = { query: 'heating', filters: [], chosenCount: 0, status: 'results', failure: '', selectedIds: new Set(), facetSelections: {}, askAvailability: null,
-    snapshot: { query: 'heating', status: 'done', results: Array.from({ length: 8 }, (_, i) => hit('h' + i, 'Result ' + i + ' ${LONG}')), facets: {} } };
+  results.view = { query: 'heating', filters: [], chosenCount: 0, status: 'ready', failure: '', selectedIds: new Set(), facetSelections: {}, askAvailability: null,
+    snapshot: { query: 'heating', matchCount: 8, totalHits: 8, facetsTruncated: false, isSearching: false, processingTimeMs: 10, error: null, searchTrace: null, results: Array.from({ length: 8 }, (_, i) => hit('h' + i, 'Result ' + i + ' ${LONG}')), facets: {} } };
   document.body.append(results);
 } else {
   const win = document.createElement('jf-sv3-window');

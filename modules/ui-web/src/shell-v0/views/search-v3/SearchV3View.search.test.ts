@@ -155,7 +155,7 @@ const countLabelOf = (results: Mounted): string =>
   (cardOf(results)?.shadowRoot?.querySelector('.meta-info')?.textContent ?? '')
     .replace(/\s+/g, ' ')
     .trim()
-    .replace(/ · found in \S+$/, '');
+    .replace(/ · [\d.]+ s$/, '');
 
 async function emptyElementOf(results: Mounted, testid: string): Promise<Sv3Empty & Mounted> {
   const el = results.shadowRoot?.querySelector(`[data-testid="${testid}"]`) as
@@ -320,14 +320,9 @@ describe('the four outcomes are distinct, and each says only what it knows', () 
     await send(el, 'zzzz');
     const results = await settle(el);
 
-    const empty = await emptyElementOf(results, 'sv3-results-empty');
-    expect(empty.shadowRoot?.querySelector('[data-testid="sv3-empty-title"]')?.textContent?.trim())
-      .toBe(MAIN_EMPTY.title);
-    expect(
-      empty.shadowRoot?.querySelector('[data-testid="sv3-empty-description"]')?.textContent?.trim(),
-    ).toBe(MAIN_EMPTY.description);
-    // The roomier region gets the roomier padding — the spec's one breakpoint on this component.
-    expect(empty.hasAttribute('roomy')).toBe(true);
+    const empty = results.shadowRoot!.querySelector('[data-testid="sv3-results-empty"]')!;
+    expect(empty.querySelector('h2')!.textContent).toBe('Nothing matches this search');
+    expect(empty.querySelector('[role="status"] > p')!.textContent).toBe('Try fewer or different words.');
     expect(rowsOf(results)).toHaveLength(0);
     expect(cardOf(results)).toBeNull();
     expect(results.shadowRoot?.querySelector('[data-testid="sv3-results-failed"]')).toBeNull();

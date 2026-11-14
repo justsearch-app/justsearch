@@ -16,9 +16,18 @@
  * It decides nothing. Every press is an event the window answers.
  */
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { cache } from 'lit/directives/cache.js';
+import { deepActiveElement } from '../../utils/keyboardHandler.js';
+import { icon } from '../../components/Icon.js';
 import { JfElement } from '../../primitives/JfElement.js';
 import { sv3Shared } from './sv3-shared-styles.js';
-import { MAIN_EMPTY, MAIN_UNREACHABLE } from './fixtures.js';
+import { MAIN_UNREACHABLE } from './fixtures.js';
+import { getAiState } from '../../state/aiStateStore.js';
+import { subscribeFirstUse } from '../../state/firstUse.js';
+import { searchExecution } from '../../components/searchResults/searchExecution.js';
+import { requestSurfaceNavigation } from '../../controllers/navigateRequest.js';
+import type { PluginHostApi } from '../../plugin-api/plugin-types.js';
+import '../../components/GettingStarted.js';
 import {
   SV3_RESULTS_IDLE,
   sv3AskAboutLabel,
@@ -48,22 +57,30 @@ const SKELETON_ROWS = 3;
 export class Sv3Results extends JfElement {
   static properties = {
     view: { attribute: false },
+    host_: { attribute: false },
+    apiBase: { type: String },
     forgetAvailable: { type: Boolean, attribute: false },
     previewId: { state: true },
   };
 
   declare view: Sv3ResultsView;
+  declare host_: PluginHostApi | undefined;
+  declare apiBase: string;
+  private stopFacts: (() => void) | undefined;
   declare forgetAvailable: boolean;
   /** The result the Space preview is showing; null while none is. */
   declare private previewId: string | null;
   private previewRow: HTMLElement | null = null;
+  private resultControlFocus: HTMLElement | null = null;
 
   constructor() {
     super();
     this.view = SV3_RESULTS_IDLE;
+    this.apiBase = '';
     this.forgetAvailable = false;
     this.previewId = null;
   }
+
 
   /** Read by the window's Escape order: the preview is more local than the details pane. */
   get previewOpen(): boolean {
@@ -117,11 +134,13 @@ export class Sv3Results extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    this.stopFacts = subscribeFirstUse(() => this.requestUpdate());
     window.addEventListener('wheel', this.closePreview, { passive: true });
     window.addEventListener('resize', this.closePreview);
   }
 
   override disconnectedCallback(): void {
+    this.stopFacts?.();
     window.removeEventListener('wheel', this.closePreview);
     window.removeEventListener('resize', this.closePreview);
     this.closePreview();
@@ -130,10 +149,25 @@ export class Sv3Results extends JfElement {
 
   /** New results may have dropped the row on preview; the card never outlives what it describes. */
   override willUpdate(changed: Map<string, unknown>): void {
+    if (changed.has('view') && this.view.status !== 'ready' && this.view.status !== 'empty') {
+      const card = this.renderRoot.querySelector('jf-results-card');
+      if (card !== null) {
+        const active = deepActiveElement();
+        let at: Node | null = active;
+        while (at !== null && at !== card) at = at.parentNode ?? (at as ShadowRoot).host ?? null;
+        this.resultControlFocus = at === card && active instanceof HTMLElement ? active : null;
+      }
+    }
     if (changed.has('view') && this.previewId !== null && this.previewHit() === null) this.closePreview();
   }
 
   override updated(): void {
+    if (this.view.status === 'ready' || this.view.status === 'empty') {
+      const focus = this.resultControlFocus;
+      this.resultControlFocus = null;
+      // A rerun temporarily disconnects the cached form. Return its keyboard unless the reader moved on.
+      if (focus?.isConnected && deepActiveElement() === document.body) focus.focus({ preventScroll: true });
+    }
     const card = this.renderRoot.querySelector<HTMLElement>('.preview');
     const row = this.previewRow?.getBoundingClientRect();
     if (card === null || row === undefined) return;
@@ -168,8 +202,7 @@ export class Sv3Results extends JfElement {
     return html`
       <section class="results" aria-label="Search results" data-testid="sv3-results"
         @card-preview=${this.onCardPreview} @keydown=${this.onPreviewKeydown}>
-        <h2 class="heading" data-testid="sv3-results-heading">Results for “${view.query}”</h2>
-        ${this.filters(view.filters)} ${this.selection(view)} ${this.body(view)}
+        ${cache(view.status === 'ready' || (view.status === 'empty' && view.filters.length > 0) ? html`${this.filters(view.filters)} ${this.selection(view)} ${this.card(view)}` : html``)} ${this.body(view)}
       </section>
       ${this.preview()}
     `;
@@ -224,7 +257,7 @@ export class Sv3Results extends JfElement {
     </div>`;
   }
 
-  private body(view: Sv3ResultsView): TemplateResult {
+  private body(view: Sv3ResultsView): TemplateResult | typeof nothing {
     if (view.status === 'loading') {
       return html`<div
         class="pending"
@@ -257,30 +290,57 @@ export class Sv3Results extends JfElement {
             >`}
       </jf-sv3-empty>`;
     }
-    if (view.status === 'empty' || view.snapshot === null) {
-      return html`<jf-sv3-empty
-        roomy
-        role="status"
-        data-testid="sv3-results-empty"
-        glyph="&#9634;"
-        heading=${MAIN_EMPTY.title}
-        description=${view.filters.length > 0 ? MAIN_EMPTY.filteredDescription : MAIN_EMPTY.description}
-      ></jf-sv3-empty>`;
+    if (view.status === 'empty' && view.snapshot !== null) {
+      const execution = searchExecution(view.snapshot.searchTrace);
+      const words = execution === 'words';
+      const ai = getAiState();
+      const advice = words && ai.snapshotLive && ai.runtime.installed.known && ai.runtime.installing.known
+        && (!ai.runtime.installed.value || ai.runtime.installing.value);
+      return html`<div class="empty-results" data-testid="sv3-results-empty">
+        <div role="status"><h2>${words ? 'No file contains these words' : 'Nothing matches this search'}</h2>
+          <p>${words ? 'Search looks for the words as typed. Try fewer or different ones.' : 'Try fewer or different words.'}</p></div>
+        <div class="ways">
+          ${advice ? html`<div class="way" data-testid="empty-ai"><span class="way-icon" aria-hidden="true">${icon({ name: 'cpu', size: 18 })}</span><div>
+            <p>Search by meaning also finds files that use other words</p>
+            <p class="information">${ai.runtime.installing.known && ai.runtime.installing.value ? 'The AI models are being installed.' : 'Needs the optional AI models.'}</p>
+          </div><button type="button" @click=${() => requestSurfaceNavigation('core.brain-surface')}>Open AI Brain</button></div>` : nothing}
+          ${view.filters.length > 0 ? html`<div class="way"><p>Filters are on</p>
+            <button type="button" data-testid="empty-clear-filters" @click=${() => this.emit('sv3-results-filters-clear')}>Clear filters</button></div>`
+            : html`<jf-getting-started data-testid="empty-add-folder" .searchEmpty=${true} .intro=${false} .host_=${this.host_} .apiBase=${this.apiBase}></jf-getting-started>`}
+        </div>
+      </div>`;
     }
+    return nothing;
+  }
+
+  private card(view: Sv3ResultsView): TemplateResult {
     return html`<jf-results-card
       data-testid="sv3-results-card"
       selection-mode="explicit"
-      .snapshot=${view.snapshot}
+      .snapshot=${view.snapshot ?? { query: view.query, results: [], matchCount: 0, totalHits: 0,
+        facetsTruncated: false, countsPending: true, isSearching: view.status === 'loading', processingTimeMs: null, error: view.failure }}
       .facetSelections=${view.facetSelections}
       .selectedIds=${view.selectedIds}
       .askAvailability=${null}
       .forgetAvailable=${this.forgetAvailable}
+      .filterError=${view.restrictionError ?? ''}
     ></jf-results-card>`;
   }
 
   static styles = [
     sv3Shared,
     css`
+      jf-results-card { --font-size-xs: var(--font-size-sv3-xs, var(--font-size-secondary)); }
+      .empty-results { padding: var(--space-6) 0; }
+      .empty-results h2 { margin: 0; font-size: var(--font-size-lg); font-weight: 500; line-height: 1.3; }
+      .empty-results p { margin: var(--space-1) 0 0; font-size: var(--font-size-sm); }
+      .empty-results [role='status'] > p, .information { color: var(--text-secondary); }
+      .ways { margin-block-start: var(--space-5); }
+      .way { display: flex; align-items: center; gap: var(--space-3); padding-block: var(--space-3); border-block: 1px solid var(--border); }
+      .way-icon { color: var(--text-secondary); flex: none; }
+      .way > div, .way > p { flex: 1; }
+      .way .information { font-size: var(--font-size-xs); }
+      .way button { border: 0; border-radius: 4px; background: transparent; color: var(--text-primary); font: inherit; font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; padding: var(--space-1); }
       :host {
         display: block;
         width: 100%;
@@ -292,12 +352,6 @@ export class Sv3Results extends JfElement {
         display: flex;
         flex-direction: column;
         gap: var(--space-2);
-      }
-      .heading {
-        margin: 0;
-        font-size: var(--font-size-sv3-sm);
-        font-weight: 600;
-        overflow-wrap: anywhere;
       }
       .filters,
       .selection {
@@ -312,12 +366,13 @@ export class Sv3Results extends JfElement {
         gap: var(--space-1);
         min-height: 28px;
         padding: 0 var(--space-2);
-        border: 1px solid var(--border);
-        border-radius: var(--radius-md);
-        background: var(--muted);
+        border: 0;
+        border-radius: 4px;
+        background: transparent;
         color: var(--foreground);
         font: inherit;
         font-size: var(--font-size-sv3-xs);
+        font-weight: 500;
         cursor: pointer;
       }
       .filter:hover {

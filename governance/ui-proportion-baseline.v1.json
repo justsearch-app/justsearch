@@ -103,18 +103,23 @@
       "maxScrollableRegions": 1
     },
     {
-      "$comment": "WP1.1 S1.12 \u2014 Search mode's result list stays reachable beside the floating composer at a narrow width with a long list. Captured at 760x720 with the `sv3-results` fixtures variant (24 hits), scrolled to the end; the step itself fails if the list did not overflow and reach its end, so the overlap row cannot pass on a list that never scrolled. NON-VACUITY per this register's occlusionNote: both selectors carry a `minHeightPx` floor. CALIBRATED against the first `--fixtures` capture: card h=1947 with its bottom at 581, dock h=99 at y=593 (bottom 692), scroller delta 1499 \u2014 a 12px gap between the last row and the glass. The card floor (600) is far under the measurement but over anything a short list or a stub renders; `maxBottomPx` is 700, not the 720 viewport, so it asserts something about the dock.",
+      "$comment": "5a: 24 results at 760x720, scrolled to the last row. Search uses the top field; the last row clears the viewport and does not overlap that field.",
       "uiShotStep": "sv3-search-results",
       "elements": [
         {
           "selector": "[data-testid=\"sv3-results-card\"]",
-          "minHeightPx": 600,
-          "mustNotOverlapSelector": "[data-testid=\"sv3-dock\"]"
+          "minHeightPx": 600
         },
         {
           "selector": "[data-testid=\"sv3-dock\"]",
           "minHeightPx": 60,
           "maxBottomPx": 700
+        },
+        {
+          "selector": "[data-testid=\"search-result-row\"]:last-child",
+          "minHeightPx": 40,
+          "maxBottomPx": 720,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-input\"]"
         }
       ],
       "minScrollableRegions": 1,
@@ -332,18 +337,23 @@
       "maxScrollableRegions": 1
     },
     {
-      "$comment": "WP1.1 S1.12 \u2014 Search mode's result list stays reachable beside the floating composer at a narrow width with a long list. Captured at 760x720 with the `sv3-results` fixtures variant (24 hits), scrolled to the end; the step itself fails if the list did not overflow and reach its end, so the overlap row cannot pass on a list that never scrolled. NON-VACUITY per this register's occlusionNote: both selectors carry a `minHeightPx` floor. CALIBRATED against the first `--fixtures` capture: card h=1947 with its bottom at 581, dock h=99 at y=593 (bottom 692), scroller delta 1499 \u2014 a 12px gap between the last row and the glass. The card floor (600) is far under the measurement but over anything a short list or a stub renders; `maxBottomPx` is 700, not the 720 viewport, so it asserts something about the dock.",
+      "$comment": "5a: 24 results at 760x720, scrolled to the last row. Search uses the top field; the last row clears the viewport and does not overlap that field.",
       "uiShotStep": "sv3-search-results-light",
       "elements": [
         {
           "selector": "[data-testid=\"sv3-results-card\"]",
-          "minHeightPx": 600,
-          "mustNotOverlapSelector": "[data-testid=\"sv3-dock\"]"
+          "minHeightPx": 600
         },
         {
           "selector": "[data-testid=\"sv3-dock\"]",
           "minHeightPx": 60,
           "maxBottomPx": 700
+        },
+        {
+          "selector": "[data-testid=\"search-result-row\"]:last-child",
+          "minHeightPx": 40,
+          "maxBottomPx": 720,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-input\"]"
         }
       ],
       "minScrollableRegions": 1,
@@ -1701,468 +1711,432 @@
       "elements": [
         {
           "selector": "[data-testid=\"sv3-composer-shell\"]",
-          "maxBottomPx": 800,
           "minHeightPx": 10,
+          "maxBottomPx": 800,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "[data-testid=\"sv3-filters-trigger\"]",
+          "selector": "[data-testid=\"sv3-main-scroller\"]",
+          "minHeightPx": 60,
           "maxBottomPx": 800,
-          "minHeightPx": 10,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "jf-sv3-filters",
-          "maxBottomPx": 800,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
-        },
-        {
-          "selector": "[data-testid=\"sv3-recents\"]",
-          "maxBottomPx": 800,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
+          "selector": "[data-testid=\"more-filters\"]",
+          "minHeightPx": 16
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-composer-shell\"]",
-        "[data-testid=\"sv3-filters-trigger\"]",
-        "jf-sv3-filters",
-        "[data-testid=\"sv3-recents\"]"
+        "[data-testid=\"more-filters\"]",
+        "jf-sv3-filters[open]",
+        "[data-filter-input=\"folder\"]"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-column\"]",
         "[data-testid=\"sv3-composer-band\"]"
-      ]
+      ],
+      "$comment": "5a E4/A4: More filters belongs to the result scroller. Bound that reading viewport against the frame, require the open editor and its trigger, and preserve the named non-scrolling column/field band. The recipe focuses and measures every field/error/note inside the viewport before returning focus to More filters. Recent is an idle list and is absent here.",
+      "absentSelectors": [
+        "[data-testid=\"sv3-recents\"]"
+      ],
+      "maxScrollableRegions": 1
     },
     {
       "uiShotStep": "sv3-filters-docked-normal-light",
       "elements": [
         {
           "selector": "[data-testid=\"sv3-composer-shell\"]",
-          "maxBottomPx": 800,
           "minHeightPx": 10,
+          "maxBottomPx": 800,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "[data-testid=\"sv3-filters-trigger\"]",
+          "selector": "[data-testid=\"sv3-main-scroller\"]",
+          "minHeightPx": 60,
           "maxBottomPx": 800,
-          "minHeightPx": 10,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "jf-sv3-filters",
-          "maxBottomPx": 800,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
-        },
-        {
-          "selector": "[data-testid=\"sv3-recents\"]",
-          "maxBottomPx": 800,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
+          "selector": "[data-testid=\"more-filters\"]",
+          "minHeightPx": 16
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-composer-shell\"]",
-        "[data-testid=\"sv3-filters-trigger\"]",
-        "jf-sv3-filters",
-        "[data-testid=\"sv3-recents\"]"
+        "[data-testid=\"more-filters\"]",
+        "jf-sv3-filters[open]",
+        "[data-filter-input=\"folder\"]"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-column\"]",
         "[data-testid=\"sv3-composer-band\"]"
-      ]
+      ],
+      "$comment": "5a E4/A4: More filters belongs to the result scroller. Bound that reading viewport against the frame, require the open editor and its trigger, and preserve the named non-scrolling column/field band. The recipe focuses and measures every field/error/note inside the viewport before returning focus to More filters. Recent is an idle list and is absent here.",
+      "absentSelectors": [
+        "[data-testid=\"sv3-recents\"]"
+      ],
+      "maxScrollableRegions": 1
     },
     {
       "uiShotStep": "sv3-filters-docked-normal-forced",
       "elements": [
         {
           "selector": "[data-testid=\"sv3-composer-shell\"]",
-          "maxBottomPx": 800,
           "minHeightPx": 10,
+          "maxBottomPx": 800,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "[data-testid=\"sv3-filters-trigger\"]",
+          "selector": "[data-testid=\"sv3-main-scroller\"]",
+          "minHeightPx": 60,
           "maxBottomPx": 800,
-          "minHeightPx": 10,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "jf-sv3-filters",
-          "maxBottomPx": 800,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
-        },
-        {
-          "selector": "[data-testid=\"sv3-recents\"]",
-          "maxBottomPx": 800,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
+          "selector": "[data-testid=\"more-filters\"]",
+          "minHeightPx": 16
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-composer-shell\"]",
-        "[data-testid=\"sv3-filters-trigger\"]",
-        "jf-sv3-filters",
-        "[data-testid=\"sv3-recents\"]"
+        "[data-testid=\"more-filters\"]",
+        "jf-sv3-filters[open]",
+        "[data-filter-input=\"folder\"]"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-column\"]",
         "[data-testid=\"sv3-composer-band\"]"
-      ]
+      ],
+      "$comment": "5a E4/A4: More filters belongs to the result scroller. Bound that reading viewport against the frame, require the open editor and its trigger, and preserve the named non-scrolling column/field band. The recipe focuses and measures every field/error/note inside the viewport before returning focus to More filters. Recent is an idle list and is absent here.",
+      "absentSelectors": [
+        "[data-testid=\"sv3-recents\"]"
+      ],
+      "maxScrollableRegions": 1
     },
     {
       "uiShotStep": "sv3-filters-docked-narrow-dark",
       "elements": [
         {
           "selector": "[data-testid=\"sv3-composer-shell\"]",
-          "maxBottomPx": 800,
           "minHeightPx": 10,
+          "maxBottomPx": 800,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "[data-testid=\"sv3-filters-trigger\"]",
+          "selector": "[data-testid=\"sv3-main-scroller\"]",
+          "minHeightPx": 60,
           "maxBottomPx": 800,
-          "minHeightPx": 10,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "jf-sv3-filters",
-          "maxBottomPx": 800,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
-        },
-        {
-          "selector": "[data-testid=\"sv3-recents\"]",
-          "maxBottomPx": 800,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
+          "selector": "[data-testid=\"more-filters\"]",
+          "minHeightPx": 16
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-composer-shell\"]",
-        "[data-testid=\"sv3-filters-trigger\"]",
-        "jf-sv3-filters",
-        "[data-testid=\"sv3-recents\"]"
+        "[data-testid=\"more-filters\"]",
+        "jf-sv3-filters[open]",
+        "[data-filter-input=\"folder\"]"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-column\"]",
         "[data-testid=\"sv3-composer-band\"]"
-      ]
+      ],
+      "$comment": "5a E4/A4: More filters belongs to the result scroller. Bound that reading viewport against the frame, require the open editor and its trigger, and preserve the named non-scrolling column/field band. The recipe focuses and measures every field/error/note inside the viewport before returning focus to More filters. Recent is an idle list and is absent here.",
+      "absentSelectors": [
+        "[data-testid=\"sv3-recents\"]"
+      ],
+      "maxScrollableRegions": 1
     },
     {
       "uiShotStep": "sv3-filters-docked-narrow-light",
       "elements": [
         {
           "selector": "[data-testid=\"sv3-composer-shell\"]",
-          "maxBottomPx": 800,
           "minHeightPx": 10,
+          "maxBottomPx": 800,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "[data-testid=\"sv3-filters-trigger\"]",
+          "selector": "[data-testid=\"sv3-main-scroller\"]",
+          "minHeightPx": 60,
           "maxBottomPx": 800,
-          "minHeightPx": 10,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "jf-sv3-filters",
-          "maxBottomPx": 800,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
-        },
-        {
-          "selector": "[data-testid=\"sv3-recents\"]",
-          "maxBottomPx": 800,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
+          "selector": "[data-testid=\"more-filters\"]",
+          "minHeightPx": 16
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-composer-shell\"]",
-        "[data-testid=\"sv3-filters-trigger\"]",
-        "jf-sv3-filters",
-        "[data-testid=\"sv3-recents\"]"
+        "[data-testid=\"more-filters\"]",
+        "jf-sv3-filters[open]",
+        "[data-filter-input=\"folder\"]"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-column\"]",
         "[data-testid=\"sv3-composer-band\"]"
-      ]
+      ],
+      "$comment": "5a E4/A4: More filters belongs to the result scroller. Bound that reading viewport against the frame, require the open editor and its trigger, and preserve the named non-scrolling column/field band. The recipe focuses and measures every field/error/note inside the viewport before returning focus to More filters. Recent is an idle list and is absent here.",
+      "absentSelectors": [
+        "[data-testid=\"sv3-recents\"]"
+      ],
+      "maxScrollableRegions": 1
     },
     {
       "uiShotStep": "sv3-filters-docked-narrow-forced",
       "elements": [
         {
           "selector": "[data-testid=\"sv3-composer-shell\"]",
-          "maxBottomPx": 800,
           "minHeightPx": 10,
+          "maxBottomPx": 800,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "[data-testid=\"sv3-filters-trigger\"]",
+          "selector": "[data-testid=\"sv3-main-scroller\"]",
+          "minHeightPx": 60,
           "maxBottomPx": 800,
-          "minHeightPx": 10,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "jf-sv3-filters",
-          "maxBottomPx": 800,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
-        },
-        {
-          "selector": "[data-testid=\"sv3-recents\"]",
-          "maxBottomPx": 800,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
+          "selector": "[data-testid=\"more-filters\"]",
+          "minHeightPx": 16
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-composer-shell\"]",
-        "[data-testid=\"sv3-filters-trigger\"]",
-        "jf-sv3-filters",
-        "[data-testid=\"sv3-recents\"]"
+        "[data-testid=\"more-filters\"]",
+        "jf-sv3-filters[open]",
+        "[data-filter-input=\"folder\"]"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-column\"]",
         "[data-testid=\"sv3-composer-band\"]"
-      ]
+      ],
+      "$comment": "5a E4/A4: More filters belongs to the result scroller. Bound that reading viewport against the frame, require the open editor and its trigger, and preserve the named non-scrolling column/field band. The recipe focuses and measures every field/error/note inside the viewport before returning focus to More filters. Recent is an idle list and is absent here.",
+      "absentSelectors": [
+        "[data-testid=\"sv3-recents\"]"
+      ],
+      "maxScrollableRegions": 1
     },
     {
       "uiShotStep": "sv3-filters-docked-1280x720-dark",
       "elements": [
         {
           "selector": "[data-testid=\"sv3-composer-shell\"]",
-          "maxBottomPx": 720,
           "minHeightPx": 10,
+          "maxBottomPx": 720,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "[data-testid=\"sv3-filters-trigger\"]",
+          "selector": "[data-testid=\"sv3-main-scroller\"]",
+          "minHeightPx": 60,
           "maxBottomPx": 720,
-          "minHeightPx": 10,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "jf-sv3-filters",
-          "maxBottomPx": 720,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
-        },
-        {
-          "selector": "[data-testid=\"sv3-recents\"]",
-          "maxBottomPx": 720,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
+          "selector": "[data-testid=\"more-filters\"]",
+          "minHeightPx": 16
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-composer-shell\"]",
-        "[data-testid=\"sv3-filters-trigger\"]",
-        "jf-sv3-filters",
-        "[data-testid=\"sv3-recents\"]"
+        "[data-testid=\"more-filters\"]",
+        "jf-sv3-filters[open]",
+        "[data-filter-input=\"folder\"]"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-column\"]",
         "[data-testid=\"sv3-composer-band\"]"
-      ]
+      ],
+      "$comment": "5a E4/A4: More filters belongs to the result scroller. Bound that reading viewport against the frame, require the open editor and its trigger, and preserve the named non-scrolling column/field band. The recipe focuses and measures every field/error/note inside the viewport before returning focus to More filters. Recent is an idle list and is absent here.",
+      "absentSelectors": [
+        "[data-testid=\"sv3-recents\"]"
+      ],
+      "maxScrollableRegions": 1
     },
     {
       "uiShotStep": "sv3-filters-docked-1280x720-light",
       "elements": [
         {
           "selector": "[data-testid=\"sv3-composer-shell\"]",
-          "maxBottomPx": 720,
           "minHeightPx": 10,
+          "maxBottomPx": 720,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "[data-testid=\"sv3-filters-trigger\"]",
+          "selector": "[data-testid=\"sv3-main-scroller\"]",
+          "minHeightPx": 60,
           "maxBottomPx": 720,
-          "minHeightPx": 10,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "jf-sv3-filters",
-          "maxBottomPx": 720,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
-        },
-        {
-          "selector": "[data-testid=\"sv3-recents\"]",
-          "maxBottomPx": 720,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
+          "selector": "[data-testid=\"more-filters\"]",
+          "minHeightPx": 16
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-composer-shell\"]",
-        "[data-testid=\"sv3-filters-trigger\"]",
-        "jf-sv3-filters",
-        "[data-testid=\"sv3-recents\"]"
+        "[data-testid=\"more-filters\"]",
+        "jf-sv3-filters[open]",
+        "[data-filter-input=\"folder\"]"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-column\"]",
         "[data-testid=\"sv3-composer-band\"]"
-      ]
+      ],
+      "$comment": "5a E4/A4: More filters belongs to the result scroller. Bound that reading viewport against the frame, require the open editor and its trigger, and preserve the named non-scrolling column/field band. The recipe focuses and measures every field/error/note inside the viewport before returning focus to More filters. Recent is an idle list and is absent here.",
+      "absentSelectors": [
+        "[data-testid=\"sv3-recents\"]"
+      ],
+      "maxScrollableRegions": 1
     },
     {
       "uiShotStep": "sv3-filters-docked-1280x720-forced",
       "elements": [
         {
           "selector": "[data-testid=\"sv3-composer-shell\"]",
-          "maxBottomPx": 720,
           "minHeightPx": 10,
+          "maxBottomPx": 720,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "[data-testid=\"sv3-filters-trigger\"]",
+          "selector": "[data-testid=\"sv3-main-scroller\"]",
+          "minHeightPx": 60,
           "maxBottomPx": 720,
-          "minHeightPx": 10,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "jf-sv3-filters",
-          "maxBottomPx": 720,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
-        },
-        {
-          "selector": "[data-testid=\"sv3-recents\"]",
-          "maxBottomPx": 720,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
+          "selector": "[data-testid=\"more-filters\"]",
+          "minHeightPx": 16
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-composer-shell\"]",
-        "[data-testid=\"sv3-filters-trigger\"]",
-        "jf-sv3-filters",
-        "[data-testid=\"sv3-recents\"]"
+        "[data-testid=\"more-filters\"]",
+        "jf-sv3-filters[open]",
+        "[data-filter-input=\"folder\"]"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-column\"]",
         "[data-testid=\"sv3-composer-band\"]"
-      ]
+      ],
+      "$comment": "5a E4/A4: More filters belongs to the result scroller. Bound that reading viewport against the frame, require the open editor and its trigger, and preserve the named non-scrolling column/field band. The recipe focuses and measures every field/error/note inside the viewport before returning focus to More filters. Recent is an idle list and is absent here.",
+      "absentSelectors": [
+        "[data-testid=\"sv3-recents\"]"
+      ],
+      "maxScrollableRegions": 1
     },
     {
       "uiShotStep": "sv3-filters-docked-600x400-dark",
       "elements": [
         {
           "selector": "[data-testid=\"sv3-composer-shell\"]",
-          "maxBottomPx": 400,
           "minHeightPx": 10,
+          "maxBottomPx": 400,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "[data-testid=\"sv3-filters-trigger\"]",
+          "selector": "[data-testid=\"sv3-main-scroller\"]",
+          "minHeightPx": 60,
           "maxBottomPx": 400,
-          "minHeightPx": 10,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "jf-sv3-filters",
-          "maxBottomPx": 400,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
-        },
-        {
-          "selector": "[data-testid=\"sv3-recents\"]",
-          "maxBottomPx": 400,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
+          "selector": "[data-testid=\"more-filters\"]",
+          "minHeightPx": 16
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-composer-shell\"]",
-        "[data-testid=\"sv3-filters-trigger\"]",
-        "jf-sv3-filters",
-        "[data-testid=\"sv3-recents\"]"
+        "[data-testid=\"more-filters\"]",
+        "jf-sv3-filters[open]",
+        "[data-filter-input=\"folder\"]"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-column\"]",
         "[data-testid=\"sv3-composer-band\"]"
-      ]
+      ],
+      "$comment": "5a E4/A4: More filters belongs to the result scroller. Bound that reading viewport against the frame, require the open editor and its trigger, and preserve the named non-scrolling column/field band. The recipe focuses and measures every field/error/note inside the viewport before returning focus to More filters. Recent is an idle list and is absent here.",
+      "absentSelectors": [
+        "[data-testid=\"sv3-recents\"]"
+      ],
+      "maxScrollableRegions": 1
     },
     {
       "uiShotStep": "sv3-filters-docked-600x400-light",
       "elements": [
         {
           "selector": "[data-testid=\"sv3-composer-shell\"]",
-          "maxBottomPx": 400,
           "minHeightPx": 10,
+          "maxBottomPx": 400,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "[data-testid=\"sv3-filters-trigger\"]",
+          "selector": "[data-testid=\"sv3-main-scroller\"]",
+          "minHeightPx": 60,
           "maxBottomPx": 400,
-          "minHeightPx": 10,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "jf-sv3-filters",
-          "maxBottomPx": 400,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
-        },
-        {
-          "selector": "[data-testid=\"sv3-recents\"]",
-          "maxBottomPx": 400,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
+          "selector": "[data-testid=\"more-filters\"]",
+          "minHeightPx": 16
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-composer-shell\"]",
-        "[data-testid=\"sv3-filters-trigger\"]",
-        "jf-sv3-filters",
-        "[data-testid=\"sv3-recents\"]"
+        "[data-testid=\"more-filters\"]",
+        "jf-sv3-filters[open]",
+        "[data-filter-input=\"folder\"]"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-column\"]",
         "[data-testid=\"sv3-composer-band\"]"
-      ]
+      ],
+      "$comment": "5a E4/A4: More filters belongs to the result scroller. Bound that reading viewport against the frame, require the open editor and its trigger, and preserve the named non-scrolling column/field band. The recipe focuses and measures every field/error/note inside the viewport before returning focus to More filters. Recent is an idle list and is absent here.",
+      "absentSelectors": [
+        "[data-testid=\"sv3-recents\"]"
+      ],
+      "maxScrollableRegions": 1
     },
     {
       "uiShotStep": "sv3-filters-docked-600x400-forced",
       "elements": [
         {
           "selector": "[data-testid=\"sv3-composer-shell\"]",
-          "maxBottomPx": 400,
           "minHeightPx": 10,
+          "maxBottomPx": 400,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "[data-testid=\"sv3-filters-trigger\"]",
+          "selector": "[data-testid=\"sv3-main-scroller\"]",
+          "minHeightPx": 60,
           "maxBottomPx": 400,
-          "minHeightPx": 10,
           "mustNotOverlapSelector": "jf-top-bar"
         },
         {
-          "selector": "jf-sv3-filters",
-          "maxBottomPx": 400,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
-        },
-        {
-          "selector": "[data-testid=\"sv3-recents\"]",
-          "maxBottomPx": 400,
-          "minHeightPx": 10,
-          "mustNotOverlapSelector": "jf-top-bar"
+          "selector": "[data-testid=\"more-filters\"]",
+          "minHeightPx": 16
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-composer-shell\"]",
-        "[data-testid=\"sv3-filters-trigger\"]",
-        "jf-sv3-filters",
-        "[data-testid=\"sv3-recents\"]"
+        "[data-testid=\"more-filters\"]",
+        "jf-sv3-filters[open]",
+        "[data-filter-input=\"folder\"]"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-column\"]",
         "[data-testid=\"sv3-composer-band\"]"
-      ]
+      ],
+      "$comment": "5a E4/A4: More filters belongs to the result scroller. Bound that reading viewport against the frame, require the open editor and its trigger, and preserve the named non-scrolling column/field band. The recipe focuses and measures every field/error/note inside the viewport before returning focus to More filters. Recent is an idle list and is absent here.",
+      "absentSelectors": [
+        "[data-testid=\"sv3-recents\"]"
+      ],
+      "maxScrollableRegions": 1
     },
     {
       "$comment": "S5 SB17, measured 2026-11-10: unseeded Engine-owned first-use status at 1280x800. Retain the notice reading measure and 320px card floor. The current step and progress bar must render with positive geometry; no existing ceiling is raised.",
@@ -2208,6 +2182,234 @@
       "requiredSelectors": [
         "#engine-loss-title",
         "#engine-loss-body"
+      ]
+    },
+    {
+      "$comment": "5a: Search field above results; scan pane and nothing found use the ordinary view in this theme. Positive content witnesses and overlap checks keep field and footer reachable.",
+      "uiShotStep": "fm-results-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-composer-input\"]",
+          "minHeightPx": 22,
+          "maxHeightPx": 24,
+          "maxBottomPx": 160
+        },
+        {
+          "selector": "[data-testid=\"sv3-results-card\"]",
+          "minHeightPx": 250
+        },
+        {
+          "selector": "[data-testid=\"card-meta\"]",
+          "minHeightPx": 16,
+          "maxHeightPx": 24,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-input\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"search-result-row\"]"
+      ]
+    },
+    {
+      "$comment": "5a: Search field above results; scan pane and nothing found use the ordinary view in this theme. Positive content witnesses and overlap checks keep field and footer reachable.",
+      "uiShotStep": "fm-results-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-composer-input\"]",
+          "minHeightPx": 22,
+          "maxHeightPx": 24,
+          "maxBottomPx": 160
+        },
+        {
+          "selector": "[data-testid=\"sv3-results-card\"]",
+          "minHeightPx": 250
+        },
+        {
+          "selector": "[data-testid=\"card-meta\"]",
+          "minHeightPx": 16,
+          "maxHeightPx": 24,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-input\"]"
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"search-result-row\"]"
+      ]
+    },
+    {
+      "$comment": "5a: Search field above results; scan pane and nothing found use the ordinary view in this theme. Positive content witnesses and overlap checks keep field and footer reachable.",
+      "uiShotStep": "fm-pane-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-composer-input\"]",
+          "minHeightPx": 22,
+          "maxHeightPx": 24,
+          "maxBottomPx": 160
+        },
+        {
+          "selector": "[data-testid=\"sv3-results-card\"]",
+          "minHeightPx": 250
+        },
+        {
+          "selector": "[data-testid=\"card-meta\"]",
+          "minHeightPx": 16,
+          "maxHeightPx": 24,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-input\"]"
+        },
+        {
+          "selector": "[data-testid=\"details-pane\"]",
+          "minWidthPx": 320,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-input\"]"
+        },
+        {
+          "selector": "[data-testid=\"details-open-file\"]",
+          "minHeightPx": 24,
+          "maxBottomPx": 700
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"search-result-row\"]",
+        "[data-testid=\"sv3-pane-document\"]"
+      ]
+    },
+    {
+      "$comment": "5a: Search field above results; scan pane and nothing found use the ordinary view in this theme. Positive content witnesses and overlap checks keep field and footer reachable.",
+      "uiShotStep": "fm-pane-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-composer-input\"]",
+          "minHeightPx": 22,
+          "maxHeightPx": 24,
+          "maxBottomPx": 160
+        },
+        {
+          "selector": "[data-testid=\"sv3-results-card\"]",
+          "minHeightPx": 250
+        },
+        {
+          "selector": "[data-testid=\"card-meta\"]",
+          "minHeightPx": 16,
+          "maxHeightPx": 24,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-input\"]"
+        },
+        {
+          "selector": "[data-testid=\"details-pane\"]",
+          "minWidthPx": 320,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-input\"]"
+        },
+        {
+          "selector": "[data-testid=\"details-open-file\"]",
+          "minHeightPx": 24,
+          "maxBottomPx": 700
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"search-result-row\"]",
+        "[data-testid=\"sv3-pane-document\"]"
+      ]
+    },
+    {
+      "$comment": "5a: Search field above results; scan pane and nothing found use the ordinary view in this theme. Positive content witnesses and overlap checks keep field and footer reachable.",
+      "uiShotStep": "fm-empty-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-composer-input\"]",
+          "minHeightPx": 22,
+          "maxHeightPx": 24,
+          "maxBottomPx": 160
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-results-empty\"]",
+        "[data-testid=\"empty-ai\"]",
+        "[data-testid=\"empty-add-folder\"]"
+      ]
+    },
+    {
+      "$comment": "5a: Search field above results; scan pane and nothing found use the ordinary view in this theme. Positive content witnesses and overlap checks keep field and footer reachable.",
+      "uiShotStep": "fm-empty-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-composer-input\"]",
+          "minHeightPx": 22,
+          "maxHeightPx": 24,
+          "maxBottomPx": 160
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"sv3-results-empty\"]",
+        "[data-testid=\"empty-ai\"]",
+        "[data-testid=\"empty-add-folder\"]"
+      ]
+    },
+    {
+      "$comment": "5a: Search field above results; scan pane and nothing found use the ordinary view in this theme. Positive content witnesses and overlap checks keep field and footer reachable.",
+      "uiShotStep": "fm-pane-narrow-dark",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-composer-input\"]",
+          "minHeightPx": 22,
+          "maxHeightPx": 24,
+          "maxBottomPx": 160
+        },
+        {
+          "selector": "[data-testid=\"sv3-results-card\"]",
+          "minHeightPx": 250
+        },
+        {
+          "selector": "[data-testid=\"card-meta\"]",
+          "minHeightPx": 16,
+          "maxHeightPx": 24,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-input\"]"
+        },
+        {
+          "selector": "[data-testid=\"details-pane\"]",
+          "minWidthPx": 320,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-input\"]"
+        },
+        {
+          "selector": "[data-testid=\"details-open-file\"]",
+          "minHeightPx": 24,
+          "maxBottomPx": 400
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"search-result-row\"]",
+        "[data-testid=\"sv3-pane-document\"]"
+      ]
+    },
+    {
+      "$comment": "5a: Search field above results; scan pane and nothing found use the ordinary view in this theme. Positive content witnesses and overlap checks keep field and footer reachable.",
+      "uiShotStep": "fm-pane-narrow-light",
+      "elements": [
+        {
+          "selector": "[data-testid=\"sv3-composer-input\"]",
+          "minHeightPx": 22,
+          "maxHeightPx": 24,
+          "maxBottomPx": 160
+        },
+        {
+          "selector": "[data-testid=\"sv3-results-card\"]",
+          "minHeightPx": 250
+        },
+        {
+          "selector": "[data-testid=\"card-meta\"]",
+          "minHeightPx": 16,
+          "maxHeightPx": 24,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-input\"]"
+        },
+        {
+          "selector": "[data-testid=\"details-pane\"]",
+          "minWidthPx": 320,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-input\"]"
+        },
+        {
+          "selector": "[data-testid=\"details-open-file\"]",
+          "minHeightPx": 24,
+          "maxBottomPx": 400
+        }
+      ],
+      "requiredSelectors": [
+        "[data-testid=\"search-result-row\"]",
+        "[data-testid=\"sv3-pane-document\"]"
       ]
     }
   ]

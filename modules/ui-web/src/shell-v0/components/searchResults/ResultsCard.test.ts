@@ -24,6 +24,8 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import './ResultsCard.js';
+import { setShowDeveloperTools } from '../../state/developerToolsState.js';
+afterEach(() => setShowDeveloperTools(false));
 import type {
   ResultsCard,
   CardHit,
@@ -114,13 +116,13 @@ describe('ResultsCard — count coherence (Search Thread S1)', () => {
       totalHits: 4,
       results: [hit('a'), hit('b'), hit('c'), hit('d')],
     });
-    expect(meta(el).textContent).toContain('4 results · 1 matched exactly');
+    expect(meta(el).textContent).toContain('4 files · 1 matched by words');
     expect(meta(el).textContent).not.toContain('1 matches');
   });
 
-  it('collapses to the singular "1 match" when matchCount=1 and exactly one row is shown', async () => {
+  it('collapses to the singular "1 file" when matchCount=1 and exactly one row is shown', async () => {
     const el = await mount({ ...BASE, matchCount: 1, totalHits: 1, results: [hit('a')] });
-    expect(meta(el).textContent).toContain('1 match');
+    expect(meta(el).textContent).toContain('1 file');
     expect(meta(el).textContent).not.toContain('1 matches');
   });
 });
@@ -300,7 +302,9 @@ describe('ResultsCard — facet chips (ports SearchSurface.facets.test.ts, tempd
 
   it('projects chips from the emitted facet counts, grouped and labeled', async () => {
     const el = await mount(FACET_SNAPSHOT);
-    const rowEl = el.shadowRoot?.querySelector('[data-testid="facet-row"]');
+    el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="more-filters"]')!.click();
+    await el.updateComplete;
+    const rowEl = el.shadowRoot;
     expect(rowEl).not.toBeNull();
     const chips = Array.from(rowEl!.querySelectorAll('.facet-chip')).map((c) => ({
       text: c.textContent ?? '',
@@ -344,6 +348,7 @@ describe('ResultsCard — facet chips (ports SearchSurface.facets.test.ts, tempd
 });
 
 describe('ResultsCard — the terminal "refined ✓" stamp (Search Thread S1)', () => {
+  beforeEach(() => setShowDeveloperTools(true));
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -380,6 +385,7 @@ describe('ResultsCard — Ask AI (jf-control availability)', () => {
   });
 
   it('renders the jf-control (not a plain enabled button) when unavailable', async () => {
+    setShowDeveloperTools(true);
     const el = await mount(snapshot, {
       askAvailability: { kind: 'unavailable', reason: 'AI is offline' },
     });
@@ -389,6 +395,7 @@ describe('ResultsCard — Ask AI (jf-control availability)', () => {
   });
 
   it('activating an available control emits card-ask-ai with the current query and shiftKey:false', async () => {
+    setShowDeveloperTools(true);
     const el = await mount(
       { ...snapshot, query: 'pipeline' },
       { askAvailability: { kind: 'available' } },
@@ -413,6 +420,7 @@ describe('ResultsCard — Ask AI (jf-control availability)', () => {
   // via a CAPTURE-phase click listener on the composed jf-control (fires before its own bubble-phase
   // click → activate()), the same shift-detection idiom handleRowClick uses for row clicks.
   it('a shift-held activation emits card-ask-ai with shiftKey:true', async () => {
+    setShowDeveloperTools(true);
     const el = await mount(
       { ...snapshot, query: 'pipeline' },
       { askAvailability: { kind: 'available' } },
@@ -613,6 +621,7 @@ describe('ResultsCard — collection pill (811 C-1a)', () => {
   });
 
   it('marks any other named collection with the neutral pill (per-collection, not one string)', async () => {
+    setShowDeveloperTools(true);
     const el = await mount({
       ...BASE,
       matchCount: 2,

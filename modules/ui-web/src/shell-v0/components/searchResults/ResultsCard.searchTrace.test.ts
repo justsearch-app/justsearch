@@ -28,6 +28,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import './ResultsCard.js';
+import { setShowDeveloperTools } from '../../state/developerToolsState.js';
+afterEach(() => setShowDeveloperTools(false));
 import type { ResultsCard, CardSnapshot, CardHit } from './ResultsCard.js';
 import { traceChipsFor } from './whyThisResult.js';
 import { setUiMode, __resetUiModeForTest } from '../../state/uiModeState.js';
@@ -56,7 +58,11 @@ async function mount(snapshot: CardSnapshot): Promise<ResultsCard> {
 }
 
 function trace(effectiveMode: string): unknown {
-  return { version: 1, decisionKind: 'multi_leg', effectiveMode, stages: [] };
+  return { version: 1, decisionKind: 'multi_leg', effectiveMode, stages: [
+    { id: 'sparse-retrieval', status: effectiveMode === 'VECTOR' ? 'skipped' : 'executed' },
+    { id: 'dense-retrieval', status: effectiveMode === 'TEXT' ? 'skipped' : 'executed' },
+    { id: 'splade-retrieval', status: 'skipped' },
+  ] };
 }
 
 // Tempdoc 738 — uiMode is a module-level store; reset after every test so a Detailed-mode test cannot
@@ -67,38 +73,38 @@ describe('ResultsCard — retrieval-mode indicator (ported from SearchSurface.re
   beforeEach(() => __resetUiModeForTest());
 
   // Tempdoc 738 (C2) — the technical mode labels render in Detailed mode.
-  it('Detailed: reads HYBRID as "Semantic + keyword"', async () => {
+  it('Detailed: reads HYBRID as "by words and meaning"', async () => {
     setUiMode('advanced');
     const el = await mount({ ...BASE, results: [hit('a')], searchTrace: trace('HYBRID') });
     const modeEl = el.shadowRoot?.querySelector('[data-testid="retrieval-mode"]');
-    expect(modeEl?.getAttribute('data-mode')).toBe('HYBRID');
-    expect(modeEl?.textContent).toContain('Semantic + keyword');
+    expect(modeEl?.textContent).not.toContain('Keyword');
+    expect(modeEl?.textContent).toContain('by words and meaning');
   });
 
   it('Detailed: reads VECTOR as "Semantic"', async () => {
     setUiMode('advanced');
     const el = await mount({ ...BASE, results: [hit('a')], searchTrace: trace('VECTOR') });
     const modeEl = el.shadowRoot?.querySelector('[data-testid="retrieval-mode"]');
-    expect(modeEl?.textContent).toContain('Semantic');
+    expect(modeEl?.textContent).toContain('by words and meaning');
   });
 
   it('Detailed: reads TEXT as "Keyword" (honest keyword fallback, not semantic)', async () => {
     setUiMode('advanced');
     const el = await mount({ ...BASE, results: [hit('a')], searchTrace: trace('TEXT') });
     const modeEl = el.shadowRoot?.querySelector('[data-testid="retrieval-mode"]');
-    expect(modeEl?.textContent).toContain('Keyword');
-    expect(modeEl?.textContent).not.toContain('Semantic');
+    expect(modeEl?.textContent).toContain('by words');
+    expect(modeEl?.textContent).not.toContain('by words and meaning');
   });
 
   // Tempdoc 738 (C2) — Simple mode (default) shows the plain-language labels.
-  it('Simple (default): reads TEXT as "exact-word search" and VECTOR as "meaning-based"', async () => {
+  it('Simple (default): reads TEXT as "by words" and VECTOR as "by words and meaning"', async () => {
     const elText = await mount({ ...BASE, results: [hit('a')], searchTrace: trace('TEXT') });
     expect(elText.shadowRoot?.querySelector('[data-testid="retrieval-mode"]')?.textContent).toContain(
-      'exact-word search',
+      'by words',
     );
     const elVec = await mount({ ...BASE, results: [hit('b')], searchTrace: trace('VECTOR') });
     expect(elVec.shadowRoot?.querySelector('[data-testid="retrieval-mode"]')?.textContent).toContain(
-      'meaning-based',
+      'by words and meaning',
     );
   });
 
@@ -110,7 +116,8 @@ describe('ResultsCard — retrieval-mode indicator (ported from SearchSurface.re
   // Register F-052 — a cross-encoder DROP reaches the user on the meta line. Before this the
   // reason existed only inside the (unmounted) explain panel's collapsed stage list, so a rerank
   // deadline miss delivered fusion order with no user-visible signal at all.
-  it('F-052: a cross-encoder deadline drop is stated on the meta line', async () => {
+  it('F-052: a cross-encoder deadline drop is stated on the developer meta line', async () => {
+    setShowDeveloperTools(true);
     const el = await mount({
       ...BASE,
       results: [hit('a')],
@@ -160,11 +167,12 @@ describe('ResultsCard — retrieval-mode indicator (ported from SearchSurface.re
   it('Simple (default): renders a plain latency ("found in …s"), never raw ms', async () => {
     const el = await mount({ ...BASE, results: [hit('a')], processingTimeMs: 62 });
     const meta = el.shadowRoot?.querySelector('[data-testid="card-meta"]')?.textContent ?? '';
-    expect(meta).toContain('found in 0.06s');
+    expect(meta).toContain('0.06 s');
     expect(meta).not.toContain('62ms');
   });
 
-  it('Detailed: renders the raw ms latency', async () => {
+  it('Developer tools: renders the raw ms latency', async () => {
+    setShowDeveloperTools(true);
     setUiMode('advanced');
     const el = await mount({ ...BASE, results: [hit('a')], processingTimeMs: 62 });
     const meta = el.shadowRoot?.querySelector('[data-testid="card-meta"]')?.textContent ?? '';
@@ -211,6 +219,11 @@ describe('ResultsCard — per-hit "Why this result?" disclosure (ported from Sea
         }),
       ],
     });
+    el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="row-actions"]')!.click();
+    const menu = document.querySelector<import('../ContextMenu.js').ContextMenu>('jf-context-menu')!;
+    await menu.updateComplete;
+    [...menu.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(button => button.textContent?.includes('Why this result'))!.click();
+    await Promise.resolve(); await el.updateComplete;
     expect(el.shadowRoot?.querySelector('[data-testid="hit-why"]')).not.toBeNull();
   });
 

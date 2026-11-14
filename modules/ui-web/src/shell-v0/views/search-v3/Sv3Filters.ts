@@ -24,12 +24,13 @@ export class Sv3Filters extends JfElement {
     :host { display: block; min-block-size: 0; min-inline-size: 0; color: var(--foreground); font-size: var(--font-size-sv3-sm); }
     :host([open]), :host([active]) { overflow-y: auto; overscroll-behavior: contain; }
     button, input, select { font: inherit; color: inherit; }
-    button { cursor: pointer; background: transparent; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-1) var(--space-2); }
+    button { cursor: pointer; background: transparent; border: 0; border-radius: 4px; font-weight: 500; padding: var(--space-1) var(--space-2); }
     button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
     .chips { display: flex; flex-wrap: wrap; gap: var(--space-1); padding-block: var(--space-1); }
     .chips button { max-inline-size: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; }
     .panel { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--space-2); background: var(--background); }
     .heading { position: sticky; top: 0; z-index: 1; background: var(--background); display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); }
+    h2 { font-weight: 500; }
     h2, p { margin: 0; font-size: inherit; }
     .fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); margin-block: var(--space-1); }
     .folder { grid-column: 1 / -1; }
