@@ -43,3 +43,13 @@ Registry follow-up to fm-first-launch: one test-only helper added to the test-su
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1daac-4e30-7bd3-b6eb-afde941f3000",
+  "verdict": "accept",
+  "digest": "sha256:49bd367fe9062d53a92a96d1445cf64570bff46ce5c49d81364302cbbac36345"
+}
+```
