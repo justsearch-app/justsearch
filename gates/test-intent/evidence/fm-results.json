@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-14T18:21:12.813Z",
-  "revision": "d10768dd89b828aa6a01a1bc1755ef44a835436b",
-  "tree": "adce9b04e34d14ee346c80bfe8d0acecbe7f9e9d",
+  "createdAt": "2026-11-14T20:58:06.177Z",
+  "revision": "820f93903cec4726fa9d1933adc1d354d02741b9",
+  "tree": "fc6ee1f5e912b3236608e05a8aa45402080d7ccb",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cusc8iw6/tmp/test-intent-vitest-2483467-1794680467367.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts\" \"src/shell-v0/views/first-minutes-page-break.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cusc8iw6/tmp/test-intent-vitest-2041658-1794689880099.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1916
+      "durationMs": 1727
     }
   ],
   "checks": [
@@ -103,7 +103,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f7535410438488fc4e63a84b428cde34fa76b742259d0124bddd31aba7ccb21b",
+      "contentDigest": "sha256:d4e0d29000439ba94a32c156d6dc4ec588c355b37a71bce0811411eeee45c4ea",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -415,6 +415,41 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/first-minutes-page-break.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/first-minutes-page-break.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4e7e3fb1117b4ed7ace0f46b39363e69f77d6f1f87073f1c8d5e4a94771d8396",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "drops page-break rules from pdf rows, on their own line or flattened",
+          "status": "passed"
+        },
+        {
+          "name": "drops page-break rules from docx rows, on their own line or flattened",
+          "status": "passed"
+        },
+        {
+          "name": "drops page-break rules from md rows, on their own line or flattened",
+          "status": "passed"
+        },
+        {
+          "name": "keeps \"---\" in ts rows",
+          "status": "passed"
+        },
+        {
+          "name": "keeps \"---\" in txt rows",
+          "status": "passed"
+        },
+        {
+          "name": "keeps \"---\" in csv rows",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": {
@@ -424,60 +459,65 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cusc8iw6/tmp/test-intent-vitest-2483467-1794680470608.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts\" \"src/shell-v0/views/first-minutes-page-break.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cusc8iw6/tmp/test-intent-vitest-2041658-1794689884306.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 2024,
-        "output": "JSON report written to /home/elias/.cache/am/cusc8iw6/tmp/test-intent-vitest-2483467-1794680470608.json\n\n"
+        "durationMs": 1685,
+        "output": "JSON report written to /home/elias/.cache/am/cusc8iw6/tmp/test-intent-vitest-2041658-1794689884306.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts",
         "classification": "assertion",
-        "detail": "S5-1 shows files mode and seconds in that order from executed legs:  AssertionError: expected '1 match · found in 0.04s · exact-word…' to be '1 file · by words · 0.04 s' // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-RT20o3/modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts:30:6\n    at processTick | S5-1 retains available versus displayed and capped counts as files:  AssertionError: expected '\\n        Top 1 of 100+ matches ·"
+        "detail": "S5-1 shows files mode and seconds in that order from executed legs:  AssertionError: expected '1 match · found in 0.04s · exact-word…' to be '1 file · by words · 0.04 s' // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts:30:6\n    at processTick | S5-1 retains available versus displayed and capped counts as files:  AssertionError: expected '\\n        Top 1 of 100+ matches ·"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts",
         "classification": "assertion",
-        "detail": "S5-8 restored Context outside Ask falls back without changing saved memory: /saved.md:  AssertionError: expected 'context' to be 'document' // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-RT20o3/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts:20:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s5/module | S5-8 restored Context outside Ask falls back without changing saved memory: :  AssertionError: expected 'cont"
+        "detail": "S5-8 restored Context outside Ask falls back without changing saved memory: /saved.md:  AssertionError: expected 'context' to be 'document' // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts:20:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s5/module | S5-8 restored Context outside Ask falls back without changing saved memory: :  AssertionError: expected 'cont"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts",
         "classification": "assertion",
-        "detail": "S5-12 literal-only empty screen explains words without repeating the query:  AssertionError: expected '\\n      \\n        Results for “privat…' to contain 'No file contains these words'\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-RT20o3/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts:19:38\n    at processTicksAndRejections (node: | S5-12 unknown execution uses the general empty message and no AI advice:  AssertionError: expected '\\n      \\n        Re"
+        "detail": "S5-12 literal-only empty screen explains words without repeating the query:  AssertionError: expected '\\n      \\n        Results for “privat…' to contain 'No file contains these words'\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts:20:38\n    at processTicksAndRejections (node: | S5-12 unknown execution uses the general empty message and no AI advice:  AssertionError: expected '\\n      \\n        Re"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts",
         "classification": "assertion",
-        "detail": "S5-4 Search results move the mounted editor to the top and Ask keeps its dock:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-RT20o3/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts:21:47\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at"
+        "detail": "S5-4 Search results move the mounted editor to the top and Ask keeps its dock:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts:21:47\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts",
         "classification": "assertion",
-        "detail": "S5-8 hides Show in folder in a browser:  AssertionError: expected <jf-button …(4)>…(1)</jf-button> to be null\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-RT20o3/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts:13:84\n    at processTicksAndRejections (node:internal/process/task_queues:104:5) | S5-8 default reader omits source controls and extraction diagnostics:  AssertionError: expected <div class=\"toggle-group\" …(2)>…(2)</div> to be null\n    at /home"
+        "detail": "S5-8 hides Show in folder in a browser:  AssertionError: expected <jf-button …(4)>…(1)</jf-button> to be null\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts:13:84\n    at processTicksAndRejections (node:internal/process/task_queues:104:5) | S5-8 default reader omits source controls and extraction diagnostics:  AssertionError: expected <div class=\"toggle-group\" …(2)>…(2)</div> to be null\n    at /home"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts",
         "classification": "assertion",
-        "detail": "date is a named text action using the shared keyboard menu and preserves custom bounds until chosen:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-RT20o3/modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts:18:23\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:/ | dates keep the year outside this year and use day then localized short month:  AssertionError: "
+        "detail": "date is a named text action using the shared keyboard menu and preserves custom bounds until chosen:  AssertionError: expected null not to be null\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts:18:23\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:/ | dates keep the year outside this year and use day then localized short month:  AssertionError: "
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts",
         "classification": "assertion",
-        "detail": "top field precedes filters and results in DOM without replacing the editor on Search and Ask moves:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-RT20o3/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts:21:47\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    a"
+        "detail": "top field precedes filters and results in DOM without replacing the editor on Search and Ask moves:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts:21:47\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    a"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts",
         "classification": "assertion",
-        "detail": "'failed' withholds the card, count and filters:  AssertionError: expected <div class=\"filters\" …(3)>…(1)</div> to be null\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-RT20o3/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts:18:84\n    at processTicksAndRejections (node:internal/process/task_queues:104: | 'syntax invalid' withholds the card, count and filters:  AssertionError: expected <div class=\"filters\" …(3)>…(1)</div> to be null\n    at /home/elias"
+        "detail": "'failed' withholds the card, count and filters:  AssertionError: expected <div class=\"filters\" …(3)>…(1)</div> to be null\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts:18:84\n    at processTicksAndRejections (node:internal/process/task_queues:104: | 'syntax invalid' withholds the card, count and filters:  AssertionError: expected <div class=\"filters\" …(3)>…(1)</div> to be null\n    at /home/elias"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts",
         "classification": "assertion",
-        "detail": "new result lists start at the top; layout and pane updates preserve the reader position:  AssertionError: expected 2000 to be +0 // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-RT20o3/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts:13:30\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at fil"
+        "detail": "new result lists start at the top; layout and pane updates preserve the reader position:  AssertionError: expected 2000 to be +0 // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts:13:30\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at fil"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/first-minutes-page-break.test.ts",
+        "classification": "assertion",
+        "detail": "drops page-break rules from pdf rows, on their own line or flattened:  AssertionError: expected 'harbour-scan\\n\\n---\\n\\nHarbour lighth…' to be 'harbour-scan Harbour lighthouse logbo…' // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-BYQCSC/modules/ui-web/src/shell-v0/views/first-minutes-page-break.test.ts:9:44\n    at file:///home/elias | drops page-break rules from docx rows, on their own line or flattened:  AssertionError: expected 'harbour-scan\\n\\n---\\n\\nHarbo"
       }
     ]
   },
-  "digest": "sha256:352edfa46b2897f4b144224f60ea40f55bb46985022d74e1acddb9f3674a5ea4"
+  "digest": "sha256:d928499e0728d61560ec76788c7ef223bf52eaafa65358aa5e92fcf2b35212de"
 }
