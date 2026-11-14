@@ -725,6 +725,11 @@ a source that predates this candidate.
       "conflictSearch": "decision records searched for a conflict: none in docs/decisions for top bar/topbar, Settings gear/button/menu, More menu, status pill/dot, palette, 44px/56px/3.5rem, sv3-topbar, one bar, command glyph and switcher icons. Matches in ADR-0008 concern settings persistence, ADR-0026 CI contrast measurement, and ADR-0050 GPU status, not these superseded presentation or entry-path expectations. Historical test names and comments describe the previous contract. Private task records were not read; the supplied adoption and delegation provenance must be checked by the acceptor.",
       "assertionChanges": [
         {
+          "oldAssertion": "None: the start-up frame's bar had no test of its own contents.",
+          "newAssertion": "Added: for light and dark start-up at 1024 and 600 px, the start-up bar is exactly 44 px, shows the three area words Search, Library, AI Brain (no icons, no gear), shows Starting⋯ on the right, has the same background as the start-up page, and the area words sit inside the bar and centred within 1 px of the room left of the window-control reserve.",
+          "reason": "R9/H3: the bar is 44 px on the page's own background with the three areas in words; the start-up frame is the first bar a user sees, and the packaged-app check found it still drawing the old gear and icons."
+        },
+        {
           "oldAssertion": "topInteractive samples every visible, non-inert interactive box whose top lies above root font size multiplied by 3.5, the old 56px-at-default frame band.",
           "newAssertion": "The helper samples boxes starting above the fixed literal 44 px boundary required by R9/H3. Its selector, visibility/inert filters and shadow traversal stay unchanged, as do drag exclusion and no-overlap/inside-window assertions across existing states, widths and text scales. The cutoff is independent of window-control geometry.",
           "reason": "R9/H3 specify the replacement bar as 44 px. A fixed requirement-derived boundary keeps controls misplaced within that bar in the sample even if the window-control layer is shorter or misplaced; the rejected geometry-derived cutoff could exclude them."
