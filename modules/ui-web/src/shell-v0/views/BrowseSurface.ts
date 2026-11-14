@@ -237,7 +237,7 @@ export class BrowseSurface extends JfElement {
     }
     .row .icon {
       flex-shrink: 0;
-      color: var(--text-tint);
+      color: var(--text-secondary);
     }
     .row.file .icon {
       color: var(--text-secondary);

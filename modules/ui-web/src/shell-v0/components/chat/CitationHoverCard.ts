@@ -68,7 +68,7 @@ export class CitationHoverCard extends JfElement {
     }
     .doc-name {
       font-size: var(--font-size-xs);
-      color: var(--text-tint);
+      color: var(--text-secondary);
       margin-bottom: 0.25rem;
       white-space: nowrap;
       overflow: hidden;

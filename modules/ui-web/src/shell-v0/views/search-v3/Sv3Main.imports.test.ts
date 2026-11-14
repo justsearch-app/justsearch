@@ -501,11 +501,11 @@ describe('every text/surface pair those components can paint clears WCAG AA on t
       // deeper one behind the tag, so both stacks are measured on top of the card fill.
       // A used row's path/locator inherit the row colour rather than staying `--text-secondary`:
       // this oracle measured that pair at 4.31:1 on the tint, which is why the rule exists.
-      { what: 'used-row title and path/locator on the tinted row', text: 'var(--text-primary)', on: ['var(--surface-secondary)', 'var(--accent-tint-08)'] },
-      { what: 'the "used" tag on its own tint', text: 'var(--text-tint)', on: ['var(--surface-secondary)', 'var(--accent-tint-08)', 'var(--accent-tint-16)'] },
+      { what: 'used-row title and path/locator on the tinted row', text: 'var(--text-primary)', on: ['var(--surface-secondary)', 'var(--surface-subtle)'] },
+      { what: 'the "used" tag on its own tint', text: 'var(--text-primary)', on: ['var(--surface-secondary)', 'var(--surface-subtle)', 'var(--surface-active)'] },
       { what: 'lineage frame label on the quoted frame', text: 'var(--text-secondary)', on: ['var(--surface-secondary)', 'var(--surface-2)'] },
       { what: 'rejected reason', text: 'var(--text-warning)', on: ['var(--surface-secondary)'] },
-      { what: 'resource link', text: 'var(--accent)', on: ['var(--surface-secondary)'] },
+      { what: 'resource link', text: 'var(--text-primary)', on: ['var(--surface-secondary)'] },
     ]);
   });
 
@@ -518,7 +518,7 @@ describe('every text/surface pair those components can paint clears WCAG AA on t
       { what: 'copy button under the pointer', text: 'var(--text-secondary)', on: ['var(--surface-subtle)', 'var(--surface-subtle)'] },
       { what: 'nested markdown body', text: 'var(--text-muted)', on: ['var(--surface-subtle)'] },
       { what: 'nested markdown code', text: 'var(--text-muted)', on: ['var(--surface-subtle)', 'var(--surface-tertiary)'] },
-      { what: 'nested markdown link', text: 'var(--text-tint)', on: ['var(--surface-subtle)'] },
+      { what: 'nested markdown link', text: 'var(--text-primary)', on: ['var(--surface-subtle)'] },
     ]);
   });
 
@@ -527,7 +527,7 @@ describe('every text/surface pair those components can paint clears WCAG AA on t
     // excerpt (:74) and the match score (:82-84).
     check('jf-citation-hover-card', [
       { what: 'card text', text: 'var(--text-primary)', on: ['var(--surface-2)'] },
-      { what: 'document name', text: 'var(--text-tint)', on: ['var(--surface-2)'] },
+      { what: 'document name', text: 'var(--text-secondary)', on: ['var(--surface-2)'] },
       { what: 'excerpt', text: 'var(--text-secondary)', on: ['var(--surface-2)'] },
       { what: 'match score', text: 'var(--text-muted)', on: ['var(--surface-2)'] },
     ]);
@@ -633,7 +633,7 @@ describe('a SELECTED citation mark keeps its grounding tier above the AA floor',
     { what: 'ungrounded (amber)', ink: 'var(--md-cite-ungrounded-color, var(--text-warning))' },
   ] as const;
   const NORMAL = 'var(--text-tint)';
-  const SELECTED_MARK = ['var(--md-cite-selected-bg, var(--accent-tint))'] as const;
+  const SELECTED_MARK = ['var(--md-cite-selected-bg, var(--surface-active))'] as const;
 
   const ratioOn = (ink: string, layers: readonly string[], scope: Map<string, string>): number => {
     const bg = surface(layers, scope);

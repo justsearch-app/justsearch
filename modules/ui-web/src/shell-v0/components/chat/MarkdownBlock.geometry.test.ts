@@ -301,7 +301,7 @@ const BEFORE: ReadonlyArray<readonly [string, Readonly<Record<string, string>>]>
   // `padding-left` is the 873 retune (was `1.25rem`); the margin is still the parent commit's.
   ['.md-content ul, .md-content ol', { margin: '0.25em 0', 'padding-left': '1.75rem' }],
   ['.md-content li', { margin: '0.125em 0' }],
-  ['.md-content a', { color: 'var(--text-tint)', 'text-decoration': 'underline' }],
+  ['.md-content a', { color: 'var(--text-primary)', 'font-weight': '500', 'text-decoration': 'underline' }],
   [
     '.md-content blockquote',
     {

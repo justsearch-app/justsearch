@@ -833,7 +833,7 @@ export class ResultsCard extends JfElement {
       }
       .copy-actions .copy-btn:hover {
         color: var(--text-primary);
-        border-color: var(--accent-tint);
+        border-color: var(--text-secondary);
       }
       .copy-actions .copy-btn.flashing {
         color: var(--text-success);
@@ -860,7 +860,7 @@ export class ResultsCard extends JfElement {
       }
       .copy-actions jf-control.copy-btn:hover::part(control) {
         color: var(--text-primary);
-        border-color: var(--accent-tint);
+        border-color: var(--text-secondary);
       }
       .results-list {
         padding: 0.5rem 0;
@@ -874,8 +874,8 @@ export class ResultsCard extends JfElement {
         background: var(--surface-secondary);
       }
       .row.selected {
-        border-left-color: var(--accent-tint);
-        background: var(--accent-tint-08);
+        border-left-color: var(--text-secondary);
+        background: var(--surface-subtle);
       }
       .row .title {
         display: flex;
@@ -904,9 +904,8 @@ export class ResultsCard extends JfElement {
         flex-shrink: 0;
       }
       /* Tempdoc 811 (C-1a) — the per-collection row marker. Same pill geometry as the shared
-         .hit-why-signal / .facet-chip chips; the help tone reuses the gate-verified teal fill
-         pair (--accent-tint / --accent-on-tint) the selected facet chip already uses, which is
-         the teal "Help" pill docs/reference/search-ui-behavior.md documents. */
+         .hit-why-signal / .facet-chip chips; the help collection uses the same neutral surface
+         and normal foreground as selected facets. */
       .row .collection-pill {
         flex-shrink: 0;
         padding: 0.05rem 0.45rem;
@@ -919,9 +918,9 @@ export class ResultsCard extends JfElement {
         white-space: nowrap;
       }
       .row .collection-pill[data-tone='help'] {
-        background: var(--accent-tint);
+        background: var(--surface-active);
         border-color: var(--accent-command);
-        color: var(--accent-on-tint);
+        color: var(--text-primary);
       }
       .row .path {
         font-size: var(--font-size-xs);

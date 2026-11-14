@@ -52,7 +52,7 @@ export class FilterChip extends JfElement {
         border-color var(--duration-fast);
     }
     button:hover {
-      border-color: var(--accent);
+      border-color: var(--text-secondary);
       color: var(--text-primary);
     }
     button:focus-visible {

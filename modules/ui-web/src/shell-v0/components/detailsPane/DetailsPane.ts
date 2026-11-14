@@ -297,7 +297,7 @@ export class DetailsPane extends JfElement {
     .tab:hover { color: var(--text-primary); }
     .tab[aria-selected='true'] {
       color: var(--text-primary);
-      border-block-end-color: var(--accent-tint);
+      border-block-end-color: var(--text-secondary);
     }
     .tab:focus-visible {
       outline: var(--frame-focus-width) solid var(--focus-ring-color);
@@ -310,14 +310,14 @@ export class DetailsPane extends JfElement {
       padding-inline: var(--jf-space-1);
       box-sizing: border-box;
       border-radius: var(--frame-control-radius);
-      background: var(--accent-tint-16);
-      color: var(--text-tint);
+      background: var(--surface-active);
+      color: var(--text-secondary);
       font-size: var(--font-size-xs);
       font-weight: 600;
       font-variant-numeric: tabular-nums;
       text-align: center;
     }
-    .tab[aria-selected='true'] .number { background: var(--accent-tint); color: var(--surface-1); }
+    .tab[aria-selected='true'] .number { background: var(--surface-active); color: var(--text-primary); }
     .close { flex: none; align-self: center; }
     .source-name {
       flex: none;

@@ -48,7 +48,7 @@ export class SystemNotice extends JfElement {
       color: var(--text-primary);
     }
     :host([tone='info']) {
-      --jf-notice-accent: var(--accent-tint);
+      --jf-notice-accent: var(--text-secondary);
     }
     :host([tone='success']) {
       --jf-notice-accent: var(--accent-success);

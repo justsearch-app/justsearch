@@ -200,7 +200,7 @@ export class AuthorizationHost extends JfElement {
       font-size: var(--font-size-sm);
     }
     .security strong {
-      color: var(--text-tint);
+      color: var(--text-secondary);
       font-weight: var(--jf-weight-medium);
     }
     .security span {
@@ -235,7 +235,7 @@ export class AuthorizationHost extends JfElement {
     }
     code {
       font-family: ui-monospace, monospace;
-      color: var(--text-tint);
+      color: var(--text-secondary);
     }
     /* Frozen targets are complete identities; wrap long path segments without truncation. */
     .description code {

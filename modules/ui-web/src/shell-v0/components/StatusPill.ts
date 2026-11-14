@@ -74,7 +74,7 @@ export class StatusPill extends JfElement {
       border-radius: var(--frame-pill-radius); background: transparent; font: inherit; cursor: pointer; }
     jf-status-badge { min-width: 0; max-width: 100%; }
     jf-status-badge::part(badge) { min-width: 0; max-width: 100%; box-sizing: border-box; }
-    .transient-action { font: inherit; color: var(--text-tint); background: var(--surface-2); border: 0; border-radius: var(--frame-pill-radius); padding: var(--jf-space-1) var(--jf-space-2); }
+    .transient-action { font: inherit; font-weight: 500; color: var(--text-primary); background: var(--surface-2); border: 0; border-radius: var(--frame-pill-radius); padding: var(--jf-space-1) var(--jf-space-2); }
     /* Measure the full words; notices that need more than two lines move below the bar. */
     .beside-notice { align-self: center; flex: 0 1 auto; min-width: 0; max-width: var(--frame-menu-width); padding-inline: var(--jf-space-2);
       color: var(--text-secondary); font-size: var(--font-size-xs); line-height: 1.2; white-space: normal; overflow-wrap: normal;

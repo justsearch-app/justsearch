@@ -124,7 +124,8 @@ export const markdownTypography = css`
     margin: var(--md-item-gap) 0;
   }
   .md-content a {
-    color: var(--text-tint);
+    color: var(--text-primary);
+    font-weight: 500;
     text-decoration: var(--md-link-decoration);
   }
   /* Unconditional, not variant-gated: with the default 'underline' at rest this is a no-op on
@@ -362,7 +363,7 @@ export const markdownCodeHighlight = css`
   .md-content .hljs-built_in,
   .md-content .hljs-class,
   .md-content .hljs-params {
-    color: var(--text-chat);
+    color: var(--text-primary);
   }
   .md-content .hljs-attr,
   .md-content .hljs-attribute,

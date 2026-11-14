@@ -983,7 +983,7 @@ select {
     }
     50% {
       transform: scale(1.05);
-      filter: drop-shadow(0 0 8px var(--accent-tint));
+      filter: drop-shadow(0 0 8px var(--text-secondary));
     }
   }
 }

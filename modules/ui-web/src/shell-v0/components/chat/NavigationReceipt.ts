@@ -75,9 +75,9 @@ export class NavigationReceipt extends JfElement {
     }
     :host([outcome='dispatched']) .receipt,
     :host([outcome='forwarded']) .receipt {
-      background: var(--accent-tint-08);
-      border-color: var(--accent-tint-30);
-      color: var(--text-tint);
+      background: var(--surface-subtle);
+      border-color: var(--border-strong);
+      color: var(--text-secondary);
     }
     :host([outcome='rejected']) .receipt {
       background: var(--accent-danger-08);
@@ -90,9 +90,9 @@ export class NavigationReceipt extends JfElement {
       color: var(--text-warning);
     }
     :host([outcome='auto-corrected']) .receipt {
-      background: var(--accent-tint-08);
-      border-color: var(--accent-tint-30);
-      color: var(--text-tint);
+      background: var(--surface-subtle);
+      border-color: var(--border-strong);
+      color: var(--text-secondary);
     }
     .corrected-from {
       text-decoration: line-through;
@@ -124,16 +124,17 @@ export class NavigationReceipt extends JfElement {
       display: inline-block;
       padding: 0.2rem 0.5rem;
       border-radius: 0.25rem;
-      border: 1px solid var(--accent-tint-45);
-      background: var(--accent-tint-08);
-      color: var(--text-tint);
+      border: 1px solid var(--border-strong);
+      background: var(--surface-subtle);
+      color: var(--text-primary);
+      font-weight: 500;
       cursor: pointer;
       font-family: ui-monospace, monospace;
       font-size: var(--font-size-xs);
       transition: background var(--duration-fast);
     }
     .suggestion-chip:hover {
-      background: var(--accent-tint-16);
+      background: var(--surface-active);
     }
     .suggestion-chip:focus-visible {
       outline: 2px solid var(--focus-ring-color);

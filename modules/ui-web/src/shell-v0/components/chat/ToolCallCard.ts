@@ -349,7 +349,7 @@ export class ToolCallCard extends JfElement {
     /* A row the run actually drew on: tinted ground + full-strength text (the filled dot and the
        "used" tag carry the same fact for readers who cannot see the tint). */
     .search-row-open.used {
-      background: var(--accent-tint-08);
+      background: var(--surface-subtle);
       color: var(--text-primary);
     }
     .search-row-open:hover,
@@ -400,15 +400,16 @@ export class ToolCallCard extends JfElement {
       white-space: nowrap;
       min-width: 0;
     }
-    /* The small "used" tag — the accessible twin of the tint, in the muted accent. */
+    /* The small "used" tag — the accessible twin of the neutral row highlight. */
     .search-row-used-tag {
       flex: none;
       font-size: var(--font-size-xs);
       line-height: 1.4;
       padding: 0 0.4em;
       border-radius: 9999px;
-      background: var(--accent-tint-16);
-      color: var(--text-tint);
+      background: var(--surface-active);
+      color: var(--text-primary);
+      font-weight: 500;
     }
     .search-row-path {
       color: var(--text-secondary);
@@ -458,7 +459,8 @@ export class ToolCallCard extends JfElement {
     }
     .tool-resource a {
       font-size: var(--font-size-xs);
-      color: var(--accent);
+      color: var(--text-primary);
+      font-weight: 500;
       word-break: break-all;
     }
     .rejected-reason {

@@ -358,7 +358,8 @@ export class Sv3Composer extends JfElement {
         cursor: pointer;
       }
       .corpus-remedy::part(control):hover {
-        color: var(--primary);
+        color: var(--foreground);
+        font-weight: 500;
       }
 
       /* The design spec stacks composer banners ABOVE the box, 8px clear of it, at the composer's
@@ -471,7 +472,8 @@ export class Sv3Composer extends JfElement {
         cursor: pointer;
       }
       .degradation-remedy::part(control):hover {
-        color: var(--primary);
+        color: var(--foreground);
+        font-weight: 500;
       }
       .degradation-disclosure {
         display: inline-flex;

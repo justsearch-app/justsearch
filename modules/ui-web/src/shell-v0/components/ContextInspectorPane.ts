@@ -155,7 +155,7 @@ export class ContextInspectorPane extends JfElement {
       color: var(--text-secondary);
     }
     .est {
-      color: var(--text-tint);
+      color: var(--text-secondary);
       font-style: italic;
     }
     :host .segment-empty { padding:0.35rem 0.1rem; }

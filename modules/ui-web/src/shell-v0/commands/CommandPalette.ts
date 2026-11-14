@@ -305,8 +305,8 @@ export class CommandPalette extends JfElement {
       font-size: var(--font-size-xs);
       font-weight: 600;
       padding: 0.125rem 0.375rem;
-      background: var(--accent-tint);
-      color: var(--accent-on-tint);
+      background: var(--surface-active);
+      color: var(--text-primary);
       border-radius: 0.25rem;
       white-space: nowrap;
     }

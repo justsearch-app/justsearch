@@ -121,10 +121,8 @@ export class AutonomyDial extends JfElement {
       background: var(--surface-2);
     }
     .seg[data-active] {
-      background: var(--accent-info);
-      /* 559 contrast-pair token: white on the light-teal accent failed WCAG AA (1.97:1); the
-         on-tint ink is dark in the dark theme / near-white in the light theme (>=4.5:1). */
-      color: var(--accent-on-tint);
+      background: var(--surface-active);
+      color: var(--text-primary);
       font-weight: 600;
     }
     .hint {

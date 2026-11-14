@@ -344,8 +344,9 @@ export class ActionLedgerView extends JfElement {
         padding: 0;
         border: 0;
         background: none;
-        color: var(--accent);
+        color: var(--text-primary);
         font: inherit;
+        font-weight: 500;
         text-decoration: underline;
         cursor: pointer;
       }
@@ -376,7 +377,7 @@ export class ActionLedgerView extends JfElement {
       }
       /* Selected reads by weight and a heavier border as well as tint, so it survives forced colours. */
       .quick button[aria-checked='true'] {
-        border: 2px solid var(--accent);
+        border: 2px solid var(--text-secondary);
         color: var(--text-primary);
         font-weight: 600;
       }
@@ -402,7 +403,7 @@ export class ActionLedgerView extends JfElement {
       }
       .new-count {
         font-size: var(--font-size-xs);
-        color: var(--text-tint);
+        color: var(--text-secondary);
         font-weight: 600;
       }
       .mark-read {
@@ -470,8 +471,8 @@ export class ActionLedgerView extends JfElement {
          there, so forced colours, which paint every border, still tell it apart. */
       .entry[aria-selected='true'] {
         padding-inline-start: var(--jf-space-2);
-        border-inline-start: calc(2 * var(--frame-focus-width)) solid var(--accent);
-        background: var(--accent-tint-16);
+        border-inline-start: calc(2 * var(--frame-focus-width)) solid var(--text-secondary);
+        background: var(--surface-active);
       }
       .scope {
         display: inline-flex;

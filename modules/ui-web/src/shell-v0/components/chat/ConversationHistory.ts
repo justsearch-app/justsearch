@@ -70,7 +70,7 @@ export class ConversationHistory extends JfElement {
     }
     .trigger:hover {
       color: var(--text-primary);
-      border-color: var(--accent-tint);
+      border-color: var(--text-secondary);
     }
     .dropdown {
       position: absolute;
@@ -136,7 +136,7 @@ export class ConversationHistory extends JfElement {
       text-overflow: ellipsis;
     }
     .branch-mark {
-      color: var(--text-tint);
+      color: var(--text-secondary);
       margin-right: 0.3rem;
       font-weight: bold;
     }

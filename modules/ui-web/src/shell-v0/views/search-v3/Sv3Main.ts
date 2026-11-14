@@ -858,6 +858,8 @@ export class Sv3Main extends JfElement {
         /* The card is the ONE raised surface here; its wells sit on it, and the quoted-output frame
            (which the component draws with a 3px --border-strong rule) goes deeper instead. */
         --surface-secondary: var(--card);
+        --surface-subtle: var(--muted);
+        --surface-active: var(--secondary);
         --surface-tertiary: var(--muted);
         --surface-2: var(--background);
         --text-primary: var(--foreground);
@@ -918,6 +920,7 @@ export class Sv3Main extends JfElement {
          below the ink hover brightens to. */
       jf-reasoning-block {
         --surface-subtle: var(--muted);
+        --surface-active: var(--secondary);
         --text-muted: var(--secondary-label);
         --text-secondary: color-mix(in srgb, var(--secondary-label) 90%, var(--foreground));
         --border-muted: var(--border);

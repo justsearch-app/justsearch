@@ -75,7 +75,7 @@ export class RouteChip extends JfElement {
         color var(--duration-fast) var(--ease-standard);
     }
     jf-control::part(control):hover {
-      border-color: var(--accent);
+      border-color: var(--text-secondary);
       color: var(--text-primary);
     }
     :host([pinned]) jf-control::part(control) {

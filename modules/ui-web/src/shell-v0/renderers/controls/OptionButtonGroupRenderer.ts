@@ -151,9 +151,9 @@ export class OptionButtonGroupRenderer extends JsonFormsRendererBase {
       background: var(--surface-hover);
     }
     .option-btn.selected {
-      border-color: var(--accent-tint);
-      background: var(--accent-tint-08);
-      color: var(--text-tint);
+      border-color: var(--text-secondary);
+      background: var(--surface-subtle);
+      color: var(--text-primary);
     }
     /* Forced colors (Windows High Contrast) erase the selected card's tint and edge, so it takes the
        selection pair ('forced-color-adjust: none' keeps the browser's Canvas backplate from landing
@@ -204,7 +204,7 @@ export class OptionButtonGroupRenderer extends JsonFormsRendererBase {
       overflow: hidden;
     }
     .option-btn.option-btn-swatch.selected .option-swatch-tile {
-      outline: 2px solid var(--accent-tint);
+      outline: 2px solid var(--text-secondary);
       outline-offset: 2px;
     }
     .option-swatch-check {
@@ -214,7 +214,7 @@ export class OptionButtonGroupRenderer extends JsonFormsRendererBase {
       display: flex;
       border-radius: 50%;
       background: var(--surface-primary);
-      color: var(--text-tint);
+      color: var(--text-secondary);
     }
     .option-btn.option-btn-swatch .option-label {
       margin-top: 0;

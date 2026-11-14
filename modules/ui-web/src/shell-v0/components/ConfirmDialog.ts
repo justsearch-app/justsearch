@@ -112,8 +112,8 @@ export class ConfirmDialog extends JfElement {
       color: var(--text-warning);
     }
     .icon-box.info {
-      background: var(--accent-tint-08);
-      color: var(--text-tint);
+      background: var(--surface-subtle);
+      color: var(--text-secondary);
     }
     .title {
       font-size: var(--font-size-md);

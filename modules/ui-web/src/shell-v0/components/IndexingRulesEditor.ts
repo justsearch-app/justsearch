@@ -249,7 +249,7 @@ export class IndexingRulesEditor extends JfElement {
     .indexing-days { display: flex; flex-wrap: wrap; gap: .5rem .9rem; margin: .5rem 0 1rem; }
     .indexing-days label { font-size: var(--font-size-xs); }
     .indexing-days[hidden] { display: none; }
-    input { font: inherit; color: var(--text-primary); accent-color: var(--accent-tint); max-width: 100%; }
+    input { font: inherit; color: var(--text-primary); accent-color: var(--text-secondary); max-width: 100%; }
     input[type=time] { background: transparent; border: 0; border-bottom: 1px dotted var(--border-subtle); padding: .1rem; color-scheme: inherit; }
     button { font: inherit; font-size: var(--font-size-sm); background: transparent; border: 0; color: var(--text-primary); padding: .4rem 0; cursor: pointer; }
     button[aria-disabled=true] { opacity: .65; cursor: default; }

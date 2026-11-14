@@ -66,7 +66,7 @@ export class ResolutionStats extends JfElement {
       padding: 0.125rem 0;
     }
     .stat-label { opacity: 0.8; }
-    .stat-value { color: var(--text-tint); font-weight: 500; }
+    .stat-value { color: var(--text-secondary); font-weight: 500; }
     .failed-id {
       padding: 0.125rem 0;
       color: var(--text-warning);

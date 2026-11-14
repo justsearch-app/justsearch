@@ -511,12 +511,12 @@ export class HealthSurface extends JfElement {
       justify-content: center;
     }
     .card-icon-box.teal {
-      background: var(--accent-tint-16);
-      color: var(--text-tint);
+      background: var(--surface-active);
+      color: var(--text-secondary);
     }
     .card-icon-box.blue {
-      background: var(--accent-chat-16);
-      color: var(--text-chat);
+      background: var(--surface-active);
+      color: var(--text-secondary);
     }
     .card-icon-box.purple {
       background: var(--accent-command-16);
@@ -570,7 +570,7 @@ export class HealthSurface extends JfElement {
     /* 595 §15.3 (E3) — a rebuild is calm/in-progress, not "done" (green) or a warning
        (amber); the info tone matches the verdict's busy→info tone. */
     .progress-bar.info {
-      background: var(--accent-info);
+      background: var(--text-secondary);
     }
     .rebuild-progress {
       margin-bottom: 0.75rem;
@@ -661,7 +661,7 @@ export class HealthSurface extends JfElement {
       border-left: 3px solid var(--accent-warning);
     }
     .event-row.info {
-      border-left: 3px solid var(--accent-tint);
+      border-left: 3px solid var(--text-secondary);
     }
     .event-message {
       flex: 1;
@@ -1544,7 +1544,7 @@ export class HealthSurface extends JfElement {
             data-testid="brain-generation-sparkline-line"
             points="${pointsStr}"
             fill="none"
-            stroke="var(--accent-tint)"
+            stroke="var(--text-secondary)"
             stroke-width="1.5"
             stroke-linejoin="round"
           />
@@ -1553,7 +1553,7 @@ export class HealthSurface extends JfElement {
               cx="${xOf(d.ts)}"
               cy="${yOf(d.gen)}"
               r="3"
-              fill="${d.row.success ? 'var(--accent-tint)' : 'var(--accent-danger)'}"
+              fill="${d.row.success ? 'var(--text-secondary)' : 'var(--accent-danger)'}"
             >
               <title>${formatTime(new Date(d.row.timestampMs))} · gen=${d.gen} · ${d.row.fromMode.toLowerCase()} → ${d.row.toMode.toLowerCase()} · ${d.row.reason.toLowerCase().replace(/_/g, ' ')} · ${d.row.durationMs}ms${d.row.wireCode ? ` · ${d.row.wireCode}` : ''}</title>
             </circle>`,
@@ -1589,7 +1589,7 @@ export class HealthSurface extends JfElement {
                 class="history-result"
               >
                 <span
-                  class="result-dot" .style=${`background: ${r.success ? 'var(--accent-tint)' : 'var(--accent-danger)'}`}
+                  class="result-dot" .style=${`background: ${r.success ? 'var(--text-secondary)' : 'var(--accent-danger)'}`}
                 ></span>
                 <span class="secondary-text"
                   >${formatTime(new Date(r.timestampMs))}</span
@@ -1657,7 +1657,7 @@ export class HealthSurface extends JfElement {
                 title=${s.trace_id ? `trace_id=${s.trace_id} (click to copy)` : ''}
               >
                 <span
-                  class="result-dot" .style=${`background: ${s.status === 'ERROR' ? 'var(--accent-danger)' : 'var(--accent-tint)'}`}
+                  class="result-dot" .style=${`background: ${s.status === 'ERROR' ? 'var(--accent-danger)' : 'var(--text-secondary)'}`}
                 ></span>
                 <span class="secondary-text">
                   ${s.start ? formatTime(new Date(s.start)) : '—'}

@@ -897,8 +897,8 @@ export class BrainSurface extends JfElement {
       font-size: var(--font-size-xs);
     }
     .mode-toggle button.active {
-      background: var(--accent-tint);
-      color: var(--accent-on-tint);
+      background: var(--surface-active);
+      color: var(--text-primary);
     }
     .variant {
       display: flex;
@@ -995,7 +995,8 @@ export class BrainSurface extends JfElement {
       color: var(--text-secondary);
     }
     .consent-terms a {
-      color: var(--text-tint);
+      color: var(--text-primary);
+      font-weight: 500;
       white-space: nowrap;
     }
     .consent-actions {
@@ -1177,10 +1178,10 @@ export class BrainSurface extends JfElement {
     .brain-status-detail, .step-meta { font-size: var(--font-size-xs); color: var(--text-secondary); line-height: 1.5; }
     .brain-status-detail { margin-bottom: 0.5rem; }
     button.feature-phrase, button.step-info, .brain-links button, .feature-panel button {
-      border: 0; border-radius: 0; padding: 0; background: transparent; color: inherit; font: inherit;
+      border: 0; border-radius: 0; padding: 0; background: transparent; color: var(--text-primary); font: inherit; font-weight: 500;
     }
     button.feature-phrase { display: inline; text-align: left; }
-    button.feature-phrase:hover, button.step-info:hover { color: var(--text-tint); background: transparent; }
+    button.feature-phrase:hover, button.step-info:hover { color: var(--text-primary); background: transparent; }
     button:focus-visible, a:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 4px; }
     .feature-switch-wrap { display: inline-flex; flex-wrap: wrap; max-width: 100%; align-items: center; vertical-align: middle; margin-inline: 0.4rem; }
     button.feature-switch { border: 1px solid var(--border-subtle); border-radius: 14px; width: 2rem; height: 1.15rem; padding: 0.1rem; background: var(--surface-tertiary); }
@@ -1225,7 +1226,7 @@ export class BrainSurface extends JfElement {
     .brain-advanced button:not(.component-toggle) { border: 0; border-radius: 0; background: transparent; padding: 0; color: var(--text-secondary); }
     .advanced-row button { margin-left: 0.75rem; }
     .slider-setting { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; }
-    .slider-setting input[type='range'] { flex: 1 1 10rem; min-width: 0; width: 100%; accent-color: var(--accent-tint); }
+    .slider-setting input[type='range'] { flex: 1 1 10rem; min-width: 0; width: 100%; accent-color: var(--text-secondary); }
     .slider-setting output { min-width: 8rem; color: var(--text-secondary); }
     .brain-advanced h4 { font-size: var(--font-size-xs); color: var(--text-secondary); font-weight: 400; }
     .brain-advanced .data-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0; font-size: var(--font-size-sm); }
@@ -1236,7 +1237,7 @@ export class BrainSurface extends JfElement {
     .section, .variant { border: 0; border-radius: 0; background: transparent; padding: 1rem 0; border-top: 1px solid var(--border-subtle); }
     jf-button::part(control) { border: 0; border-radius: 0; background: transparent; }
     jf-button.install-action::part(control), jf-button.consent-confirm::part(control) { background: var(--accent-tint); color: var(--accent-on-tint); border-radius: 14px; }
-    jf-button.repair-action::part(control) { color: var(--text-primary); font-weight: 600; }
+    jf-button.repair-action::part(control) { background: transparent; border-color: transparent; color: var(--text-primary); font-weight: 500; }
     dialog.consent { box-sizing: border-box; width: min(32rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); overflow: auto; }
     @media (max-width: 800px) {
       .body { padding: 1.25rem; }
@@ -3623,7 +3624,7 @@ export class BrainSurface extends JfElement {
                     ${icon({ name: 'check-circle-2', size: 14 })} Preflight
                   </jf-button>
                   <jf-button
-                    variant="primary"
+                    variant="ghost"
                     label="Import pack"
                     .availability=${this.busy['pack-import']
                       ? { kind: 'blocked' }

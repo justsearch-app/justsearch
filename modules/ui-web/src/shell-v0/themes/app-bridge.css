@@ -41,8 +41,8 @@
   --jf-surface-fg-faint: var(--text-ghost);
 
   /* Severity — accent palette uses the React app's semantic colors */
-  --jf-severity-info: var(--accent-tint);
-  --jf-severity-info-strong: var(--accent-tint);
+  --jf-severity-info: var(--text-secondary);
+  --jf-severity-info-strong: var(--text-secondary);
   --jf-severity-warning: var(--accent-warning);
   --jf-severity-error: var(--accent-danger);
   --jf-severity-unknown: var(--text-muted);

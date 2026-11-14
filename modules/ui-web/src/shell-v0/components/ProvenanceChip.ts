@@ -59,9 +59,9 @@ export class ProvenanceChip extends JfElement {
       font-size: var(--font-size-xs);
       font-weight: 500;
       letter-spacing: 0.02em;
-      background: var(--accent-tint-16);
-      color: var(--text-tint);
-      border: 1px solid var(--accent-tint-30);
+      background: var(--surface-active);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-strong);
     }
     .chip.untrusted {
       background: var(--accent-warning-16);
@@ -70,8 +70,8 @@ export class ProvenanceChip extends JfElement {
     }
     .chip.verified {
       /* identity.verified === true — slightly stronger accent */
-      background: var(--accent-tint-16);
-      border-color: var(--accent-tint-45);
+      background: var(--surface-active);
+      border-color: var(--border-strong);
     }
     .chip-verify-mark {
       font-weight: 700;

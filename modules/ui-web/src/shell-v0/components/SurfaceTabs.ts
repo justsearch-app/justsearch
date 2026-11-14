@@ -122,7 +122,7 @@ export class SurfaceTabs extends JfElement {
     }
     .tabs button.active {
       color: var(--text-primary);
-      border-bottom-color: var(--accent-tint);
+      border-bottom-color: var(--text-secondary);
     }
     /* X1 — forced colours repaint every border, the unselected tab's transparent one included, so
        both tabs drew the same underline. The tab keeps its own system colours: only the selected

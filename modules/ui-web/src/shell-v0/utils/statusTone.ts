@@ -97,7 +97,7 @@ export function toneAccent(tone: NoticeTone): string {
     case 'error':
       return 'var(--accent-danger)';
     case 'info':
-      return 'var(--accent-tint)';
+      return 'var(--text-secondary)';
     case 'neutral':
     default:
       return 'var(--text-secondary)';
@@ -126,7 +126,7 @@ export function toneText(tone: NoticeTone): string {
     case 'error':
       return 'var(--text-danger)';
     case 'info':
-      return 'var(--text-tint)';
+      return 'var(--text-secondary)';
     case 'neutral':
     default:
       return 'var(--text-secondary)';
@@ -148,7 +148,7 @@ export function toneAccentSoft(tone: NoticeTone): string {
     case 'error':
       return 'var(--accent-danger-16)';
     case 'info':
-      return 'var(--accent-tint-16)';
+      return 'var(--surface-active)';
     case 'neutral':
     default:
       return 'var(--surface-2)';

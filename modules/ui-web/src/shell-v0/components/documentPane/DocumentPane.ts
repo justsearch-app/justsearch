@@ -853,9 +853,10 @@ export class DocumentPane extends JfElement {
       outline-offset: 1px;
     }
     .toggle-btn.selected {
-      background: var(--accent-tint-16);
-      color: var(--text-tint);
-      border-color: var(--accent-tint);
+      background: var(--surface-active);
+      color: var(--text-primary);
+      font-weight: 500;
+      border-color: var(--border-strong);
     }
     /* Forced colors (Windows High Contrast) erase the selected mode's tint, so it takes the selection
        pair ('forced-color-adjust: none' keeps the browser's Canvas backplate from landing behind its
@@ -985,15 +986,15 @@ export class DocumentPane extends JfElement {
         border-color var(--duration-slow) var(--ease-standard);
     }
     .blocks .block.hl-weak {
-      background: var(--accent-tint-08);
+      background: var(--surface-subtle);
       color: var(--text-highlight-weak);
-      border-left: 2px solid var(--accent-tint-30);
+      border-left: 2px solid var(--border-strong);
       padding-left: 0.5rem;
       margin-left: -0.5rem;
     }
     .blocks .block.hl-strong {
-      background: var(--accent-tint);
-      color: var(--accent-on-tint);
+      background: var(--surface-active);
+      color: var(--text-primary);
       border-radius: 0.25rem;
       padding: 0.1rem 0.4rem;
       margin-left: -0.4rem;
@@ -1014,13 +1015,13 @@ export class DocumentPane extends JfElement {
         border-color var(--duration-slow) var(--ease-standard);
     }
     pre.source span.hl-weak {
-      background: var(--accent-tint-08);
+      background: var(--surface-subtle);
       color: var(--text-highlight-weak);
-      border-left: 2px solid var(--accent-tint-30);
+      border-left: 2px solid var(--border-strong);
     }
     pre.source span.hl-strong {
-      background: var(--accent-tint);
-      color: var(--accent-on-tint);
+      background: var(--surface-active);
+      color: var(--text-primary);
       border-radius: 4px;
     }
     /* Forced colors (Windows High Contrast) erase the highlight's tint, which would leave the cited

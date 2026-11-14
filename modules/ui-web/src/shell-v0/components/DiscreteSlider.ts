@@ -81,7 +81,7 @@ export class DiscreteSlider extends JfElement {
       width: 1rem;
       height: 1rem;
       border-radius: 50%;
-      background: var(--accent-tint);
+      background: var(--text-secondary);
       border: 2px solid var(--surface-primary);
       margin-top: -0.375rem;
     }
@@ -90,7 +90,7 @@ export class DiscreteSlider extends JfElement {
       height: 1rem;
       border: 2px solid var(--surface-primary);
       border-radius: 50%;
-      background: var(--accent-tint);
+      background: var(--text-secondary);
     }
     input[type='range']:focus-visible {
       outline: none;

@@ -605,7 +605,7 @@ describe('CitationsPanel 822 §5.4 — the source card is the selection’s far 
     const cssText = (CitationsPanel.styles as unknown as { cssText: string }).cssText;
     // The accent is still the FALLBACK, so the shipped hover border is byte-identical; only a
     // window that declares `--cp-hover-edge` takes it off the accent (822 §5.4).
-    expect(cssText).toContain('border-color: var(--cp-hover-edge, var(--accent-tint))');
+    expect(cssText).toContain('border-color: var(--cp-hover-edge, var(--text-secondary))');
     // The spec’s precedence rule, and it is about the WASH: `.source[data-selected]` sits after `.source:hover`
     // at the same (0,2,0), so a card that is both takes the selected fill; and the (0,3,0)
     // `[data-selected]:hover` after it raises that to the higher rung rather than layering a second

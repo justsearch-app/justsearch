@@ -439,7 +439,7 @@ describe('the tier ink is a POSITIVE class — absence is neutral, not strongest
   });
 
   it('the grounded tier has a rule of its own, at the ink it always shipped', () => {
-    expect(ruleBody('.cite-ref.cite-grounded')).toContain('--text-tint');
+    expect(ruleBody('.cite-ref.cite-grounded')).toContain('--text-primary');
   });
 });
 

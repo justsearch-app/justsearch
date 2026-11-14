@@ -17,9 +17,9 @@ describe('originatorTone — the one originator(role) → accent authority (574 
     expect(toOriginator(null)).toBe('system');
   });
 
-  it('projects each role to a DISTINCT non-status accent token (agent=purple, user=teal, system=neutral)', () => {
+  it('projects each role to a DISTINCT non-status accent token (agent=purple, user=primary, system=secondary)', () => {
     expect(originatorAccent('agent')).toBe('var(--accent-command)');
-    expect(originatorAccent('user')).toBe('var(--accent-tint)');
+    expect(originatorAccent('user')).toBe('var(--text-primary)');
     expect(originatorAccent('system')).toBe('var(--text-secondary)');
     // the three text accents are mutually distinct (the originator-invisibility bug this fixes)
     const accents = new Set([
@@ -32,7 +32,7 @@ describe('originatorTone — the one originator(role) → accent authority (574 
 
   it('projects each role to its soft (tinted-background) sibling token', () => {
     expect(originatorAccentSoft('agent')).toBe('var(--accent-command-16)');
-    expect(originatorAccentSoft('user')).toBe('var(--accent-tint-16)');
+    expect(originatorAccentSoft('user')).toBe('var(--surface-active)');
     expect(originatorAccentSoft('system')).toBe('var(--surface-2)');
   });
 });

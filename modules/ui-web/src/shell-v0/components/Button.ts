@@ -151,9 +151,9 @@ export class JfButton extends JfElement {
         color: var(--accent-on-danger);
       }
       :host([tone='info']) jf-control::part(control) {
-        background: var(--accent-tint);
+        background: var(--surface-3);
         border-color: transparent;
-        color: var(--accent-on-tint);
+        color: var(--text-primary);
       }
       :host([tone]) jf-control::part(control):hover {
         filter: brightness(1.08);

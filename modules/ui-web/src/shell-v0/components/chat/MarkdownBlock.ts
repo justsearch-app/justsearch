@@ -975,7 +975,8 @@ export class MarkdownBlock extends JfElement {
        claim on every mark that makes no claim. Every tier-1 mark already carries exactly one of the
        three grounding classes, so the shipped rendering of a verified mark is byte-identical. */
     .cite-ref.cite-grounded {
-      color: var(--md-cite-grounded-color, var(--text-tint));
+      color: var(--md-cite-grounded-color, var(--text-primary));
+      font-weight: 500;
     }
     .cite-ref.cite-weak {
       color: var(--md-cite-weak-color, var(--text-secondary));
@@ -1003,7 +1004,7 @@ export class MarkdownBlock extends JfElement {
        token is minted alongside the surface ones: an ink escape hatch is an F2 escape hatch. */
     .cite-ref.cite-selected {
       padding: 0 var(--md-cite-pad-x, 0.25em);
-      background: var(--md-cite-selected-bg, var(--accent-tint));
+      background: var(--md-cite-selected-bg, var(--surface-active));
       box-shadow: inset 0 0 0 1px var(--md-cite-selected-edge, transparent);
     }
     /* Forced colors (Windows High Contrast) erase the wash and drop the inset edge, and the tier
