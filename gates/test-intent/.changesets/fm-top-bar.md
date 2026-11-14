@@ -736,3 +736,14 @@ a source that predates this candidate.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1d88a-3aa3-7ac1-9320-b3d64377b0b8",
+  "verdict": "reject",
+  "digest": "sha256:a5acee50b414b346bd97077004e61d21b5b0f4e4aa040efb2ce20071da934755",
+  "note": "Unsupported weakening: Shell.engineLoss-lockdown tests Menu instead of Settings reachability; boot-frame-lockdown derives its sampling cutoff from current window-control geometry, allowing controls inside the required 44px bar to escape checks."
+}
+```
