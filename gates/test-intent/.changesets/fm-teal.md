@@ -367,3 +367,13 @@ CSS declaration. The entries identify those limits explicitly.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1d79d-3fd3-73f1-bcff-ea37fdc8cd71",
+  "verdict": "accept",
+  "digest": "sha256:3031b66c18785bc0c87e72e1e7dbbb9a05d687812f12dc6fba14817435ad217e"
+}
+```
