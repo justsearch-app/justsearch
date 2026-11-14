@@ -51,7 +51,7 @@ final class McpSemanticBudgetNoteTest {
     SearchTrace trace =
         new SearchTrace(SearchTrace.SCHEMA_VERSION, "HYBRID", null, null, degradation, List.of());
     return new KnowledgeSearchResponse(
-        0L, 0L, 3L, List.of(), null, null, null, null, null, null, null, trace, null);
+        0L, 0L, 3L, List.of(), null, null, null, null, null, null, null, trace, null, null);
   }
 
   static Map<String, Object> invokeSearch(KnowledgeSearchResponse canned) {

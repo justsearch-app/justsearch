@@ -109,6 +109,8 @@ message SearchRequest {
   // privacy-safe regardless; this gates only the heavyweight numeric map. Replaces the
   // debug=true universe — `debug` (5) is honored as a transitional alias. Absent/false omits it.
   optional bool include_detail = 16;
+  // Optional caller-specific exclusion; absent preserves existing search populations.
+  repeated string excluded_collections = 17;
 }
 
 message SearchResponse {
@@ -152,6 +154,13 @@ message SearchResponse {
   // distinct from total_hits (the bounded fused-candidate-union / retrieval window). The FE
   // headline binds to this ("Top N of M matches"); total_hits stays for telemetry / the trace.
   int64 match_count = 27;
+  // Present only when Help is excluded and its lexical count succeeds.
+  HelpMatches help_matches = 28;
+}
+
+message HelpMatches {
+  int64 count = 1;
+  bool capped = 2;
 }
 
 // === 549: Unified stage-keyed search trace ===

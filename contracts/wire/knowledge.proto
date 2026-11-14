@@ -111,6 +111,7 @@ message KnowledgeSearchResponse {
   // distinct from total_hits (the bounded fused-candidate-union). The FE headline binds to this
   // ("Top N of M matches"). Mirrors app-api KnowledgeSearchResponse.matchCount.
   int64 match_count = 28 [json_name = "matchCount"];
+  HelpMatches help_matches = 30 [json_name = "helpMatches"];
   // Tempdoc 366 §1b: the filter echo — mirrors the `filters` / `boostFilters` the request carried,
   // so a client can distinguish a scoped search from one whose scope was silently dropped without
   // inferring it from the rows. Absent when the request carried no filters. Mirrors app-api
@@ -127,6 +128,11 @@ message AppliedFilters {
 
 // The request's filter set, echoed back on the response. Mirrors app-api
 // KnowledgeSearchRequest.Filters; unset members are omitted from the JSON (NON_EMPTY).
+message HelpMatches {
+  int64 count = 1;
+  bool capped = 2;
+}
+
 message SearchFilters {
   repeated string mime = 1;
   repeated string language = 2;

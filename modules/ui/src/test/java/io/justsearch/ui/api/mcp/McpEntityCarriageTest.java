@@ -339,7 +339,7 @@ final class McpEntityCarriageTest {
     // limit 10+ the five facet slots hold the most-referenced entities of the matched set, which is
     // exactly not the per-hit bridge entity of one long document.
     return new KnowledgeSearchResponse(
-        1L, 1L, 7L, List.of(hit), null, Map.of(), null, null, null, null, null, null, null);
+        1L, 1L, 7L, List.of(hit), null, Map.of(), null, null, null, null, null, null, null, null);
   }
 
   /** The same response with the bridge entity in the facet snapshot, which F1 reads its vocabulary from. */
@@ -356,7 +356,7 @@ final class McpEntityCarriageTest {
         null,
         null,
         null,
-        null, null);
+        null, null, null);
   }
 
   /**

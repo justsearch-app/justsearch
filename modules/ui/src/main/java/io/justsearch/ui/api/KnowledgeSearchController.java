@@ -368,6 +368,18 @@ public class KnowledgeSearchController {
 
       log.info("Knowledge search: query='{}', limit={}", redact(new SensitiveQuery(query)), limit);
 
+      List<String> excludedCollections = List.of();
+      Object excludedRaw = body.get("excludedCollections");
+      if (excludedRaw != null) {
+        if (!(excludedRaw instanceof List<?> values)
+            || values.stream().anyMatch(v -> !(v instanceof String text) || text.isBlank())) {
+          ctx.status(400).json(ApiErrorHandler.toResponse(ApiErrorCode.INVALID_REQUEST,
+              "excludedCollections must be an array of non-blank strings", telemetry, ApiErrorHandler.routeOf(ctx)));
+          return;
+        }
+        excludedCollections = values.stream().map(String.class::cast).distinct().toList();
+      }
+
       // Optional: projection
       List<String> projection = List.of();
       Object projectionRaw = body.get("projection");
@@ -468,7 +480,7 @@ public class KnowledgeSearchController {
       KnowledgeSearchRequest req =
           new KnowledgeSearchRequest(
               query, limit, modeText, sortText, cursorText, workerProjection, filters, boostFilters,
-              facets, querySyntaxText, includeExcerpts, debug, pipelineConfig);
+              facets, querySyntaxText, includeExcerpts, debug, pipelineConfig, excludedCollections);
       KnowledgeSearchResponse response = adapter.search(req, WindowAuthority.hasAuthority(ctx), engineContext);
 
       // Tempdoc 580 §17 (Track C P1) — stable per-query join key. The FE echoes it back with a
@@ -486,6 +498,7 @@ public class KnowledgeSearchController {
       out.put("totalHits", response.totalHits());
       // Tempdoc 597: the true matched-document count — the FE headline binds to this.
       out.put("matchCount", response.matchCount());
+      if (response.helpMatches() != null) out.put("helpMatches", response.helpMatches());
       out.put("tookMs", response.tookMs());
       out.put(
           "results",

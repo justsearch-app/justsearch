@@ -904,7 +904,7 @@ class McpProtocolHandlerTest {
             List.of(new HitStage(StageId.SPARSE_RETRIEVAL, 1, 3.3f, null)));
     KnowledgeSearchResponse canned =
         new KnowledgeSearchResponse(
-            1L, 1L, 5L, List.of(hit), null, null, null, null, null, null, null, trace, null);
+            1L, 1L, 5L, List.of(hit), null, null, null, null, null, null, null, trace, null, null);
 
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
     McpSearchSessionFixture.stub(adapter, canned);
@@ -982,7 +982,7 @@ class McpProtocolHandlerTest {
             List.of(),
             List.of(new HitStage(StageId.SPARSE_RETRIEVAL, 1, 3.3f, Map.of("bm25", 3.3f))));
     return new KnowledgeSearchResponse(
-        1L, 1L, 5L, List.of(hit), null, null, null, null, null, null, null, trace, null);
+        1L, 1L, 5L, List.of(hit), null, null, null, null, null, null, null, trace, null, null);
   }
 
   /** A handler wired to a mock adapter that always returns {@code canned}. */

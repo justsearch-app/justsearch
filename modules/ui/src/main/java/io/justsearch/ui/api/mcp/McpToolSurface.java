@@ -1150,7 +1150,7 @@ public final class McpToolSurface {
         resp.queryUnderstanding(),
         resp.filterNormalization(),
         resp.searchTrace(),
-        resp.appliedFilters());
+        resp.appliedFilters(), null);
   }
 
   /**

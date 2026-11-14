@@ -114,13 +114,13 @@ final class McpFramingRenderSnapshotTest {
     persons.put("Vince Kaminski", 12L);
     facets.put("entity_persons_raw", persons);
     return new KnowledgeSearchResponse(
-        1L, 1L, 8L, List.of(hit), null, facets, null, null, null, null, null, null, null);
+        1L, 1L, 8L, List.of(hit), null, facets, null, null, null, null, null, null, null, null);
   }
 
   /** A zero-result response — nothing matched at all. */
   private static KnowledgeSearchResponse zeroResponse() {
     return new KnowledgeSearchResponse(
-        0L, 0L, 6L, List.of(), null, Map.of(), null, null, null, null, null, null, null);
+        0L, 0L, 6L, List.of(), null, Map.of(), null, null, null, null, null, null, null, null);
   }
 
   private static ContextResult answerResult() {
@@ -396,7 +396,7 @@ final class McpFramingRenderSnapshotTest {
               null));
     }
     return new KnowledgeSearchResponse(
-        5L, 5L, 9L, hits, null, Map.of(), null, null, null, null, null, null, null);
+        5L, 5L, 9L, hits, null, Map.of(), null, null, null, null, null, null, null, null);
   }
 
   private static String stripLinesContaining(String text, String needle) {

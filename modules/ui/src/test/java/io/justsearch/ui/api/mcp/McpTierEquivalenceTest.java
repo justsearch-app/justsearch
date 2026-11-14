@@ -220,7 +220,7 @@ final class McpTierEquivalenceTest {
     // facetsTruncated=TRUE (7th positional arg) exercises FACETS_TRUNCATED below, alongside FACETS.
     KnowledgeSearchResponse canned =
         new KnowledgeSearchResponse(
-            37L, 37L, 15L, hits, null, facets, Boolean.TRUE, null, null, null, null, null, null);
+            37L, 37L, 15L, hits, null, facets, Boolean.TRUE, null, null, null, null, null, null, null);
 
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
     McpSearchSessionFixture.stub(adapter, canned);
@@ -290,7 +290,7 @@ final class McpTierEquivalenceTest {
     KnowledgeSearchResponse canned =
         new KnowledgeSearchResponse(
             1L, 1L, 5L, List.of(hit), null, facets, Boolean.FALSE, null, null, null, null, null,
-            null);
+            null, null);
 
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
     McpSearchSessionFixture.stub(adapter, canned);

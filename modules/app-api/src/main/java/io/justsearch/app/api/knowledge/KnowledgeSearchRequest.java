@@ -23,9 +23,19 @@ public record KnowledgeSearchRequest(
     String querySyntax,
     Boolean includeExcerpts,
     Boolean debug,
-    PipelineConfig pipeline) {
+    PipelineConfig pipeline,
+    List<String> excludedCollections) {
+
+  /** Compatibility constructor: callers that omit exclusions keep their existing population. */
+  public KnowledgeSearchRequest(String query, Integer limit, String mode, String sort, String cursor,
+      List<String> projection, Filters filters, Filters boostFilters, Facets facets,
+      String querySyntax, Boolean includeExcerpts, Boolean debug, PipelineConfig pipeline) {
+    this(query, limit, mode, sort, cursor, projection, filters, boostFilters, facets, querySyntax,
+        includeExcerpts, debug, pipeline, List.of());
+  }
 
   public KnowledgeSearchRequest {
+    excludedCollections = excludedCollections == null ? List.of() : List.copyOf(excludedCollections);
     projection = projection == null ? List.of() : List.copyOf(projection);
     querySyntax = querySyntax == null || querySyntax.isBlank() ? null : querySyntax.trim();
   }

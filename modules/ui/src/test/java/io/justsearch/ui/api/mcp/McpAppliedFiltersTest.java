@@ -88,7 +88,7 @@ final class McpAppliedFiltersTest {
         null,
         null,
         trace,
-        KnowledgeSearchResponse.AppliedFilters.of(req.filters(), req.boostFilters()));
+        KnowledgeSearchResponse.AppliedFilters.of(req.filters(), req.boostFilters()), null);
   }
 
   private McpProtocolHandler handler(ArgumentCaptor<KnowledgeSearchRequest> captor) {

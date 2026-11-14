@@ -39,7 +39,10 @@ public record KnowledgeSearchResponse(
     // Tempdoc 549 Phase E4: introspection retired — the unified trace is the single source.
     SearchTrace searchTrace,
     // Tempdoc 366 §1b: the filter echo — null when the request carried no filters.
-    AppliedFilters appliedFilters) {
+    AppliedFilters appliedFilters,
+    @JsonInclude(JsonInclude.Include.NON_NULL) HelpMatches helpMatches) {
+
+  public record HelpMatches(long count, boolean capped) {}
 
   public KnowledgeSearchResponse {
     results = results == null ? List.of() : List.copyOf(results);

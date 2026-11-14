@@ -278,7 +278,7 @@ final class VduRequestActivityTest {
             // The same response fixtures serve both original and authority-carrying signatures.
             if (call.getMethod().getName().equals("search")) {
               return new io.justsearch.app.api.knowledge.KnowledgeSearchResponse(
-                  0, 0, 0, List.of(), null, Map.of(), false, Map.of(), null, null, null, null, null);
+                  0, 0, 0, List.of(), null, Map.of(), false, Map.of(), null, null, null, null, null, null);
             }
             if (call.getMethod().getName().equals("listFolders")) {
               return new io.justsearch.app.api.knowledge.FolderBrowseResponse(List.of(), 0, false);
@@ -290,7 +290,7 @@ final class VduRequestActivityTest {
           }), (mock, context) -> {
         when(mock.suggest(anyString(), anyInt(), any())).thenReturn(List.of("suggestion"));
         when(mock.search(any(), any())).thenReturn(new io.justsearch.app.api.knowledge.KnowledgeSearchResponse(
-            0, 0, 0, List.of(), null, Map.of(), false, Map.of(), null, null, null, null, null));
+            0, 0, 0, List.of(), null, Map.of(), false, Map.of(), null, null, null, null, null, null));
       })) {
         var search = new KnowledgeSearchController(readyBootstrap, null);
         assertEquals(List.of(search.getAdapter()), adapter.constructed(),

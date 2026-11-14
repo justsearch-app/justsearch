@@ -154,6 +154,14 @@ public final class QueryFilterBuilder {
     return false;
   }
 
+  /** Request-specific exclusions bind before every retrieval candidate budget. */
+  private static void addExcludedCollections(BooleanQuery.Builder qb, List<String> collections) {
+    if (!hasTermValues(collections)) return;
+    qb.add(new TermInSetQuery(SchemaFields.COLLECTION,
+        collections.stream().filter(v -> v != null && !v.isBlank()).map(BytesRef::new).toList()),
+        BooleanClause.Occur.MUST_NOT);
+  }
+
   /** Cacheable postings-only guard. Alias/parent ownership is checked on returned rows. */
   static Query privateSourceQuery(boolean includeAppData) {
     var excluded = new BooleanQuery.Builder();
@@ -238,6 +246,7 @@ public final class QueryFilterBuilder {
     // collections; the default excludes the reserved agent-history collection so transcripts don't
     // pollute normal document search.
     addCollectionScope(qb, filters.collection());
+    addExcludedCollections(qb, filters.excludedCollections());
 
     // Entity filters (NER-extracted values)
     addTermOrFilter(qb, filters.entityPersons(), SchemaFields.ENTITY_PERSONS_RAW);
@@ -299,6 +308,7 @@ public final class QueryFilterBuilder {
 
     // Tempdoc 585 §D Phase 4 (D4b) — collection scope (default-excludes the reserved agent-history).
     hasFilters |= addCollectionScope(qb, filters.collection());
+    addExcludedCollections(qb, filters.excludedCollections());
 
     // Entity filters (NER-extracted values)
     hasFilters |= addTermOrFilter(qb, filters.entityPersons(), SchemaFields.ENTITY_PERSONS_RAW);
@@ -387,6 +397,7 @@ public final class QueryFilterBuilder {
 
     // Collection and source ownership apply to legacy chunks as well as current parents.
     hasClause |= addCollectionScope(qb, filters.collection());
+    addExcludedCollections(qb, filters.excludedCollections());
 
     if (filters.pathPrefix() != null && !filters.pathPrefix().isBlank()) {
       String normalized = normalizePathPrefix(filters.pathPrefix());

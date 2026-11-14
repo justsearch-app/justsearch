@@ -37,6 +37,8 @@ final class KnowledgeWireContractConformanceTest {
     assertRecordSubsetOfProto(
         KnowledgeSearchResponse.class, io.justsearch.contract.wire.KnowledgeSearchResponse.getDescriptor());
     assertRecordSubsetOfProto(
+        KnowledgeSearchResponse.HelpMatches.class, io.justsearch.contract.wire.HelpMatches.getDescriptor());
+    assertRecordSubsetOfProto(
         KnowledgeSearchResponse.Hit.class, io.justsearch.contract.wire.Hit.getDescriptor());
     assertRecordSubsetOfProto(
         KnowledgeSearchResponse.IndexCapabilities.class,
