@@ -83,7 +83,9 @@ class KnowledgeSearchHelpBoundaryTest {
       var client = mock(KnowledgeClient.class);
       var context = context(Map.of("query", "needle", "excludedCollections", raw, "pipeline", Map.of()));
       controller(client).handleSearch(context);
-      verify(context).status(400);
+      var status = ArgumentCaptor.forClass(Integer.class);
+      verify(context, org.mockito.Mockito.atLeast(0)).status(status.capture());
+      assertEquals(1, java.util.Collections.frequency(status.getAllValues(), 400), "malformed excludedCollections " + raw + " must be rejected with 400");
       verify(client, never()).search(any(SearchRequest.class), anyBoolean(), any(EngineContext.class));
     }
   }

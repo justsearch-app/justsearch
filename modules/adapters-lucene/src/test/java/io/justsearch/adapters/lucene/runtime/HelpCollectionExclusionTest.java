@@ -23,7 +23,7 @@ class HelpCollectionExclusionTest {
   void exclusionBindsLexicalVectorSpladeAndChunkFiltersBeforeBudgets() throws Exception {
     var builder = LuceneRuntimeTypesRuntimeSearchFiltersBuilder.builder();
     // Reflection keeps the before check executable: the missing request-specific field is the failure.
-    builder.getClass().getMethod("excludedCollections", List.class).invoke(builder, List.of("justsearch-help"));
+    exclude(builder, List.of("justsearch-help"));
     var filters = builder.build();
     try (var directory = new ByteBuffersDirectory();
          var writer = new IndexWriter(directory, new IndexWriterConfig(new StandardAnalyzer()))) {
@@ -51,7 +51,7 @@ class HelpCollectionExclusionTest {
   @Test
   void helpCannotConsumeTextDenseSpladeOrPassageCandidateBudgets() throws Exception {
     var builder = LuceneRuntimeTypesRuntimeSearchFiltersBuilder.builder();
-    builder.getClass().getMethod("excludedCollections", List.class).invoke(builder, List.of("justsearch-help"));
+    exclude(builder, List.of("justsearch-help"));
     var filters = builder.build().withSizeFromBytes(0L);
     try (var directory = new ByteBuffersDirectory();
         var writer = new IndexWriter(directory, new IndexWriterConfig(new StandardAnalyzer()))) {
@@ -103,4 +103,14 @@ class HelpCollectionExclusionTest {
         .add(filter, org.apache.lucene.search.BooleanClause.Occur.FILTER).build();
   }
 
+
+  private static void exclude(Object builder, List<String> collections) throws Exception {
+    java.lang.reflect.Method method;
+    try {
+      method = builder.getClass().getMethod("excludedCollections", List.class);
+    } catch (NoSuchMethodException e) {
+      throw new AssertionError("runtime filters must accept request-specific excluded collections", e);
+    }
+    method.invoke(builder, collections);
+  }
 }
