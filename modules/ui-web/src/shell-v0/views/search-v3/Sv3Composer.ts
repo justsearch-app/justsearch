@@ -2119,7 +2119,7 @@ export class Sv3Composer extends JfElement {
   private corpusLine(): TemplateResult | typeof nothing {
     const setup = getFirstUse();
     if (this.tier !== 'search' || !setup.sessionReading || !setup.reading || (setup.roots ?? 0) === 0 || setup.searchable === null) return nothing;
-    return html`<p class="corpus" data-testid="first-use-progress">${setup.searchable.toLocaleString()} files searchable so far</p>`;
+    return html`<p class="corpus" data-testid="first-use-progress">${setup.searchable.toLocaleString()} ${setup.searchable === 1 ? 'file' : 'files'} searchable so far</p>`;
   }
 
 
