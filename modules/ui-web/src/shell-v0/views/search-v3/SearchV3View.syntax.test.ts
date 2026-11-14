@@ -111,7 +111,11 @@ it('x5 withholds prior counts and facets while the new query awaits its Engine c
   await main.updateComplete;
   const results = main.shadowRoot!.querySelector('jf-sv3-results') as Mounted;
   await results.updateComplete;
-  expect(results.shadowRoot!.querySelector('jf-results-card')?.shadowRoot?.querySelector('[data-testid="search-result-row"]')).toBeNull();
+  // The card may stay mounted for the filter row; it must show none of the prior query's rows, counts or facets.
+  const card = results.shadowRoot!.querySelector('jf-results-card')?.shadowRoot ?? null;
+  expect(card?.querySelector('[data-testid="search-result-row"]') ?? null).toBeNull();
+  expect(card?.querySelector('[data-testid="facet-row"] button') ?? null).toBeNull();
+  expect(card?.textContent ?? '').not.toMatch(/\d/);
   expect(getSearchState().isRefining).toBe(true);
   expect(getSearchState().isSearching).toBe(false);
   release(good('new')); await settle(view);

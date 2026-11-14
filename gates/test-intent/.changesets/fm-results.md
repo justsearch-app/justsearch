@@ -441,3 +441,14 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "pvl5fiza-test-intent",
+  "verdict": "reject",
+  "digest": "sha256:ddbdf5811f5f2cca7e39a0c1d06ee7a7326ec83aed095f91ed9a7eae45f3df0c",
+  "note": "Entry 1 weakens the live x5 stale-count/facet oracle to row absence; entry 3 has no fail-before evidence (failBefore null), and before/after execution plus file isolation could not be verified because Vitest is missing and dependency preparation fails with EAI_AGAIN."
+}
+```
