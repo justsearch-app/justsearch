@@ -112,8 +112,8 @@ export const facetChipStyles: CSSResult = css`
     outline: 2px solid transparent;
   }
   .facet-chip.selected {
-    background: var(--accent-tint);
-    color: var(--accent-on-tint);
+    background: var(--surface-active);
+    color: var(--text-primary);
     border-color: var(--accent-command);
   }
   /* Forced colors (Windows High Contrast) erase the selected chip's fill, so it takes the selection

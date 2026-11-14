@@ -702,7 +702,7 @@ export class LibrarySurface extends JfElement {
       .skip-rule input { flex: 1; min-width: 0; padding: .5rem .2rem; font: inherit; font-size: var(--font-size-sm); font-family: monospace;
         border: 0; background: transparent; color: var(--text-primary); }
       .skip-rule input:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
-      .add-rule::part(control) { color: var(--accent-tint); }
+      .add-rule::part(control) { color: var(--text-primary); font-weight: 500; }
       @media (max-width: 800px) { .library-rules { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; } }
       @media (forced-colors: active) { .skip-rule { border-color: CanvasText; } .skip-rule input:focus-visible { outline-color: Highlight; } }
       .gap-decision h3 { font-size: var(--font-size-sm); font-weight: 400; color: var(--text-primary); }

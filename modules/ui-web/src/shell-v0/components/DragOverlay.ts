@@ -58,11 +58,11 @@ export class DragOverlay extends JfElement {
       height: 5rem;
       margin: 0 auto 1rem auto;
       border-radius: 14px;
-      border: 2px dashed var(--accent-tint);
+      border: 2px dashed var(--text-secondary);
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--text-tint);
+      color: var(--text-secondary);
     }
     h3 {
       margin: 0 0 0.25rem 0;

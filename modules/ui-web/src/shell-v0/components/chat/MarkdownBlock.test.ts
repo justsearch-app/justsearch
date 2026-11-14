@@ -561,12 +561,12 @@ describe('MarkdownBlock 822 §3c — the ungrounded mark has its own color', () 
   });
 
   /**
-   * The tier palette is MONOTONIC as a source invariant: grounded ≠ weak ≠ ungrounded. Asserted on
+   * The tier presentations remain distinct: grounded ≠ weak ≠ ungrounded. Asserted on
    * the stylesheet text rather than on computed values because happy-dom does not cascade shadow
    * styles — the computed-value check runs live in the browser (§5.4 S2). Before 822 §3c there was
    * no `cite-ungrounded` rule at all and the WEAKEST tier inherited the STRONGEST tier's blue.
    */
-  it('declares a distinct color for each of the three mark tiers', () => {
+  it('declares a distinct colour and weight presentation for all four mark tiers', () => {
     const cssText = markdownBlockCssText();
     const colorOf = (selector: string): string => {
       const m = new RegExp(`${selector.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`).exec(cssText);
@@ -587,23 +587,31 @@ describe('MarkdownBlock 822 §3c — the ungrounded mark has its own color', () 
     // Tempdoc 869 C3 re-bases this from `.cite-ref` to the tier's OWN rule: the base rule no longer
     // carries the strongest tier's ink for a mark to fall through to, because falling through was
     // the defect (a tier-2 mark states no grounding class and used to inherit the tint anyway).
-    const grounded = shippedInk('.cite-ref.cite-grounded');
-    const weak = shippedInk('.cite-ref.cite-weak');
-    const ungrounded = shippedInk('.cite-ref.cite-ungrounded');
+    const weightOf = (selector: string): string => {
+      const body = new RegExp(`${selector.replace(/[.]/g, '\\.')}\\s*\\{([^}]*)\\}`).exec(cssText)![1]!;
+      return /font-weight:\s*([^;]+);/.exec(body)?.[1]?.trim()
+        ?? (selector === '.cite-ref' ? '400' : weightOf('.cite-ref'));
+    };
+    const presentationOf = (selector: string): string => `${shippedInk(selector)}/${weightOf(selector)}`;
+    const grounded = presentationOf('.cite-ref.cite-grounded');
+    const weak = presentationOf('.cite-ref.cite-weak');
+    const ungrounded = presentationOf('.cite-ref.cite-ungrounded');
+    expect(weightOf('.cite-ref.cite-grounded')).toBe('500');
     expect(new Set([grounded, weak, ungrounded]).size).toBe(3);
-    // Tempdoc 869 F6 — FOUR inks, because there are four things a mark can be, and the SOURCE tier
+    // Tempdoc 869 F6 — FOUR presentations, because there are four things a mark can be, and the SOURCE tier
     // (the base rule, worn by a tier-2 mark that states no grounding class) is one of them. C3's
     // first cut gave the base rule `--text-secondary`, which is `.cite-weak`'s own shipped ink: in
     // any window that re-points neither hook — the shipped shell — a mark asserting "the model
     // named this source" and a mark asserting "the verifier scored this sentence WEAKLY" resolved
     // to one colour. Moving the tint off the base rule is only half the inversion; the other half
-    // is that what falls through must not collide with a tier that states itself.
-    const sourceTier = shippedInk('.cite-ref');
+    // is that what falls through must not collide with a tier that states itself. The neutral
+    // source and grounded tiers share primary ink but differ by weight (600 vs 500).
+    const sourceTier = presentationOf('.cite-ref');
     expect(new Set([sourceTier, grounded, weak, ungrounded]).size).toBe(4);
     // The warning role's TEXT member — an `--accent-*` fill token is not a text color, and sv3
     // bridges `--text-warning` and `--accent-warning` to one `--warning-foreground`.
-    expect(ungrounded).toBe('--text-warning');
-    expect(weak).toBe('--text-secondary');
+    expect(shippedInk('.cite-ref.cite-ungrounded')).toBe('--text-warning');
+    expect(shippedInk('.cite-ref.cite-weak')).toBe('--text-secondary');
     // …and the opt-in knobs are the cite vocabulary's own, so a window re-points the INK without
     // touching `--text-secondary` / `--text-warning`, which dress half the renderer besides.
     expect(colorOf('.cite-ref.cite-weak')).toBe('var(--md-cite-weak-color, var(--text-secondary))');
@@ -993,7 +1001,7 @@ describe('822 §5.2 — frozen defaults: the shipped window is unmoved (S4-style
     // design's §7 live check), the same split the S4 containment test records.
     const cssText = markdownBlockCssText();
     const rule = /\.cite-ref\.cite-selected\s*\{([^}]*)\}/.exec(cssText)![1]!;
-    expect(rule).toContain('background: var(--md-cite-selected-bg, var(--accent-tint));');
+    expect(rule).toContain('background: var(--md-cite-selected-bg, var(--surface-active));');
     expect(rule).toContain('padding: 0 var(--md-cite-pad-x, 0.25em);');
     // A transparent edge is a computed no-op — the hairline is the window's opt-in, not a default.
     expect(rule).toContain('box-shadow: inset 0 0 0 1px var(--md-cite-selected-edge, transparent);');

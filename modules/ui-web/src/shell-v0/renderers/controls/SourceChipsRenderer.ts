@@ -44,7 +44,7 @@ export class SourceChipsRenderer extends JsonFormsRendererBase {
       font-size: var(--font-size-xs);
     }
     .chip .num {
-      color: var(--text-tint);
+      color: var(--text-secondary);
       font-weight: 600;
     }
   `;

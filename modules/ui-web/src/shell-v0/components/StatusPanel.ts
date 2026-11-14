@@ -130,11 +130,11 @@ export class StatusPanel extends JfElement {
     time { flex-shrink: 0; font-variant-numeric: tabular-nums; }
     .actions { display: flex; flex-wrap: wrap; gap: var(--jf-space-3); margin-top: var(--jf-space-2); }
     button { font: inherit; color: var(--text-primary); background: transparent; border: 0; padding: var(--jf-space-1); cursor: pointer; }
-    .actions button, .footer button { color: var(--text-tint); }
+    .actions button, .footer button { color: var(--text-primary); font-weight: 500; }
     button:hover { text-decoration: underline; }
     button:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); outline-offset: var(--jf-space-1); }
     progress { display: block; width: 100%; height: var(--jf-space-1); accent-color: var(--accent); margin-top: var(--jf-space-2); }
-    .unread { font-size: var(--font-size-xs); color: var(--text-tint); }
+    .unread { font-size: var(--font-size-xs); color: var(--text-secondary); }
     .plugins { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--jf-space-3); min-width: 0; }
     .plugins.open { flex-wrap: wrap; }
     .plugin { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-2); max-width: 100%; min-width: 0; }
@@ -143,7 +143,7 @@ export class StatusPanel extends JfElement {
     .plugin-body { display: block; min-width: 0; max-inline-size: 100%; overflow: hidden; }
     .plugin-body > * { max-inline-size: 100%; box-sizing: border-box; }
     .empty { padding: var(--jf-space-4); }
-    .actions button.primary { color: var(--accent-on-tint); background: var(--accent-tint); border-radius: var(--frame-control-radius);
+    .actions button.primary { color: var(--text-primary); background: transparent; border-radius: var(--frame-control-radius);
       padding-inline: var(--jf-space-3); }
     .error { color: var(--text-danger); font-size: var(--font-size-xs); }
     /* ref-10 — the review of one request, inside the panel. */
@@ -154,7 +154,7 @@ export class StatusPanel extends JfElement {
     .who { display: flex; align-items: center; gap: var(--jf-space-3); }
     .who p { margin: 0; }
     .avatar { flex: none; display: grid; place-items: center; inline-size: var(--frame-control-size); block-size: var(--frame-control-size);
-      border-radius: var(--frame-control-radius); background: var(--surface-2); color: var(--text-tint); }
+      border-radius: var(--frame-control-radius); background: var(--surface-2); color: var(--text-secondary); }
     .lines { list-style: none; margin: 0; padding: 0; }
     .lines li { display: flex; gap: var(--jf-space-3); padding-block: var(--jf-space-2); border-top: var(--frame-hairline) solid var(--border-subtle); }
     .lines li:last-child { border-bottom: var(--frame-hairline) solid var(--border-subtle); }

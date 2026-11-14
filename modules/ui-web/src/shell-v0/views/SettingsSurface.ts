@@ -703,9 +703,9 @@ export class SettingsSurface extends JfElement {
       background: var(--surface-hover);
     }
     .option-btn.selected {
-      border-color: var(--accent-tint);
-      background: var(--accent-tint-08);
-      color: var(--text-tint);
+      border-color: var(--text-secondary);
+      background: var(--surface-subtle);
+      color: var(--text-primary);
     }
     .option-label {
       font-size: var(--font-size-sm);
@@ -746,7 +746,7 @@ export class SettingsSurface extends JfElement {
       border-color: var(--border-strong, var(--border-subtle));
     }
     .theme-tile.selected {
-      outline: 2px solid var(--accent-tint);
+      outline: 2px solid var(--text-secondary);
       outline-offset: 2px;
     }
     /* Forced colors (Windows High Contrast) erase the selected option's tint and edge, so it takes
@@ -794,7 +794,7 @@ export class SettingsSurface extends JfElement {
       display: flex;
       border-radius: 50%;
       background: var(--surface-primary);
-      color: var(--text-tint);
+      color: var(--text-primary);
     }
     .theme-tile-label {
       margin-top: 0.375rem;

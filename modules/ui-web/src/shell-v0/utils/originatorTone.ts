@@ -32,13 +32,13 @@ export function toOriginator(origin: string | undefined | null): Originator {
   }
 }
 
-/** Originator → solid accent token (the badge's text colour): agent=purple, user=teal, system=neutral. */
+/** Originator → solid accent token (the badge's text colour): agent=purple, user=primary, system=secondary. */
 export function originatorAccent(origin: Originator): string {
   switch (origin) {
     case 'agent':
       return 'var(--accent-command)';
     case 'user':
-      return 'var(--accent-tint)';
+      return 'var(--text-primary)';
     case 'system':
     default:
       return 'var(--text-secondary)';
@@ -52,7 +52,7 @@ export function originatorAccentSoft(origin: Originator): string {
     case 'agent':
       return 'var(--accent-command-16)';
     case 'user':
-      return 'var(--accent-tint-16)';
+      return 'var(--surface-active)';
     case 'system':
     default:
       return 'var(--surface-2)';

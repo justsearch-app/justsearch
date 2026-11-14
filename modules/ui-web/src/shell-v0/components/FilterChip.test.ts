@@ -22,7 +22,7 @@ describe('jf-filter-chip (574 §23.B atom)', () => {
   it('projects the active tint from the tone (statusTone authority); defaults to info', async () => {
     const def = await mount((c) => (c.active = true));
     expect(def.shadowRoot!.querySelector('button')!.getAttribute('style')).toContain(
-      'var(--accent-tint)', // info default
+      'var(--text-secondary)', // info default
     );
     const err = await mount((c) => {
       c.active = true;

@@ -61,13 +61,13 @@ export class GettingStarted extends JfElement {
     header h2 { font-size: var(--font-size-md); font-weight: 500; margin: 0; }
     header p { flex: 1; font-size: var(--font-size-xs); }
     progress { flex-basis: 100%; inline-size: 100%; block-size: var(--jf-space-2); accent-color: var(--text-tint); }
-    li[aria-current='step'] { border-inline-start: var(--frame-focus-width) solid var(--text-tint); }
+    li[aria-current='step'] { border-inline-start: var(--frame-focus-width) solid var(--text-secondary); }
     ol { list-style: none; margin: 0; padding: 0; }
     li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-3);
       padding: var(--jf-space-4); border-block-start: var(--frame-hairline) solid var(--border-subtle); }
     .step { flex: 1; min-inline-size: 0; }
     .step p { margin-block-end: 0; }
-    .mark { font-weight: 600; color: var(--text-tint); }
+    .mark { font-weight: 600; color: var(--text-secondary); }
     .progress { text-align: center; margin-block: var(--jf-space-4); }
     .add-row { display: flex; flex-wrap: wrap; gap: var(--jf-space-2); margin-block: var(--jf-space-3); }
     input { flex: 1; min-inline-size: 0; max-inline-size: 100%; font: inherit; color: var(--text-primary);

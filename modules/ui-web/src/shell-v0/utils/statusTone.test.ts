@@ -53,7 +53,7 @@ describe('statusTone — the one status → tone → accent authority (565 §3.B
     expect(toneAccent('success')).toBe('var(--accent-success)');
     expect(toneAccent('warning')).toBe('var(--accent-warning)');
     expect(toneAccent('error')).toBe('var(--accent-danger)');
-    expect(toneAccent('info')).toBe('var(--accent-tint)');
+    expect(toneAccent('info')).toBe('var(--text-secondary)');
     expect(toneAccent('neutral')).toBe('var(--text-secondary)');
     // Every returned value is a token reference, never a hex/rgb literal.
     for (const tone of ['success', 'warning', 'error', 'info', 'neutral'] as const) {

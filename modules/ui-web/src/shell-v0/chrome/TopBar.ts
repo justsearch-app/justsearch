@@ -136,7 +136,7 @@ export class TopBar extends JfElement {
     .brand { display: inline-flex; align-items: center; gap: var(--jf-space-3); flex: none;
       color: var(--text-primary); font-size: var(--font-size-md); font-weight: var(--jf-weight-semibold); white-space: nowrap; }
     .dot { inline-size: var(--frame-brand-dot); block-size: var(--frame-brand-dot); border-radius: var(--frame-pill-radius);
-      background: var(--accent-tint); box-shadow: 0 0 0 var(--frame-brand-halo) var(--accent-tint-16); flex: none; }
+      background: var(--text-secondary); box-shadow: 0 0 0 var(--frame-brand-halo) var(--surface-active); flex: none; }
     nav { display: flex; align-items: center; justify-content: center; }
     nav[hidden] + .end { grid-column: 3; }
     .segments { display: flex; align-items: center; gap: var(--frame-hairline); padding: var(--jf-space-1);
@@ -148,7 +148,7 @@ export class TopBar extends JfElement {
       font-weight: var(--jf-weight-medium); white-space: nowrap; }
     .segment:hover { color: var(--text-primary); }
     .segment[aria-current='page'], .area-trigger { background: var(--surface-2); color: var(--text-primary); }
-    .segment[aria-current='page'] svg, .area-trigger svg { color: var(--text-tint); }
+    .segment[aria-current='page'] svg, .area-trigger svg { color: var(--text-secondary); }
     .area-trigger { display: none; }
     .icon-button { display: inline-grid; place-items: center; inline-size: var(--frame-control-size);
       block-size: var(--frame-control-size); border-radius: var(--frame-control-radius); flex: none; }
@@ -173,7 +173,7 @@ export class TopBar extends JfElement {
       box-sizing: border-box; min-block-size: var(--frame-control-size); padding: var(--jf-space-1) var(--jf-space-3);
       border-radius: var(--frame-control-radius); text-align: start; color: var(--text-primary); }
     [role='menuitem']:hover, [role='menuitem']:focus-visible, [role='menuitemradio']:hover, [role='menuitemradio']:focus-visible { background: var(--surface-2); }
-    [role='menuitemradio'][aria-checked='true'] svg { color: var(--text-tint); }
+    [role='menuitemradio'][aria-checked='true'] svg { color: var(--text-secondary); }
     .item-label { flex: 1; min-width: 0; }
     .item-detail, kbd { color: var(--text-secondary); font-size: var(--font-size-xs); white-space: nowrap; }
     kbd { font: inherit; font-size: var(--font-size-xs); padding: 0 var(--jf-space-1);

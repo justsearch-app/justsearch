@@ -31,13 +31,10 @@ import type { PresentationDeclaration, PresentationOrigin } from '../themes/pres
 
 /**
  * Swatch fill for a declaration that declares no theme tier (CORE_DECLARED, SETTINGS_DECLARED,
- * THREE_SURFACE_SPIKE): applying one changes no accent token, so "the default accent" is the honest
- * preview. A literal rather than `var(--accent-tint)`, because applying a skin overwrites that token
- * document-scoped — which is exactly the defect where every card previewed the ACTIVE skin instead of
- * its own. Reuses the theme-invariant `--h-teal` hue constant (src/styles/tokens.css); only the
- * lightness/chroma pair is local.
+ * THREE_SURFACE_SPIKE): applying one changes no accent token, so its fallback preview is neutral.
+ * It must not echo the document accent: that would preview the active skin on every such card.
  */
-const DEFAULT_SWATCH_TINT = 'oklch(75% 0.15 var(--h-teal))';
+const DEFAULT_SWATCH_TINT = 'var(--text-secondary)';
 
 export class PresentationGallerySurface extends JfElement {
   static properties = {
@@ -177,7 +174,7 @@ export class PresentationGallerySurface extends JfElement {
         gap: 0.4rem;
       }
       .card.active {
-        border-color: var(--accent-primary);
+        border-color: var(--text-secondary);
       }
       /* Each card supplies its own --swatch-tint from the declaration via swatchTint(). */
       .swatch {

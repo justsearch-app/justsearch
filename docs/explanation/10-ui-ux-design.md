@@ -33,9 +33,10 @@ visual reference:
 - **Say the state in words.** For example, “Your files are searchable” tells the user what
   they can do. Keep technical detail in Detailed mode; a colour or icon alone is not a status.
 - **Use text actions.** Avoid outlined pill buttons. Give a window's main action one filled
-  teal button; secondary actions are quiet text controls.
-- **Reserve teal** for the main action, switches that are on, progress, and links that add
-  something. Do not use it as decoration or a file-type colour code.
+  teal button; text actions use the normal text colour in medium weight.
+- **Reserve teal** for “on or working now”: switches that are on, progress, and the lit
+  steps of AI Brain, plus the one filled main action on a screen. Tabs, the active area
+  and selected rows are neutral; information is grey.
 - **Use the existing typography and surface tokens.** Inter ships with the app; 20 and 28 px
   text uses its display optical size through the variable font's optical-size axis. The six
   text sizes are 11 px for small labels, 12 px for secondary text, 13 px for body and controls,
@@ -407,9 +408,9 @@ Requests that need typing (high-risk operations, and agent suggestions that need
 confirmation) are listed the same way, but answering them opens the protected security
 dialog (Review, or Allow suggestion for a suggestion). Plugin permission requests that the
 reader's own action started (installing or enabling a plugin) open it at once. That dialog is a native modal `<dialog>` in the
-browser's top layer, headed “JustSearch security check”, with a teal border; skins and
-plugins cannot restyle or cover it. For plugin permissions, “Allow once” is the primary
-answer. A confirmation the reader's own command needs opens at once too: the security
+browser's top layer, headed “JustSearch security check”, with a teal border. This border is
+the one deliberate exception to the teal rule: it marks the genuine dialog. Skins and plugins
+cannot restyle or cover it. For plugin permissions, “Allow once” is the primary answer. A confirmation the reader's own command needs opens at once too: the security
 dialog when it must be typed, otherwise a small dialog that leaves the page usable.
 
 When copies of one agent request share an operation key, answering one answers all of

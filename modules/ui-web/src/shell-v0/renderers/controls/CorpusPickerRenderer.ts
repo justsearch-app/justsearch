@@ -49,7 +49,7 @@ export class CorpusPickerRenderer extends JsonFormsRendererBase {
       flex: 0 0 auto;
       width: 1rem;
       height: 1rem;
-      color: var(--text-tint);
+      color: var(--text-secondary);
     }
     .picker__input {
       flex: 1 1 auto;

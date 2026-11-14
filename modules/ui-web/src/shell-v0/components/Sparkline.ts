@@ -43,13 +43,13 @@ export class Sparkline extends JfElement {
     svg { display: block; overflow: visible; }
     .line {
       fill: none;
-      stroke: var(--accent-tint);
+      stroke: var(--text-secondary);
       stroke-width: 1.25;
       stroke-linejoin: round;
       stroke-linecap: round;
     }
     .endpoint {
-      fill: var(--accent-tint);
+      fill: var(--text-secondary);
     }
   `;
 

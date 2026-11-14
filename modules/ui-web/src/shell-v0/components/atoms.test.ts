@@ -106,7 +106,7 @@ describe('jf-status-badge (574 atom)', () => {
     );
     const user = await mount<StatusBadge>('jf-status-badge', (c) => (c.origin = 'user'));
     expect(user.shadowRoot!.querySelector('.badge')!.getAttribute('style')).toContain(
-      'var(--accent-tint)',
+      'var(--text-primary)',
     );
   });
   it('gives the NEUTRAL case (origin system / status neutral) a delineating border; vivid tones none (§23.C.1)', async () => {

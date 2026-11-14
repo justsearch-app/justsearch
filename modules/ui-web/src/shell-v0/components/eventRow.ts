@@ -108,7 +108,7 @@ export const eventRowStyles: CSSResult = css`
     width: 0.45rem;
     height: 0.45rem;
     border-radius: 50%;
-    background: var(--accent-tint);
+    background: var(--text-secondary);
     align-self: center;
   }
   /* Forced colours replace backgrounds: keep the unread dot visible in the system text colour. */
@@ -127,7 +127,8 @@ export const eventRowStyles: CSSResult = css`
     background: var(--surface-2);
   }
   .who[data-originator='agent'] {
-    color: var(--text-tint);
+    color: var(--text-primary);
+    font-weight: 500;
   }
   .who[data-originator='system'] {
     color: var(--text-secondary);

@@ -293,7 +293,7 @@ export class CitationsPanel extends JfElement {
       background: var(--surface-3);
       /* 822 §5.4 — the panel's one accent spend, recovered: a hover edge is not an act-now signal,
          so the window that wants it neutral re-points it. Default unchanged. */
-      border-color: var(--cp-hover-edge, var(--accent-tint));
+      border-color: var(--cp-hover-edge, var(--text-secondary));
     }
     /* Tempdoc 822 §5.4 — the selected source card. Containment means every --cp-* name defaults to
        TODAY'S VALUE, not to nothing: this selector's (0,2,0) outranks the base '.citation, .source'
@@ -325,7 +325,7 @@ export class CitationsPanel extends JfElement {
          otherwise WEAKEN the edge on hover, reading as "less selected" the moment the pointer
          arrives. Shipped consumers set neither name and fall through to the accent edge exactly as
          before. */
-      border-color: var(--cp-selected-hover-edge, var(--cp-hover-edge, var(--accent-tint)));
+      border-color: var(--cp-selected-hover-edge, var(--cp-hover-edge, var(--text-secondary)));
     }
     /* Tempdoc 870 item 6a — the reveal EASES now. 'display' is a discrete property, so the
        none → block swap this rule pair has always made could never animate: the preview appeared
@@ -401,13 +401,13 @@ export class CitationsPanel extends JfElement {
       border-radius: 4px;
       transition: width var(--duration-normal);
     }
-    .score.high { color: var(--text-tint); }
+    .score.high { color: var(--text-primary); font-weight: 500; }
     .score.medium { color: var(--text-secondary); }
     .score.low { color: var(--text-warning); }
     /* Tempdoc 603 C1 — the per-source GROUNDING (faithfulness) badge. Cited → tier colour; uncited → muted
        (never the alarming warning colour — "retrieved, not cited" is neutral, not a fault). */
     .grounding { font-size: var(--font-size-xs); font-weight: 500; white-space: normal; }
-    .grounding.high { color: var(--text-tint); }
+    .grounding.high { color: var(--text-primary); }
     .grounding.medium { color: var(--text-secondary); }
     .grounding.uncited { color: var(--text-secondary); font-style: italic; }
     /* Tempdoc 849 §5/§7 — the RETRIEVED-vs-RECEIVED badge, beside the grounding badge because they
@@ -442,7 +442,7 @@ export class CitationsPanel extends JfElement {
       border-radius: 4px;
       transition: width var(--duration-normal);
     }
-    .confidence-bar .fill.high { background: var(--accent-tint); }
+    .confidence-bar .fill.high { background: var(--text-primary); }
     .confidence-bar .fill.medium { background: var(--text-secondary); }
     .confidence-bar .fill.low { background: var(--accent-warning); }
     /* The CONTENT role: --font-size-sm off the '.citation, .source' rule above, at the transcript's
