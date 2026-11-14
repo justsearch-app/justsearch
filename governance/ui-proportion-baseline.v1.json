@@ -504,7 +504,7 @@
       ]
     },
     {
-      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-normal-dark",
       "elements": [
         {
@@ -515,18 +515,34 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 800,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"
       ]
     },
     {
-      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-normal-light",
       "elements": [
         {
@@ -537,18 +553,34 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 800,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"
       ]
     },
     {
-      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-normal-forced",
       "elements": [
         {
@@ -559,18 +591,34 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 800,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"
       ]
     },
     {
-      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-narrow-dark",
       "elements": [
         {
@@ -581,18 +629,34 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 800,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"
       ]
     },
     {
-      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-narrow-light",
       "elements": [
         {
@@ -603,18 +667,34 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 800,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"
       ]
     },
     {
-      "$comment": "WP2.4b Y7: full 13-row Recent; positive row/control witnesses, no list scrolling, bar overlap or clipped hero introduction. Calibrated from real captures.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-narrow-forced",
       "elements": [
         {
@@ -625,18 +705,34 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 800,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"
       ]
     },
     {
-      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-1280x720-dark",
       "elements": [
         {
@@ -647,18 +743,34 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 720,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"
       ]
     },
     {
-      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-1280x720-light",
       "elements": [
         {
@@ -669,18 +781,34 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 720,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"
       ]
     },
     {
-      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-1280x720-forced",
       "elements": [
         {
@@ -691,18 +819,34 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 720,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"
       ]
     },
     {
-      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-760x720-dark",
       "elements": [
         {
@@ -713,18 +857,34 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 720,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"
       ]
     },
     {
-      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-760x720-light",
       "elements": [
         {
@@ -735,18 +895,34 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 720,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"
       ]
     },
     {
-      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-760x720-forced",
       "elements": [
         {
@@ -757,18 +933,34 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 720,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"
       ]
     },
     {
-      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-600x400-dark",
       "elements": [
         {
@@ -779,18 +971,34 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 400,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"
       ]
     },
     {
-      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-600x400-light",
       "elements": [
         {
@@ -801,18 +1009,34 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 400,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"
       ]
     },
     {
-      "$comment": "WP2.4b R1a/Y7a: full 13-row list; setup asserts real ancestor clipping, every keyboard row and pointer reachability. Only the listbox may scroll.",
+      "$comment": "Eight in-flow recent searches: the list clears the field and headline; its last row is present and fully in view after scrolling the composer. The list itself never scrolls.",
       "uiShotStep": "sv3-recents-hero-600x400-forced",
       "elements": [
         {
@@ -823,11 +1047,27 @@
           "selector": "[data-testid=\"sv3-composer-headline\"]",
           "minHeightPx": 40,
           "mustNotOverlapSelector": "jf-top-bar"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "minHeightPx": 10,
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-shell\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"]",
+          "mustNotOverlapSelector": "[data-testid=\"sv3-composer-headline\"]"
+        },
+        {
+          "selector": "[data-testid=\"sv3-recents\"] li:last-child button",
+          "minHeightPx": 10,
+          "maxBottomPx": 400,
+          "mustNotOverlapSelector": "jf-top-bar"
         }
       ],
       "requiredSelectors": [
         "[data-testid=\"sv3-recent-clear\"]",
-        "[data-testid=\"sv3-composer-headline\"]"
+        "[data-testid=\"sv3-composer-headline\"]",
+        "[data-testid=\"sv3-recents\"] li:last-child button"
       ],
       "nonScrollableSelectors": [
         "[data-testid=\"sv3-recents\"]"

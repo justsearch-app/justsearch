@@ -13,6 +13,7 @@ await import('/src/shell-v0/views/search-v3/Sv3Composer.ts');
 const firstUse = await import('/src/shell-v0/state/firstUse.ts');
 const ai = await import('/src/shell-v0/state/aiStateStore.ts');
 firstUse.setFirstUseRoots([{ pathHash: 'notes' }], new Map([['notes', '/notes']]));
+firstUse.recordFirstUseFolderAdded('/notes', []);
 window.observe = (indexState, pendingJobs, paused = false, state = 'fresh') => {
   ai.__feedForTest({ status: { worker: { core: { indexState, indexedDocuments: 8, searchableDocuments: 8, ownSearchableDocuments: 3,
     ...(pendingJobs === null ? {} : { pendingJobs }) }, countObservations: { searchable: { state, value: 8 } } },

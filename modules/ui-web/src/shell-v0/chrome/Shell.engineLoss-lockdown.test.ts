@@ -41,6 +41,7 @@ __seedForTest({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', pr
   surface('core.settings-surface', 'jf-loss-search-probe', { placement: 'MODAL' }),
 ] });
 window.ai = await import('/src/shell-v0/state/aiStateStore.ts');
+window.appearance = await import('/src/shell-v0/state/themeState.ts');
 document.body.append(document.createElement('jf-shell'));
 document.body.dataset.ready = 'true';
 </script></body></html>`;
@@ -93,8 +94,8 @@ async function open(viewport = { width: 1280, height: 800 }): Promise<Page> {
 
 async function theme(page: Page, palette: 'dark' | 'light' | 'forced', textScale = 1): Promise<void> {
   await page.emulateMedia({ colorScheme: palette === 'light' ? 'light' : 'dark', forcedColors: palette === 'forced' ? 'active' : 'none' });
-  await page.evaluate(([mode, scale]) => {
-    document.documentElement.setAttribute('data-theme', mode as string);
+  await page.evaluate(async ([mode, scale]) => {
+    await (window as unknown as { appearance: { applyAppearance(value: unknown): Promise<void> } }).appearance.applyAppearance({ theme: mode });
     document.documentElement.style.fontSize = `${Number(scale) * 100}%`;
   }, [palette === 'light' ? 'light' : 'dark', textScale] as const);
   await settle(page);
@@ -145,10 +146,12 @@ const contrasts = (page: Page) => section(page).evaluate(root => {
     const [r, g, b] = colour.map(value => { const c = value / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; });
     return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
   };
-  const up = (at: Element): Element | null => at.parentElement ?? ((at.getRootNode() as ShadowRoot).host ?? null);
+  const up = (at: Element): Element | null => at.assignedSlot ?? at.parentElement ?? ((at.getRootNode() as ShadowRoot).host ?? null);
   const measure = (el: Element): number => {
     const fills: string[] = [];
-    for (let at: Element | null = el; at; at = up(at)) {
+    // Slotted button text is painted over the native control, not its light-DOM host.
+    const text = [...el.childNodes].find((node): node is Text => node.nodeType === Node.TEXT_NODE && !!node.textContent?.trim());
+    for (let at: Element | null = text?.assignedSlot ?? el; at; at = up(at)) {
       const fill = getComputedStyle(at).backgroundColor;
       if (fill !== 'rgba(0, 0, 0, 0)' && fill !== 'transparent') fills.unshift(fill);
       if (at === document.documentElement) break;

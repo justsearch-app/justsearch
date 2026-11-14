@@ -150,12 +150,12 @@ describe('Engine first-use snapshot through real Chromium (SB16/SB17)', { timeou
     expect(await page.getByRole('progressbar').count()).toBe(0);
     expect(await add(page).count()).toBe(1);
   });
-  it('the partial own count is independent of legacy first-use progress', async () => {
+  it('existing folders show no partial count regardless of legacy first-use progress', async () => {
     const page = await open('?reading&help-indexed');
-    expect(await page.getByText('2 files searchable so far', { exact: true }).count()).toBe(1);
+    expect(await page.getByText('2 files searchable so far', { exact: true }).count()).toBe(0);
     expect(await page.locator('[data-testid="sv3-composer-corpus"]').count()).toBe(0);
     await page.evaluate(() => (window as unknown as AppWindow).firstUse.hideGettingStarted()); await settle(page);
-    expect(await page.getByText('2 files searchable so far', { exact: true }).count()).toBe(1);
+    expect(await page.getByText('2 files searchable so far', { exact: true }).count()).toBe(0);
     expect(await page.locator('[data-testid="sv3-composer-corpus"]').count()).toBe(0);
   });
   it('a new add attempt clears an earlier error before the new preview appears', async () => {

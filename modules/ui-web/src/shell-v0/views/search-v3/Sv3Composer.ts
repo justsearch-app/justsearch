@@ -1352,6 +1352,7 @@ export class Sv3Composer extends JfElement {
 
   private selectRecent(item: Sv3RecentItem): void {
     this.dispatchEvent(new CustomEvent('sv3-recent-select', { detail: item, bubbles: true, composed: true }));
+    void this.updateComplete.then(() => this.focusField());
   }
 
   private recentList(): TemplateResult | typeof nothing {
@@ -1360,6 +1361,7 @@ export class Sv3Composer extends JfElement {
       <div class="recent-heading"><span id="sv3-recent-heading">Recent searches</span>
         <button type="button" data-testid="sv3-recent-clear" @click=${() => {
                 this.dispatchEvent(new CustomEvent('sv3-recents-clear', { bubbles: true, composed: true }));
+                void this.updateComplete.then(() => this.focusField());
         }}>Clear</button>
       </div>
       <ul id="sv3-recent-list">
@@ -2024,7 +2026,7 @@ export class Sv3Composer extends JfElement {
   /** The tier, on exactly the effort rung's terms — the composer announces it and keeps nothing. */
   private chooseTier(tier: Sv3ComposerTier): void {
     this.tierMenuOpen = false;
-    this.focusTrigger('sv3-composer-tier');
+    void this.updateComplete.then(() => this.focusField());
     // Choosing even the displayed mode is explicit intent (for example after task context retired).
     this.dispatchEvent(
       new CustomEvent<Sv3TierChange>(SV3_TIER_CHANGE, {
@@ -2116,7 +2118,7 @@ export class Sv3Composer extends JfElement {
 
   private corpusLine(): TemplateResult | typeof nothing {
     const setup = getFirstUse();
-    if (this.tier !== 'search' || !setup.reading || (setup.roots ?? 0) === 0 || setup.searchable === null) return nothing;
+    if (this.tier !== 'search' || !setup.sessionReading || !setup.reading || (setup.roots ?? 0) === 0 || setup.searchable === null) return nothing;
     return html`<p class="corpus" data-testid="first-use-progress">${setup.searchable.toLocaleString()} files searchable so far</p>`;
   }
 

@@ -427,7 +427,7 @@ export class StatusPill extends JfElement {
   }
   override render() {
     const model = this.status.model;
-    if (getFirstUse().empty && !this.open) return html``;
+    if (getFirstUse().empty && ['calm', 'working', 'first-use'].includes(model.pill.kind) && !this.open) return html``;
     const reading = getFirstUse().reading && model.pill.kind === 'working';
     const pill = reading ? { ...model.pill, label: 'Reading files', percent: undefined } : model.pill;
     const plugins = this.pluginsVisible ? listStatusBarItems().filter(item => item.source === 'plugin') : [];
@@ -454,7 +454,7 @@ export class StatusPill extends JfElement {
     const action = shown && toastActionAvailable(shown) ? shown : undefined;
     const undo = action?.toast?.reversal === true;
     return html`<button type="button" class="trigger ${transient ? 'notice' : pill.kind} ${pill.stale ? 'stale' : ''}"
-      aria-label=${label} aria-expanded=${this.open} aria-haspopup="dialog" title=${calm ? label : transient?.toast?.message ?? "What's going on · Ctrl+Shift+S"}
+      aria-label=${reading ? text : label} aria-expanded=${this.open} aria-haspopup="dialog" title=${calm ? label : transient?.toast?.message ?? "What's going on · Ctrl+Shift+S"}
       @click=${() => this.toggle()} @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)}
       @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)}>
       <jf-status-badge .tone=${pill.kind === 'needs' || pill.kind === 'limited' ? 'warning' : pill.kind === 'unreachable' || pill.kind === 'problems' ? 'error' : 'neutral'}><span class="content">${icon}${calm || this.narrow && !transient ? nothing : html`<span class="label">${text}</span>`}</span></jf-status-badge></button>

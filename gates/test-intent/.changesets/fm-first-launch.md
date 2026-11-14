@@ -113,6 +113,8 @@ is restored byte-for-byte and its lockdown wrapper passes afterward. In total,
 evidence. The final stable-source lockdown rerun passes all 52 files / 667 tests. The source tree and all test changes remain uncommitted.
 Acceptance records are untouched.
 
+Repair follow-through (current bounded assignment, 2026-11-14): the count lifetime is now a successful session add through its first reading, including across area navigation; restarting never revives it. Primary slotted text inherits its fill's existing on-accent token, including tone overrides. Native first-launch picking retains error detail while the plugin contract is restored to path-or-null. Reading names already matched in source baseline e53db69d91 and are a preservation check, not a claimed fail-before reproduction. New isolated checks live in `FirstMinutes.repairs-lockdown.test.ts`, `platform.folderPicker.test.ts`, and `scripts/jsharness/tests/test_ui_recents_proportion_repairs.py`. The supplied source locations identify the current repair brief; private provenance was not read. Committed-candidate `run-evidence.mjs --before` remains for the orchestrator because this builder cannot write the source repository's Git metadata. No acceptance records were written.
+
 ```json
 {
   "entries": [
@@ -277,14 +279,20 @@ Acceptance records are untouched.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "fm-02 line lifetime: \"N files searchable so far\" shows on Search's idle screen only while the first reading of the user's folders is under way (indexing activity running, no completed search needed); otherwise no count line; independent of stored first-use progress. Stop writing first-use progress (try-search); keep existing stored records.",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "The count line \"N files searchable so far\" must show only while a folder added in this app session is being read for the first time; after a restart, re-reading existing folders shows no count line. (Decision; overrides the earlier \"while indexing activity runs\".)",
+          "location": "task t-20261113-fmimpl user turn 2026-11-14 (supplied builder repair assignment, item 7; private record not read)",
+          "label": "owner words"
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none found in docs/decisions for getting started, first launch, recent, search-as-you-type, typeahead, debounce, corpus, Draft kept, Ctrl+Enter, Search / Ask, Structured and Delegate. Matches concern engine query/metadata contracts (ADR-0016/0020), inference/model and context policy (ADR-0019/0047), scoped paths (ADR-0028), primitives (ADR-0031), streams and resource categories (ADR-0036/0037), rather than the superseded UI expectations. Private task records were not read in this builder session; the acceptor must confirm the supplied adoption and delegation turns and scope. This search does not supply missing intent for a coverage reduction flagged in checkLimits.",
       "assertionChanges": [
         {
           "oldAssertion": "The card and Getting started pill appear, show numbered Done/Under way steps, offer Open Library for an empty folder, and repeat searchable plus waiting counts.",
-          "newAssertion": "The card/pill are absent; live reading shows only N files searchable so far, including zero. Settled folders and Help count updates produce no count line; a search field remains available.",
-          "reason": "R6 removes the checklist and pill; R2/D1/D10/C9 restrict the one partial-count line to live reading and keep returning corpus facts in Library. Old Done, Under way and Open Library assertions are intentionally retired, not selector changes."
+          "newAssertion": "The card/pill are absent. Merely observing existing folders being read, including zero searchable files and after reload, shows no partial-count line. A successfully added folder in this app session shows N files searchable so far only through its first reading; a search field remains available.",
+          "reason": "R6 removes the checklist and pill. The explicit item 7 decision supersedes the earlier global indexing-activity lifetime; the partial count belongs only to a folder added in this app session during its first reading. Old Done, Under way and Open Library assertions remain retired."
         },
         {
           "oldAssertion": "Hide is clicked in the card; Help reopens it across windows, reload and profile changes. A successful search writes try-search, and Help can reopen the checklist above docked Search.",
@@ -297,7 +305,7 @@ Acceptance records are untouched.
           "reason": "R6/D8 replace checklist AI promotion with the first-launch folder action. This tests the adopted action rather than accepting the candidate's former AI placement."
         }
       ],
-      "checkLimits": "R6/D7 retire the checklist and its pill/reopen UI; R6 retires the first-launch AI action. Deletions: checklist header/current step/Done/Under way, empty-folder Open Library, waiting-count text, visible Hide and Help reopen, and first-launch AI Brain reachability have no same-UI replacements because that UI is removed. State sharing is still checked through APIs, a narrower interaction path. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status and #S4-8 browser path entry has no Collection; acceptance focuses Search and reading count expires assert replacement launch/focus/count-lifetime behavior. Its S4-19 viewport/theme cases check Add reachability, not the retired AI action. Those replacement browser tests pass in the full lockdown run. Existing cancellation, errors/retry, duplicate add, navigation/history and reload assertions remain."
+      "checkLimits": "R6/D7 retire the checklist and its pill/reopen UI; R6 retires the first-launch AI action. Deletions: checklist header/current step/Done/Under way, empty-folder Open Library, waiting-count text, visible Hide and Help reopen, and first-launch AI Brain reachability have no same-UI replacements because that UI is removed. State sharing is still checked through APIs, a narrower interaction path. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-1 first launch has one message/action and no field, checklist, sidebar or status and #S4-8 browser path entry has no Collection; acceptance focuses Search and reading count expires assert replacement launch/focus/count-lifetime behavior. Its S4-19 viewport/theme cases check Add reachability, not the retired AI action. Those replacement browser tests pass in the full lockdown run. Existing cancellation, errors/retry, duplicate add, navigation/history and reload assertions remain. Repair follow-through: item 7 replaces the global activity lifetime with a session add and first-reading lifetime. FirstMinutes.repairs-lockdown.test.ts checks successful add, expiry, later reading, restart and focus through owned Chromium. First-use calm/working status is hidden; urgent status remains visible per repair item 6. Reading status names already matched on the source baseline and remain a preservation check."
     },
     {
       "items": [
@@ -360,17 +368,23 @@ Acceptance records are untouched.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "fm-02 line lifetime: \"N files searchable so far\" shows on Search's idle screen only while the first reading of the user's folders is under way (indexing activity running, no completed search needed); otherwise no count line; independent of stored first-use progress. Stop writing first-use progress (try-search); keep existing stored records.",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "The count line \"N files searchable so far\" must show only while a folder added in this app session is being read for the first time; after a restart, re-reading existing folders shows no count line. (Decision; overrides the earlier \"while indexing activity runs\".)",
+          "location": "task t-20261113-fmimpl user turn 2026-11-14 (supplied builder repair assignment, item 7; private record not read)",
+          "label": "owner words"
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none found in docs/decisions for getting started, first launch, recent, search-as-you-type, typeahead, debounce, corpus, Draft kept, Ctrl+Enter, Search / Ask, Structured and Delegate. Matches concern engine query/metadata contracts (ADR-0016/0020), inference/model and context policy (ADR-0019/0047), scoped paths (ADR-0028), primitives (ADR-0031), streams and resource categories (ADR-0036/0037), rather than the superseded UI expectations. Private task records were not read in this builder session; the acceptor must confirm the supplied adoption and delegation turns and scope. This search does not supply missing intent for a coverage reduction flagged in checkLimits.",
       "assertionChanges": [
         {
           "oldAssertion": "Card header, current step and progressbar all say step 1 of 3, with a setup pill; hiding the card reveals a second composer corpus line.",
-          "newAssertion": "No setup pill, card or progressbar; one Add action. During reading the own partial count appears once, without waiting text, and hide does not expose corpus chrome or remove that partial count.",
-          "reason": "R6/D7 retire setup progress; R2/D1/D10/C9 make reading independent of legacy card visibility and prohibit a duplicate returning count."
+          "newAssertion": "No setup pill, card or progressbar; one Add action. Existing folders being read show no partial count, before and after legacy Hide. Hide exposes no duplicate corpus chrome.",
+          "reason": "R6/D7 retire setup progress. The explicit item 7 decision supersedes D10/C9 global activity: folders not added in this app session show no transient count."
         }
       ],
-      "checkLimits": "Numbered progress/current-step and hide-to-reveal-corpus assertions are removed, not preserved. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-8 browser path entry has no Collection; acceptance focuses Search and reading count expires checks focused Search and count expiry; #S4-1 first launch has one message/action and no field, checklist, sidebar or status checks replacement first launch with intercepted responses, not the Engine-backed obligation. Despite its historical Engine-path filename, this modified file intercepts fetch and is not an independent live Engine check; it passes in the lockdown run. Dropping recordFirstUseSearch from the AppWindow type is unused harness signature cleanup."
+      "checkLimits": "Numbered progress/current-step and hide-to-reveal-corpus assertions are removed, not preserved. modules/ui-web/src/shell-v0/chrome/FirstMinutes.app-lockdown.test.ts#S4-8 browser path entry has no Collection; acceptance focuses Search and reading count expires checks focused Search and count expiry; #S4-1 first launch has one message/action and no field, checklist, sidebar or status checks replacement first launch with intercepted responses, not the Engine-backed obligation. Despite its historical Engine-path filename, this modified file intercepts fetch and is not an independent live Engine check; it passes in the lockdown run. Dropping recordFirstUseSearch from the AppWindow type is unused harness signature cleanup. Repair follow-through: item 7 replaces the global activity lifetime with a session add and first-reading lifetime. FirstMinutes.repairs-lockdown.test.ts checks successful add, expiry, later reading, restart and focus through owned Chromium. First-use calm/working status is hidden; urgent status remains visible per repair item 6. Reading status names already matched on the source baseline and remain a preservation check."
     },
     {
       "items": [
@@ -470,17 +484,23 @@ Acceptance records are untouched.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "fm-02 line lifetime: \"N files searchable so far\" shows on Search's idle screen only while the first reading of the user's folders is under way (indexing activity running, no completed search needed); otherwise no count line; independent of stored first-use progress. Stop writing first-use progress (try-search); keep existing stored records.",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "The count line \"N files searchable so far\" must show only while a folder added in this app session is being read for the first time; after a restart, re-reading existing folders shows no count line. (Decision; overrides the earlier \"while indexing activity runs\".)",
+          "location": "task t-20261113-fmimpl user turn 2026-11-14 (supplied builder repair assignment, item 7; private record not read)",
+          "label": "owner words"
         }
       ],
       "conflictSearch": "decision records searched for a conflict: none found in docs/decisions for getting started, first launch, recent, search-as-you-type, typeahead, debounce, corpus, Draft kept, Ctrl+Enter, Search / Ask, Structured and Delegate. Matches concern engine query/metadata contracts (ADR-0016/0020), inference/model and context policy (ADR-0019/0047), scoped paths (ADR-0028), primitives (ADR-0031), streams and resource categories (ADR-0036/0037), rather than the superseded UI expectations. Private task records were not read in this builder session; the acceptor must confirm the supplied adoption and delegation turns and scope. This search does not supply missing intent for a coverage reduction flagged in checkLimits.",
       "assertionChanges": [
         {
           "oldAssertion": "Mount jf-getting-started and assert its .progress says 3 files searchable so far · still reading for INDEXING with null/zero queue.",
-          "newAssertion": "Mount jf-sv3-composer and assert first-use-progress says 3 files searchable so far for those same queue cases; size html/body to the viewport.",
-          "reason": "The card is removed by R6; D1/D10/C9 put only the partial own count on idle Search while live reading continues. The full-height harness is fixture-only support for that composer, not a new count oracle or a passing visibility check."
+          "newAssertion": "Seed an accepted session folder add, mount jf-sv3-composer, and assert first-use-progress says 3 files searchable so far for the same INDEXING null/zero-queue cases; size html/body to the viewport.",
+          "reason": "The card is removed by R6. Item 7 requires a new session folder before the existing live-reading/count oracles apply. Only the fixture gains that accepted-add event; queue, pause, unknown and stale-count expectations are preserved."
         }
       ],
-      "checkLimits": "Resolved browser boundary: GettingStarted.reading-lockdown.test.ts executes the actual composer in owned Chromium for both omitted (null) and zero pendingJobs while indexState is INDEXING and requires exact rendered 3 files searchable so far. R2/D1/D10/C9 retire the waiting/still-reading suffix; the count and live-reading obligation are retained. State permutations remain in FirstMinutes.reading.test.ts."
+      "checkLimits": "Resolved browser boundary: GettingStarted.reading-lockdown.test.ts executes the actual composer in owned Chromium for both omitted (null) and zero pendingJobs while indexState is INDEXING and requires exact rendered 3 files searchable so far. R2/D1/D10/C9 retire the waiting/still-reading suffix; the count and live-reading obligation are retained. State permutations remain in FirstMinutes.reading.test.ts. Repair follow-through: item 7 replaces the global activity lifetime with a session add and first-reading lifetime. FirstMinutes.repairs-lockdown.test.ts checks successful add, expiry, later reading, restart and focus through owned Chromium. First-use calm/working status is hidden; urgent status remains visible per repair item 6. Reading status names already matched on the source baseline and remain a preservation check. The matching ui-shot first-use-reading capture now clicks Add Documents and receives a successful operation response before polling the reading facts; no evaluated module import or synthetic in-memory add is used by that capture."
     },
     {
       "items": [
@@ -570,6 +590,11 @@ Acceptance records are untouched.
           "oldAssertion": "A later successful own-file search completes try-search; the mounted/reloaded card displays counts, waiting and Try a search.",
           "newAssertion": "Neither search writes try-search; no Try a search is rendered and the legacy host is empty with existing roots, including after reload.",
           "reason": "R6/D7 remove the checklist and C9 stops new progress writes. The Search composer, rather than this host, owns the transient count."
+        },
+        {
+          "oldAssertion": "Native cancellation was driven through the plugin-platform pickFolder mock.",
+          "newAssertion": "Native cancellation is driven through the internal folderPicker mock; the cancel call count, untouched facts and restored Add focus assertions are unchanged.",
+          "reason": "Repair item 8 restores plugin pickFolder to Promise<string | null> while retaining internal first-launch error details; the fixture must address the internal picker used by that UI."
         }
       ],
       "checkLimits": "Restored and passing: after unregister, the walkthrough has no .card and its entire shadow text is empty; the surrounding Help host may remain populated under D7/C8. The watched /Documents path is forbidden throughout the first-launch host, alongside absence of its Add action. Mutations walkthrough-empty-text and watched-path-text fail these restored oracles. R6/D7 retire checklist Try a search, card counts and card reload UI; C9 retires progress writes. Launch and Help integration remain separately exercised."
@@ -2401,6 +2426,35 @@ Acceptance records are untouched.
         }
       ],
       "checkLimits": "Fixture-only repair of the remaining export interface; all export tests pass in the full unit suite. The test still stubs its HTTP boundary; independent Engine export verification is not claimed."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/chrome/Shell.engineLoss-lockdown.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Adaptation",
+      "moved": [
+        "instrumentation",
+        "input re-encoding"
+      ],
+      "whatMoved": "The contrast probe follows the rendered text node through assignedSlot before walking shadow hosts, so it measures the filled native button behind slotted primary text. Theme changes use applyAppearance so the derived on-accent token follows the actual fill. The 4.5:1 floor, viewport/text-scale matrix, focus, geometry, navigation and outage oracles are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Make the primary filled button text meet 4.5:1 in dark and light (and high-contrast themes) through the existing on-accent token, so every primary filled button benefits; check with node scripts/ci/check-contrast-matrix.mjs (add the pairing if it is missing).",
+          "location": "task t-20261113-fmimpl user turn 2026-11-14 (supplied builder repair assignment, item 4; private record not read)",
+          "label": "owner words"
+        }
+      ],
+      "assertionChanges": [
+        {
+          "oldAssertion": "Contrast against light-DOM ancestors missed the native button fill behind slotted text; manual theme attributes left the derived ink stale.",
+          "newAssertion": "Contrast follows the composed slot path to the painted native control; the theme fixture refreshes derived ink through the product appearance API. The same 4.5:1 text threshold applies.",
+          "reason": "The primary-button repair exposes that the old instrumentation compared dark on-teal ink against the dark panel. Correct instrumentation fails the source baseline on white-on-teal button text and passes the shared button fix."
+        }
+      ],
+      "checkLimits": "Owned Chromium: the corrected probe fails eight baseline palette/viewport cases at 2.04:1 or other sub-AA ratios, and all 18 candidate outage tests pass. This strengthens background measurement; no oracle or scenario is removed. No committed run-evidence or independent verification is claimed."
     }
   ]
 }

@@ -5,6 +5,7 @@ import { getFirstUse, subscribeFirstUse, firstUseWatchedPaths } from '../state/f
 import { getSuggestedRoots, type SuggestedRoot } from '../../api/domains/indexing.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { FolderAddFlow, emptyFolderAddState, focusFolderAdd } from '../controllers/FolderAddFlow.js';
+import { pickFolder } from '../../utils/folderPicker.js';
 import './Button.js';
 
 const mounted = new Set<GettingStarted>();
@@ -20,7 +21,7 @@ function notify(): void { for (const card of mounted) card.requestUpdate(); }
 function flow(): FolderAddFlow {
   return addFlow ??= new FolderAddFlow({ state: addState,
     api: () => { if (!api) throw new Error('Folder controls are unavailable. Retry or open Library.'); return api; },
-    changed: notify, current: () => () => true,
+    pickFolder, changed: notify, current: () => () => true,
     open: async () => { await opener?.updateComplete; },
     focus: async target => { const card = opener; if (!card?.isConnected) return; await card.updateComplete;
       if (card.isConnected && card.shadowRoot) await focusFolderAdd(card.shadowRoot, target); },
@@ -45,12 +46,10 @@ export class GettingStarted extends JfElement {
     .intro { text-align: center; padding-block-end: 30px; }
     .intro p { max-inline-size: 520px; margin-inline: auto; margin-block: 6px 0; line-height: 21px; }
     .suggestions { margin-block-start: var(--jf-space-3); align-items: baseline; gap: var(--jf-space-1); color: var(--text-secondary); }
-    .suggestions button { padding: 0; border: 0; background: transparent; color: var(--text-primary); font: inherit; cursor: pointer; }
+    .suggestions button { padding: 0; border: 0; background: transparent; color: var(--text-primary); font: inherit; font-weight: 500; cursor: pointer; }
     .suggestions { --focus-ring-color: var(--text-primary); }
     .suggestions button:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); }
     .intro > jf-button::part(control) { min-block-size: 38px; padding-inline: 20px; }
-    .intro > jf-button { color: var(--accent-on-tint); }
-    .add-label { color: var(--accent-on-tint); }
     .intro > jf-button svg { inline-size: 18px; block-size: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; }
     h1 { font: inherit; font-size: var(--font-size-sv3-display, var(--font-size-headline)); line-height: 40px; font-variation-settings: "opsz" 32; margin: 0; }
     p { margin: var(--jf-space-2) 0; color: var(--text-secondary); }
@@ -66,7 +65,7 @@ export class GettingStarted extends JfElement {
     input:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); }
     .message, .error, .add-preview { overflow-wrap: anywhere; margin-block: var(--jf-space-2); }
     .error { color: var(--text-danger); }
-    @media (forced-colors: active) { .intro > jf-button, .add-label { color: ButtonText; } .mark, .error, .path, p { color: CanvasText; } .card, input { border-color: CanvasText; } }
+    @media (forced-colors: active) { .mark, .error, .path, p { color: CanvasText; } .card, input { border-color: CanvasText; } }
   `;
   override connectedCallback(): void {
     super.connectedCallback(); mounted.add(this);
@@ -115,7 +114,7 @@ export class GettingStarted extends JfElement {
         <h1 data-testid="first-use-headline">Nothing to search yet</h1>
         <p>Add the folders you want JustSearch to read. Your files stay where they are, and nothing leaves this computer.</p>
         <jf-button variant="primary" label="Add a folder" data-add-folder .disabled=${addState.addBusy}
-          .onActivate=${() => this.add()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span class="add-label">Add a folder</span></jf-button>
+          .onActivate=${() => this.add()}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg><span>Add a folder</span></jf-button>
         ${suggestions.length ? html`<div class="suggestions"><span>Or start with</span>
           ${suggestions.map((s, i) => html`${i > 0 ? i === suggestions.length - 1 ? ' or ' : ', ' : ''}<button type="button" aria-label=${`Add ${s.label}`} ?disabled=${addState.addBusy}
             @click=${() => this.add(s.path)}>${s.label}</button>`)}

@@ -15,7 +15,8 @@ const states = import.meta.glob('../state/firstUse.ts', { eager: true });
 const state = Object.values(states)[0] as typeof import('../state/firstUse.js') | undefined;
 const response = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
 const success = vi.fn(async () => ({ success: true }));
-const pick = vi.fn(async (): Promise<string | null> => null);
+const { pick } = vi.hoisted(() => ({ pick: vi.fn(async (): Promise<string | null> => null) }));
+vi.mock('../../utils/folderPicker.js', () => ({ pickFolder: pick }));
 const capabilities = new Set<string>();
 const host = { platform: { capabilities, pickFolder: pick }, data: {
   invokeOperation: success, fetch: vi.fn(async () => response({ exists: true, isDir: true })) },

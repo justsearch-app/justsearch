@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 /** One first-use projection. Unknown observations never become setup advice. */
 import { getAiState, subscribeAiState, type AiState } from './aiStateStore.js';
+import { folderStatus } from './folderStatus.js';
 import { isWorkerReportedIndex, selectIndexingProgress } from './indexingProgress.js';
 import { getWalkthroughProgress, mutateDocument, subscribeWalkthroughProgress, type WalkthroughProgress } from './UserStateDocument.js';
 import type { IndexedRootView } from '../../api/generated/schema-types/indexed-root-view.js';
@@ -48,6 +49,34 @@ export type FirstUse = ReturnType<typeof projectFirstUse>;
 let roots: readonly IndexedRootView[] | null = null;
 let paths: ReadonlyMap<string, string> = new Map();
 const listeners = new Set<() => void>();
+// Window-session only: a restart never revives a first-reading count.
+const sessionReadings = new Map<string, boolean>();
+const normalizeFolder = (path: string) => {
+  const normalized = path.replaceAll('\\', '/').replace(/\/+$/, '') || '/';
+  return /^[a-z]:/i.test(normalized) ? normalized.toLowerCase() : normalized;
+};
+export function recordFirstUseFolderAdded(path: string, watchedBefore: readonly string[] | null): void {
+  const key = normalizeFolder(path);
+  if (watchedBefore?.some(value => normalizeFolder(value) === key)) return;
+  sessionReadings.set(key, false);
+  for (const listener of listeners) listener();
+}
+function sessionReadingActive(facts: FirstUseFacts, ai: AiState): boolean {
+  const fresh = ai.indexingStatusLive && isWorkerReportedIndex(ai.status)
+    && ai.status?.meta?.workerRpcStale !== true
+    && !ai.status?.operating?.freshness?.staleSources?.includes('indexing');
+  for (const [path, seenReading] of sessionReadings) {
+    const root = roots?.find(root => root.pathHash && normalizeFolder(paths.get(root.pathHash) ?? '') === path);
+    if (!fresh) continue;
+    const folder = root && folderStatus(root, { relativeTime: '', verifiedRelativeTime: '', provisional: false });
+    if (folder && ['ready', 'empty', 'keyword-only'].includes(folder.state)
+      || seenReading && !facts.reading && facts.waiting === 0
+        && selectIndexingProgress(ai.status, true, ai.episodeMaxPendingJobs, ai.enrichSettleSamples).phase === 'ready') {
+      sessionReadings.delete(path);
+    } else if (facts.reading) sessionReadings.set(path, true);
+  }
+  return sessionReadings.size > 0;
+}
 /** Fed by the existing frame observation; no new roots poller. Paths are retained on worker loss. */
 export function setFirstUseRoots(value: readonly IndexedRootView[] | null, resolved: ReadonlyMap<string, string>): void {
   roots = value; paths = new Map(resolved);
@@ -77,13 +106,16 @@ export function firstUseFacts(ai: AiState): FirstUseFacts {
     aiActive: ai.snapshotLive && ai.runtime.mode === 'online' && ai.capabilities.chat,
   };
 }
-export function getFirstUse(): FirstUse {
+export function getFirstUse(): FirstUse & { readonly sessionReading: boolean } {
   const suppressed = typeof location !== 'undefined' && new URLSearchParams(location.search).get('demoMode') === '1';
   const pending = listWalkthroughs().some(w => {
     const p = getWalkthroughProgress(w.id);
     return !p?.dismissed && (p?.activeStepIndex ?? 0) < w.steps.length;
   });
-  return projectFirstUse(firstUseFacts(getAiState()), getWalkthroughProgress(GETTING_STARTED_ID), getWalkthroughProgress('welcome'), suppressed, pending);
+  const ai = getAiState();
+  const facts = firstUseFacts(ai);
+  return { ...projectFirstUse(facts, getWalkthroughProgress(GETTING_STARTED_ID), getWalkthroughProgress('welcome'), suppressed, pending),
+    sessionReading: sessionReadingActive(facts, ai) };
 }
 export function subscribeFirstUse(listener: () => void): () => void {
   listeners.add(listener);

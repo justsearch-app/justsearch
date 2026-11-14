@@ -459,7 +459,7 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
-          "test": "S4-12 pointer and native keyboard activation replay the query with current restrictions"
+          "test": "S4-12 pointer activation replay the query with current restrictions"
         }
       ]
     },
@@ -579,7 +579,7 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
-          "test": "S4-12 pointer and native keyboard activation replay the query with current restrictions"
+          "test": "S4-12 pointer activation replay the query with current restrictions"
         },
         {
           "layer": "view",

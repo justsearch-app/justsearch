@@ -1756,6 +1756,9 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             if state == "hero":
                 await page.locator('[data-testid="sv3-recents"] button[data-kind="search"]').nth(7).wait_for(state="attached")
             await assert_recents_fit(page, state)
+            if state == "hero":
+                # Capture the last in-flow row after scrolling the composer, not a clipped list.
+                await page.locator('[data-testid="sv3-recents"] li:last-child button').scroll_into_view_if_needed()
             await _settle_focus_marks(page)
         return setup
 
@@ -2205,6 +2208,25 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     def first_use_setup(reading=False):
         async def setup(page):
+            if reading:
+                # Reach the reading capture through a successful folder add in this session.
+                added = False
+
+                async def reading_state(route):
+                    await route.fulfill(status=200, content_type="application/json",
+                        body=ui_fixtures.fixture_body(route.request.url,
+                            variant="first-use-reading" if added else "first-use"))
+
+                async def add_folder(route):
+                    nonlocal added
+                    assert route.request.post_data_json["args"]["path"] == "/home/user/Documents"
+                    added = True
+                    await route.fulfill(status=200, content_type="application/json",
+                        body=json.dumps({"success": True, "message": "Folder added"}))
+
+                await page.route("**/api/status", reading_state)
+                await page.route("**/api/indexing-roots/substrate**", reading_state)
+                await page.route("**/api/operations/core.add-watched-root/invoke", add_folder)
             # Unlike ordinary fixture captures, these variants seed no user-state document.
             # Remove demo flags: the production demo contract deliberately hides onboarding.
             parsed = urlparse(ui_url)
@@ -2218,6 +2240,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             progress = await page.evaluate("""() => JSON.parse(localStorage.getItem('justsearch.userState.v2') || '{}').walkthroughState""")
             assert not progress, "first-use capture must have no seeded walkthrough progress"
             if reading:
+                await page.get_by_role("button", name="Add Documents", exact=True).click()
                 await page.get_by_text("2 files searchable so far", exact=True).wait_for()
                 await page.locator('jf-sv3-composer textarea').wait_for(state="visible")
             else:

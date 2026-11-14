@@ -7,6 +7,8 @@ import { isReservedCollection } from '../state/otherSources.js';
 import { icon } from '../components/Icon.js';
 import type { JfButton } from '../components/Button.js';
 import { z } from 'zod';
+import type { FolderPickerResult } from '../../utils/folderPicker.js';
+import { firstUseWatchedPaths, recordFirstUseFolderAdded } from '../state/firstUse.js';
 import '../components/Button.js';
 
 const previewSchema = z.object({ exists: z.boolean(), isDir: z.boolean(), fileCount: z.number().optional(),
@@ -28,6 +30,8 @@ export function emptyFolderAddState(): FolderAddState {
 interface FolderAddHost {
   readonly state: FolderAddState;
   api(): PluginHostApi;
+  /** Internal launch UI can distinguish dialog failure from cancellation. */
+  pickFolder?(): Promise<FolderPickerResult>;
   changed(): void;
   open(): Promise<void>;
   focus(target: 'path' | 'button'): Promise<void>;
@@ -55,7 +59,7 @@ export class FolderAddFlow {
     this.pickerBusy = true;
     try {
       if (this.host.api().platform.capabilities.has('folder-picker')) {
-        const picked = await this.host.api().platform.pickFolder();
+        const picked = await (this.host.pickFolder?.() ?? this.host.api().platform.pickFolder());
         if (!current()) return;
         if (picked && typeof picked === 'object') throw new Error(picked.error);
         if (!picked) { await this.host.focus('button'); return; }
@@ -127,12 +131,14 @@ export class FolderAddFlow {
     const path = state.pendingPath.trim();
     if (!path || this.availability().kind !== 'available') return;
     const current = this.host.current();
+    const watchedBefore = firstUseWatchedPaths();
     state.addBusy = true; state.error = null; state.actionMessage = 'Adding folder…'; this.host.changed();
     try {
       const collection = state.pendingCollection.trim();
       const result = await this.host.api().data.invokeOperation('core.add-watched-root', collection ? { path, collection } : { path });
       if (!current()) return;
       if (!result.success) throw new Error(result.message || 'Add refused');
+      recordFirstUseFolderAdded(path, watchedBefore);
       state.pendingPath = ''; state.pendingCollection = ''; state.pendingPreview = null; state.showManualInput = false;
       state.actionMessage = this.firstLaunch ? null : 'Folder added. Indexing activity is shown below.';
       await this.host.added();

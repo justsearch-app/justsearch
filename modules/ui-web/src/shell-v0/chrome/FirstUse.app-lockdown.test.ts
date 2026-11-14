@@ -124,7 +124,7 @@ describe('first use through the real frame', { timeout: 60_000 }, () => {
     await page.evaluate(() => (window as unknown as AppWindow).observe(1, 2, 8)); await settle(page);
     expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(0);
     expect(await page.locator('jf-sv3-composer textarea').count()).toBe(1);
-    expect(await page.getByText('2 files searchable so far', { exact: true }).count()).toBe(1);
+    expect(await page.getByText('2 files searchable so far', { exact: true }).count()).toBe(0);
   });
   it('Help alone keeps setup current, and unknown own counts stay unknown', async () => {
     const page = await open();
@@ -144,7 +144,7 @@ describe('first use through the real frame', { timeout: 60_000 }, () => {
     const page = await open();
     await page.evaluate(() => (window as unknown as AppWindow).observe(1, 0, 8)); await settle(page);
     expect(await card(page).count()).toBe(0);
-    expect(await page.getByText('0 files searchable so far', { exact: true }).count()).toBe(1);
+    expect(await page.getByText('0 files searchable so far', { exact: true }).count()).toBe(0);
     await page.evaluate(() => (window as unknown as AppWindow).observe(1, 0)); await settle(page);
     expect(await page.getByText('0 files searchable so far', { exact: true }).count()).toBe(0);
     expect(await page.locator('jf-sv3-composer textarea').count()).toBe(1);
@@ -214,10 +214,10 @@ describe('first use through the real frame', { timeout: 60_000 }, () => {
     expect(await page.locator('jf-help-surface').getByRole('button', { name: 'Getting started', exact: true }).count()).toBe(0);
     expect(await page.evaluate(() => (window as unknown as AppWindow).addCalls.length)).toBe(0);
   });
-  it('reloading during indexing rediscovers the folder and live count before offering search', async () => {
+  it('reloading during reading rediscovers the folder without a first-reading count', async () => {
     const page = await open('?reading'); expect(await card(page).count()).toBe(0);
     for (let i = 0; i < 2; i++) {
-      expect(await page.getByText('2 files searchable so far', { exact: true }).count()).toBe(1);
+      expect(await page.getByText('2 files searchable so far', { exact: true }).count()).toBe(0);
       expect(await page.locator('jf-sv3-composer textarea').count()).toBe(1);
       expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(0);
       if (i === 0) { await page.reload(); await page.locator('body[data-ready="true"]').waitFor(); await settle(page); }
