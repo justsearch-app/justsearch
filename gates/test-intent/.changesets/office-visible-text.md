@@ -44,3 +44,14 @@ part is that preview, changes from one embedded resource at depth one to none.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "stfi7akg",
+  "verdict": "accept",
+  "digest": "sha256:2cb9c90a9d4ebe2dbb4fb28c1042cbabe83e84fff3a160245712874201cab477",
+  "note": "The S1/S10 delegated choice requires skipping the package preview without counting it; changing only the PPTX preview count and depth from one to zero follows that source. Cited evidence records PPTX assertion failure before and all capability cases passing after; projection preservation passed in both."
+}
+```
