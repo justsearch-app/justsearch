@@ -301,7 +301,7 @@ describe('the four outcomes are distinct, and each says only what it knows', () 
     expect(results.shadowRoot?.querySelector('[data-testid="sv3-results-loading"]')).not.toBeNull();
     // Pending is not emptiness and not a result: neither verdict may be on screen yet.
     expect(results.shadowRoot?.querySelector('[data-testid="sv3-results-empty"]')).toBeNull();
-    expect(cardOf(results)?.shadowRoot?.querySelector('[data-testid="search-result-row"]')).toBeNull();
+    expect(cardOf(results)).toBeNull();
     expect(rowsOf(results)).toHaveLength(0);
 
     release({
@@ -346,7 +346,7 @@ describe('the four outcomes are distinct, and each says only what it knows', () 
     // corpus nothing was ever asked of.
     expect(results.shadowRoot?.querySelector('[data-testid="sv3-results-empty"]')).toBeNull();
     expect(rowsOf(results)).toHaveLength(0);
-    expect(cardOf(results)?.shadowRoot?.querySelector('[data-testid="search-result-row"]')).toBeNull();
+    expect(cardOf(results)).toBeNull();
   });
 
   it('treats a refused response the same way, and words it differently from zero results', async () => {

@@ -543,9 +543,7 @@ export class SearchV3View extends JfElement {
            wheel-scrollable right up to the glass edge. */
         pointer-events: none;
       }
-      :host([search-results]) .reading-column { reading-flow: flex-visual; }
       :host([search-results]) .reading-column > .dock {
-        order: -1;
         position: static;
         flex: none;
         padding-block-start: var(--space-6);
@@ -2813,44 +2811,6 @@ export class SearchV3View extends JfElement {
         ${this.renderBranchOrigin()}
         ${this.recoveryNotice()}
         <div class="column reading-column">
-        ${this.search.forgetNotice ? html`<div role="status" aria-live="polite" data-testid="sv3-forget-notice">
-          <span class="forget-notice">${this.search.forgetNotice}</span>
-          <jf-button label="Review in Library" .onActivate=${() => requestSurfaceNavigation('core.library-surface')}>Review in Library</jf-button>
-        </div>` : nothing}
-        <jf-sv3-main
-          .apiBase=${this.apiBase} .host_=${this.host_}
-          state=${this.composerState}
-          .view=${results}
-          ?results-top=${this.searchAtTop}
-          ?inert=${this.searchAtTop && this.paneOverlay && this.paneTab !== null}
-          .forgetAvailable=${this.search.forgetAvailable && !this.search.forgetBusy}
-          .turns=${turns}
-          .conversationId=${session?.id ?? ''}
-          .turnScopes=${this.search.scopesByTurn}
-          .turnFilters=${this.search.filtersByTurn}
-          .modelAnswerUnavailableReason=${this.modelAnswerUnavailableReason}
-          ?model-answer-busy=${this.askDomain.contextPending || this.agentController()?.runInFlight === true}
-          .structuredNotes=${new Map(turns.filter(t => t.shapeId === 'core.extract').map(t => [t.id, this.askDomain.structuredNote(t.id)]))}
-          .run=${visibleRun}
-          .liveEvidencePaths=${this.agentController()?.groundingDeltaPaths ?? EMPTY_EVIDENCE_PATHS}
-          .unconfirmedSteerNotes=${this.runDomain.unconfirmedSteerNotes}
-          ?record-notice=${this.contextDomain.recordNotice}
-          ?history-locked=${this.historyLocked}
-          ?locked-refusal=${this.lockedRefusal}
-          .reasoning=${this.askDomain.liveReasoning()}
-          .reasoningTurnId=${this.askDomain.liveReasoningTurnId()}
-          .currentModelLabel=${this.currentModelLabel}
-          ?detailed=${isAdvancedMode()}
-          .turnContexts=${contexts}
-          .turnLineage=${this.branchDomain.turnLineage()}
-          .continuationVersions=${this.branchDomain.continuationVersions()}
-          .floorSummary=${session?.history?.contextFloorSummary ?? null}
-          ?streaming=${this.streaming || this.contextDomain.unfinishedConversation}
-          ?checking-saved-outcome=${this.contextDomain.checkingSavedOutcome}
-          .stopping=${this.askStopping ?? this.runDomain.runStopping()}
-          .checkingTurnId=${this.askCheckingTurnId}
-          data-testid="sv3-main"
-        ></jf-sv3-main>
         <!-- 859 §B — ONE positioned wrapper for the whole dock, so its height is one observable
              box and the transcript scrolls beneath it rather than being cut off above it. -->
         <div class="dock" data-testid="sv3-dock">
@@ -2896,6 +2856,45 @@ export class SearchV3View extends JfElement {
           data-testid="sv3-composer"
         ></jf-sv3-composer>
         </div>
+        ${this.search.forgetNotice ? html`<div role="status" aria-live="polite" data-testid="sv3-forget-notice">
+          <span class="forget-notice">${this.search.forgetNotice}</span>
+          <jf-button label="Review in Library" .onActivate=${() => requestSurfaceNavigation('core.library-surface')}>Review in Library</jf-button>
+        </div>` : nothing}
+        <jf-sv3-main
+          .apiBase=${this.apiBase} .host_=${this.host_}
+          state=${this.composerState}
+          .view=${results}
+          ?results-top=${this.searchAtTop}
+          ?inert=${this.searchAtTop && this.paneOverlay && this.paneTab !== null}
+          .forgetAvailable=${this.search.forgetAvailable && !this.search.forgetBusy}
+          .turns=${turns}
+          .conversationId=${session?.id ?? ''}
+          .turnScopes=${this.search.scopesByTurn}
+          .turnFilters=${this.search.filtersByTurn}
+          .modelAnswerUnavailableReason=${this.modelAnswerUnavailableReason}
+          ?model-answer-busy=${this.askDomain.contextPending || this.agentController()?.runInFlight === true}
+          .structuredNotes=${new Map(turns.filter(t => t.shapeId === 'core.extract').map(t => [t.id, this.askDomain.structuredNote(t.id)]))}
+          .run=${visibleRun}
+          .liveEvidencePaths=${this.agentController()?.groundingDeltaPaths ?? EMPTY_EVIDENCE_PATHS}
+          .unconfirmedSteerNotes=${this.runDomain.unconfirmedSteerNotes}
+          ?record-notice=${this.contextDomain.recordNotice}
+          ?history-locked=${this.historyLocked}
+          ?locked-refusal=${this.lockedRefusal}
+          .reasoning=${this.askDomain.liveReasoning()}
+          .reasoningTurnId=${this.askDomain.liveReasoningTurnId()}
+          .currentModelLabel=${this.currentModelLabel}
+          ?detailed=${isAdvancedMode()}
+          .turnContexts=${contexts}
+          .turnLineage=${this.branchDomain.turnLineage()}
+          .continuationVersions=${this.branchDomain.continuationVersions()}
+          .floorSummary=${session?.history?.contextFloorSummary ?? null}
+          ?streaming=${this.streaming || this.contextDomain.unfinishedConversation}
+          ?checking-saved-outcome=${this.contextDomain.checkingSavedOutcome}
+          .stopping=${this.askStopping ?? this.runDomain.runStopping()}
+          .checkingTurnId=${this.askCheckingTurnId}
+          data-testid="sv3-main"
+        ></jf-sv3-main>
+
         </div>
       </div>
       ${this.pane()}

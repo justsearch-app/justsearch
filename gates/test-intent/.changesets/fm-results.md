@@ -11,7 +11,7 @@ author-session: codex-builder-fm-results-20261114
 
 `Obsolete` identifies superseded UI wording, default diagnostic visibility and control locations. The assertions that still apply remain. Diagnostic, citation and contrast checks now opt into the existing developer preference. Pending-response preservation uses an explicitly held response instead of relying on a microtask race. The known facet/pinned-scope stale-response issue remains outside this slice.
 
-Baseline f5fd95ca9d: the 10 originally affected existing files pass 274/274 in the shared clone, which owns separate dependencies. New files: 24 assertion failures and 2 preservation passes on that baseline; the initial 11 checks ran before product changes. Candidate: all 10,074 ordinary unit checks passed. Generated candidate evidence is attached for the five new isolated files. `run-evidence --before` is left to the orchestrator because its worktree creation writes repository Git metadata. The builder writes no acceptance record.
+Baseline f5fd95ca9d: the 10 originally affected existing files pass 274/274 in the shared clone, which owns separate dependencies. New files: 24 assertion failures and 2 preservation passes on that baseline; the initial 11 checks ran before product changes. Earlier candidate: all 10,074 ordinary unit checks passed. Generated candidate evidence is attached for the five new isolated files. `run-evidence --before` is left to the orchestrator because its worktree creation writes repository Git metadata. The builder writes no acceptance record.
 
 The harness adds dark/light results, scan pane and nothing-found states plus the 600×400 pane pair. The proportion baseline relocates Search filter-editor witnesses from the composer to the existing editor under More filters, retains all field/error/focus checks, and adds viewport checks while visiting each scrollable editor control. The old whole-card versus dock rectangle witness becomes the last visible row versus the top field after scrolling, with both presence and viewport constraints. Unchanged Ask/top-bar baseline failures remain failures: nine rows across five families, all reproduced before 5a. The eight new states pass all 80 constraints; a11y passes all 110 registered states.
 
@@ -38,7 +38,7 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
         },
         {
           "kind": "owner-words",
-          "quote": "Six text sizes and four corner radii, nothing in between. Text: 11 · 12 · 13 · 15 · 20 · 28. Corners: 4 · 8 · 14 · fully round. Weight 400 for text, 500 for names and actions, 600 only for the brand.",
+          "quote": "Six text sizes and four corner radii, nothing in between. Text: 11 \u00b7 12 \u00b7 13 \u00b7 15 \u00b7 20 \u00b7 28. Corners: 4 \u00b7 8 \u00b7 14 \u00b7 fully round. Weight 400 for text, 500 for names and actions, 600 only for the brand.",
           "location": "task t-20261113-fmimpl request (delegated 5a builder brief, Rules that apply verbatim)"
         },
         {
@@ -53,7 +53,7 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
         },
         {
           "kind": "owner-words",
-          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings \u203a Advanced \u203a Show developer tools, or away.",
           "location": "task t-20261113-fmimpl request (delegated 5a builder brief, Rules that apply verbatim)"
         },
         {
@@ -82,7 +82,7 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "E3: Summary line left of the filter row: \"N files · by words · 0.04 s\". Mode words from the actual retrieval mode of the response: words-only \"by words\"; hybrid \"by words and meaning\"; meaning-only \"by meaning\"; unknown: omitted. Capped counts keep \"+\". The \"Results for 'query'\" line goes (the query is in the field). Slow/pending states keep their words.",
+          "choice": "E3: Summary line left of the filter row: \"N files \u00b7 by words \u00b7 0.04 s\". Mode words from the actual retrieval mode of the response: words-only \"by words\"; hybrid \"by words and meaning\"; meaning-only \"by meaning\"; unknown: omitted. Capped counts keep \"+\". The \"Results for 'query'\" line goes (the query is in the field). Slow/pending states keep their words.",
           "label": "agent choice"
         },
         {
@@ -98,7 +98,7 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "E5: Rows: type icon, name (mail with a subject: \"Subject · file.eml\"), date at the right (modifiedAt carried into the hit model; absent -> no date), two lines of clean text. Folder trail only when the library has more than one folder (known root count > 1) or the count is unknown; normal UI font in secondary colour (not monospace). Collection badge only with developer tools. MD/JSON/Paths header copy and the per-row \"Why this result?\" leave the default view: the row menu gains \"Why this result\" (opens today's explanation) and \"Copy as Markdown\" / \"Copy as JSON\" for that row; whole-list copy buttons stay only with developer tools on.",
+          "choice": "E5: Rows: type icon, name (mail with a subject: \"Subject \u00b7 file.eml\"), date at the right (modifiedAt carried into the hit model; absent -> no date), two lines of clean text. Folder trail only when the library has more than one folder (known root count > 1) or the count is unknown; normal UI font in secondary colour (not monospace). Collection badge only with developer tools. MD/JSON/Paths header copy and the per-row \"Why this result?\" leave the default view: the row menu gains \"Why this result\" (opens today's explanation) and \"Copy as Markdown\" / \"Copy as JSON\" for that row; whole-list copy buttons stay only with developer tools on.",
           "label": "agent choice"
         },
         {
@@ -114,7 +114,7 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "E7: Side pane: icon + file name once + Close; one line \"folder path · N pages · size\" with unknown parts omitted (size from sizeBytes carried from the search hit; pages from existing preview metadata); for a scan one note \"Read from a scan. A few words may be wrong.\"; then the file's text (Markdown rendered as today); footer Open file and Show in folder (Show in folder hidden where unsupported, browser). No place stepper (HANDOVER fallback: the response holds selected passages, not all places); named in delivery. Text source, quality %, OCR details, Rendered/Source switch and provenance go behind developer tools. \"Context\" tab only inside an Ask conversation; a restored pane whose saved tab is Context outside Ask opens the document instead (saved memory is not rewritten until the user changes the pane).",
+          "choice": "E7: Side pane: icon + file name once + Close; one line \"folder path \u00b7 N pages \u00b7 size\" with unknown parts omitted (size from sizeBytes carried from the search hit; pages from existing preview metadata); for a scan one note \"Read from a scan. A few words may be wrong.\"; then the file's text (Markdown rendered as today); footer Open file and Show in folder (Show in folder hidden where unsupported, browser). No place stepper (HANDOVER fallback: the response holds selected passages, not all places); named in delivery. Text source, quality %, OCR details, Rendered/Source switch and provenance go behind developer tools. \"Context\" tab only inside an Ask conversation; a restored pane whose saved tab is Context outside Ask opens the document instead (saved memory is not rewritten until the user changes the pane).",
           "label": "agent choice"
         },
         {
@@ -236,29 +236,63 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "A12 (E7): Browser Open file passing a filesystem path to window.open exists on main -> finding. Size shows only when it belongs to the pane's document (same path).",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required: no count and no filter row in those states (as on main d61d78ce4e/eea268db53). Restore the check that was removed for this (`expect(cardOf(results)).toBeNull()` or its equivalent for these states).",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required: DOM order matches visual order when the field is on top: field, then summary and filters, then results; Tab from the field reaches the filters, Shift+Tab from the first result reaches the filters then the field.",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required: a text action (normal text colour, weight 500, a chevron icon) that opens a menu (reuse the app's existing menu component) with Any time / Past week / Past month / Past year (and \"Custom dates\" shown as the label when More filters set dates); same in browser and desktop; keyboard and screen-reader names work.",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required: a new result list starts at the top (first row visible directly under the field and filters); opening or closing the pane keeps the current scroll position. Remove the bottom-dock scroll assumptions that cause this.",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required: this year \"12 Nov\"; other years \"9 Oct 2025\" (use the app's existing date formatting/locale helpers).",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required (decision): remove Markdown marks for all files except code and plain text (code = the extensions the app already treats as code; .txt/.log/.csv stay raw), because extracted office/PDF/mail text is stored Markdown-structured; remove extraction marker lines for all files: \"--- OCR page N ---\" and any other \"--- ... ---\" separator lines that the extractors insert (find their producers in modules/worker-services, e.g. extract/PdfOcrEngine.java, and match exactly what they emit; do not strip ordinary \"---\" text a user wrote). Display only: copy, export, Ask, citations and the pane keep raw text and offsets.",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
         }
       ],
-      "conflictSearch": "Repository docs/decisions searched for result counts, snippets, copy, details pane, no results and developer tools. No conflicting UI decision found. Private task records were not read in this builder session. E3/A1/A6 retire the previous summary words and effectiveMode-only fixture; E4/A2/A7 relocate the filter editor and keep its validation; E5/A10/A11 move copy/Why and collections; E7/A8 move diagnostics behind developer tools and retain anchors; E8/A1/A9 replace empty copy. Every changed assertion is listed in tmp/s5-evidence/test-expectations.txt. No retained payload, selection, error, raw-text or contrast assertion was removed."
+      "conflictSearch": "Repository docs/decisions searched for result counts, snippets, copy, details pane, no results and developer tools. No conflicting UI decision found. Private task records were not read in this builder session. E3/A1/A6 retire the previous summary words and effectiveMode-only fixture; E4/A2/A7 relocate the filter editor and keep its validation; E5/A10/A11 move copy/Why and collections; E7/A8 move diagnostics behind developer tools and retain anchors; E8/A1/A9 replace empty copy. Every changed assertion is listed in tmp/s5-evidence/test-expectations.txt. No retained payload, selection, error, raw-text or contrast assertion was removed. Repair request supersedes A5: all extracted document formats are Markdown-cleaned, with the existing code-extension set and txt/log/csv literal. Failure/loading card-absence assertions are restored (including x5), not weakened. Additional expectation changes are listed in tmp/s5-evidence/test-expectations-2.txt."
     },
     {
       "items": [
         "modules/ui-web/e2e/type-ladder-chromium.mjs",
         "modules/ui-web/e2e/type-ladder-fixture.js",
-        "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts"
+        "modules/ui-web/src/shell-v0/chrome/Shell.details-lockdown.test.ts",
+        "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/Sv3Results.preview.test.ts",
+        "modules/ui-web/src/shell-v0/components/detailsPane/DetailsPane.frame-lockdown.test.ts",
+        "scripts/jsharness/jsharness/ui_check.py"
       ],
       "class": "Adaptation",
       "moved": [
         "instrumentation",
         "input re-encoding"
       ],
-      "whatMoved": "The existing filter gesture uses More filters on Search results. The type-ladder fixture gains a test-only developer preference control; the default pane is still captured before opting in for both existing Rendered/Source captures. Shell.details quiet-highlight tests explicitly opt in before exercising the same view controls. Original documents, themes, contrast thresholds and assertions remain. The Library pane Arrow-key case remains unchanged.",
+      "whatMoved": "The existing filter gesture uses More filters on Search results. The type-ladder fixture gains a test-only developer preference control; the default pane is still captured before opting in for both existing Rendered/Source captures. Shell.details quiet-highlight tests explicitly opt in before exercising the same view controls. Original documents, themes, contrast thresholds and assertions remain. The Library pane Arrow-key case remains unchanged. Repair: date selection uses the shared menu instead of a native select; preset/range/path assertions remain. The preview fixture now uses the real ready status rather than the unsupported results status, retaining all 15 preview/keyboard oracles. Search filter races commit their second restriction through the canonical store while pending UI has no filter row; generation, payload and stale-response oracles remain. Error assertions read the failure region, then verify entered restrictions in Ask, where the editor remains available. The real Chromium Space-preview fixture makes the same results-to-ready correction and supplies a complete snapshot; every geometry, focus, keyboard and error assertion stays unchanged. Docked filter cameras retain the displayed latest query in the field before committing restrictions: the recents setup intentionally empties it, and the product deliberately cannot rerun an empty draft, so those restrictions remain stale and the requested UI correctly withholds the filter row. Same query, restriction inputs, viewports, focus, error, accessibility and geometry assertions are retained.",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "E7: Side pane: icon + file name once + Close; one line \"folder path · N pages · size\" with unknown parts omitted (size from sizeBytes carried from the search hit; pages from existing preview metadata); for a scan one note \"Read from a scan. A few words may be wrong.\"; then the file's text (Markdown rendered as today); footer Open file and Show in folder (Show in folder hidden where unsupported, browser). No place stepper (HANDOVER fallback: the response holds selected passages, not all places); named in delivery. Text source, quality %, OCR details, Rendered/Source switch and provenance go behind developer tools. \"Context\" tab only inside an Ask conversation; a restored pane whose saved tab is Context outside Ask opens the document instead (saved memory is not rewritten until the user changes the pane).",
+          "choice": "E7: Side pane: icon + file name once + Close; one line \"folder path \u00b7 N pages \u00b7 size\" with unknown parts omitted (size from sizeBytes carried from the search hit; pages from existing preview metadata); for a scan one note \"Read from a scan. A few words may be wrong.\"; then the file's text (Markdown rendered as today); footer Open file and Show in folder (Show in folder hidden where unsupported, browser). No place stepper (HANDOVER fallback: the response holds selected passages, not all places); named in delivery. Text source, quality %, OCR details, Rendered/Source switch and provenance go behind developer tools. \"Context\" tab only inside an Ask conversation; a restored pane whose saved tab is Context outside Ask opens the document instead (saved memory is not rewritten until the user changes the pane).",
           "label": "agent choice"
         },
         {
@@ -276,6 +310,21 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "A7 (E4): \"Any time\" menu: Any time clears both date bounds; Past week/month/year set modified-from to the start of the local day N days back and clear modified-to; custom dates from More filters show as \"Custom dates\" in the menu label; URL/pin semantics of dates unchanged.",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required: no count and no filter row in those states (as on main d61d78ce4e/eea268db53). Restore the check that was removed for this (`expect(cardOf(results)).toBeNull()` or its equivalent for these states).",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required: DOM order matches visual order when the field is on top: field, then summary and filters, then results; Tab from the field reaches the filters, Shift+Tab from the first result reaches the filters then the field.",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required: a text action (normal text colour, weight 500, a chevron icon) that opens a menu (reuse the app's existing menu component) with Any time / Past week / Past month / Past year (and \"Custom dates\" shown as the label when More filters set dates); same in browser and desktop; keyboard and screen-reader names work.",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
         }
       ]
     },
@@ -285,7 +334,11 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
         "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts",
         "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts",
         "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts",
-        "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts"
+        "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts",
+        "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts"
       ],
       "class": "New",
       "behaviour": "Executed-leg summary; available/displayed/capped counts; format-aware display-only text; date and folder visibility; default diagnostic gating; text facets/date presets; per-row raw copy without selection changes and with focus return; literal/general/filtered empty outcomes and AI navigation-only advice; stable mounted editor; browser footer and preview metadata; restored Context fallback without memory writes. Supplemental cases were written during implementation and then run in the unchanged shared clone; initial 11 checks preceded product edits.",
@@ -295,7 +348,7 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "E3: Summary line left of the filter row: \"N files · by words · 0.04 s\". Mode words from the actual retrieval mode of the response: words-only \"by words\"; hybrid \"by words and meaning\"; meaning-only \"by meaning\"; unknown: omitted. Capped counts keep \"+\". The \"Results for 'query'\" line goes (the query is in the field). Slow/pending states keep their words.",
+          "choice": "E3: Summary line left of the filter row: \"N files \u00b7 by words \u00b7 0.04 s\". Mode words from the actual retrieval mode of the response: words-only \"by words\"; hybrid \"by words and meaning\"; meaning-only \"by meaning\"; unknown: omitted. Capped counts keep \"+\". The \"Results for 'query'\" line goes (the query is in the field). Slow/pending states keep their words.",
           "label": "agent choice"
         },
         {
@@ -303,7 +356,7 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "E5: Rows: type icon, name (mail with a subject: \"Subject · file.eml\"), date at the right (modifiedAt carried into the hit model; absent -> no date), two lines of clean text. Folder trail only when the library has more than one folder (known root count > 1) or the count is unknown; normal UI font in secondary colour (not monospace). Collection badge only with developer tools. MD/JSON/Paths header copy and the per-row \"Why this result?\" leave the default view: the row menu gains \"Why this result\" (opens today's explanation) and \"Copy as Markdown\" / \"Copy as JSON\" for that row; whole-list copy buttons stay only with developer tools on.",
+          "choice": "E5: Rows: type icon, name (mail with a subject: \"Subject \u00b7 file.eml\"), date at the right (modifiedAt carried into the hit model; absent -> no date), two lines of clean text. Folder trail only when the library has more than one folder (known root count > 1) or the count is unknown; normal UI font in secondary colour (not monospace). Collection badge only with developer tools. MD/JSON/Paths header copy and the per-row \"Why this result?\" leave the default view: the row menu gains \"Why this result\" (opens today's explanation) and \"Copy as Markdown\" / \"Copy as JSON\" for that row; whole-list copy buttons stay only with developer tools on.",
           "label": "agent choice"
         },
         {
@@ -319,7 +372,7 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "E7: Side pane: icon + file name once + Close; one line \"folder path · N pages · size\" with unknown parts omitted (size from sizeBytes carried from the search hit; pages from existing preview metadata); for a scan one note \"Read from a scan. A few words may be wrong.\"; then the file's text (Markdown rendered as today); footer Open file and Show in folder (Show in folder hidden where unsupported, browser). No place stepper (HANDOVER fallback: the response holds selected passages, not all places); named in delivery. Text source, quality %, OCR details, Rendered/Source switch and provenance go behind developer tools. \"Context\" tab only inside an Ask conversation; a restored pane whose saved tab is Context outside Ask opens the document instead (saved memory is not rewritten until the user changes the pane).",
+          "choice": "E7: Side pane: icon + file name once + Close; one line \"folder path \u00b7 N pages \u00b7 size\" with unknown parts omitted (size from sizeBytes carried from the search hit; pages from existing preview metadata); for a scan one note \"Read from a scan. A few words may be wrong.\"; then the file's text (Markdown rendered as today); footer Open file and Show in folder (Show in folder hidden where unsupported, browser). No place stepper (HANDOVER fallback: the response holds selected passages, not all places); named in delivery. Text source, quality %, OCR details, Rendered/Source switch and provenance go behind developer tools. \"Context\" tab only inside an Ask conversation; a restored pane whose saved tab is Context outside Ask opens the document instead (saved memory is not rewritten until the user changes the pane).",
           "label": "agent choice"
         },
         {
@@ -425,6 +478,36 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "A12 (E7): Browser Open file passing a filesystem path to window.open exists on main -> finding. Size shows only when it belongs to the pane's document (same path).",
           "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required: no count and no filter row in those states (as on main d61d78ce4e/eea268db53). Restore the check that was removed for this (`expect(cardOf(results)).toBeNull()` or its equivalent for these states).",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required: DOM order matches visual order when the field is on top: field, then summary and filters, then results; Tab from the field reaches the filters, Shift+Tab from the first result reaches the filters then the field.",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required: a text action (normal text colour, weight 500, a chevron icon) that opens a menu (reuse the app's existing menu component) with Any time / Past week / Past month / Past year (and \"Custom dates\" shown as the label when More filters set dates); same in browser and desktop; keyboard and screen-reader names work.",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required: a new result list starts at the top (first row visible directly under the field and filters); opening or closing the pane keeps the current scroll position. Remove the bottom-dock scroll assumptions that cause this.",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required: this year \"12 Nov\"; other years \"9 Oct 2025\" (use the app's existing date formatting/locale helpers).",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Required (decision): remove Markdown marks for all files except code and plain text (code = the extensions the app already treats as code; .txt/.log/.csv stay raw), because extracted office/PDF/mail text is stored Markdown-structured; remove extraction marker lines for all files: \"--- OCR page N ---\" and any other \"--- ... ---\" separator lines that the extractors insert (find their producers in modules/worker-services, e.g. extract/PdfOcrEngine.java, and match exactly what they emit; do not strip ordinary \"---\" text a user wrote). Display only: copy, export, Ask, citations and the pane keep raw text and offsets.",
+          "location": "task t-20261113-fmimpl request (builder repair brief, 2026-11-14)"
         }
       ],
       "evidence": "gates/test-intent/evidence/fm-results.json",
@@ -433,12 +516,22 @@ The harness adds dark/light results, scan pane and nothing-found states plus the
         "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts",
         "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts",
         "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts",
-        "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts"
+        "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts",
+        "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts"
       ]
     }
   ]
 }
 ```
+
+
+Repair evidence (5ef58a99e4 before checkout): the four new isolated files fail 13 assertions before the product fix; 34 literal-text preservation cases pass. Restored pending/failure assertions fail twice before; restored x5 fails once before. The shared-clone known-good eea268db53 withholds the card; its active restriction chips remain visible, so the stricter no-filter assertion has no known-good pass there. Exact extractor separator inventory found only the OCR marker at PdfOcrEngine.java:341 and :477; ordinary user separators remain. The exact restored pending/transport/refused/syntax/stale checks also run against eea268db53. Candidate execution evidence is regenerated; fail-before publication remains for the orchestrator because the builder cannot create repository worktrees or commit. Acceptance records below are unchanged.
+
+
+A real Chromium date-choice probe exposed focus loss during the temporary cache disconnection. A focused check failed on null activeElement before the focus repair, then passed; the same control regains focus only if the reader has not focused another control while waiting. The browser probe now reads Modified date: Past week on the focused date action after the rerun.
 
 ## Acceptance records
 

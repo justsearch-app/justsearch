@@ -16,6 +16,8 @@
  * It decides nothing. Every press is an event the window answers.
  */
 import { html, css, nothing, type TemplateResult } from 'lit';
+import { cache } from 'lit/directives/cache.js';
+import { deepActiveElement } from '../../utils/keyboardHandler.js';
 import { icon } from '../../components/Icon.js';
 import { JfElement } from '../../primitives/JfElement.js';
 import { sv3Shared } from './sv3-shared-styles.js';
@@ -69,6 +71,7 @@ export class Sv3Results extends JfElement {
   /** The result the Space preview is showing; null while none is. */
   declare private previewId: string | null;
   private previewRow: HTMLElement | null = null;
+  private resultControlFocus: HTMLElement | null = null;
 
   constructor() {
     super();
@@ -146,10 +149,25 @@ export class Sv3Results extends JfElement {
 
   /** New results may have dropped the row on preview; the card never outlives what it describes. */
   override willUpdate(changed: Map<string, unknown>): void {
+    if (changed.has('view') && this.view.status !== 'ready' && this.view.status !== 'empty') {
+      const card = this.renderRoot.querySelector('jf-results-card');
+      if (card !== null) {
+        const active = deepActiveElement();
+        let at: Node | null = active;
+        while (at !== null && at !== card) at = at.parentNode ?? (at as ShadowRoot).host ?? null;
+        this.resultControlFocus = at === card && active instanceof HTMLElement ? active : null;
+      }
+    }
     if (changed.has('view') && this.previewId !== null && this.previewHit() === null) this.closePreview();
   }
 
   override updated(): void {
+    if (this.view.status === 'ready' || this.view.status === 'empty') {
+      const focus = this.resultControlFocus;
+      this.resultControlFocus = null;
+      // A rerun temporarily disconnects the cached form. Return its keyboard unless the reader moved on.
+      if (focus?.isConnected && deepActiveElement() === document.body) focus.focus({ preventScroll: true });
+    }
     const card = this.renderRoot.querySelector<HTMLElement>('.preview');
     const row = this.previewRow?.getBoundingClientRect();
     if (card === null || row === undefined) return;
@@ -184,7 +202,7 @@ export class Sv3Results extends JfElement {
     return html`
       <section class="results" aria-label="Search results" data-testid="sv3-results"
         @card-preview=${this.onCardPreview} @keydown=${this.onPreviewKeydown}>
-        ${this.filters(view.filters)} ${this.selection(view)} ${this.card(view)} ${this.body(view)}
+        ${cache(view.status === 'ready' || view.status === 'empty' ? html`${this.filters(view.filters)} ${this.selection(view)} ${this.card(view)}` : html``)} ${this.body(view)}
       </section>
       ${this.preview()}
     `;

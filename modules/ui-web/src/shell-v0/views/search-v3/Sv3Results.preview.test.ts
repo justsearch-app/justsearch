@@ -15,7 +15,7 @@ vi.mock('../../primitives/modality.js', { spy: true });
 const hit = (id: string, title: string): Record<string, unknown> => ({ id, title, path: `/docs/${title}`, snippet: `snippet of ${title}`, score: 1 });
 
 function view(results: Array<Record<string, unknown>>): Sv3ResultsView {
-  return { ...SV3_RESULTS_IDLE, status: 'results', query: 'heating', snapshot: { query: 'heating', results, status: 'done' } } as unknown as Sv3ResultsView;
+  return { ...SV3_RESULTS_IDLE, status: 'ready', query: 'heating', snapshot: { query: 'heating', results, matchCount: results.length, totalHits: results.length, facetsTruncated: false, isSearching: false, processingTimeMs: 10, error: null, searchTrace: null } } as unknown as Sv3ResultsView;
 }
 
 async function mount(results = [hit('a', 'alpha.md'), hit('b', 'beta.md')]): Promise<Sv3Results> {

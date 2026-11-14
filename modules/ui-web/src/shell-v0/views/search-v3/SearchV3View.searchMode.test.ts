@@ -1583,7 +1583,8 @@ it('F8 same-query filter commits cancel stale rows counts facets and chosen-file
   aiOnline(); backend.corpus.needle = [wireHit('old', '/outside/old.md')]; const el = await mount(); await filtersOf(el); await searchFor(el, 'needle');
   await clickRow(el, 'old.md', { ctrlKey: true }); backend.holdSearches = true; await filterEdit(el, 'folder', '/first');
   const old = backend.held.splice(0); backend.corpus.needle = [wireHit('new', '/new/new.md')];
-  await filterEdit(el, 'folder', '/new');
+  expect((await results(el))!.shadowRoot!.querySelector('jf-results-card')).toBeNull();
+  setFilters({ ...getFilters(), pathPrefix: '/new' }); await settle(el);
   expect(await rows(el)).toHaveLength(0); expect(q((await results(el))!, 'sv3-results-ask')).toBeNull();
   backend.held.splice(0).forEach(release => release()); await settle(el); old.forEach(release => release()); await settle(el);
   expect(await rowTitles(el)).toEqual(['new.md']); expect((await results(el))!.shadowRoot!.textContent).not.toContain('/first');
@@ -1676,10 +1677,15 @@ it('F5 Engine 400 errors appear next to Search and Ask controls with the entered
   const normal = fetchMock.getMockImplementation()! as (...args: unknown[]) => unknown;
   fetchMock.mockImplementation(async (url: unknown, init: unknown) => String(url).includes('/api/knowledge/search') || String(url).includes('/api/chat/dispatch')
     ? json({ errorCode: 'INVALID_REQUEST', error: 'pathPrefix: rejected by Engine' }, 400) : normal(url, init));
-  await searchFor(el, 'needle'); let filters = await filtersOf(el);
-  expect(filters.shadowRoot!.querySelector('#folder-error')!.textContent).toContain('pathPrefix: rejected by Engine');
+  await searchFor(el, 'needle');
+  const failed = (await results(el))!;
+  expect(failed.shadowRoot!.querySelector('jf-results-card')).toBeNull();
+  expect(q(failed, 'sv3-results-failure-detail')!.textContent).toContain('pathPrefix: rejected by Engine');
+  expect(getFilters().pathPrefix).toBe('/inside');
+  await chooseTier(el, 'ask');
+  let filters = await filtersOf(el);
   expect(filters.shadowRoot!.querySelector<HTMLInputElement>('[data-filter-input=folder]')!.value).toBe('/inside');
-  await chooseTier(el, 'ask'); await askNow(el, 'needle'); filters = await filtersOf(el);
+  await askNow(el, 'needle'); filters = await filtersOf(el);
   expect(filters.shadowRoot!.querySelector('#folder-error')!.textContent).toContain('pathPrefix: rejected by Engine');
   expect(backend.streams).toHaveLength(0);
 });
@@ -1736,6 +1742,8 @@ it('XFilters syntax errors show the Engine syntax message and preserve active fi
   expect(q(composer, 'sv3-search-error')?.textContent).toBe(reason);
   expect((await fieldOf(el)).value).toBe('"');
   expect(getFilters()).toEqual(original);
+  expect((await results(el))!.shadowRoot!.querySelector('jf-results-card')).toBeNull();
+  await chooseTier(el, 'ask');
   expect((await filtersOf(el)).shadowRoot!.querySelectorAll('[data-filter]')).toHaveLength(3);
   expect((await filtersOf(el)).shadowRoot!.textContent).not.toContain(reason);
   expect(getSearchState().results).toEqual([]);
@@ -1747,7 +1755,9 @@ it('XFilters changing a restriction during syntax Search drops the old response 
   backend.holdSearches = true; await searchFor(el, query);
   expect(backend.searches.at(-1)?.querySyntax).toBe('search');
   const old = backend.held.splice(0);
-  backend.corpus[query] = [wireHit('new', '/next/new.md')]; await filterEdit(el, 'folder', '/next');
+  backend.corpus[query] = [wireHit('new', '/next/new.md')];
+  expect((await results(el))!.shadowRoot!.querySelector('jf-results-card')).toBeNull();
+  setFilters({ ...getFilters(), pathPrefix: '/next' }); await settle(el);
   backend.held.splice(0).forEach(release => release()); await settle(el);
   old.forEach(release => release()); await settle(el);
   expect(await rowTitles(el)).toEqual(['new.md']);
@@ -1759,7 +1769,7 @@ it('XFilters changing a restriction during syntax Search drops the old response 
     ? { ok: false, status: 400, json: () => new Promise(resolve => { releaseBody = resolve; }) } : normal(url, init));
   await searchFor(el, query);
   fetchMock.mockImplementation(normal);
-  await filterEdit(el, 'folder', '/current');
+  setFilters({ ...getFilters(), pathPrefix: '/current' }); await settle(el);
   releaseBody({ errorCode: 'SEARCH_SYNTAX_INVALID', error: 'obsolete syntax reason' }); await settle(el);
   expect(getSearchState().error).toBeNull();
   expect(await rowTitles(el)).toEqual(['new.md']);
@@ -1776,8 +1786,9 @@ it('XFilters restriction errors on syntax queries retain the Engine restriction 
   await searchFor(el, query);
   const request = fetchMock.mock.calls.filter(call => String(call[0]).includes('/api/knowledge/search')).at(-1);
   expect(JSON.parse(String((request?.[1] as RequestInit).body))).toMatchObject({ query, querySyntax: 'search', filters: wireRestrictions() });
-  const filters = await filtersOf(el);
-  expect(filters.shadowRoot!.querySelector('#folder-error')?.textContent).toBe(reason);
+  const failed = (await results(el))!;
+  expect(failed.shadowRoot!.querySelector('jf-results-card')).toBeNull();
+  expect(q(failed, 'sv3-results-failure-detail')!.textContent).toBe(`${reason} Open Health to check the connection and service status before trying again.`);
   expect(q(await region(el, 'jf-sv3-composer'), 'sv3-search-error')).toBeNull();
   expect(getFilters()).toEqual(original); expect((await fieldOf(el)).value).toBe(query);
 });

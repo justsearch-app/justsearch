@@ -76,14 +76,20 @@ it('S5-5 pending responses retain known Type values without old counts', async (
 it('S5-5 date presets use local day boundaries and clear the opposite bound', async () => {
   setFilters({ modifiedFromMs: 1234, modifiedToMs: 9876, pathPrefix: '/notes' });
   const el = await mount();
-  const select = el.shadowRoot!.querySelector<HTMLSelectElement>('select[aria-label="Modified date"]');
-  expect(select, 'date menu is on the filter row').not.toBeNull();
-  expect(select!.selectedOptions[0]!.textContent).toBe('Custom dates');
-  select!.value = '7'; select!.dispatchEvent(new Event('change')); await el.updateComplete;
+  const trigger = el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="date-filter"]')!;
+  expect(trigger, 'date menu is on the filter row').not.toBeNull();
+  expect(trigger.textContent).toContain('Custom dates');
+  trigger.click();
+  const menu = document.querySelector<ContextMenu>('jf-context-menu')!; await menu.updateComplete;
+  menu.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')[1]!.click();
+  for (let n = 0; n < 10; n++) await Promise.resolve(); await el.updateComplete;
   const day = new Date(); day.setHours(0, 0, 0, 0); day.setDate(day.getDate() - 7);
   expect(getFilters()).toEqual({ pathPrefix: '/notes', modifiedFromMs: day.getTime() });
-  expect(select!.selectedOptions[0]!.textContent).toBe('Past week');
-  select!.value = 'any'; select!.dispatchEvent(new Event('change'));
+  expect(trigger.textContent).toContain('Past week');
+  trigger.click();
+  const again = document.querySelector<ContextMenu>('jf-context-menu')!; await again.updateComplete;
+  again.shadowRoot!.querySelector<HTMLButtonElement>('[role="menuitem"]')!.click();
+  for (let n = 0; n < 10; n++) await Promise.resolve();
   expect(getFilters()).toEqual({ pathPrefix: '/notes' });
 });
 it.each(['md', 'json'] as const)('S5-6 row %s copy keeps raw text chosen files and focus', async format => {

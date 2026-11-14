@@ -1824,6 +1824,16 @@ export class Sv3Main extends JfElement {
     this.settleBudgetAutoContinue();
     const el = this.scroller;
     if (el === null) return;
+    if (this.resultsArmRendered) {
+      const previous = changed.get('view') as Sv3ResultsView | undefined;
+      // A new response starts at its first row. Pane/selection/layout updates keep the same list.
+      if (el !== this.lastScrolledEl || previous && (previous.query !== this.view.query
+        || previous.snapshot?.results !== this.view.snapshot?.results)) el.scrollTop = 0;
+      this.lastScrolledEl = el;
+      this.lastScrollHeight = 0;
+      return;
+    }
+    if (!this.transcriptArmRendered) return;
     if (el !== this.lastScrolledEl) {
       this.lastScrolledEl = el;
       this.lastScrollHeight = 0;

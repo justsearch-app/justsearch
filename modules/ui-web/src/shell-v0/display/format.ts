@@ -58,3 +58,12 @@ export function formatDeadline(deadline: Date): string {
     ...(today ? {} : { weekday: 'short' }), hour: '2-digit', minute: '2-digit',
   }).format(deadline);
 }
+
+/** Compact file date: day and local month, retaining the year outside this year. */
+export function formatShortDate(date: Date): string {
+  if (Number.isNaN(date.getTime())) return 'Invalid Date';
+  const parts = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short',
+    ...(date.getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }),
+  }).formatToParts(date);
+  return ['day', 'month', 'year'].map(type => parts.find(part => part.type === type)?.value).filter(Boolean).join(' ');
+}

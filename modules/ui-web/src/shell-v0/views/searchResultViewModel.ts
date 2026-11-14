@@ -104,8 +104,11 @@ const SNIPPET_MAX = 240;
 
 /** Display only. Stored snippets and citation offsets always keep the original text. */
 function cleanSnippet(text: string, path: string): string {
-  let clean = text.replace(/---\s*OCR page \d+\s*---/gi, ' ');
-  if (/\.(md|markdown|mdx)$/i.test(path)) {
+  // Exact marker emitted by PdfOcrEngine (both OCR paths). Snippets may flatten its newlines.
+  let clean = text.replace(/--- OCR page [1-9]\d* ---/g, ' ');
+  // The code extensions are IndexingDocumentOps.isCodeExtension's classification.
+  // Plain text stays literal too; office/PDF/mail extraction stores Markdown structure.
+  if (!/\.(ts|tsx|js|jsx|py|java|kt|go|rs|c|cc|cpp|h|hpp|cs|rb|php|swift|scala|sql|sh|ps1|yml|yaml|json|xml|toml|ini|gradle|properties|txt|log|csv)$/i.test(path)) {
     clean = clean
       .replace(/!?(?:\[([^\]]*)\])\([^)]*\)/g, '$1')
       .replace(/^\s{0,3}#{1,6}\s+/gm, '')

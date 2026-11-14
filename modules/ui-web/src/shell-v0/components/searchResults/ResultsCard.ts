@@ -38,7 +38,7 @@ import {
   highlightTerms,
   highlightStyles,
 } from './resultRowPresentation.js';
-import { formatDateTime } from '../../display/format.js';
+import { formatDateTime, formatShortDate } from '../../display/format.js';
 import { getShowDeveloperTools, subscribeShowDeveloperTools } from '../../state/developerToolsState.js';
 import { getFirstUse, subscribeFirstUse } from '../../state/firstUse.js';
 import { getFilters, setFilterRange, subscribeFilters } from '../../state/searchFiltersState.js';
@@ -172,6 +172,7 @@ export class ResultsCard extends JfElement {
   static properties = {
     snapshot: { attribute: false },
     moreFiltersOpen: { state: true },
+    dateMenuOpen: { state: true },
     whyId: { state: true },
     filterError: { type: String },
     facetSelections: { attribute: false },
@@ -193,6 +194,7 @@ export class ResultsCard extends JfElement {
 
   declare snapshot: CardSnapshot | null;
   declare private moreFiltersOpen: boolean;
+  declare private dateMenuOpen: boolean;
   declare private whyId: string | null;
   declare filterError: string;
   declare facetSelections: Record<string, string[]>;
@@ -239,6 +241,7 @@ export class ResultsCard extends JfElement {
     super();
     this.snapshot = null;
     this.moreFiltersOpen = false;
+    this.dateMenuOpen = false;
     this.whyId = null;
     this.filterError = '';
     this.facetSelections = {};
@@ -649,7 +652,7 @@ export class ResultsCard extends JfElement {
               >${view.collection.label}</span>`
             : nothing}
           ${typeof hit.modifiedAt === 'number' && Number.isFinite(hit.modifiedAt) && Math.abs(hit.modifiedAt) <= 8.64e15
-            ? html`<time datetime=${new Date(hit.modifiedAt).toISOString()} title=${formatDateTime(new Date(hit.modifiedAt))}>${new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(new Date(hit.modifiedAt))}</time>` : nothing}
+            ? html`<time datetime=${new Date(hit.modifiedAt).toISOString()} title=${formatDateTime(new Date(hit.modifiedAt))}>${formatShortDate(new Date(hit.modifiedAt))}</time>` : nothing}
           ${isLive
             ? html`<button
                 class="row-actions"
@@ -784,12 +787,35 @@ export class ResultsCard extends JfElement {
     </button>`;
   }
 
+  private async openDateMenu(event: Event): Promise<void> {
+    if (this.dateMenuOpen) return;
+    const trigger = event.currentTarget as HTMLButtonElement;
+    const rect = trigger.getBoundingClientRect();
+    this.dateMenuOpen = true;
+    try {
+      const value = await openContextMenu({ anchor: { x: rect.left, y: rect.bottom },
+        actions: [
+          { id: 'any', label: 'Any time' }, { id: '7', label: 'Past week' },
+          { id: '30', label: 'Past month' }, { id: '365', label: 'Past year' },
+        ].map(action => ({ ...action, category: 'file' as const, enabled: true })),
+      });
+      if (value === 'any') setFilterRange(undefined, undefined);
+      else if (value !== null) {
+        const day = new Date(); day.setHours(0, 0, 0, 0); day.setDate(day.getDate() - Number(value));
+        setFilterRange(day.getTime(), undefined);
+      }
+    } finally {
+      this.dateMenuOpen = false;
+      if (trigger.isConnected) trigger.focus({ preventScroll: true });
+    }
+  }
+
   private renderFilters(): TemplateResult {
     const dates = getFilters();
     const from = dates.modifiedFromMs, to = dates.modifiedToMs;
     const start = new Date(); start.setHours(0, 0, 0, 0);
-    const preset = !to && [7, 30, 365].find(days => { const day = new Date(start); day.setDate(day.getDate() - days); return from === day.getTime(); });
-    const label = !from && !to ? 'Any time' : preset ? String(preset) : 'Custom dates';
+    const preset = to === undefined && [7, 30, 365].find(days => { const day = new Date(start); day.setDate(day.getDate() - days); return from === day.getTime(); });
+    const label = from === undefined && to === undefined ? 'Any time' : preset === 7 ? 'Past week' : preset === 30 ? 'Past month' : preset === 365 ? 'Past year' : 'Custom dates';
     const facets = this.snapshot?.facets as Parameters<typeof renderFacetChips>[0];
     return html`<div class="result-filters" role="group" aria-label="Result filters">
       <button type="button" class="text-filter" data-testid="type-all" aria-pressed=${String(!(this.facetSelections.file_kind?.length))}
@@ -797,18 +823,9 @@ export class ResultsCard extends JfElement {
       ${renderFacetChips(this.snapshot?.countsPending ? null : facets, this.facetSelections,
         { fields: ['file_kind'], pendingValues: this.snapshot?.countsPending ? this.lastFacets : null,
           onToggle: (field, value) => this.emitCard('card-facet-toggle', { field, value }) })}
-      <select class=${label === 'Any time' ? 'text-filter' : 'text-filter active'} aria-label="Modified date"
-        @change=${(event: Event) => {
-          const value = (event.target as HTMLSelectElement).value;
-          if (value === 'any') setFilterRange(undefined, undefined);
-          else if (value !== 'custom') {
-            const day = new Date(); day.setHours(0, 0, 0, 0); day.setDate(day.getDate() - Number(value));
-            setFilterRange(day.getTime(), undefined);
-          }
-        }}>
-        <option value="any" .selected=${label === 'Any time'}>Any time</option><option value="7" .selected=${label === '7'}>Past week</option><option value="30" .selected=${label === '30'}>Past month</option><option value="365" .selected=${label === '365'}>Past year</option>
-        ${label === 'Custom dates' ? html`<option value="custom" .selected=${true}>Custom dates</option>` : nothing}
-      </select>
+      <button type="button" class="text-filter date-filter" data-testid="date-filter"
+        aria-label=${`Modified date: ${label}`} aria-haspopup="menu" aria-expanded=${String(this.dateMenuOpen)}
+        @click=${this.openDateMenu}>${label}${icon({ name: 'chevron-down', size: 12 })}</button>
       <button type="button" class="text-filter" data-testid="more-filters" aria-expanded=${String(this.moreFiltersOpen)}
         @click=${() => { this.moreFiltersOpen = !this.moreFiltersOpen; }}>More filters</button>
     </div>`;
@@ -858,6 +875,7 @@ export class ResultsCard extends JfElement {
       .result-filters .facet-group-label { display: none; }
       .text-filter { font: inherit; font-size: var(--font-size-xs); font-weight: 400; color: var(--text-secondary); border: 0; border-radius: 4px; background: transparent; padding: var(--jf-space-1); cursor: pointer; }
       .text-filter.active, .text-filter[aria-pressed='true'], .text-filter[aria-expanded='true'], [data-testid='more-filters'] { font-weight: 500; color: var(--text-primary); }
+      .date-filter { display: inline-flex; align-items: center; gap: var(--jf-space-1); font-weight: 500; color: var(--text-primary); }
       .text-filter:focus-visible { outline: 2px solid var(--focus-ring-color); }
       .row time { margin-inline-start: auto; color: var(--text-secondary); font-size: var(--font-size-xs); font-weight: 400; flex: none; }
       .hit-why summary, .hit-why-explain { color: var(--text-primary); font-weight: 500; }

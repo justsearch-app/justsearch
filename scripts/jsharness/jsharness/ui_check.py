@@ -1765,6 +1765,10 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
     def setup_sv3_filters(state, narrow, viewport=None):
         async def setup(page):
             await setup_sv3_recents(state, narrow, viewport)(page)
+            if state != "hero":
+                # Recents setup empties the draft. Keep the displayed query while editing result
+                # filters so commits can rerun it; an empty draft deliberately leaves them stale.
+                await page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first.fill("latest")
             # The fresh search document seeds profile preferences during setup.
             await _enable_developer_tools(page)
             trigger = page.locator('[data-testid="more-filters"]:visible, [data-testid="sv3-filters-trigger"]:visible').first

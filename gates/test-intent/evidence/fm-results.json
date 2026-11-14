@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-14T17:04:19.763Z",
-  "revision": "806f4e8138ac5356ccd25b2324d6163d9bb6f595",
-  "tree": "9a56b4458c532f6b1692a55e52111bc5e463d598",
+  "createdAt": "2026-11-14T18:18:35.788Z",
+  "revision": "5ef58a99e475e73de62cda5eeedbffec07b8c08c",
+  "tree": "6add7d19277de9fbebf743a6800ba94f1672d007",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,10 +18,10 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cusc8iw6/tmp/test-intent-vitest-1260028-1794675854908.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3yimpuhc/tmp/test-intent-vitest-4-1794680313460.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1636
+      "durationMs": 2325
     }
   ],
   "checks": [
@@ -29,7 +29,7 @@
       "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts",
       "file": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:b8c40617a754220dd3eae2e1a483309aedc9c1c7ff3fe6a3e1daadf6b59b6304",
+      "contentDigest": "sha256:8e13c18d4f8c08ae385716b31d443efea825078e2e266f9a62b7458b7d4db927",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -183,49 +183,240 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutesRepairs.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bca0dec63c5ea1f58cf5fd6c81cfc3e0933a827edd3d3ef264acc2d39e3a59fa",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "date is a named text action using the shared keyboard menu and preserves custom bounds until chosen",
+          "status": "passed"
+        },
+        {
+          "name": "dates keep the year outside this year and use day then localized short month",
+          "status": "passed"
+        },
+        {
+          "name": "cleans extracted Markdown in docx only for display",
+          "status": "passed"
+        },
+        {
+          "name": "cleans extracted Markdown in pdf only for display",
+          "status": "passed"
+        },
+        {
+          "name": "cleans extracted Markdown in eml only for display",
+          "status": "passed"
+        },
+        {
+          "name": "cleans extracted Markdown in xlsx only for display",
+          "status": "passed"
+        },
+        {
+          "name": "cleans extracted Markdown in html only for display",
+          "status": "passed"
+        },
+        {
+          "name": "cleans extracted Markdown in md only for display",
+          "status": "passed"
+        },
+        {
+          "name": "keeps ts punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps tsx punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps js punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps jsx punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps py punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps java punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps kt punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps go punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps rs punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps c punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps cc punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps cpp punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps h punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps hpp punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps cs punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps rb punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps php punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps swift punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps scala punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps sql punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps sh punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps ps1 punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps yml punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps yaml punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps json punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps xml punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps toml punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps ini punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps gradle punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps properties punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps txt punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps log punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        },
+        {
+          "name": "keeps csv punctuation and ordinary user separators while removing exact OCR markers",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsDomOrder.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dd090b3d68421412985c954ccc190e669e0cbe1cbab46f54f39ad4acef5df481",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "top field precedes filters and results in DOM without replacing the editor on Search and Ask moves",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsFailure.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:cb8e4079500c5a81e3a70624c65d30850bf4258067e03768e0d46cf670a1b579",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "'failed' withholds the card, count and filters",
+          "status": "passed"
+        },
+        {
+          "name": "'syntax invalid' withholds the card, count and filters",
+          "status": "passed"
+        },
+        {
+          "name": "'stale response' withholds the card, count and filters",
+          "status": "passed"
+        },
+        {
+          "name": "a temporary pending response removes result chrome and restores the same open filter editor and draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsScroll.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0d6dcc6c725b03268ad8fc3c9693c75bbc014593132287a280c059c72bc6b1b0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "new result lists start at the top; layout and pane updates preserve the reader position",
+          "status": "passed"
+        }
+      ]
     }
   ],
-  "failBefore": {
-    "ref": "eea268db53",
-    "revision": "eea268db53344383e65e85752ffa3a546d6a1753",
-    "overlays": [],
-    "patches": [],
-    "runs": [
-      {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cusc8iw6/tmp/test-intent-vitest-1260028-1794675857856.json\"",
-        "cwd": "<before-worktree>",
-        "exitCode": 1,
-        "durationMs": 1711,
-        "output": "JSON report written to /home/elias/.cache/am/cusc8iw6/tmp/test-intent-vitest-1260028-1794675857856.json\n\n"
-      }
-    ],
-    "checks": [
-      {
-        "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts",
-        "classification": "assertion",
-        "detail": "S5-1 shows files mode and seconds in that order from executed legs:  AssertionError: expected '1 match · found in 0.04s · exact-word…' to be '1 file · by words · 0.04 s' // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-9VjiY8/modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts:30:6\n    at processTick | S5-1 retains available versus displayed and capped counts as files:  AssertionError: expected '\\n        Top 1 of 100+ matches ·"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts",
-        "classification": "assertion",
-        "detail": "S5-8 restored Context outside Ask falls back without changing saved memory: /saved.md:  AssertionError: expected 'context' to be 'document' // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-9VjiY8/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts:20:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s5/module | S5-8 restored Context outside Ask falls back without changing saved memory: :  AssertionError: expected 'cont"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts",
-        "classification": "assertion",
-        "detail": "S5-12 literal-only empty screen explains words without repeating the query:  AssertionError: expected '\\n      \\n        Results for “privat…' to contain 'No file contains these words'\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-9VjiY8/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts:19:38\n    at processTicksAndRejections (node: | S5-12 unknown execution uses the general empty message and no AI advice:  AssertionError: expected '\\n      \\n        Re"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts",
-        "classification": "assertion",
-        "detail": "S5-4 Search results move the mounted editor to the top and Ask keeps its dock:  AssertionError: expected false to be true // Object.is equality\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-9VjiY8/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts:21:47\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts",
-        "classification": "assertion",
-        "detail": "S5-8 hides Show in folder in a browser:  AssertionError: expected <jf-button …(4)>…(1)</jf-button> to be null\n    at /home/elias/.cache/am/cusc8iw6/tmp/test-intent-before-9VjiY8/modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts:13:84\n    at processTicksAndRejections (node:internal/process/task_queues:104:5) | S5-8 default reader omits source controls and extraction diagnostics:  AssertionError: expected <div class=\"toggle-group\" …(2)>…(2)</div> to be null\n    at /home"
-      }
-    ]
-  },
-  "digest": "sha256:d95f6f6ca052abc55f908d9ac47a3094f18081263fedbf8ce0d2be7bdae7b80c"
+  "failBefore": null,
+  "digest": "sha256:68c6f437eb83f5ded948d79ec5e5742d837f8fc1b8a8360907f9616bab5a974a"
 }
