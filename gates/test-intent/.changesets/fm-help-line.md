@@ -141,3 +141,13 @@ New isolated checks cover runtime exclusions before text/dense/SPLADE/chunk budg
   "note": "Hold: the current digest retains the earlier rejection and the gate fails. UI isolation is repaired; the intent sources and preserved oracles are sound. Independent Java reruns are blocked by the read-only /home/elias/.gradle wrapper lock."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1dc1b-6a7f-7040-9d01-5ac96d6dd90e",
+  "verdict": "accept",
+  "digest": "sha256:d0c0311975360b37b51f9df7d5e1895c48a90c27c34502ad788112c622753c04"
+}
+```
