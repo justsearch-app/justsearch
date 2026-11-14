@@ -503,7 +503,13 @@ a source that predates this candidate.
           "reason": "R9/H3 require the calm dot; delegated choice 3 applies it to every calm case and preserves its name, while choice 4 retains the narrow fallback. The symbol text replacement accommodates a drawn dot but does not itself specify how CSS must draw it."
         }
       ],
-      "checkLimits": "The dot is asserted through its component style rule and token, not a rendered pixel measurement in this jsdom-style test; the rendered 8 px dot is checked in the browser and packaged-app verification.",
+      "checkLimits": "The dot is asserted through its component style rule and token, not a rendered pixel measurement in this jsdom-style test; the rendered 8 px dot is checked in the browser and packaged-app verification."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts"
+      ],
+      "change": "modified",
       "kind": "test-code",
       "class": "Obsolete",
       "sources": [
