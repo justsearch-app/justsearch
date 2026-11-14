@@ -499,17 +499,11 @@ a source that predates this candidate.
         },
         {
           "oldAssertion": "At wide width calm Up to date appears as label text; at 900px it is hidden and the symbol contains the literal filled-circle glyph.",
-          "newAssertion": "Calm has no .label at wide or 900px width, and the narrow .symbol has empty text. Up to date remains the accessible name. The existing narrow needs-you badge/name, notice text, wide non-calm words and Undo/Ctrl+Z behavior checks remain.",
+          "newAssertion": "Calm has no .label at wide or 900px width, and the narrow .symbol has empty text and is drawn by CSS as the dot: it sits inside the calm trigger and the component rule .calm .symbol sets inline-size and block-size to --frame-status-dot (0.5rem, asserted in StatusPill.calmDot.test.ts), background --text-success and the round pill radius. Up to date remains the accessible name. The existing narrow needs-you badge/name, notice text, wide non-calm words and Undo/Ctrl+Z behavior checks remain.",
           "reason": "R9/H3 require the calm dot; delegated choice 3 applies it to every calm case and preserves its name, while choice 4 retains the narrow fallback. The symbol text replacement accommodates a drawn dot but does not itself specify how CSS must draw it."
         }
       ],
-      "checkLimits": "Weakened visual observation: the old literal-dot assertion is replaced by empty symbol text, with no assertion of nonzero circle size, shape, colour or visibility. StatusPill.calmDot.test.ts likewise checks an empty symbol and names, not a rendered dot. A browser visual check is needed for that obligation. Existing Undo assertions cover availability and exact-once reversal, not the newly delegated inline placement at narrow widths."
-    },
-    {
-      "items": [
-        "modules/ui-web/src/shell-v0/components/StatusPill.transitions.test.ts"
-      ],
-      "change": "modified",
+      "checkLimits": "The dot is asserted through its component style rule and token, not a rendered pixel measurement in this jsdom-style test; the rendered 8 px dot is checked in the browser and packaged-app verification.",
       "kind": "test-code",
       "class": "Obsolete",
       "sources": [
@@ -746,5 +740,16 @@ a source that predates this candidate.
   "verdict": "reject",
   "digest": "sha256:a5acee50b414b346bd97077004e61d21b5b0f4e4aa040efb2ce20071da934755",
   "note": "Unsupported weakening: Shell.engineLoss-lockdown tests Menu instead of Settings reachability; boot-frame-lockdown derives its sampling cutoff from current window-control geometry, allowing controls inside the required 44px bar to escape checks."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-fm-top-bar-8mrrdw5k",
+  "verdict": "reject",
+  "digest": "sha256:effb199d04c103a2a32f3ff351ad311178704cb2c8766eb4c04396e2c0daad92",
+  "note": "Unsupported weakening: StatusPill.design.test.ts replaces the calm dot glyph assertion with empty symbol text without any assertion that a visible dot remains. R9/H3 still require a calm dot; delegated choice 3 preserves that obligation, and StatusPill.calmDot.test.ts supplies no replacement drawing assertion."
 }
 ```

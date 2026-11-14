@@ -79,6 +79,13 @@ describe('status pill drawing', () => {
     viewport(900); await flush();
     expect(trigger().querySelector('.label')).toBeNull();
     expect(trigger().querySelector('.symbol')!.textContent).toBe('');
+    // The calm dot is drawn by CSS on the empty symbol: a filled, round, success-coloured box of --frame-status-dot.
+    expect(trigger().querySelector('.symbol')!.closest('.calm')).not.toBeNull();
+    const calmDotRule = /\.calm \.symbol \{([^}]*)\}/.exec(
+      ([] as { cssText: string }[]).concat(StatusPill.styles as never).map(c => c.cssText).join(' ').replace(/\s+/g, ' '))?.[1] ?? '';
+    expect(calmDotRule).toMatch(/inline-size: var\(--frame-status-dot\).*block-size: var\(--frame-status-dot\)/);
+    expect(calmDotRule).toMatch(/background: var\(--text-success\)/);
+    expect(calmDotRule).toMatch(/border-radius: var\(--frame-pill-radius\)/);
     expect(trigger().getAttribute('aria-label')).toBe('Up to date');
     proposeEffect({ kind: 'navigate', to: '#one' }, CORE_PROVENANCE, 'agent'); await flush();
     expect(trigger().querySelector('.label')).toBeNull();
