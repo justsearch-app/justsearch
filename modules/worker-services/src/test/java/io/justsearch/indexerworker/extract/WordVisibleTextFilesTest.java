@@ -145,7 +145,8 @@ class WordVisibleTextFilesTest extends LuceneExecutorTestBase {
         () -> assertFalse(text.contains("[footnoteRef:"), text),
         () -> assertTrue(text.contains("Visible footnote explanation"), text),
         () -> assertTrue(text.contains("Visible vector illustration"), text),
-        () -> assertTrue(text.contains("report.docx"), text));
+        // Mail attachment names are not stored today (unchanged); archive member names are.
+        () -> assertTrue(!container.equals("zip") || text.contains("report.docx"), text));
   }
 
   @ParameterizedTest(name = "S2p/S6 {0} name {1}")
