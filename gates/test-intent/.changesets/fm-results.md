@@ -565,3 +565,14 @@ A real Chromium date-choice probe exposed focus loss during the temporary cache 
   "digest": "sha256:5fafdba00413f831a6d6da10fd8d892bc908ea24fd25855909b3386f469b636a"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "verifier-06r2gq8w-test-intent-audit",
+  "verdict": "reject",
+  "digest": "sha256:5fafdba00413f831a6d6da10fd8d892bc908ea24fd25855909b3386f469b636a",
+  "note": "Entry 1 drops two still-valid expectations. (1) SearchV3View.search.test.ts zero-result case: base 'no results card' (cardOf null) weakened to 'card has no rows'; the candidate now shows '0 files · All · Any time · More filters' above 'Nothing matches this search' with no filters on; no source supports a count on the unfiltered nothing-found screen (fm-06: says so once). (2) DocumentPane.test.ts: the file-wide developer-tools opt-in moves 36 checks that still apply (citation anchors and offsets, highlight decay, missing file, empty state, a11y) out of the default view; only 13 (citation header, Rendered/Source, path header, provenance/VDU) need it. Also: the six 'Required...' sources are labelled owner-words but sit in the builder repair brief; record them as delegated-choice, the cleaning one as superseding A5."
+}
+```
