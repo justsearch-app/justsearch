@@ -192,6 +192,7 @@ public final class StructuredContentHandler extends DefaultHandler {
             tableRows.add(currentRow);
           }
           if (!tableRows.isEmpty()) {
+            flushTextBuffer();
             addElement(new Table(List.copyOf(tableRows), currentPageIndex));
           }
           inTable = false;
@@ -345,6 +346,7 @@ public final class StructuredContentHandler extends DefaultHandler {
       headingLevel = 0;
     }
     if (inTable) {
+      flushTextBufferFinal();
       if (inCell && cellBuffer != null && currentRow != null) {
         currentRow.add(finishText(cellBuffer));
       }

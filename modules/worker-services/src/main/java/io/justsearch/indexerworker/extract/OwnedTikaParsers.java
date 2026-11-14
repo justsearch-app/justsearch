@@ -25,7 +25,7 @@ final class OwnedTikaParsers {
 
   static AutoDetectParser create(Detector detector) {
     TikaOcrRuntime.resolve();
-    return new AutoDetectParser(detector, Configuration.CONFIG.getParser());
+    return new AutoDetectParser(detector, new OfficeContentParser(Configuration.CONFIG.getParser()));
   }
 
   private static void configureHtmlParsers(Parser parser, EncodingDetector encodingDetector) {
