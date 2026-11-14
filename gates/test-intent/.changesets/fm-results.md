@@ -641,3 +641,23 @@ Audit repair validation on c9a2476b2f with uncommitted repairs: lint and tsc pas
   "note": "Entry 1 drops two still-valid expectations. (1) SearchV3View.search.test.ts zero-result case: base 'no results card' (cardOf null) weakened to 'card has no rows'; the candidate now shows '0 files · All · Any time · More filters' above 'Nothing matches this search' with no filters on; no source supports a count on the unfiltered nothing-found screen (fm-06: says so once). (2) DocumentPane.test.ts: the file-wide developer-tools opt-in moves 36 checks that still apply (citation anchors and offsets, highlight decay, missing file, empty state, a11y) out of the default view; only 13 (citation header, Rendered/Source, path header, provenance/VDU) need it. Also: the six 'Required...' sources are labelled owner-words but sit in the builder repair brief; record them as delegated-choice, the cleaning one as superseding A5."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-qiacoiml-test-intent",
+  "verdict": "accept",
+  "digest": "sha256:1855eb57a2212102f20f07d713b57a0527a28bae8884d43e5e34a17722e3f394"
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "verifier-3ypduse4-test-intent-audit",
+  "verdict": "accept",
+  "digest": "sha256:1855eb57a2212102f20f07d713b57a0527a28bae8884d43e5e34a17722e3f394"
+}
+```
