@@ -9,7 +9,7 @@ author-session: codex-builder-fm-s5b
 
 The user's rule and fm-04 picture note govern the quiet Help line. G1-G4/H1-H9 are delegated choices, not attributed to the owner as their wording; H amendments win. The action uses normal text colour at medium weight; information is grey. Text uses the existing first-minutes size tokens and no new element style attributes.
 
-New isolated checks cover runtime exclusions before text/dense/SPLADE/chunk budgets, worker rows/counts/facets/filter intersections, count failure omission, HTTP/API/IPC round trips and malformed requests, quick/refined request construction and accessible Help navigation. They change no shared fixture or global process state. The new Java fixture needed a document UID; the HTTP fixture uses the existing borrowed ConfigStore and unavailable AI service seam. No scenario was changed. Checks-first results are in tmp/s5b-evidence/checks-first.txt and summarized in the builder return; temporary evidence is not publication evidence. The orchestrator must publish candidate-bound evidence after committing. Acceptance records are reserved for an independent acceptor.
+New isolated checks cover runtime exclusions before text/dense/SPLADE/chunk budgets, worker rows/counts/facets/filter intersections, count failure omission, HTTP/API/IPC round trips and malformed requests, quick/refined request construction and accessible Help navigation. They change no shared fixture or global process state. The new Java fixture needed a document UID; the HTTP fixture uses the existing borrowed ConfigStore and unavailable AI service seam. No scenario was changed. Fail-before evidence for the five new files is gates/test-intent/evidence/fm-help-line.json (run-evidence --before 94fdd08cc1; each fails by assertion). The UI check lives in views/search-v3/first-minutes/ResultsHelp.test.ts so that no existing source scanner reads it (an earlier location next to SearchV3View.ask.test.ts was read by its scanners).
 
 ```json
 {
@@ -128,5 +128,16 @@ New isolated checks cover runtime exclusions before text/dense/SPLADE/chunk budg
   "verdict": "reject",
   "digest": "sha256:91c3fec6ffea1a6604e11f002bee8eb06ed3f04061d779a3c714234a859b5d39",
   "note": "Sv3Results.help.test.ts is not isolated: existing SearchV3View.ask.test.ts reads it as source input at lines 264 and 278. Runtime readFileSync tracing confirmed both reads. Test-intent rules prohibit exempt new tests from being read by existing tests. Supply a New entry with evidence and acceptance, or isolate the test without weakening the scanner. All 14 new cases pass on the candidate; no MCP/VDU assertion was weakened."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1dc13-6b29-7803-a804-433e2f11c582",
+  "verdict": "reject",
+  "digest": "sha256:91c3fec6ffea1a6604e11f002bee8eb06ed3f04061d779a3c714234a859b5d39",
+  "note": "Hold: the current digest retains the earlier rejection and the gate fails. UI isolation is repaired; the intent sources and preserved oracles are sound. Independent Java reruns are blocked by the read-only /home/elias/.gradle wrapper lock."
 }
 ```
