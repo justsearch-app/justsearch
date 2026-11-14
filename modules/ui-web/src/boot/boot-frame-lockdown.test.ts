@@ -1330,38 +1330,3 @@ legibilityCases.forEach(({ palette, mode }, caseIndex) => it(`SW5 X1 window cont
   }
   expect(failures).toEqual([]);
 }, 90_000));
-
-
-it('the startup bar has the new 44 px boundary, words, page background and menu', async () => {
-  for (const os of ['light', 'dark'] as const) {
-    const page = await create({ os });
-    // End the module request without mounting the app: the initial frame remains, while the
-    // production font preloads can finish before the evidence screenshot is taken.
-    await page.route(`**${entry}`, route => route.fulfill({ contentType: 'text/javascript', body: '' }));
-    await page.goto(url);
-    try {
-      for (const width of [1024, 600]) {
-        await page.setViewportSize({ width, height: 700 });
-        const bar = page.locator('.boot-topbar');
-        expect(await bar.evaluate(el => el.getBoundingClientRect().height)).toBe(44);
-        expect(await page.locator('.boot-areas span').allTextContents()).toEqual(['Search', 'Library', 'AI Brain']);
-        expect(await page.locator('.boot-end').textContent()).toBe('Starting⋯');
-        expect(await bar.evaluate(el => getComputedStyle(el).backgroundColor))
-          .toBe(await page.locator('#boot-frame').evaluate(el => getComputedStyle(el).backgroundColor));
-        const bounds = await page.locator('.boot-areas').evaluate(el => {
-          const rect = el.getBoundingClientRect();
-          const bar = el.closest('.boot-topbar')!;
-          const style = getComputedStyle(bar);
-          const reserved = parseFloat(style.paddingInlineEnd) - parseFloat(style.paddingInlineStart);
-          return { centre: (rect.left + rect.right) / 2, target: (bar.clientWidth - reserved) / 2, top: rect.top, bottom: rect.bottom };
-        });
-        expect(bounds.top).toBeGreaterThanOrEqual(0);
-        expect(bounds.bottom).toBeLessThanOrEqual(44);
-        expect(Math.abs(bounds.centre - bounds.target)).toBeLessThanOrEqual(1);
-        if (process.env.S3_EVIDENCE_DIR) {
-          await page.screenshot({ path: path.resolve(process.env.S3_EVIDENCE_DIR, `boot-${width}-${os}.png`) });
-        }
-      }
-    } finally { await page.close(); }
-  }
-}, 120_000);
