@@ -774,3 +774,14 @@ a source that predates this candidate.
   "digest": "sha256:2a80c111f17bd13d7448036147f02da480b496452c08a2de3e06e1fcdccf5a3b"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-fm-top-bar-b43bf9eb-999d-4d9c-a973-c85d62175e6a",
+  "verdict": "reject",
+  "digest": "sha256:d9f9997e4fcd9275f7bc223e31441ed8bc38c4ef305aeea68f6b5d84c180aed0",
+  "note": "boot-frame-lockdown.test.ts adds a new startup-bar check but its sole entry is Obsolete and provides no New-class behaviour, newChecks or script-generated execution evidence. The isolated-new-file exemption does not apply to an existing test file. Classify and evidence the added check before acceptance."
+}
+```
