@@ -7,13 +7,14 @@ author-session: codex-builder-fm-top-bar-20261114
 
 # Test-intent entries
 
-This changeset accounts for the fourteen modified product-test files in candidate
-326814343d against origin/main 1fd084cd79. Each entry names the superseded
-presentation, input path or observation and its replacement. `Obsolete` is used
+This changeset accounts for the fourteen modified product-test files in the working
+candidate based on ec75ad29d6 against origin/main 1fd084cd79. Each entry names
+the superseded presentation, input path or observation and its replacement. `Obsolete` is used
 because the adopted product contract changes: even the files that only add a
 Menu-opening action no longer promise a directly available Settings gear. Their
 unchanged navigation, notification and synchronization outcomes are explicitly
-retained. No test execution or independent acceptance is claimed here.
+retained. The entry descriptions do not claim independent acceptance; the
+acceptance records below are preserved as recorded.
 
 Source provenance follows fm-teal.md. R9 names **rule 9** and H3 names
 **handover slice 3** of task t-20261113-uicritique. Both are agent-drafted,
@@ -46,10 +47,10 @@ records were searched; the entry fields state the scope of that conflict search.
 The earlier builder's tmp/s3-evidence/test-expectations.txt was a navigation aid;
 the classifications below follow each actual git diff, not its claimed results.
 
-Coverage limits are part of these entries, not passes: the outage test now
-hit-tests Menu without opening Settings, empty symbol text does not prove a drawn
-dot, and the boot probe narrows its sample to the window-control band. The retired
-Search component loses its own title, glyph, height and decoration assertions by
+Coverage limits are part of these entries, not passes: the outage test opens
+Settings through Menu, empty symbol text does not prove a drawn dot, and the boot
+probe samples the fixed, required 44 px bar rather than current control geometry.
+The retired Search component loses its own title, glyph, height and decoration assertions by
 design. Per-entry `checkLimits` fields identify deletions and weaker observations,
 including where another existing test supplies only a partial replacement.
 Choice 4's narrow Undo placement and choice 5's icon fallback are source decisions;
@@ -350,11 +351,11 @@ a source that predates this candidate.
       "assertionChanges": [
         {
           "oldAssertion": "The outage layout helper hit-tests the centre of the standalone Settings surface-id element and reports settingsReachable when the hit belongs to jf-top-bar.",
-          "newAssertion": "The same helper instead samples .more-trigger. The existing true assertion now means the Menu centre hits somewhere in the top bar. Window containment, no horizontal scrolling, action non-overlap, contrast, focus order and visible-focus assertions are unchanged across the size/theme/text-scale cases.",
-          "reason": "R9/H3 remove the direct gear, so the entry control that must remain usable during engine loss is now Menu. This justifies changing the sampled control, not claiming that a centre hit alone proves the full Settings route works."
+          "newAssertion": "The helper hit-tests .more-trigger and reports menuReachable; the true assertion names Menu. In every existing outage size/theme/text-scale case, after all prior layout, contrast, focus-order, visible-focus and no-motion assertions, the test clicks Menu, requires exactly one visible, enabled Settings menuitem, clicks it, and polls the Settings dialog until it is open and modal.",
+          "reason": "R9/H3 remove the direct gear and put Settings first in Menu. The replacement therefore checks the complete Menu-to-Settings route during engine loss, retaining the Settings reachability obligation and every other original assertion."
         }
       ],
-      "checkLimits": "Coverage limitation: the old direct-Settings hit observation is replaced only by a Menu hit observation. Despite the unchanged settingsReachable name and Settings assertion message, this test neither opens Menu nor clicks Settings during the outage, and it accepts any top-bar descendant at that point. There is no equivalent end-to-end Settings-access assertion in this diff. Normal Menu-to-Settings paths in the frame tests do not replace outage-specific verification."
+      "checkLimits": "The Menu centre hit still accepts any top-bar descendant, but real clicks plus explicit Settings presence, visibility, enabled state and open-modal assertions now cover the full outage-specific entry route. The Settings surface remains the existing probe fixture; this does not check Settings backend operations during an outage."
     },
     {
       "items": [
@@ -725,11 +726,11 @@ a source that predates this candidate.
       "assertionChanges": [
         {
           "oldAssertion": "topInteractive samples every visible, non-inert interactive box whose top lies above root font size multiplied by 3.5, the old 56px-at-default frame band.",
-          "newAssertion": "The helper samples up to #window-controls.getBoundingClientRect().bottom. Its selector, visibility/inert filters and shadow traversal stay unchanged, as do drag exclusion and no-overlap/inside-window assertions for the sampled controls across existing states, widths and text scales.",
-          "reason": "R9/H3 shrink the frame to 44px. The retired 3.5rem observation band would include Search content beneath the new frame. The real window-control band supplies the relevant interface boundary; it is not a source for the target 44px height, which comes from R9/H3."
+          "newAssertion": "The helper samples boxes starting above the fixed literal 44 px boundary required by R9/H3. Its selector, visibility/inert filters and shadow traversal stay unchanged, as do drag exclusion and no-overlap/inside-window assertions across existing states, widths and text scales. The cutoff is independent of window-control geometry.",
+          "reason": "R9/H3 specify the replacement bar as 44 px. A fixed requirement-derived boundary keeps controls misplaced within that bar in the sample even if the window-control layer is shorter or misplaced; the rejected geometry-derived cutoff could exclude them."
         }
       ],
-      "checkLimits": "Narrowed observation: controls starting between the new band bottom and the old 3.5rem threshold no longer participate in the helper's drag, overlap and crowding checks; there is no replacement check for that strip in this diff. The new cutoff also follows current window-control geometry and cannot independently catch a wrong band height. TopBar.singleBar.test.ts separately pins the 2.75rem source token, not live geometry. Existing non-frame recovery-action and native-control checks remain; this entry does not claim all former sample coverage is identical."
+      "checkLimits": "Controls whose top is 44 px or greater are outside this helper sample, including the strip from 44 px to the old 3.5rem threshold. That narrowing follows the required bar boundary rather than live control placement. The helper does not assert the computed bar height itself. Existing non-frame recovery-action and native-control checks remain."
     }
   ]
 }

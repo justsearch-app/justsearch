@@ -790,7 +790,8 @@ async function topInteractive(page: Page) {
     const selector = 'button, a[href], input, select, textarea, summary, label, [role="button"], [role^="menuitem"], [role="tab"], [tabindex]:not([tabindex="-1"]), [role="menu"], .group-label';
     // An inert subtree (the app beneath the start-up frame) has no reachable controls.
     const inert = (el: Element) => { for (let node: Element | null = el; node; node = node.parentElement ?? ((node.getRootNode() as ShadowRoot).host ?? null)) if ((node as HTMLElement).inert) return true; return false; };
-    const limit = document.getElementById('window-controls')!.getBoundingClientRect().bottom;
+    // R9/H3 require a 44 px bar; misplaced controls must not change the sampled region.
+    const limit = 44;
     const visit = (root: Document | ShadowRoot) => root.querySelectorAll('*').forEach(el => {
       if (el.matches(selector)) {
         const r = el.getBoundingClientRect();
