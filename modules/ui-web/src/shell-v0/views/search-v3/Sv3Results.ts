@@ -343,9 +343,9 @@ export class Sv3Results extends JfElement {
     css`
       jf-results-card { --font-size-xs: var(--font-size-sv3-xs, var(--font-size-secondary)); }
       jf-results-card[hidden] { display: none; }
-      .help-matches { display: flex; align-items: center; gap: var(--space-2); padding-block: var(--space-3); color: var(--secondary-label); font-size: var(--font-size-sv3-xs); }
+      .help-matches { display: flex; align-items: center; gap: var(--space-2); padding-block: var(--space-3); color: var(--text-secondary); font-size: var(--font-size-sv3-xs); }
       .help-matches > span:first-child { display: flex; flex: none; }
-      .help-matches button { border: 0; border-radius: 4px; padding: var(--space-1) 0; background: transparent; color: var(--foreground); font: inherit; font-weight: 500; cursor: pointer; }
+      .help-matches button { border: 0; border-radius: 4px; padding: var(--space-1) 0; background: transparent; color: var(--text-primary); font: inherit; font-weight: 500; cursor: pointer; }
       .help-matches button:hover { text-decoration: underline; }
       .help-matches button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
       .empty-results { padding: var(--space-6) 0; }

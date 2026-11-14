@@ -170,3 +170,13 @@ New isolated checks cover runtime exclusions before text/dense/SPLADE/chunk budg
   "note": "SearchPerSourceHelpMatchesTest.fullSourceWindowOmitsSourceScopedHelpCount asserts that the entire helpMatches field is absent when the source window is full, without a count failure. H3 requires the same-query, same-predicate Help count when Help is excluded; H5 permits omission on count failure. No supplied source adopts omission merely because backfill was unnecessary. This assertion rejects an accurate base-scope count and pins a weaker outcome. Reframe the check to reject child-scoped counts while allowing an accurate base-scope count, or supply an adopted change to H3."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "codex-verifier-72qfop32",
+  "verdict": "accept",
+  "digest": "sha256:ec898a0bb09fbc9065da69e04e29f55cd1296ba5c4630f4d4185945ee9675cce"
+}
+```
