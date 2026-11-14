@@ -26,7 +26,9 @@ it('a temporary pending response removes result chrome and restores the same ope
       processingTimeMs: 10, error: null, searchTrace: null } };
   results.view = ready; document.body.append(results); await results.updateComplete;
   const card = results.shadowRoot!.querySelector<ResultsCard>('jf-results-card')!; await card.updateComplete;
-  card.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="more-filters"]')!.click(); await card.updateComplete;
+  const moreFilters = card.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="more-filters"]');
+  expect(moreFilters).not.toBeNull();
+  moreFilters!.click(); await card.updateComplete;
   const filters = card.shadowRoot!.querySelector<Sv3Filters>('jf-sv3-filters')!; await filters.updateComplete;
   const input = filters.shadowRoot!.querySelector<HTMLInputElement>('[data-filter-input="folder"]')!;
   input.value = 'unfinished folder'; input.dispatchEvent(new Event('input')); await filters.updateComplete;

@@ -37,9 +37,9 @@ it('date is a named text action using the shared keyboard menu and preserves cus
 it('dates keep the year outside this year and use day then localized short month', async () => {
   vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 10, 14));
   const card = await mount(); const month = (date: Date) => new Intl.DateTimeFormat(undefined, { month: 'short' }).format(date);
-  expect(card.shadowRoot!.querySelector('time')!.textContent).toBe(`9 ${month(new Date(2025, 9, 9))} 2025`);
+  expect(card.shadowRoot!.querySelector('time')?.textContent).toBe(`9 ${month(new Date(2025, 9, 9))} 2025`);
   card.snapshot = { ...card.snapshot!, results: [{ ...card.snapshot!.results[0]!, modifiedAt: new Date(2026, 10, 12).getTime() }] }; await card.updateComplete;
-  expect(card.shadowRoot!.querySelector('time')!.textContent).toBe(`12 ${month(new Date(2026, 10, 12))}`);
+  expect(card.shadowRoot!.querySelector('time')?.textContent).toBe(`12 ${month(new Date(2026, 10, 12))}`);
 });
 it.each(['docx', 'pdf', 'eml', 'xlsx', 'html', 'md'])('cleans extracted Markdown in %s only for display', ext => {
   const raw = '# Harbor Report\n**cargo** [arrival](file.pdf)\n--- OCR page 2 ---\n> - delivered | today';
