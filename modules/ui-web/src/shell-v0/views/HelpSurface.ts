@@ -13,8 +13,7 @@
  * pulls this file into the boot graph automatically.
  */
 
-import { reopenGettingStarted } from '../state/firstUse.js';
-import { requestSurfaceNavigation } from '../controllers/navigateRequest.js';
+import '../components/WalkthroughCard.js';
 import '../components/Button.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
@@ -50,7 +49,7 @@ const BUG_REPORT_URL = 'https://github.com/justsearch-app/justsearch/issues/new?
 const FAQ: FaqItem[] = [
   {
     q: 'How do I add files to search?',
-    a: 'Go to Library and click "Add Folder" to index a directory. JustSearch will automatically scan and index all supported files.',
+    a: 'Go to Library and choose "Add a folder". JustSearch reads supported files in that folder and keeps its search results up to date.',
   },
   {
     q: 'What file types are supported?',
@@ -66,7 +65,7 @@ const FAQ: FaqItem[] = [
   },
   {
     q: 'How do I ask the AI a question?',
-    a: 'Type your question in the search bar. A query that reads like a question (for example one with "?" or starting with "how" or "what") is answered with citations from your files; press Ctrl+Enter to search it instead. This needs the local chat model (see above).',
+    a: 'When Search / Ask is available, choose Ask, type your question and press Enter. Answers include citations from your files and need the local chat model (see above). In Search, Enter searches your files.',
   },
 ];
 
@@ -85,8 +84,8 @@ const SHORTCUTS: ShortcutRow[] = [
   { keys: 'Ctrl / ⌘ + Shift + Z', desc: 'Redo' },
   { keys: 'Ctrl / ⌘ + L or /', desc: 'Put the cursor in the search bar (in the Search view; / only when not typing)' },
   { keys: 'Enter', desc: 'Run the query (in the search bar)' },
-  { keys: 'Shift + Enter', desc: 'New line in the search bar' },
-  { keys: 'Ctrl + Enter', desc: 'Run the query the other way: ask instead of search, or search instead of ask' },
+  { keys: 'Shift + Enter', desc: 'New line in Ask or another question mode' },
+  { keys: 'Ctrl + Enter', desc: 'Delegate from Ask or another question mode' },
   { keys: 'Ctrl / ⌘ + 1 / 2 / 3', desc: 'Go to Search, Library or AI Brain' },
   { keys: 'Alt + ← / →', desc: 'Go back / forward between views (the mouse back and forward buttons do the same)' },
   { keys: 'F6 / Shift + F6', desc: 'Move between the top bar, the window tabs, the content and the details pane' },
@@ -172,7 +171,7 @@ export class HelpSurface extends JfElement {
     const body = activeBodyFor(HELP_REFERENCE_REGION);
     if (!body) {
       return html`
-        <jf-button label="Getting started" .onActivate=${() => { reopenGettingStarted(); requestSurfaceNavigation('core.search-v3-surface'); }}>Getting started</jf-button>
+        <jf-walkthrough-card embedded></jf-walkthrough-card>
         ${this.renderShortcuts()}
         <section class="reference-section">
           <div class="panel">
@@ -192,7 +191,7 @@ export class HelpSurface extends JfElement {
         </section>
       `;
     }
-    return html`<jf-button label="Getting started" .onActivate=${() => { reopenGettingStarted(); requestSurfaceNavigation('core.search-v3-surface'); }}>Getting started</jf-button><jf-declared-surface
+    return html`<jf-walkthrough-card embedded></jf-walkthrough-card><jf-declared-surface
       .declaration=${body}
       .data=${{ shortcuts: SHORTCUTS, troubleshooting: TROUBLESHOOTING, network: NETWORK }}
       .enabled=${true}

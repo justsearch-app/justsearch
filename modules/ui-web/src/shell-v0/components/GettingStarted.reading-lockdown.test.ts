@@ -7,9 +7,9 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-const HARNESS = `<!doctype html><html lang="en"><body><script type="module">
+const HARNESS = `<!doctype html><html lang="en"><head><style>html, body { height: 100%; margin: 0; }</style></head><body><script type="module">
 window.fetch = async () => new Response('{"suggestions":[]}', { status: 200 });
-await import('/src/shell-v0/components/GettingStarted.ts');
+await import('/src/shell-v0/views/search-v3/Sv3Composer.ts');
 const firstUse = await import('/src/shell-v0/state/firstUse.ts');
 const ai = await import('/src/shell-v0/state/aiStateStore.ts');
 firstUse.setFirstUseRoots([{ pathHash: 'notes' }], new Map([['notes', '/notes']]));
@@ -20,7 +20,7 @@ window.observe = (indexState, pendingJobs, paused = false, state = 'fresh') => {
   ai.__feedContactForTest();
 };
 window.observe('IDLE', 0);
-document.body.append(document.createElement('jf-getting-started'));
+document.body.append(document.createElement('jf-sv3-composer'));
 document.body.dataset.ready = 'true';
 </script></body></html>`;
 let server: ViteDevServer;
@@ -49,12 +49,12 @@ beforeAll(async () => {
 }, 60_000);
 afterAll(async () => { await browser?.close(); await browserServer?.close(); await server?.close(); if (output) await rm(output, { recursive: true, force: true }); });
 
-it.each([null, 0])('renders still reading with live INDEXING and queue %s', async pending => {
+it.each([null, 0])('shows the partial own count during live INDEXING with queue %s', async pending => {
   const context = await browser.newContext();
   try {
     const page = await context.newPage();
     await page.goto(url); await page.locator('body[data-ready="true"]').waitFor();
     await page.evaluate(q => (window as unknown as { observe(state: string, pending: number | null): void }).observe('INDEXING', q), pending);
-    await expect.poll(() => page.locator('jf-getting-started .progress').textContent()).toBe('3 files searchable so far · still reading');
+    await expect.poll(() => page.locator('[data-testid="first-use-progress"]').textContent()).toBe('3 files searchable so far');
   } finally { await context.close(); }
 }, 60_000);

@@ -2203,10 +2203,10 @@ export class BrainSurface extends JfElement {
    * to the direct picker if host_ is absent.
    */
   private async hostPickFolder(title?: string): Promise<string | null> {
-    if (this.host_) {
-      return this.host_.platform.pickFolder();
-    }
-    return pickFolder(title !== undefined ? { title } : undefined);
+    const result = this.host_ ? await this.host_.platform.pickFolder()
+      : await pickFolder(title !== undefined ? { title } : undefined);
+    if (result && typeof result === 'object') throw new Error(result.error);
+    return result;
   }
 
   /**

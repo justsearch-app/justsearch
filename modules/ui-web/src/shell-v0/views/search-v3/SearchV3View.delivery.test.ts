@@ -48,7 +48,7 @@ async function mount(shape?: string, initialNavigationPending = false): Promise<
 }
 async function send(el: SearchV3View, text: string): Promise<void> {
   await type(el, text);
-  composer(el).shadowRoot!.querySelector<HTMLElement>('[data-testid=sv3-composer-send]')!.click();
+  field(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   await settle(el);
 }
 function action(el: SearchV3View, id: string): HTMLButtonElement | null { return el.shadowRoot!.querySelector(`[data-testid=${id}]`); }
@@ -252,7 +252,7 @@ it('resolving saved A after reload never authorizes restored B to send before re
   saveOutcome(); await waitForRead(el);
   expect(retained().payload.task).toBeNull();
   expect(action(el, 'sv3-draft-review-confirm')).not.toBeNull();
-  composer(el).shadowRoot!.querySelector<HTMLElement>('[data-testid=sv3-composer-send]')!.click(); await settle(el);
+  field(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await settle(el);
   expect(field(el).value).toBe('newer B');
   expect(dispatches()).toHaveLength(1);
 });

@@ -80,7 +80,7 @@ type AppWindow = Window & { observe(roots: number | null, count: number | null, 
   updateHelp(n: number): void;
   holdHelp: boolean; helpCalls: number; releaseHelp(): void;
   search: { setQuery(query: string): void; submitSearch(): void };
-  firstUse: { recordFirstUseSearch(): void; hideGettingStarted(): void; reopenGettingStarted(): void };
+  firstUse: { hideGettingStarted(): void; reopenGettingStarted(): void };
   userState: { markWalkthroughStepComplete(id: string, step: string): void; createProfile(id: string, label: string): void; setActiveProfileId(id: string): void };
 };
 let server: ViteDevServer;
@@ -143,19 +143,20 @@ describe('Engine first-use snapshot through real Chromium (SB16/SB17)', { timeou
     expect(await card(page).count()).toBe(0);
     expect(await page.locator('jf-status-pill').getByRole('button', { name: /Getting started/ }).count()).toBe(0);
   });
-  it('card and pill agree on the current first step and expose its progress bar', async () => {
+  it('first launch has one Add action and no checklist or setup pill', async () => {
     const page = await open();
-    expect(await page.locator('jf-status-pill').getByRole('button', { name: 'Getting started · 1 of 3', exact: true }).count()).toBe(1);
-    expect(await card(page).locator('header').textContent()).toContain('1 of 3');
-    expect(await card(page).locator('li[aria-current="step"]').textContent()).toContain('Add folders to search');
-    expect(await card(page).getByRole('progressbar').getAttribute('aria-valuenow')).toBe('1');
+    expect(await page.locator('jf-status-pill').getByRole('button', { name: /Getting started/ }).count()).toBe(0);
+    expect(await card(page).count()).toBe(0);
+    expect(await page.getByRole('progressbar').count()).toBe(0);
+    expect(await add(page).count()).toBe(1);
   });
-  it('the own count is the only corpus count until Getting started is hidden', async () => {
+  it('the partial own count is independent of legacy first-use progress', async () => {
     const page = await open('?reading&help-indexed');
-    expect(await page.getByText('2 files searchable so far · 8 waiting to be read', { exact: true }).count()).toBe(1);
+    expect(await page.getByText('2 files searchable so far', { exact: true }).count()).toBe(1);
     expect(await page.locator('[data-testid="sv3-composer-corpus"]').count()).toBe(0);
     await page.evaluate(() => (window as unknown as AppWindow).firstUse.hideGettingStarted()); await settle(page);
-    expect(await page.locator('[data-testid="sv3-composer-corpus"]').count()).toBe(1);
+    expect(await page.getByText('2 files searchable so far', { exact: true }).count()).toBe(1);
+    expect(await page.locator('[data-testid="sv3-composer-corpus"]').count()).toBe(0);
   });
   it('a new add attempt clears an earlier error before the new preview appears', async () => {
     const page = await open(); await page.evaluate(() => (window as unknown as AppWindow).attachHost());

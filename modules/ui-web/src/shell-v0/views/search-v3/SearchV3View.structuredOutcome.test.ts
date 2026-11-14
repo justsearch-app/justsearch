@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { setInstallState as firstMinutesInstall } from '../../state/aiStateStore.js';
+import { setShowDeveloperTools as firstMinutesDeveloper } from '../../state/developerToolsState.js';
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import './SearchV3View.js';
@@ -42,8 +44,8 @@ async function mount(): Promise<{ view: View; composer: View; box: HTMLTextAreaE
 beforeEach(() => {
   sessionStorage.clear(); localStorage.clear();
   __resetConversationListForTest(); __resetDraftProvidersForTest(); __resetDraftKeptForTest();
-  __resetAiStateForTest();
-  __feedForTest({ inference: { mode: 'online', available: true } as never,
+  __resetAiStateForTest(); firstMinutesInstall(true, false); firstMinutesDeveloper(true);
+  __feedForTest({ inference: { gpu: { cudaAvailable: true }, mode: 'online', available: true } as never,
     status: { worker: { core: { indexedDocuments: 42 } } } as unknown as StatusSnapshot });
   __feedContactForTest();
   vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
@@ -62,7 +64,7 @@ afterEach(async () => {
   finish?.({ done: true }); finish = undefined;
   document.body.replaceChildren();
   await new Promise<void>(resolve => setTimeout(resolve, 0));
-  resetSearchState(); __resetAiStateForTest();
+  resetSearchState(); __resetAiStateForTest(); firstMinutesInstall(true, false); firstMinutesDeveloper(true);
   vi.unstubAllGlobals(); vi.restoreAllMocks();
 });
 

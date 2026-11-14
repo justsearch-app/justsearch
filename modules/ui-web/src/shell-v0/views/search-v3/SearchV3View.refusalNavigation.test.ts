@@ -173,6 +173,7 @@ it('S79 refusal allows conversation addresses and subsequent traversal', async (
 it('S80 S81 Search after refusal projects its current address', async () => {
   const view = await refuseFiles(); mode(view, 'search'); await drain(view);
   const input = await field(view); input.value = 'Cedar'; input.dispatchEvent(new Event('input'));
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   await new Promise(resolve => setTimeout(resolve, 700)); await drain(view); flushPendingProjection();
   expect(fetchMock.mock.calls.some(c => String(c[0]).includes('/api/knowledge/search'))).toBe(true);
   expect(window.location.hash).not.toContain('query=');

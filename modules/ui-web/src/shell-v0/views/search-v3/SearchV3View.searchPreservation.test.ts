@@ -30,7 +30,7 @@ async function mount(): Promise<SearchV3View> {
 const searches = () => http.mock.calls.filter(call => String(call[0]).includes('/api/knowledge/search'));
 function runSearch(view: SearchV3View, action: string): void {
   if (action === 'Enter') emit(view, 'sv3-composer-submit', { tier: 'search', query: 'current draft' });
-  if (action === 'typing') emit(view, 'sv3-composer-draft', { previous: 'previous draft', text: 'current draft' });
+  if (action === 'typing') { composer(view).draft = 'current draft'; emit(view, 'sv3-composer-submit', { tier: 'search', query: 'current draft' }); }
   // The app palette's "Search everything": the action this window registers under its id.
   if (action === 'palette') void invokeCommandWithResult('cmd-everything');
 }

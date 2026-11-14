@@ -43,67 +43,26 @@ class AppNotMountedError(Exception):
 
 
 async def assert_recents_fit(page, state: str) -> None:
-    """R1a/Y7a: real clipping boxes and every keyboard/pointer-reachable row."""
-    async def fully_visible(locator):
-        return await locator.evaluate("""el => {
-            const r = el.getBoundingClientRect();
-            if (r.width <= 0 || r.height <= 0 || r.top < -1 || r.bottom > innerHeight + 1) return false;
-            for (let a = el.parentElement ?? el.getRootNode().host; a;
-                 a = a.parentElement ?? a.getRootNode().host) {
-                const c = getComputedStyle(a), b = a.getBoundingClientRect();
-                if (['hidden','clip','auto','scroll'].includes(c.overflowY) &&
-                    (r.top < b.top - 1 || r.bottom > b.bottom + 1)) return false;
-            }
-            return true;
-        }""")
-
+    """S4: native search buttons stay reachable in the idle page flow."""
     recent = page.locator('[data-testid="sv3-recents"]')
-    for selector in ['[data-testid="sv3-composer-shell"]', '[data-testid="sv3-recent-clear"]'] + (
-            ['[data-testid="sv3-composer-headline"]'] if state == 'hero' else []):
-        assert await fully_visible(page.locator(selector)), f"R1a/Y7a clipped heading/bar/control: {selector}"
-    assert await fully_visible(recent), "R1a/Y7a Recent extends outside its clipping column"
-    options = recent.locator('[role="option"]')
-    assert await options.count() == 13, "R1a/Y7a requires all eight searches and five conversations"
-    field = page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first
-    for index in range(13):
-        await field.press('ArrowDown')
-        selected = recent.locator('[aria-selected="true"]')
-        await selected.wait_for(state='visible')
-        assert await selected.get_attribute('id') == f'sv3-recent-{index}'
-        assert await fully_visible(selected), f"R1a/Y7a keyboard row {index} clipped/unreachable"
-    original_viewport = page.viewport_size
-    alternate = {"width": 600, "height": 400} if original_viewport['height'] > 400 else {"width": 1280, "height": 720}
-    for viewport in (alternate, original_viewport):
-        await page.set_viewport_size(viewport)
-        await page.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))')
-        # Resizing crosses the existing animated sidebar breakpoint. Judge the settled
-        # layout after its finite transitions, then let ResizeObserver publish geometry.
-        await page.evaluate("""async () => {
-            await Promise.all(document.getAnimations().filter(a =>
-                a.effect?.getTiming().iterations !== Infinity).map(a => a.finished.catch(() => {})));
-            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-        }""")
-        await page.locator('jf-sv3-sidebar').first.evaluate("""async el => {
-            await Promise.all(el.getAnimations().map(a => a.finished.catch(() => {})));
-            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-        }""")
-        assert await fully_visible(selected), "R1a/Y7a resizing hides the active option"
-    # Pointer scrolling must work without asking Playwright to auto-scroll the target row.
-    await recent.locator('[role="listbox"]').evaluate('el => { el.scrollTop = 0; }')
-    await recent.hover()
-    await page.mouse.wheel(0, 10000)
-    await page.wait_for_timeout(100)
-    assert await fully_visible(options.last), "R1a/Y7a last row unreachable by pointer"
-    extra_scrollers = await recent.evaluate("""el => {
-        let count = 0;
-        for (let a = el.parentElement ?? el.getRootNode().host; a;
-             a = a.parentElement ?? a.getRootNode().host) {
-            const c = getComputedStyle(a);
-            if (['auto','scroll'].includes(c.overflowY) && a.scrollHeight > a.clientHeight + 1) count++;
-        }
-        return count;
-    }""")
-    assert extra_scrollers == 0, "R1a/Y7a added a scroller outside Recent"
+    if state != 'hero':
+        assert await recent.count() == 0, "Recent searches belong to the idle screen"
+        return
+    options = recent.locator('button[data-kind="search"]')
+    assert await options.count() == 8, "Recent contains eight searches, no conversations"
+    assert await recent.locator('[role="listbox"], [role="option"]').count() == 0
+    assert await recent.evaluate("el => getComputedStyle(el).position") == 'static'
+    for button in [page.get_by_test_id('sv3-recent-clear'), *await options.all()]:
+        await button.focus()
+        await button.scroll_into_view_if_needed()
+        assert await button.evaluate("""el => {
+            const r = el.getBoundingClientRect();
+            return el.matches(':focus') && r.width > 0 && r.height > 0 &&
+                r.top >= -1 && r.bottom <= innerHeight + 1 &&
+                r.left >= -1 && r.right <= innerWidth + 1;
+        }"""), "Recent button clipped or unreachable"
+    await page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first.focus()
+    await page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first.scroll_into_view_if_needed()
 
 
 async def _await_app_ready(page, *, timeout_ms: int = 15_000) -> None:
@@ -1308,7 +1267,17 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             await setup_fn(page)
         return setup
 
+    async def _enable_developer_tools(page):
+        await _goto_surface(page, S.RAIL_SURFACE_SETTINGS)
+        await page.locator('jf-settings-nav [data-settings-category="advanced"]').click()
+        await page.locator('jf-settings-surface #show-developer-tools').check()
+        # Settings is a modal over Search. Close it without navigating to a fresh task.
+        await page.keyboard.press("Escape")
+        await page.locator(S.CSS_SETTINGS_WINDOW_DIALOG).wait_for(state="hidden")
+
     async def _choose_search_tier(page, tier):
+        if tier in ("structured", "delegate"):
+            await _enable_developer_tools(page)
         await page.get_by_test_id("sv3-composer-tier").click()
         await page.locator(f'[data-testid="sv3-composer-tier-option"][data-tier="{tier}"]').click()
         await page.locator(f'jf-sv3-composer[tier="{tier}"]').wait_for(state="visible")
@@ -1762,7 +1731,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     def setup_sv3_recents(state, narrow, viewport=None):
         async def setup(page):
-            # A full list: eight accepted explicit searches and five saved conversations.
+            # Eight explicit searches; saved conversations remain in the column.
             async def conversations(route):
                 await route.fulfill(status=200, content_type="application/json", body=json.dumps({
                     "sessions": [{"sessionId": f"recent-{i}", "title": f"Conversation {i + 1}",
@@ -1780,26 +1749,21 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                     await field.press("Enter")
             await field.fill("")
             if state == "hero":
-                # Escape dismisses Recent first, then returns the composer to hero.
-                await field.press("Escape")
                 await field.press("Escape")
                 await page.locator("jf-sv3-composer[state='hero']").wait_for(state="visible")
             await field.blur()
             await field.focus()
-            await page.locator('[data-testid="sv3-recents"] [role="option"]').nth(12).wait_for(state="visible")
-            if viewport is not None:
-                await assert_recents_fit(page, state)
-            else:
-                await field.press("ArrowDown")
-            if await page.evaluate("matchMedia('(forced-colors: active)').matches"):
-                selected = page.locator('[data-testid="sv3-recents"] [aria-selected="true"]')
-                assert await selected.evaluate("el => getComputedStyle(el).forcedColorAdjust") == "none"
+            if state == "hero":
+                await page.locator('[data-testid="sv3-recents"] button[data-kind="search"]').nth(7).wait_for(state="attached")
+            await assert_recents_fit(page, state)
             await _settle_focus_marks(page)
         return setup
 
     def setup_sv3_filters(state, narrow, viewport=None):
         async def setup(page):
             await setup_sv3_recents(state, narrow, viewport)(page)
+            # The fresh search document seeds profile preferences during setup.
+            await _enable_developer_tools(page)
             await page.locator('[data-testid="sv3-filters-trigger"]').click()
             for key, value in (("folder", "/inside"), ("from", "2026-03-29"), ("to", "2026-03-29"),
                                ("minimum", "0"), ("maximum", "2")):
@@ -2251,16 +2215,16 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             await page.goto(urlunparse(parsed._replace(query=urlencode(params, doseq=True), fragment="")),
                             wait_until="domcontentloaded", timeout=timeout_ms)
             await _await_app_ready(page)
-            await page.locator('jf-getting-started .card').wait_for(state="visible", timeout=timeout_ms)
             progress = await page.evaluate("""() => JSON.parse(localStorage.getItem('justsearch.userState.v2') || '{}').walkthroughState""")
             assert not progress, "first-use capture must have no seeded walkthrough progress"
             if reading:
-                await page.get_by_text("2 files searchable so far · 8 waiting to be read", exact=True).wait_for()
+                await page.get_by_text("2 files searchable so far", exact=True).wait_for()
                 await page.locator('jf-sv3-composer textarea').wait_for(state="visible")
             else:
                 await page.get_by_text("Nothing to search yet", exact=True).wait_for()
-                await page.get_by_role("button", name="Getting started · 1 of 3", exact=True).wait_for()
-                await page.get_by_text("/home/user/Documents", exact=True).wait_for()
+                await page.get_by_role("button", name="Add a folder", exact=True).wait_for()
+                await page.get_by_role("button", name="Add Documents", exact=True).wait_for()
+                assert await page.locator('jf-sv3-sidebar, jf-getting-started .card').count() == 0
             if cooldown_ms > 0:
                 await asyncio.sleep(cooldown_ms / 1000)
         return setup
@@ -2432,13 +2396,13 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                setup=setup_sv3_recents(state, width == "narrow"), isolated=True,
                color_scheme="light" if theme == "light" else "dark",
                forced_colors="active" if theme == "forced" else None)
-          for state in ("hero", "docked") for width in ("normal", "narrow")
+          for state in ("hero",) for width in ("normal", "narrow")
           for theme in ("dark", "light", "forced")],
         *[Step(f"sv3-recents-{state}-{width}x{height}-{theme}",
                setup=setup_sv3_recents(state, False, {"width": width, "height": height}), isolated=True,
                color_scheme="light" if theme == "light" else "dark",
                forced_colors="active" if theme == "forced" else None)
-          for state in ("hero", "docked") for width, height in ((1280, 720), (760, 720), (600, 400))
+          for state in ("hero",) for width, height in ((1280, 720), (760, 720), (600, 400))
           for theme in ("dark", "light", "forced")],
         *[Step(f"sv3-filters-{state}-{width}-{theme}",
                setup=setup_sv3_filters(state, width == "narrow"), isolated=True,

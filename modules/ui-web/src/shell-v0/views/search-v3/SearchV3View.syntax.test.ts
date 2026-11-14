@@ -75,20 +75,21 @@ it('x6 explicit submit keeps text and renders the Engine reason under the bar wi
   expect(JSON.parse(String(searches().at(-1)?.[1]?.body)).querySyntax).toBe('search');
 });
 
-it('x6 automatic 400 stays quiet and schedules no refined request then a correction resumes', async () => {
+it('x6 explicit invalid syntax stays visible and a correction resumes with one request', async () => {
   const view = await mount();
   fetchMock.mockImplementation(async (url: unknown) => String(url).includes('/api/knowledge/search') ? invalid() : response({}));
-  await type(view, '"'); await settle(view, 1500);
+  await submit(view, '"'); await settle(view, 1500);
   expect(searches()).toHaveLength(1);
-  expect(JSON.parse(String(searches()[0]?.[1]?.body)).pipeline.sparseEnabled).toBe(true);
-  expect(getSearchState().error).toBeNull();
-  expect((await composer(view)).shadowRoot!.querySelector('[data-testid="sv3-search-error"]')).toBeNull();
+  expect(JSON.parse(String(searches()[0]?.[1]?.body)).querySyntax).toBe('search');
+  expect(getSearchState().error).toContain(reason);
+  expect((await composer(view)).shadowRoot!.querySelector('[data-testid="sv3-search-error"]')).not.toBeNull();
   expect(getSearchState().isSearching).toBe(false);
   expect(getSearchState().isRefining).toBe(false);
   expect(getSearchState().slowSearch).toBe(false);
   fetchMock.mockImplementation(async (url: unknown) => String(url).includes('/api/knowledge/search') ? good('corrected') : response({}));
-  await type(view, '"budget review"'); await settle(view, 1500);
-  expect(searches()).toHaveLength(3);
+  await submit(view, '"budget review"'); await settle(view, 1500);
+  expect(searches()).toHaveLength(2);
+  expect(getSearchState().error).toBeNull();
   expect(getSearchState().results[0]?.id).toBe('corrected');
   expect(getSearchState().passStage).toBe('refined');
 });
@@ -98,7 +99,9 @@ it('x5 withholds prior counts and facets while the new query awaits its Engine c
   fetchMock.mockImplementation(async (url: unknown) => String(url).includes('/api/knowledge/search') ? good('old') : response({}));
   await submit(view, 'ordinary');
   expect(getSearchState().facets).toEqual({ language: { en: 1 } });
-  await type(view, 'title:budget');
+  let release!: (value: unknown) => void;
+  fetchMock.mockImplementation((url: unknown) => String(url).includes('/api/knowledge/search') ? new Promise(resolve => { release = resolve; }) : Promise.resolve(response({})));
+  await submit(view, 'title:budget');
   expect(getSearchState().countsPending).toBe(true);
   expect(getSearchState().matchCount).toBe(0);
   await view.updateComplete;
@@ -107,49 +110,46 @@ it('x5 withholds prior counts and facets while the new query awaits its Engine c
   const results = main.shadowRoot!.querySelector('jf-sv3-results') as Mounted;
   await results.updateComplete;
   expect(results.shadowRoot!.querySelector('jf-results-card')).toBeNull();
-  expect(getSearchState().isSearching).toBe(true);
+  expect(getSearchState().isSearching || getSearchState().isRefining).toBe(true);
+  release(good('new')); await settle(view);
+  expect(getSearchState().results[0]?.id).toBe('new');
 });
 
-it('x6 each edit supersedes an older success and an older error body', async () => {
+it('x6 a new submit supersedes an older success and an older error body', async () => {
   const view = await mount();
   let release!: (value: unknown) => void;
   fetchMock.mockImplementation((url: unknown) => String(url).includes('/api/knowledge/search')
     ? new Promise(resolve => { release = resolve; }) : Promise.resolve(response({})));
-  await type(view, 'valid'); await settle(view, 200);
-  expect(searches()).toHaveLength(1);
-  await type(view, '"');
-  release(good('stale'));
-  await settle(view);
-  expect(getSearchState().results).toEqual([]);
+  await submit(view, 'valid');
   let releaseBody!: (value: unknown) => void;
   fetchMock.mockImplementation(async (url: unknown) => String(url).includes('/api/knowledge/search')
     ? { ...invalid(), json: () => new Promise(resolve => { releaseBody = resolve; }) } : response({}));
-  await settle(view, 200);
+  await submit(view, '"');
+  release(good('stale')); await settle(view);
+  expect(getSearchState().results).toEqual([]);
   fetchMock.mockImplementation(async (url: unknown) => String(url).includes('/api/knowledge/search') ? good('current') : response({}));
-  await type(view, '"corrected"');
+  await submit(view, '"corrected"');
   releaseBody({ errorCode: 'SEARCH_SYNTAX_INVALID', error: reason });
   await settle(view, 1500);
   expect(getSearchState().error).toBeNull();
   expect(getSearchState().results[0]?.id).toBe('current');
-  expect(searches()).toHaveLength(4);
+  expect(searches()).toHaveLength(3);
 });
 
-it('x5 advanced quick results keep counts and facets pending until refinement', async () => {
+it('x5 explicit advanced results use the refined counts immediately', async () => {
   const view = await mount();
   fetchMock.mockImplementation(async (url: unknown) => String(url).includes('/api/knowledge/search')
-    ? response({ advancedSyntax: true, results: [{ id: 'strict', fields: { path: '/strict' } }],
-      matchCount: 1, totalHits: 1 }) : response({}));
-  await type(view, 'title:budget'); await settle(view, 250);
-  expect(getSearchState().passStage).toBe('quick');
-  expect(getSearchState().countsPending).toBe(true);
-  expect(getSearchState().facets).toBeNull();
+    ? response({ advancedSyntax: true, results: [{ id: 'strict', fields: { path: '/strict' } }], matchCount: 1, totalHits: 1 }) : response({}));
+  await submit(view, 'title:budget'); await settle(view, 250);
+  expect(getSearchState().passStage).toBe('refined');
+  expect(getSearchState().countsPending).toBe(false);
+  expect(getSearchState().matchCount).toBe(1);
   const main = view.shadowRoot!.querySelector('jf-sv3-main') as Mounted; await main.updateComplete;
   const results = main.shadowRoot!.querySelector('jf-sv3-results') as Mounted; await results.updateComplete;
   const card = results.shadowRoot!.querySelector('jf-results-card') as Mounted; await card.updateComplete;
-  expect(card.shadowRoot!.querySelector('.meta-info')?.textContent).toContain('counts pending');
+  expect(card.shadowRoot!.querySelector('.meta-info')?.textContent).not.toContain('counts pending');
   await settle(view, 1000);
-  expect(getSearchState().passStage).toBe('refined');
-  expect(getSearchState().countsPending).toBe(false);
+  expect(searches()).toHaveLength(1);
 });
 
 it('x8 legacy URL restoration keeps operator text and uses Search syntax', async () => {

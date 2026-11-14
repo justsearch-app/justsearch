@@ -440,6 +440,7 @@ describe('copy is the only yielding element, and it reports without renaming its
 describe('the composer states which model would answer — identity only, never state', () => {
   async function mountComposer(over: Record<string, string> = {}): Promise<Sv3Composer & Mounted> {
     const el = document.createElement('jf-sv3-composer') as Sv3Composer & Mounted;
+    el.tier = 'ask';
     for (const [name, value] of Object.entries(over)) el.setAttribute(name, value);
     document.body.appendChild(el);
     await el.updateComplete;

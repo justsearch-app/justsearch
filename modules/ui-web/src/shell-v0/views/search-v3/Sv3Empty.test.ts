@@ -54,8 +54,7 @@ describe('the empty states are one pattern in two regions', () => {
   it('renders the sidebar variant before this window has searched anything', async () => {
     // Phase A2: the sidebar's zero state is reached the real way — a window with no sessions yet —
     // rather than through the retired `fixtures="empty"` dev handle.
-    const el = await mount();
-    const sidebar = await region(el, 'jf-sv3-sidebar');
+    const sidebar = document.createElement('jf-sv3-sidebar') as Sv3Sidebar; document.body.append(sidebar); await sidebar.updateComplete;
     const empty = sidebar.shadowRoot?.querySelector('[data-testid="sv3-sidebar-empty"]') as
       | (Sv3Empty & Mounted)
       | null;
@@ -71,8 +70,7 @@ describe('the empty states are one pattern in two regions', () => {
   // a response can be given to it.
 
   it('builds the media as a fanned three-card stack, two of them hidden from assistive tech', async () => {
-    const el = await mount();
-    const sidebar = await region(el, 'jf-sv3-sidebar');
+    const sidebar = document.createElement('jf-sv3-sidebar') as Sv3Sidebar; document.body.append(sidebar); await sidebar.updateComplete;
     const empty = sidebar.shadowRoot?.querySelector('jf-sv3-empty') as Sv3Empty & Mounted;
     await empty.updateComplete;
     const tiles = [...(empty.shadowRoot?.querySelectorAll('.tile') ?? [])];
@@ -121,8 +119,7 @@ describe('the empty states are one pattern in two regions', () => {
 
   it('keeps the empty state out of the heading outline the shell already owns', async () => {
     // The shell's single-<h1> closure is a real gate; a zero state must not mint a second one.
-    const el = await mount();
-    const sidebar = await region(el, 'jf-sv3-sidebar');
+    const sidebar = document.createElement('jf-sv3-sidebar') as Sv3Sidebar; document.body.append(sidebar); await sidebar.updateComplete;
     const empty = sidebar.shadowRoot?.querySelector('jf-sv3-empty') as Sv3Empty & Mounted;
     await empty.updateComplete;
     expect(empty.shadowRoot?.querySelector('h1, h2, h3')).toBeNull();

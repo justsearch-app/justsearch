@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import { getFirstUse } from '../state/firstUse.js';
 import { html, css, nothing, type PropertyValues } from 'lit';
 import { keyed } from 'lit/directives/keyed.js';
 import { JfElement } from '../primitives/JfElement.js';
@@ -131,12 +132,13 @@ export class StatusPill extends JfElement {
     .ring circle { fill: none; stroke-width: 2.5; }
     .ring .track { stroke: var(--border-emphasized); }
     .ring .arc { stroke: var(--accent); }
+    .ring.indeterminate .arc { stroke: var(--accent-tint); }
     kbd { font: inherit; font-size: var(--font-size-xs); color: var(--text-secondary); margin-inline-start: var(--jf-space-2); }
     @media (forced-colors: active) {
       .trigger { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
       .symbol { color: ButtonText !important; } .calm .symbol { background: ButtonText; forced-color-adjust: none; } button:focus-visible { outline-color: Highlight; }
       .count, .count.problems { background: ButtonText; color: ButtonFace; forced-color-adjust: none; }
-      .ring .track { stroke: GrayText; } .ring .arc { stroke: ButtonText; }
+      .ring .track { stroke: GrayText; } .ring .arc, .ring.indeterminate .arc { stroke: ButtonText; }
       .overlay { background: transparent; }
       .notice-below { border-color: CanvasText; }
     }
@@ -425,7 +427,9 @@ export class StatusPill extends JfElement {
   }
   override render() {
     const model = this.status.model;
-    const pill = model.pill;
+    if (getFirstUse().empty && !this.open) return html``;
+    const reading = getFirstUse().reading && model.pill.kind === 'working';
+    const pill = reading ? { ...model.pill, label: 'Reading files', percent: undefined } : model.pill;
     const plugins = this.pluginsVisible ? listStatusBarItems().filter(item => item.source === 'plugin') : [];
     const notice = this.status.snapshot.advisories.find(row => row.key === this.status.transientKey);
     // R1 — a more urgent state keeps the pill; the notice shows beside it, never in its place.
@@ -439,9 +443,9 @@ export class StatusPill extends JfElement {
     // Needs you and problems show their count (ref-22: also when the pill is its icon alone).
     const icon = !transient && (pill.kind === 'needs' || pill.kind === 'problems') && pill.count != null
       ? html`<span class="count ${pill.kind}" aria-hidden="true">${pill.count}</span>`
-      : !transient && pill.kind === 'working' && pill.percent != null
-        ? html`<svg class="ring" viewBox="0 0 20 20" aria-hidden="true" data-percent=${pill.percent}><circle class="track" cx="10" cy="10" r="8"></circle>
-          <circle class="arc" cx="10" cy="10" r="8" pathLength="100" stroke-dasharray="${pill.percent} 100" transform="rotate(-90 10 10)"></circle></svg>`
+      : !transient && pill.kind === 'working' && (reading || pill.percent != null)
+        ? html`<svg class="ring ${reading ? 'indeterminate' : ''}" viewBox="0 0 20 20" aria-hidden="true" data-percent=${reading ? nothing : pill.percent}><circle class="track" cx="10" cy="10" r="8"></circle>
+          <circle class="arc" cx="10" cy="10" r="8" pathLength="100" stroke-dasharray="${reading ? 25 : pill.percent} 100" transform="rotate(-90 10 10)"></circle></svg>`
         : html`<span class="symbol" aria-hidden="true">${calm ? nothing : symbols[pill.kind]}</span>`;
     const text = transient?.toast?.message ?? (pill.kind === 'needs' && pill.count != null ? (pill.count === 1 ? 'Needs you' : 'Need you')
       : pill.kind === 'problems' && pill.count != null ? 'Problems right now' : label);

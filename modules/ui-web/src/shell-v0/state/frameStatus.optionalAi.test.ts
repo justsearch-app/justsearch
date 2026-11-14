@@ -32,11 +32,11 @@ const firstUse = { visible: true, known: true, currentStep: 1 };
 const derive = (state: AiState, gettingStarted = firstUse) => deriveFrameStatus({ ai: state, now: 100000, contactLostAt: null, gettingStarted });
 
 describe('FA3 optional AI and the status pill', () => {
-  it('fresh install, no AI models, nothing asked of AI: the pill shows first-use progress, nothing needs the person', () => {
+  it('fresh install, no AI models, nothing asked of AI: the pill shows keyword readiness, nothing needs the person', () => {
     for (const engine of ['not_installed', 'connecting'] as const) {
       const model = derive(ai(engine));
       expect(model.progress.phase).toBe('blocked');
-      expect(model.pill.label, engine).toBe('Getting started · 1 of 3');
+      expect(model.pill.label, engine).toBe(engine === 'not_installed' ? 'Keyword search ready' : 'Checking search status · last seen just now · checking');
       expect(model.sections.needs, engine).toEqual([]);
     }
   });

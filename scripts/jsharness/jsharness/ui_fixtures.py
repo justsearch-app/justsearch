@@ -858,6 +858,9 @@ def fixture_body(url: str, variant: str = "default") -> str:
             {"label": "Downloads", "path": "/home/user/Downloads"}]})
     if variant.startswith("first-use") and "/api/path-hash/resolve" in url:
         return json.dumps({"path": "/home/user/Documents"})
+    if "/api/ai/install/status" in url:
+        return json.dumps({"state": "idle", "installedFully": variant in _DEGRADED_VARIANTS,
+                           "packages": [], "stages": [], "readyCapabilities": []})
     if "/api/inference/status" in url:
         return _inference_body(variant)
     if "/api/status" in url:
@@ -1056,7 +1059,10 @@ async def install_fixtures(ctx, variant: str = "default", color_scheme: str = "d
     `/api/settings/v2` for this context and defaults to dark. Call once on a fresh
     context, before `new_page`."""
     if not variant.startswith("first-use"):
-        await ctx.add_init_script(WALKTHROUGH_SEED)
+        seed = WALKTHROUGH_SEED
+        if variant == "agent-live":
+            seed = seed.replace("profiles: {}", "profiles: { default: { id: 'default', label: 'Default', userConfig: {}, activeThemeId: null, pinnedSearches: [], showDeveloperTools: true } }")
+        await ctx.add_init_script(seed)
     # Variant-gated: only the record-bearing variants want a cold chat surface to auto-restore
     # the fixture conversation (`_thread_body`), so no other step's boot changes.
     if variant in _THREAD_RECORD_VARIANTS:

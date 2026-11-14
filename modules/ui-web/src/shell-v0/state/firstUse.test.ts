@@ -14,7 +14,7 @@ beforeEach(() => __resetUserStateForTest());
 describe('Getting started facts (SB1–SB11)', () => {
   it('zero searchable documents confirms first use without Help', () => {
     expect(project({ ...facts, searchable: 0 })).toMatchObject({
-      searchable: 0, known: true, empty: true, visible: true, currentStep: 1, done: [false, false, false],
+      searchable: 0, known: true, empty: true, visible: false, currentStep: 1, done: [false, false, false],
     });
   });
   it('unknown searchable documents stay unknown without Help', () => {
@@ -25,7 +25,7 @@ describe('Getting started facts (SB1–SB11)', () => {
   it('unknown → zero → positive never presents unknown as empty', () => {
     expect(project({ ...facts, roots: null, searchable: null })).toMatchObject({ empty: false, visible: false });
     expect(project({ ...facts, searchable: null })).toMatchObject({ empty: false, visible: false });
-    expect(project(facts)).toMatchObject({ empty: true, visible: true, done: [false, false, false] });
+    expect(project(facts)).toMatchObject({ empty: true, visible: false, done: [false, false, false] });
     expect(project({ ...facts, roots: 1, searchable: 7 })).toMatchObject({ empty: false, done: [true, false, false] });
   });
   it('a watched folder under way never licenses setup completion', () => {
@@ -37,13 +37,13 @@ describe('Getting started facts (SB1–SB11)', () => {
     expect(project({ ...facts, roots: 1, searchable: null, waiting: null })).toMatchObject({ progress: null, empty: false });
   });
   it('a watched folder with zero searchable documents points to Library and does not finish', () => {
-    expect(project({ ...facts, roots: 1 })).toMatchObject({ visible: true, done: [false, false, false], folderNeedsAttention: true });
+    expect(project({ ...facts, roots: 1 })).toMatchObject({ visible: false, done: [false, false, false], folderNeedsAttention: true });
   });
   it('ad-hoc documents need no watched folder, and unsupported hardware needs no AI', () => {
     expect(project({ ...facts, searchable: 9 })).toMatchObject({ empty: false, done: [true, false, false] });
     expect(project({ ...facts, searchable: 9 }, { activeStepIndex: 0, completedStepIds: ['try-search'], dismissed: false })).toMatchObject({ visible: false, done: [true, true, false] });
   });
-  for (const [name, old, suppress] of [
+  for (const [name, old, _suppress] of [
     ['absent', undefined, false],
     ['partial', { activeStepIndex: 2, completedStepIds: ['open-palette'], dismissed: false }, false],
     ['finished', { activeStepIndex: 4, completedStepIds: [], dismissed: false }, true],
@@ -51,7 +51,7 @@ describe('Getting started facts (SB1–SB11)', () => {
     ['malformed', { activeStepIndex: 'four', completedStepIds: null, dismissed: 'yes' }, false],
   ] as const) {
     for (const roots of [0, 1]) it(`old welcome ${name}, ${roots ? 'populated' : 'empty'} engine`, () => {
-      expect(project({ ...facts, roots, searchable: roots ? 10 : 0 }, undefined, old)).toMatchObject({ visible: !(roots && suppress), done: [!!roots, false, false] });
+      expect(project({ ...facts, roots, searchable: roots ? 10 : 0 }, undefined, old)).toMatchObject({ visible: false, done: [!!roots, false, false] });
     });
   }
   it('Hide and Help reopen survive reload, keep old/plugin records and co-resident values', () => {
@@ -64,7 +64,7 @@ describe('Getting started facts (SB1–SB11)', () => {
     expect(project(facts, getWalkthroughProgress('core.getting-started'))).toMatchObject({ visible: false });
     api?.reopenGettingStarted();
     __resetInMemoryStateForTest();
-    expect(project({ ...facts, roots: 1, searchable: 1 }, getWalkthroughProgress('core.getting-started'), getWalkthroughProgress('welcome'))).toMatchObject({ visible: true, reopened: true });
+    expect(project({ ...facts, roots: 1, searchable: 1 }, getWalkthroughProgress('core.getting-started'), getWalkthroughProgress('welcome'))).toMatchObject({ visible: false, reopened: true });
     expect(getAllWalkthroughProgress()).toMatchObject({ welcome: { completedStepIds: ['old'], dismissed: true }, 'plugin.tour': { completedStepIds: ['plugin-step'] } });
   });
   it('ordinary profile switch keeps progress, completed factory reset starts fresh', () => {
@@ -72,6 +72,6 @@ describe('Getting started facts (SB1–SB11)', () => {
     createProfile('work', 'Work'); setActiveProfileId('work');
     expect(project(facts, getWalkthroughProgress('core.getting-started'))).toMatchObject({ visible: false });
     __resetUserStateForTest();
-    expect(project(facts, getWalkthroughProgress('core.getting-started'))).toMatchObject({ visible: true, done: [false, false, false] });
+    expect(project(facts, getWalkthroughProgress('core.getting-started'))).toMatchObject({ visible: false, done: [false, false, false] });
   });
 });

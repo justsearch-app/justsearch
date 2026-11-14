@@ -35,6 +35,10 @@
  *
  * Side-effect registers <jf-sv3-composer>.
  */
+import { formatTimeMinutes } from '../../display/format.js';
+import { getAiState } from '../../state/aiStateStore.js';
+import { projectAvailability } from '../../state/availability.js';
+import { getShowDeveloperTools, subscribeShowDeveloperTools } from '../../state/developerToolsState.js';
 import { getFirstUse, subscribeFirstUse } from '../../state/firstUse.js';
 import type { PluginHostApi } from '../../plugin-api/plugin-types.js';
 import '../../components/GettingStarted.js';
@@ -49,10 +53,6 @@ import { sv3Shared } from './sv3-shared-styles.js';
 import {
   COMPOSER_PLACEHOLDER,
   COMPOSER_STATE_DEFAULT,
-  CORPUS_ADD_FOLDERS,
-  CORPUS_NONE,
-  CORPUS_UNKNOWN,
-  CORPUS_REMEDY_TARGET,
   HERO_HEADLINE,
   SV3_DEGRADATION_DETAIL_ID,
   SV3_DEGRADATION_GLYPH_SIZE,
@@ -79,8 +79,8 @@ import {
 } from './sv3-run.js';
 import {
   SV3_CORPUS_UNKNOWN,
-  SV3_REMEDY,
   type Sv3Corpus,
+  SV3_REMEDY,
   type Sv3RemedyDetail,
 } from './sv3-honesty.js';
 import { localizeResourceKey, onCatalogUpdated } from '../../../i18n/resourceCatalog.js';
@@ -240,7 +240,7 @@ export class Sv3Composer extends JfElement {
         inset: 0;
         z-index: var(--z-overlay);
         display: flex;
-        justify-content: center;
+        justify-content: flex-start;
         pointer-events: none;
       }
 
@@ -262,20 +262,14 @@ export class Sv3Composer extends JfElement {
         border: 1px solid var(--border); border-radius: var(--radius-lg);
         background: var(--background); color: var(--foreground); font-size: var(--font-size-sv3-sm);
         min-block-size: 0; display: flex; flex-direction: column; }
-      .recents [role="listbox"] { min-block-size: 0; overflow-y: auto; overscroll-behavior: contain; }
-      .recents > :not([role="listbox"]) { flex-shrink: 0; }
       .recent-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
       .recents button { font: inherit; color: inherit; background: transparent; border: 0;
         border-radius: var(--radius-sm); padding: var(--space-1) var(--space-2); cursor: pointer; text-align: start; }
-      .recents [role='option'] { padding-block: calc(var(--space-1) / 2); display: flex; gap: var(--space-2); align-items: center; width: 100%; min-width: 0; }
-      .recents [role='option'] span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .recents [aria-selected='true'], .recents button:hover { background: var(--muted); }
+      .recents button:hover { background: var(--muted); }
       .recents button:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
       .recents p { margin: var(--space-1) var(--space-2); }
       @media (forced-colors: active) {
         .recents { background: Canvas; color: CanvasText; border-color: CanvasText; }
-        .recents [aria-selected='true'] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
-        .recents [aria-selected='true'] * { color: HighlightText; }
       }
       jf-sv3-filters[open] { margin-block-start: var(--space-1); }
       .disclosures { display: grid; min-block-size: 0; }
@@ -1156,6 +1150,39 @@ export class Sv3Composer extends JfElement {
           transform: none;
         }
       }
+      :host([tier='search']) .band { max-inline-size: 640px; }
+      :host([tier='search'][state='hero']) { padding-block: 0; }
+      :host([state='hero']) { overflow-y: auto; }
+      :host([state='hero']) .band { margin-block: auto; padding-block: var(--space-8); }
+      :host([state='hero']) .landing { position: static; padding-bottom: var(--space-5); }
+      :host([state='hero']) .band:has(.recents) { margin-block: 0; padding-block-start: 120px; }
+      :host([tier='search'][state='hero']) .band .landing { padding-bottom: calc(var(--space-5) + 2px); }
+      :host([tier='search'][state='hero']) .band:has(.search-field):not(:has(.recents)) { padding-block-end: 62px; }
+      :host([tier='search']) .headline { line-height: 40px; }
+      @media (max-height: 600px) {
+        :host([state='hero']) .band:has(.recents) { padding-block-start: var(--space-6); }
+      }
+      .search-field:has(textarea:focus-visible)::after { border-color: var(--foreground); }
+      .mode-switch { display: flex; padding: 2px; border-radius: var(--radius-sm); background: var(--muted); }
+      .mode-switch button { color: color-mix(in srgb, var(--muted-foreground) 90%, var(--foreground)); }
+      .mode-switch button[aria-pressed='true'] { background: var(--surface-2); color: var(--foreground); }
+      .search-field { display: flex; align-items: center; gap: var(--space-3); min-block-size: 46px; box-sizing: border-box; padding: var(--space-2) 14px; }
+      .search-field .field { flex: 1; min-width: 0; padding: 0; display: flex; align-items: center; gap: var(--space-3); }
+      .search-field .editor { flex: 1; min-width: 0; }
+      .search-field textarea { min-height: 0; height: auto; min-block-size: 1.5em; padding: 0; line-height: 1.5; white-space: pre; overflow: auto; resize: none; }
+      .search-field .footer { margin: 0; padding: 0; flex: none; }
+      .search-field .footer:has(.controls:empty) { display: none; }
+      .search-field .actions:empty { display: none; }
+      .recents { --ring: var(--foreground); border: 0; background: transparent; margin-block-start: calc(var(--space-5) + 2px); padding: 0; }
+      .recent-heading { padding-inline: var(--space-1); color: var(--muted-foreground); }
+      /* Clear is a text action: the normal text colour in medium weight. */
+      .recent-heading button { color: var(--foreground); font-weight: 500; }
+      .recents ul { list-style: none; padding: 0; margin: var(--space-1) 0 0; }
+      .recents li { border-block-start: 1px solid var(--border); }
+      .recents li button { display: flex; align-items: center; gap: 10px; inline-size: 100%; padding: var(--space-2) var(--space-1); }
+      .recent-query { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      .recent-meta { color: var(--muted-foreground); font-size: var(--font-size-xs); white-space: nowrap; }
+
     `,
   ];
 
@@ -1191,8 +1218,6 @@ export class Sv3Composer extends JfElement {
     degradationOpen: { state: true },
     recentItems: { attribute: false },
     recentLocked: { type: Boolean },
-    recentsOpen: { state: true },
-    recentIndex: { state: true },
     filtersOpen: { state: true },
     filterNote: { type: String },
     filterError: { type: String },
@@ -1298,76 +1323,50 @@ export class Sv3Composer extends JfElement {
   declare filtersOpen: boolean;
   declare filterNote: string;
   declare filterError: string;
-  declare recentsOpen: boolean;
-  declare private recentIndex: number;
+  private stopDeveloperTools: (() => void) | undefined;
   private catalogUnsubscribe: (() => void) | null = null;
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this.stopFirstUse = subscribeFirstUse(() => this.requestUpdate());
+    this.stopFirstUse = subscribeFirstUse(() => {
+      const wasEmpty = !!this.shadowRoot?.querySelector('jf-getting-started')?.shadowRoot?.querySelector('[data-testid=first-use-headline]');
+      this.requestUpdate();
+      if (wasEmpty && !getFirstUse().empty) void this.updateComplete.then(() => this.focusField());
+    });
+    this.stopDeveloperTools = subscribeShowDeveloperTools(() => this.requestUpdate());
     this.catalogUnsubscribe = onCatalogUpdated(() => this.requestUpdate());
   }
 
   override disconnectedCallback(): void {
+    this.stopDeveloperTools?.(); this.stopDeveloperTools = undefined;
     this.stopFirstUse?.(); this.stopFirstUse = undefined;
     this.catalogUnsubscribe?.();
     this.catalogUnsubscribe = null;
-    this.closeRecents();
     super.disconnectedCallback();
   }
 
   override updated(changed: PropertyValues): void {
     super.updated(changed);
     if (changed.has('filterError') && this.filterError) this.filtersOpen = true;
-    if (changed.has('recentIndex') || changed.has('recentItems')) this.keepRecentSelectionVisible();
-  }
-
-  keepRecentSelectionVisible(): void {
-    if (!this.recentsOpen) return;
-    const list = this.shadowRoot?.getElementById('sv3-recent-list');
-    const option = this.shadowRoot?.getElementById(`sv3-recent-${this.recentIndex}`);
-    if (list && option) {
-      // Scroll only the list: scrollIntoView also scrolls the clipped workspace ancestors.
-      const box = list.getBoundingClientRect(), row = option.getBoundingClientRect();
-      list.scrollTop += Math.min(0, row.top - box.top) + Math.max(0, row.bottom - box.bottom);
-    }
-  }
-
-  closeRecents(): void { this.recentsOpen = false; this.recentIndex = -1; }
-
-  private openRecents(): void {
-    if (this.tier !== 'search' || this.draft !== '') return;
-    this.recentsOpen = true;
-    this.recentIndex = -1;
-    this.dispatchEvent(new CustomEvent('sv3-recents-refresh', { bubbles: true, composed: true }));
   }
 
   private selectRecent(item: Sv3RecentItem): void {
-    this.closeRecents();
     this.dispatchEvent(new CustomEvent('sv3-recent-select', { detail: item, bubbles: true, composed: true }));
   }
 
   private recentList(): TemplateResult | typeof nothing {
-    if (!this.recentsOpen || this.tier !== 'search' || this.draft !== '') return nothing;
-    return html`<section class="recents" data-testid="sv3-recents" aria-labelledby="sv3-recent-heading"
-      @keydown=${(event: KeyboardEvent) => {
-        if (event.key === 'Escape' && !event.isComposing) {
-          event.preventDefault(); event.stopPropagation(); this.focusField(); this.closeRecents();
-        }
-      }}>
-      <div class="recent-heading"><span id="sv3-recent-heading">${localizeResourceKey('search.recent')}</span>
+    if (this.state !== 'hero' || this.tier !== 'search' || this.recentItems.length === 0) return nothing;
+    return html`<section class="recents" data-testid="sv3-recents" aria-labelledby="sv3-recent-heading">
+      <div class="recent-heading"><span id="sv3-recent-heading">Recent searches</span>
         <button type="button" data-testid="sv3-recent-clear" @click=${() => {
-          this.recentIndex = -1;
-          this.dispatchEvent(new CustomEvent('sv3-recents-clear', { bubbles: true, composed: true }));
-        }}>${localizeResourceKey('search.clear-recent')}</button>
+                this.dispatchEvent(new CustomEvent('sv3-recents-clear', { bubbles: true, composed: true }));
+        }}>Clear</button>
       </div>
-      <div id="sv3-recent-list" role="listbox" aria-labelledby="sv3-recent-heading">
-        ${this.recentItems.map((item, index) => html`<button type="button" role="option"
-          id=${`sv3-recent-${index}`} tabindex="-1" aria-selected=${index === this.recentIndex}
-          data-kind=${item.kind} @pointerdown=${(event: Event) => event.preventDefault()}
-          @click=${() => this.selectRecent(item)}>${icon({ name: item.kind === 'search' ? 'search' : 'message-square', size: 14 })}<span>${item.label || localizeResourceKey('search.untitled-conversation')}</span></button>`)}
-      </div>
-      ${this.recentLocked ? html`<p role="status">${localizeResourceKey('search.conversations-locked')}</p>` : nothing}
+      <ul id="sv3-recent-list">
+        ${this.recentItems.filter(item => item.kind === 'search').map(item => html`<li><button type="button"
+          data-kind="search" @click=${() => this.selectRecent(item)}>${icon({ name: 'clock', size: 14 })}<span class="recent-query">${item.label}</span>
+          <span class="recent-meta">${item.count ? html`${item.count} · ` : nothing}${item.at === undefined ? nothing : html`<time datetime=${new Date(item.at).toISOString()}>${formatTimeMinutes(new Date(item.at))}</time>`}</span></button></li>`)}
+      </ul>
     </section>`;
   }
 
@@ -1409,8 +1408,6 @@ export class Sv3Composer extends JfElement {
     this.recentItems = [];
     this.filtersOpen = false; this.filterNote = ''; this.filterError = '';
     this.recentLocked = false;
-    this.recentsOpen = false;
-    this.recentIndex = -1;
     this.slotKind = 'send';
     this.slotReason = sv3PrimaryAction({
       pendingPrompt: false,
@@ -1451,12 +1448,20 @@ export class Sv3Composer extends JfElement {
   }
 
   private onInput(event: Event): void {
-    this.closeRecents();
     this.setDraft((event.target as HTMLTextAreaElement).value, (event as InputEvent).isComposing === true);
-    if (this.draft === '' && !(event as InputEvent).isComposing) this.openRecents();
   }
 
   /** The IME committed: the composed text is the draft now, and only now is it announced. */
+  private onPaste(event: ClipboardEvent): void {
+    if (this.tier !== 'search') return;
+    const text = event.clipboardData?.getData('text/plain');
+    if (text === undefined || !/[\r\n]/.test(text)) return;
+    event.preventDefault();
+    const field = event.target as HTMLTextAreaElement;
+    field.setRangeText(text.replace(/\r\n|[\r\n]/g, ' '), field.selectionStart, field.selectionEnd, 'end');
+    this.setDraft(field.value, false);
+  }
+
   private onCompositionEnd(event: Event): void {
     this.setDraft((event.target as HTMLTextAreaElement).value, false);
   }
@@ -1480,19 +1485,11 @@ export class Sv3Composer extends JfElement {
     // Escape branch, not after it: `Escape` is how a reader dismisses an IME candidate window, and
     // this handler used to read that press as "leave the composer" and flip the window to hero
     // mid-draft. Same reason the `Enter` branch below has always tested `isComposing`.
-    if (event.isComposing) { this.closeRecents(); return; }
-    if (this.recentsOpen && this.tier === 'search' && this.draft === '') {
-      if (event.shiftKey || event.ctrlKey || event.metaKey) this.closeRecents();
-      else if (event.key === 'Escape') {
-        event.preventDefault(); event.stopPropagation(); this.closeRecents(); return;
-      } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        const count = this.recentItems.length;
-        this.recentIndex = count === 0 ? -1 : (this.recentIndex + (event.key === 'ArrowDown' ? 1 : (this.recentIndex < 0 ? 0 : -1)) + count) % count;
-        return;
-      } else if (event.key === 'Enter' && this.recentItems[this.recentIndex]) {
-        event.preventDefault(); event.stopPropagation(); this.selectRecent(this.recentItems[this.recentIndex]!); return;
-      }
+    if (event.isComposing) return;
+    if (this.tier === 'search' && event.key === 'Enter') {
+      event.preventDefault();
+      if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) this.submit('search');
+      return;
     }
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -1657,9 +1654,7 @@ export class Sv3Composer extends JfElement {
     // Like the degradation banner, this is a reachable description of the refusal. The shell's
     // always-mounted status deck announces observed health/indexing changes once for all surfaces.
     return html`
-      <div class="band" data-testid="sv3-composer-band" @focusout=${(event: FocusEvent) => {
-        if (!this.shadowRoot?.contains(event.relatedTarget as Node | null)) this.closeRecents();
-      }}>
+      <div class="band" data-testid="sv3-composer-band">
         ${this.state === 'hero' ? this.landing() : nothing}
         ${this.degradationBanner()}
         ${reason === ''
@@ -1669,33 +1664,30 @@ export class Sv3Composer extends JfElement {
             </p>`}
         ${this.scopeNote()}
         <div
-          class="glass"
+          class="glass ${this.tier === 'search' ? 'search-field' : ''}"
           data-testid="sv3-composer-shell"
           data-focus-forward
           @pointerdown=${this.onGlassPointerDown}
         >
           <div class="field">
+            ${this.tier === 'search' ? html`<span class="search-icon" data-testid="sv3-search-icon">${icon({ name: 'search', size: 18 })}</span>` : nothing}
             <div class="editor">
               <textarea
                 rows="1"
                 .value=${this.draft}
-                aria-label=${COMPOSER_PLACEHOLDER}
+                aria-label=${this.tier === 'search' ? this.state === 'hero' ? nothing : 'Search' : COMPOSER_PLACEHOLDER}
+                aria-labelledby=${this.tier === 'search' && this.state === 'hero' ? 'sv3-search-headline' : nothing}
                 data-testid="sv3-composer-input"
-                role=${this.tier === 'search' ? 'combobox' : nothing}
-                aria-autocomplete=${this.tier === 'search' ? 'list' : nothing}
-                aria-haspopup=${this.tier === 'search' ? 'listbox' : nothing}
-                aria-expanded=${this.tier === 'search' ? String(this.recentsOpen && this.draft === '') : nothing}
-                aria-controls=${this.recentsOpen && this.tier === 'search' && this.draft === '' ? 'sv3-recent-list' : nothing}
-                aria-activedescendant=${this.recentsOpen && this.recentItems[this.recentIndex] ? `sv3-recent-${this.recentIndex}` : nothing}
                 aria-invalid=${this.tier === 'search' && this.searchError ? 'true' : 'false'}
                 aria-describedby=${this.tier === 'search' && this.searchError ? 'sv3-search-error' : nothing}
-                @focus=${this.openRecents}
+                @paste=${this.onPaste}
+                @beforeinput=${(event: InputEvent) => { if (this.tier === 'search' && ['insertLineBreak', 'insertParagraph'].includes(event.inputType) && !event.isComposing) event.preventDefault(); }}
                 @input=${this.onInput}
-                @compositionstart=${() => { this.closeRecents(); this.draftVersion += 1; this.dispatchEvent(new CustomEvent('sv3-composer-assignment', { bubbles: true, composed: true })); }}
+                @compositionstart=${() => { this.draftVersion += 1; this.dispatchEvent(new CustomEvent('sv3-composer-assignment', { bubbles: true, composed: true })); }}
                 @compositionend=${this.onCompositionEnd}
                 @keydown=${this.onKeydown}
               ></textarea>
-              ${empty
+              ${empty && this.tier !== 'search'
                 ? html`<span
                     class="placeholder"
                     aria-hidden="true"
@@ -1728,26 +1720,27 @@ export class Sv3Composer extends JfElement {
           </div>` : nothing}
           <div class="footer">
             <div class="controls" @focusout=${this.onControlsFocusOut}>
-              ${this.tierControl()}${this.effortControl()}
-              <button type="button" class="composer-control" data-testid="sv3-filters-trigger"
+              ${this.tierControl()}${this.tier === 'search' ? nothing : this.effortControl()}
+              ${this.tier === 'search' && this.state === 'hero' && !getShowDeveloperTools() && !this.filtersOpen && !this.filterNote && !this.filterError ? nothing : html`<button type="button" class="composer-control" data-testid="sv3-filters-trigger"
                 aria-expanded=${String(this.filtersOpen)} aria-controls="sv3-filters"
-                @click=${() => { this.filtersOpen = !this.filtersOpen; this.effortMenuOpen = false; this.tierMenuOpen = false; }}>${localizeResourceKey('search.filters')}</button>
-              ${this.modelLabelFact()}
+                @click=${() => { this.filtersOpen = !this.filtersOpen; this.effortMenuOpen = false; this.tierMenuOpen = false; }}>${localizeResourceKey('search.filters')}</button>`}
+              ${this.tier === 'search' ? nothing : this.modelLabelFact()}
             </div>
             <div class="actions">
-              ${this.standingStop()}${this.primaryAction(
+              ${this.tier === 'search' ? nothing : html`${this.standingStop()}${this.primaryAction(
                 empty,
                 unavailable,
                 this.refusalDescribedBy(reason),
-              )}
+              )}`}
             </div>
           </div>
         </div>
+      ${this.state === 'hero' && this.tier === 'search' ? this.corpusLine() : nothing}
       ${this.filterNote && !this.filtersOpen ? html`<p class="notice" data-testid="sv3-filter-note">${this.filterNote}</p>` : nothing}
       <div class="disclosures"><jf-sv3-filters id="sv3-filters" .open=${this.filtersOpen} .note=${this.filterNote} .serverError=${this.filterError}
         @sv3-filters-close=${() => { this.filtersOpen = false; this.focusTrigger('sv3-filters-trigger'); }}></jf-sv3-filters>
       ${this.recentList()}</div>
-      ${this.state === 'hero' ? html`<jf-getting-started .intro=${false} .host_=${this.host_} .apiBase=${this.apiBase ?? ''}></jf-getting-started>` : nothing}
+      <jf-getting-started .intro=${false} .host_=${this.host_} .apiBase=${this.apiBase ?? ''}></jf-getting-started>
       </div>
     `;
   }
@@ -1821,7 +1814,15 @@ export class Sv3Composer extends JfElement {
    * real control, so it takes the full button treatment — unlike the model FACT beside it, which is
    * deliberately not focusable and carries no role.
    */
-  private tierControl(): TemplateResult {
+  private tierControl(): TemplateResult | typeof nothing {
+    if (this.offeredTiers.length < 2) return nothing;
+    if (this.offeredTiers.every(option => option.id === 'search' || option.id === 'ask')) {
+      return html`<div class="mode-switch" role="group" aria-label="Mode" data-testid="sv3-composer-tier">
+        ${this.offeredTiers.map(option => html`<button type="button" class="composer-control" aria-pressed=${String(option.id === this.tier)}
+          data-testid="sv3-composer-tier-option" data-tier=${option.id}
+          @click=${() => this.chooseTier(option.id)}>${option.label}</button>`)}
+      </div>`;
+    }
     return html`
       ${this.controlTrigger({
         testid: 'sv3-composer-tier',
@@ -1910,7 +1911,7 @@ export class Sv3Composer extends JfElement {
         @keydown=${this.onMenuKeydown}
       >
         <div class="menu-label">${SV3_TIER_MENU_LABEL}</div>
-        ${SV3_TIER_OPTIONS.map(
+        ${this.offeredTiers.map(
           (option) => html`
             <button
               type="button"
@@ -1940,6 +1941,16 @@ export class Sv3Composer extends JfElement {
         )}
       </div>
     `;
+  }
+
+  private get offeredTiers() {
+    const ai = getAiState();
+    const available = projectAvailability('documents', ai, true);
+    const answers = ai.runtime.installed?.known && ai.runtime.installed.value && ai.runtime.gpu?.available === true
+      && ai.snapshotLive && !ai.chatDisabledBySpec && !ai.chatFailureReason
+      && (available.kind === 'available' || available.kind === 'degraded');
+    return SV3_TIER_OPTIONS.filter(option => option.id === 'search' || option.id === this.tier
+      || (option.id === 'ask' ? answers : getShowDeveloperTools()));
   }
 
   /** Why a mode cannot run right now, from the same reasons the window hands down; `''` if it can. */
@@ -2098,45 +2109,17 @@ export class Sv3Composer extends JfElement {
   private landing(): TemplateResult {
     return html`
       <div class="landing">
-        <h1 class="headline" data-testid="sv3-composer-headline">${HERO_HEADLINE}</h1>
-        ${this.corpusLine()}
+        <h1 id="sv3-search-headline" class="headline" data-testid="sv3-composer-headline">${HERO_HEADLINE}</h1>
       </div>
     `;
   }
 
   private corpusLine(): TemplateResult | typeof nothing {
     const setup = getFirstUse();
-    if (setup.coreVisible && setup.progress && !setup.empty) return nothing;
-    if (this.corpus.kind === 'unknown') {
-      return html`<p class="corpus" data-testid="sv3-composer-corpus" data-kind="unknown">${CORPUS_UNKNOWN}</p>`;
-    }
-    if (this.corpus.kind === 'documents') {
-      return html`<p class="corpus" data-testid="sv3-composer-corpus" data-kind="documents">
-        Searching ${this.corpus.count.toLocaleString()}
-        ${this.corpus.count === 1 ? 'file' : 'files'}
-      </p>`;
-    }
-    return html`<p class="corpus" data-testid="sv3-composer-corpus" data-kind="empty">
-      ${CORPUS_NONE}
-      <jf-control
-        class="corpus-remedy"
-        data-testid="sv3-composer-corpus-remedy"
-        label=${CORPUS_ADD_FOLDERS}
-        .onActivate=${() => this.remedy()}
-        >${CORPUS_ADD_FOLDERS}</jf-control
-      >
-    </p>`;
+    if (this.tier !== 'search' || !setup.reading || (setup.roots ?? 0) === 0 || setup.searchable === null) return nothing;
+    return html`<p class="corpus" data-testid="first-use-progress">${setup.searchable.toLocaleString()} files searchable so far</p>`;
   }
 
-  private remedy(): void {
-    this.dispatchEvent(
-      new CustomEvent<Sv3RemedyDetail>(SV3_REMEDY, {
-        detail: { target: CORPUS_REMEDY_TARGET },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-  }
 
   /**
    * The availability of the tier the reader has CHOSEN (852 S4). The two tiers are gated separately

@@ -1192,7 +1192,7 @@ export class Sv3DraftDomain {
     this.configureDraft();
     // WP1.1 S1.10 — beside the result list, Search mode's text is the query: text written in another
     // mode is searched as it stands, so the composer and the list never describe different queries.
-    if (tier === 'search' && this.search.showing && this.draftMayIssue()) this.search.type(this.composer.read());
+
   }
   reconcileForgotten(forgottenPath: string, scope: ForgetScope): void {
     if (!this.recoveryOpened) this.openRecovery();

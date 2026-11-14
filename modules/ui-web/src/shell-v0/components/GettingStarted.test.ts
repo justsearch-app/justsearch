@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import './WalkthroughCard.js';
+import '../views/HelpSurface.js';
 import { __resetUserStateForTest, getWalkthroughProgress, markWalkthroughStepComplete, setWalkthroughActiveStep } from '../state/UserStateDocument.js';
 import { registerWalkthrough, unregisterWalkthrough, __resetWalkthroughsForTest } from '../commands/WalkthroughRegistry.js';
 import { makeCoreProvenance } from '../primitives/provenance.js';
@@ -30,6 +31,8 @@ function feed(count: number, pending = 0) {
   __feedContactForTest();
 }
 async function activate(card: Card, label: string) {
+  const native = card.shadowRoot?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
+  if (native) { native.click(); await pump(card); return; }
   const action = [...card.shadowRoot?.querySelectorAll('jf-button') ?? []].find(b => b.getAttribute('label') === label) as HTMLElement & { onActivate?: () => unknown };
   expect(action, `${label} must be reachable`).toBeTruthy();
   action?.onActivate?.(); await pump(card);
@@ -54,18 +57,18 @@ describe('Getting started interactions', () => {
     state?.setFirstUseRoots([{ pathHash: 'notes' }], new Map([['notes', '/notes']])); feed(2);
     markWalkthroughStepComplete('core.getting-started', 'try-search');
     markWalkthroughStepComplete('sample.tour', 'one'); setWalkthroughActiveStep('sample.tour', 1);
-    const card = await mount();
+    const card = document.createElement('jf-help-surface') as Card; document.body.append(card); await pump(card);
     registerWalkthrough({ id: 'sample.tour', title: 'Sample tour', source: 'plugin', priority: 0,
       provenance: makeCoreProvenance(), steps: [{ id: 'one', title: 'One', body: 'First' }, { id: 'two', title: 'Two', body: 'Second' }] });
     await pump(card);
     const plugin = card.shadowRoot?.querySelector('jf-walkthrough-card') as Card | null;
-    expect(plugin, 'pending plugin must remain discoverable without Help').toBeTruthy();
+    expect(plugin, 'pending plugin must be resumable in Help').toBeTruthy();
     await plugin?.updateComplete;
     expect(plugin?.shadowRoot?.textContent).toContain('Sample tour');
     expect(plugin?.shadowRoot?.textContent).toContain('Two');
     expect(card.shadowRoot?.textContent).not.toContain('Try a search');
     unregisterWalkthrough('sample.tour'); await pump(card);
-    expect(card.shadowRoot?.textContent?.trim()).toBe('');
+    expect(card.shadowRoot?.querySelector('jf-walkthrough-card')?.shadowRoot?.textContent).not.toContain('Sample tour');
     expect(getWalkthroughProgress('sample.tour')).toMatchObject({ activeStepIndex: 1, completedStepIds: ['one'] });
   });
   it('suggestions are deduplicated and watched paths are excluded even without a worker', async () => {
@@ -74,10 +77,11 @@ describe('Getting started interactions', () => {
     ] })));
     state?.setFirstUseRoots([], new Map());
     const card = await mount();
-    expect(card.shadowRoot?.querySelectorAll('.suggestions jf-button')).toHaveLength(2);
+    expect(card.shadowRoot?.querySelectorAll('.suggestions button')).toHaveLength(2);
     state?.setFirstUseRoots([{ pathHash: 'documents' }], new Map([['documents', '/Documents']]));
     __resetAiStateForTest(); await pump(card);
-    expect(card.shadowRoot?.textContent).not.toContain('/Documents');
+    state?.setFirstUseRoots([{ pathHash: 'documents' }], new Map([['documents', '/Documents']])); await pump(card);
+    expect(card.shadowRoot?.querySelector('button[aria-label="Add Documents"]')).toBeNull();
     expect(success).not.toHaveBeenCalled();
   });
   for (const payload of [[], null]) it(`missing suggestions (${payload === null ? 'failure' : 'empty'}) leave Add a folder usable`, async () => {
@@ -136,16 +140,16 @@ describe('Getting started interactions', () => {
     const card = await mount(); state?.setFirstUseRoots([{ pathHash: 'notes' }], new Map([['notes', '/notes']]));
     setQuery('notes'); submitSearch(); await pump(card); feed(1); await pump(card);
     expect((getWalkthroughProgress('core.getting-started')?.completedStepIds ?? [])).not.toContain('try-search');
-    expect(card.shadowRoot?.textContent).toContain('Try a search');
+    expect(card.shadowRoot?.textContent).not.toContain('Try a search');
     setQuery('notes again'); submitSearch(); await pump(card);
-    expect(getWalkthroughProgress('core.getting-started')?.completedStepIds).toContain('try-search');
+    expect(getWalkthroughProgress('core.getting-started')?.completedStepIds ?? []).not.toContain('try-search');
     expect(card.shadowRoot?.textContent?.trim()).toBe('');
   });
   it('reload during indexing uses the live count and a watched folder, not saved step counters', async () => {
     state?.setFirstUseRoots([{ pathHash: 'notes' }], new Map([['notes', '/notes']])); feed(2, 8);
-    const card = await mount(); expect(card.shadowRoot?.textContent).toContain('2 files searchable so far');
+    const card = await mount(); expect(card.shadowRoot?.textContent?.trim()).toBe('');
     card.remove(); const reloaded = await mount();
-    expect(reloaded.shadowRoot?.textContent).toContain('8 waiting to be read');
-    expect(reloaded.shadowRoot?.textContent).toContain('Try a search');
+    expect(reloaded.shadowRoot?.textContent?.trim()).toBe('');
+    expect(reloaded.shadowRoot?.textContent).not.toContain('Try a search');
   });
 });

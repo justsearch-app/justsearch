@@ -18,6 +18,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import './SearchV3View.js';
+import { EPHEMERAL_TOAST_EVENT } from '../../components/advisory/ephemeralToast.js';
 import type { SearchV3View } from './SearchV3View.js';
 import type { Sv3SessionRow } from './Sv3SessionRow.js';
 import { resetSearchState } from '../../state/searchState.js';
@@ -173,6 +174,7 @@ async function fieldOf(el: Mounted): Promise<HTMLTextAreaElement> {
 
 /** Type a draft and press send — the affordances a user has, not an internal call. */
 async function send(el: Mounted, draft: string): Promise<void> {
+  (el as SearchV3View).tier = 'ask'; await el.updateComplete;
   const composer = await region(el, 'jf-sv3-composer');
   const field = await fieldOf(el);
   field.value = draft;
@@ -224,6 +226,7 @@ async function confirmDeletion(el: Mounted, focusAtDelete?: HTMLElement): Promis
 }
 
 async function rowsOf(el: Mounted): Promise<Sv3SessionRow[]> {
+  if (!el.shadowRoot?.querySelector('jf-sv3-sidebar')) return [];
   const sidebar = await region(el, 'jf-sv3-sidebar');
   const rows = [
     ...(sidebar.shadowRoot?.querySelectorAll('jf-sv3-session-row') ?? []),
@@ -233,6 +236,7 @@ async function rowsOf(el: Mounted): Promise<Sv3SessionRow[]> {
 }
 
 const groupLabelsOf = async (el: Mounted): Promise<string[]> => {
+  if (!el.shadowRoot?.querySelector('jf-sv3-sidebar')) return [];
   const sidebar = await region(el, 'jf-sv3-sidebar');
   return [
     ...(sidebar.shadowRoot?.querySelectorAll('[data-testid="sv3-sidebar-group-label"]') ?? []),
@@ -245,6 +249,7 @@ const clickRow = async (row: Sv3SessionRow): Promise<void> => {
 };
 
 async function newSession(el: Mounted): Promise<void> {
+  if (!el.shadowRoot?.querySelector('jf-sv3-sidebar')) return;
   const sidebar = await region(el, 'jf-sv3-sidebar');
   sidebar.shadowRoot?.querySelector<HTMLButtonElement>('[data-testid="sv3-sidebar-new"]')?.click();
   await el.updateComplete;
@@ -836,13 +841,18 @@ describe('the row actions each change the state they name', () => {
 
     it('falls back to a neutral deletion announcement when the list empties', async () => {
       const el = await mount();
+      const messages: string[] = [];
+      const hear = (event: Event) => messages.push((event as CustomEvent).detail.message);
+      document.addEventListener(EPHEMERAL_TOAST_EVENT, hear);
       await ask(el, 'the only one');
       const invoker = actionOf((await rowsOf(el))[0] as Sv3SessionRow, 'remove');
       pressEnter(invoker);
       await confirmDeletion(el, invoker);
 
       expect(await rowsOf(el)).toHaveLength(0);
-      expect(focusedTestId(el)).toBe('sv3-sidebar-announcer');
+      expect(focusedTestId(el)).toBe('sv3-composer-input');
+      expect(messages).toContain('Conversation deleted');
+      document.removeEventListener(EPHEMERAL_TOAST_EVENT, hear);
     });
 
     it('announces the deletion politely, and says WHICH conversation went', async () => {
@@ -867,6 +877,7 @@ describe('the row actions each change the state they name', () => {
       // is emptied on the request and filled when the removal lands, and both steps are observed
       // here rather than inferred from the final text.
       const el = await mount();
+      await ask(el, 'survivor');
       for (const _ of [0, 1]) {
         await newSession(el);
         await ask(el, 'same title');
@@ -886,7 +897,7 @@ describe('the row actions each change the state they name', () => {
       pressEnter(actionOf((await rowsOf(el))[0] as Sv3SessionRow, 'remove'));
       await confirmDeletion(el);
 
-      expect((await rowsOf(el)).map((r) => r.label)).toEqual([]);
+      expect((await rowsOf(el)).map((r) => r.label)).toEqual(['survivor']);
       // Said, cleared, said again. The region starts empty, so the first clear is a no-op; what
       // matters is the clear BETWEEN the two identical announcements, without which the second
       // discard would set a string the region already held and say nothing at all.

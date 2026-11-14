@@ -21,7 +21,6 @@
  *    generation) is dropped, never rendered.
  */
 
-import { recordFirstUseSearch } from './firstUse.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 import { createApiError } from '../../api/http.js';
 import { localizeError } from '../../i18n/errorCatalog.js';
@@ -736,7 +735,6 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
       // Tempdoc 580 §17 P3 — the per-query join key (additive wire field; FE parse is cast-tolerant).
       interactionId: (data as { interactionId?: string | null }).interactionId ?? null,
     };
-    recordFirstUseSearch();
     openedThisQuery = false;
     emit();
     return true;

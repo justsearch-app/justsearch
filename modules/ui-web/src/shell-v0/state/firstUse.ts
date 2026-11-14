@@ -22,19 +22,16 @@ function validProgress(value: unknown): WalkthroughProgress | undefined {
     && p.completedStepIds.every(s => typeof s === 'string') && typeof p.dismissed === 'boolean'
     ? p as WalkthroughProgress : undefined;
 }
-export function projectFirstUse(facts: FirstUseFacts, saved?: unknown, legacy?: unknown, suppressed = false, pluginPending = false) {
+export function projectFirstUse(facts: FirstUseFacts, saved?: unknown, _legacy?: unknown, suppressed = false, _pluginPending = false) {
   const progress = validProgress(saved);
-  const old = validProgress(legacy);
   const own = facts.searchable;
   const count = own !== null && Number.isSafeInteger(own) && own >= 0 ? own : null;
   const done = [(count ?? 0) > 0,
     progress?.completedStepIds.includes('try-search') ?? false, facts.aiActive] as const;
   const reopened = progress?.completedStepIds.includes(REOPENED_MARKER) ?? false;
   const known = facts.roots !== null && count !== null;
-  const oldFinished = !!old && (old.dismissed || old.activeStepIndex >= 4);
-  const coreVisible = !suppressed && !progress?.dismissed && (reopened || known && !(done[0] && done[1])
-    && !(oldFinished && (facts.roots ?? 0) > 0));
-  const visible = !suppressed && !progress?.dismissed && (coreVisible || pluginPending);
+  const coreVisible = false;
+  const visible = false;
   const reading = facts.waiting !== null && facts.waiting > 0
     ? `${facts.waiting.toLocaleString()} waiting to be read` : facts.reading ? 'still reading' : '';
   return { ...facts, searchable: count, done, reopened, visible, coreVisible, known,
@@ -68,11 +65,14 @@ export function firstUseFacts(ai: AiState): FirstUseFacts {
   const progress = selectIndexingProgress(ai.status, ai.indexingStatusLive, ai.episodeMaxPendingJobs, ai.enrichSettleSamples);
   const queueKnown = ai.indexingStatusLive && isWorkerReportedIndex(ai.status)
     && typeof ai.status?.worker?.core?.pendingJobs === 'number';
+  const readingObserved = ai.indexingStatusLive && isWorkerReportedIndex(ai.status)
+    && ai.status?.meta?.workerRpcStale !== true
+    && !ai.status?.operating?.freshness?.staleSources?.includes('indexing');
   return { roots: roots === null ? null : roots.length,
     searchable: count !== null && Number.isInteger(count) && count >= 0 ? count : null,
     waiting: queueKnown ? progress.jobsQueued : null,
     // A scan can still be finding files while its observed queue is empty or absent.
-    reading: progress.activity.confirmed && !progress.pause
+    reading: readingObserved && !progress.pause
       && (progress.phase === 'indexing' || ai.status?.worker?.core?.indexState === 'INDEXING'),
     aiActive: ai.snapshotLive && ai.runtime.mode === 'online' && ai.capabilities.chat,
   };
@@ -103,17 +103,6 @@ export function reopenGettingStarted(): void {
   mutateDocument(doc => { const ids = doc.walkthroughState?.[GETTING_STARTED_ID]?.completedStepIds ?? [];
     return { ...doc, walkthroughState: { ...doc.walkthroughState, [GETTING_STARTED_ID]: {
       activeStepIndex: 0, completedStepIds: [...new Set([...ids, REOPENED_MARKER])], dismissed: false,
-    } } };
-  });
-}
-/** Called only at searchState's successful response seam, never from a subscriber or restored rows. */
-export function recordFirstUseSearch(): void {
-  if ((getFirstUse().searchable ?? 0) <= 0) return;
-  mutateDocument(doc => {
-    const prev = doc.walkthroughState?.[GETTING_STARTED_ID];
-    if (prev?.completedStepIds.includes('try-search')) return doc;
-    return { ...doc, walkthroughState: { ...doc.walkthroughState, [GETTING_STARTED_ID]: {
-      activeStepIndex: 0, completedStepIds: [...(prev?.completedStepIds ?? []), 'try-search'], dismissed: prev?.dismissed ?? false,
     } } };
   });
 }

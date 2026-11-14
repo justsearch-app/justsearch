@@ -22,6 +22,8 @@ export interface Sv3RecentItem {
   readonly kind: 'search' | 'conversation';
   readonly value: string;
   readonly label: string;
+  readonly count?: string;
+  readonly at?: number;
 }
 
 interface SessionsHost {
@@ -50,6 +52,7 @@ interface SessionsHost {
   confirmTree(children: string[], preview: DeleteTreeEntry[], apiBase: string, signal: AbortSignal): Promise<boolean>;
   deletionOutcome(result: DeleteCascadeResult, tree: DeleteTreeEntry[]): string;
   announce(message: string, severity: 'warning'): void;
+  lastConversationDeleted(): void;
   requestUpdate(): void;
 }
 
@@ -76,9 +79,7 @@ export class Sv3SessionsDomain {
 
   /** These are the store's recent rows, not another session projection. */
   conversations: readonly Conversation[] = [];
-  private recentSearches: readonly string[] = [];
-  private recentClearTime = -Infinity;
-  private recentConversationsReady = true;
+  private recentSearches: readonly Sv3RecentItem[] = [];
   private recentEpoch = 0;
   private convListUnsubscribe: (() => void) | null = null;
   private liveDraftOwner: { id: string; draft: ComposerCapture } | null = null;
@@ -116,21 +117,23 @@ export class Sv3SessionsDomain {
   resetProfileRecents(): void {
     this.recentEpoch += 1;
     this.recentSearches = [];
-    this.recentClearTime = -Infinity;
-    this.recentConversationsReady = false;
     this.host.requestUpdate();
     this.host.resetProfilePresentation();
     void this.refreshRecents();
   }
   invalidateRecentEpoch(): void { this.recentEpoch += 1; }
   refreshUnlockedRecents(): void {
-    this.recentConversationsReady = false;
     this.host.requestUpdate();
     void this.refreshRecents();
   }
-  recordSearch(query: string): void {
-    this.recentSearches = [query, ...this.recentSearches.filter(value => value !== query)].slice(0, 8);
-    this.host.requestUpdate();
+  recordSearch(query: string): (count?: string) => void {
+    const epoch = this.recentEpoch;
+    return count => {
+      if (epoch !== this.recentEpoch) return;
+      this.recentSearches = [{ kind: 'search' as const, value: query, label: query, at: Date.now(),
+        ...(count === undefined ? {} : { count }) }, ...this.recentSearches.filter(item => item.value !== query)].slice(0, 8);
+      this.host.requestUpdate();
+    };
   }
 
   restoreLastViewed(): void {
@@ -290,6 +293,7 @@ export class Sv3SessionsDomain {
   }
 
   private forgetDeletedConversations(ids: readonly string[]): void {
+    const hadConversations = this.sessions.sessions.length > 0;
     for (const gone of ids) {
       const owned = this.removalDraft;
       if (owned?.id === gone) {
@@ -306,6 +310,7 @@ export class Sv3SessionsDomain {
       // Server confirmation wins even over stale local run state: the content is already gone.
       this.sessions = { ...this.sessions, sessions: this.sessions.sessions.filter(s => s.id !== gone) };
     }
+    if (hadConversations && this.sessions.sessions.length === 0 && this.host.connected()) this.host.lastConversationDeleted();
   }
 
   selectSession(id: string): void {
@@ -402,26 +407,20 @@ export class Sv3SessionsDomain {
   }
 
   get recentItems(): readonly Sv3RecentItem[] {
-    const searches: Sv3RecentItem[] = this.recentSearches.map(value => ({ kind: 'search', value, label: value }));
-    if (this.historyLocked || !this.recentConversationsReady) return searches;
-    return [...searches, ...this.conversations.filter(c => c.lastActiveAt > this.recentClearTime)
-      .sort((a, b) => b.lastActiveAt - a.lastActiveAt).slice(0, 5)
-      .map(c => ({ kind: 'conversation' as const, value: c.id,
-        label: c.title || '' }))];
+    return this.recentSearches;
   }
 
   async refreshRecents(): Promise<void> {
     const epoch = this.recentEpoch;
     const loaded = await this.transport.loadConversations();
     if (loaded && epoch === this.recentEpoch && !this.historyLocked) {
-      this.recentConversationsReady = true;
       this.host.requestUpdate();
     }
   }
 
   clearRecents(): void {
     this.recentSearches = [];
-    this.recentClearTime = Date.now();
+    this.recentEpoch += 1;
     this.host.requestUpdate();
   }
 

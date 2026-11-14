@@ -103,6 +103,7 @@ vi.mock('../../state/agentSessionStore.js', () => ({
 }));
 
 import './SearchV3View.js';
+import { setShowDeveloperTools } from '../../state/developerToolsState.js';
 import type { SearchV3View } from './SearchV3View.js';
 import { resetSearchState } from '../../state/searchState.js';
 import {
@@ -114,8 +115,6 @@ import type { StatusSnapshot } from '../../utils/statusPoll.js';
 import { __resetConversationListForTest } from '../../state/conversationListStore.js';
 import { __resetDraftProvidersForTest } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
-import { NAVIGATE_TO_SURFACE_EVENT } from '../../controllers/navigateRequest.js';
-import { CORPUS_REMEDY_TARGET } from './fixtures.js';
 
 type Mounted = HTMLElement & { updateComplete: Promise<unknown> };
 
@@ -139,6 +138,7 @@ function aiOnlineWithoutDocuments(): void {
 }
 
 beforeEach(() => {
+  setShowDeveloperTools(true);
   sessionStorage.clear();
   localStorage.clear();
   __resetConversationListForTest();
@@ -207,6 +207,7 @@ async function delegateWithGate(
   el: Mounted,
   gate: 'budget' | 'context',
 ): Promise<Mounted> {
+  (el as SearchV3View).tier = 'delegate'; await el.updateComplete;
   const composer = await region(el, 'jf-sv3-composer');
   const field = composer.shadowRoot?.querySelector<HTMLTextAreaElement>(
     '[data-testid="sv3-composer-input"]',
@@ -296,24 +297,13 @@ describe('the run decisions are born on the operability primitive', () => {
 });
 
 describe('the composer remedies are born on the primitive', () => {
-  it('takes the corpus remedy through the primitive, out the window one remedy exit', async () => {
+  it('does not repeat the Library corpus remedy in Search', async () => {
     aiOnlineWithoutDocuments();
     const el = await mount();
     const composer = await region(el, 'jf-sv3-composer');
-    const navigations: string[] = [];
-    document.addEventListener(NAVIGATE_TO_SURFACE_EVENT, (event) =>
-      navigations.push((event as CustomEvent<{ surfaceId: string }>).detail.surfaceId),
-    );
-
-    await activate(q(composer, 'sv3-composer-corpus-remedy'));
-    await settle(el);
-    expect(navigations).toEqual([CORPUS_REMEDY_TARGET]);
+    expect(q(composer, 'sv3-composer-corpus-remedy')).toBeNull();
   });
-});
 
-/* ── 2. What adoption must NOT have cost ─────────────────────────────────────────────────────── */
-
-describe('adoption kept every control identifiable and named', () => {
   it('keeps the testid on the host, so the harness and the suite still find it', async () => {
     aiOnline();
     const el = await mount();
@@ -334,6 +324,7 @@ describe('adoption kept every control identifiable and named', () => {
     // aria-haspopup/aria-expanded, a menu RUNG carries role=menuitemradio + aria-checked, and the
     // primary slot's send is natively `disabled` on an empty draft — none of which `jf-control`
     // renders. Pinned so that "why is this one still a button?" has an answer in the suite.
+    (el as SearchV3View).tier = 'ask'; await el.updateComplete; await composer.updateComplete;
     const trigger = q(composer, 'sv3-composer-tier');
     expect(trigger?.localName).toBe('button');
     expect(trigger?.getAttribute('aria-haspopup')).toBe('menu');

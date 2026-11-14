@@ -31,6 +31,7 @@ import './Sv3SessionRow.js';
 import './Sv3AgentRuns.js';
 import type { Sv3SessionRow } from './Sv3SessionRow.js';
 import './Sv3Empty.js';
+import { reasonFor } from '../../state/readinessNotice.js';
 import { SIDEBAR_EMPTY } from './fixtures.js';
 import type { Sv3SessionGroup } from './sv3-sessions.js';
 
@@ -217,6 +218,7 @@ export class Sv3Sidebar extends JfElement {
 
   static properties = {
     groups: { attribute: false },
+    locked: { type: Boolean },
     collapsed: { type: Boolean, reflect: true },
     renamingId: { attribute: false },
     announcement: { state: true },
@@ -225,6 +227,7 @@ export class Sv3Sidebar extends JfElement {
 
   /** The window's projected session groups; empty means nothing has been searched in this window. */
   declare groups: readonly Sv3SessionGroup[];
+  declare locked: boolean;
   /** The panel is on its 3rem icon rail (Phase F5). The WIDTH is the window's — this is the mode. */
   declare collapsed: boolean;
   /** Which row is being renamed, or null. At most one: an edit is where the reader's attention is. */
@@ -249,6 +252,7 @@ export class Sv3Sidebar extends JfElement {
   constructor() {
     super();
     this.groups = [];
+    this.locked = false;
     this.collapsed = false;
     this.renamingId = null;
     this.announcement = '';
@@ -315,6 +319,12 @@ export class Sv3Sidebar extends JfElement {
 
   /** Keep focus outside removed rows untouched, including rows removed by another window. */
   protected override willUpdate(changed: PropertyValues<this>): void {
+    if (this.locked) {
+      this.announcement = '';
+      this.pendingDiscard = null;
+      this.focusAfterDiscard = null;
+      return;
+    }
     const rows = this.flatRows();
     const previous = changed.get('groups');
     if (previous) {
@@ -414,8 +424,8 @@ export class Sv3Sidebar extends JfElement {
             <jf-sv3-empty
               data-testid="sv3-sidebar-empty"
               glyph="&#9634;"
-              heading=${SIDEBAR_EMPTY.title}
-              description=${SIDEBAR_EMPTY.description}
+              heading=${this.locked ? reasonFor('conversations.locked').wording : SIDEBAR_EMPTY.title}
+              description=${this.locked ? '' : SIDEBAR_EMPTY.description}
             ></jf-sv3-empty>
           `
         : html`
@@ -460,7 +470,7 @@ export class Sv3Sidebar extends JfElement {
               )}
             </div>
           `}
-      ${this.collapsed ? nothing : html`<jf-sv3-agent-runs api-base=${this.apiBase}></jf-sv3-agent-runs>`}
+      ${this.collapsed || this.locked ? nothing : html`<jf-sv3-agent-runs api-base=${this.apiBase}></jf-sv3-agent-runs>`}
       ${/* The panel's one polite announcement channel (tempdoc 831). A LEAF at the end of the
            panel, holding text and nothing else: a live region wrapped around controls re-announces
            the whole subtree every time any of it re-renders, which turns a screen reader into

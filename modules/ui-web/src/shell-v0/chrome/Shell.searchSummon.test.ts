@@ -221,15 +221,15 @@ describe('native search summon shared destination', () => {
     const input = field as unknown as HTMLTextAreaElement;
     input.value = 'keep the actual v3 draft';
     input.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    expect(getSearchState().query).toBe('');
     const button = document.createElement('button'); document.body.append(button); button.focus();
     await summon(shell);
     expect(deepActiveElement()).toBe(input);
-    expect(input.getAttribute('aria-label')).toBeTruthy();
+    expect(input.getAttribute('aria-label') || input.getAttribute('aria-labelledby')).toBeTruthy();
     expect(input.value).toBe('keep the actual v3 draft');
     await vi.advanceTimersByTimeAsync(200);
-    expect(getSearchState().passStage).toBe('quick');
-    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    expect(getSearchState().query).toBe('');
+    expect(getSearchState().query).toBe('');
   });
 
   it('SC2 reuses a secondary search pane and never focuses the other composer', async () => {

@@ -2,6 +2,7 @@
 /** Stage 2: start-fresh ownership and unfinished saved conversations, through the real window. */
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import './SearchV3View.js';
+import { mergeStoreConversations } from './sv3-sessions.js';
 import type { SearchV3View } from './SearchV3View.js';
 import type { Sv3Composer } from './Sv3Composer.js';
 import { __feedContactForTest, __feedForTest, __resetAiStateForTest } from '../../state/aiStateStore.js';
@@ -425,6 +426,7 @@ it.each([false, true])('New latches abandonment during a queued saved-history re
 
 it.each(['query', 'chosen-files', 'schema'] as const)('New retains authored results work as a reviewable results proposal: %s', async preparation => {
   const el = await mount();
+  el.sessions = mergeStoreConversations(el.sessions, [{ id: 'existing', title: 'Saved conversation', firstUserMessage: '', createdAt: 1, lastActiveAt: 1 }]); await settle(el);
   composer(el).dispatchEvent(new CustomEvent('sv3-tier-change', { bubbles: true, composed: true, detail: { tier: 'search' } }));
   await settle(el); await type(el, 'results query');
   field(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true })); await settle(el);

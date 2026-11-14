@@ -633,7 +633,7 @@ it.each(invalidCutoverTasks)('C2 A2 visibly refuses invalid task data %j without
   const view = await mount(); await navigate(state); await drain(view); const c = await composer(view);
   expect(q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.value).toBe('keep text');
   expect(c.shadowRoot!.textContent).toMatch(/Invalid|Unknown|No readable/);
-  q<HTMLButtonElement>(c, 'sv3-composer-send')!.click(); await drain(view);
+  q<HTMLTextAreaElement>(c, 'sv3-composer-input')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await drain(view);
   expect(dispatches()).toHaveLength(0);
 });
 

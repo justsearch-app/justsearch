@@ -242,7 +242,6 @@ import {
 import { authorizedFetch } from '../../api/authorizedFetch.js';
 import { DraftPersistence } from '../../controllers/draftPersistence.js';
 import { requestLoadAnyway } from '../../state/chatResidency.js';
-import { notifyDraftKeptOnce } from '../../controllers/draftKeptHint.js';
 // Tempdoc 834 §15.3 — the backend's live-run enumeration, asked on a cold load.
 import { discoverLiveAgentRun } from '../../controllers/liveRuns.js';
 import {
@@ -699,6 +698,7 @@ export class SearchV3View extends JfElement {
       :host([sidebar-narrow]) button.sidebar-grip {
         display: none;
       }
+      :host([sidebar-narrow]:not([sidebar-collapsed])) .column.no-conversations { margin-inline-start: 0; }
       .sidebar-backdrop {
         position: absolute;
         inset: 0;
@@ -917,6 +917,14 @@ export class SearchV3View extends JfElement {
     </div>`;
   }
 
+  private readonly syntheticDraftRows = new Set<string>();
+
+  private get hasConversations(): boolean {
+    return this.sessionsDomain.conversations.length > 0
+      || this.sessions.sessions.some(session => session.turns.length > 0 || !this.syntheticDraftRows.has(session.id))
+      || getConversationListState().activeId !== null && !this.syntheticDraftRows.has(getConversationListState().activeId!);
+  }
+
   private readonly composerDraft = new Sv3ComposerPort(() => this.composer);
 
   private readonly draftDomain: Sv3DraftDomain = new Sv3DraftDomain({
@@ -926,6 +934,7 @@ export class SearchV3View extends JfElement {
     session: id => sessionById(this.sessions, id),
     startNewSession: () => { this.sessions = startNewSession(this.sessions); },
     keepUnsentConversation: (id, text, now) => {
+      this.syntheticDraftRows.add(id);
       this.sessions = mergeStoreConversations(this.sessions, [
         { id, title: 'Unsent draft', firstUserMessage: text, createdAt: now, lastActiveAt: now },
       ]);
@@ -1110,8 +1119,7 @@ export class SearchV3View extends JfElement {
     draft: () => this.draftDomain,
     historyLocked: () => this.historyLocked,
     clearAskFilterError: () => { this.askDomain.askFilterError = ''; },
-    recordSearch: query => this.sessionsDomain.recordSearch(query),
-    closeRecents: () => this.composer?.closeRecents(),
+    recordSearch: (query): ((count?: string) => void) => this.sessionsDomain.recordSearch(query),
     focusComposer: () => this.focusComposer(),
     connected: () => this.isConnected,
     apiBase: () => this.apiBase,
@@ -1129,7 +1137,7 @@ export class SearchV3View extends JfElement {
     publishForgetCompletion: detail => publishForgetCompletion(this, detail.apiBase, detail.outcome, detail.owner),
   });
 
-  private readonly sessionsDomain = new Sv3SessionsDomain({
+  private readonly sessionsDomain: Sv3SessionsDomain = new Sv3SessionsDomain({
     sessions: () => this.sessions,
     setSessions: sessions => { this.sessions = sessions; },
     draft: () => this.draftDomain,
@@ -1151,13 +1159,18 @@ export class SearchV3View extends JfElement {
     resetProfilePresentation: () => {
       // What was on show belonged to the profile left behind (C4).
       this.clearPane();
-      this.composer?.closeRecents();
       resetSearchState();
       clearFilters();
       this.composer?.shadowRoot?.querySelector('jf-sv3-filters')?.resetInputs();
     },
     searchNow: text => this.search.searchNow(text),
     writeDraft: text => this.writeDraft(text),
+    lastConversationDeleted: () => {
+      if (this.shadowRoot?.activeElement?.localName === 'jf-sv3-sidebar') {
+        emitEphemeralToast({ message: 'Conversation deleted' });
+        void this.focusComposer();
+      }
+    },
     confirmTree: confirmConversationTree,
     deletionOutcome: conversationDeleteOutcome,
     announce: (message, severity) => emitEphemeralToast({ message, severity }),
@@ -1378,7 +1391,6 @@ export class SearchV3View extends JfElement {
     // BEFORE `super`, which is what tears the shadow tree's controllers down: the reassurance has to
     // read the draft while the composer still holds it (tempdoc 609 §R T1.4 — instance retention
     // keeps the draft, and this is what makes that invisible guarantee legible, once per session).
-    notifyDraftKeptOnce(SV3_SURFACE_KEY, this.currentDraft().trim().length > 0);
     // Tempdoc 609 Phase 4 (inventory G11) — a torn-down stream is no longer live, so the app-wide
     // activity indicator must not be left claiming this window's work is still going.
     if (this.streaming) this.settleAiActivity();
@@ -1460,7 +1472,6 @@ export class SearchV3View extends JfElement {
     this.boxObserver = new ResizeObserver(() => {
       this.paneOverlay = !sv3PaneIsInline(this.availableWidth());
       this.reflowSidebar();
-      this.composer?.keepRecentSelectionVisible();
     });
     this.boxObserver.observe(this);
   }
@@ -1525,7 +1536,6 @@ export class SearchV3View extends JfElement {
    * keystroke that changed the band.
    */
   private publishOcclusion(): void {
-    this.composer?.keepRecentSelectionVisible();
     const current = this.style.getPropertyValue(OCCLUSION_VAR);
     if (this.composerState !== 'hero') {
       const px = this.observedDock?.getBoundingClientRect().height ?? 0;
@@ -1796,6 +1806,7 @@ export class SearchV3View extends JfElement {
    * rail, and an overlaid pane occupies nothing at all.
    */
   private sidebarOccupiedWidth(): number {
+    if (!this.hasConversations) return 0;
     return this.sidebarCollapsed || this.sidebarNarrow
       ? SV3_SIDEBAR_COLLAPSED_PX : this.sidebarWidthPx;
   }
@@ -2132,7 +2143,7 @@ export class SearchV3View extends JfElement {
     // so the row's `stopPropagation` cannot defend it — the window has to decline. Without this,
     // an Escape pressed while typing in the rename field closed the PANE, silently, in a region
     // the reader was not looking at, and left the edit open (F-series fit audit, DEFECT-7).
-    if (event.key === 'Escape' && !event.isComposing && (this.composer?.recentsOpen || this.composer?.filtersOpen)
+    if (event.key === 'Escape' && !event.isComposing && this.composer?.filtersOpen
       && event.composedPath().includes(this.composer)) return;
     if (event.key === 'Escape' && renamingRowInPath(event)) return;
     // An open control menu is served the same way and for the same reason: it is the most local
@@ -2305,10 +2316,13 @@ export class SearchV3View extends JfElement {
       this.draftDomain.saveRecovery();
     }
     if (this.draftDomain.draftReview) { this.draftDomain.saveRecovery(); return; }
-    if (this.draftDomain.humanTask !== null && this.tier !== 'search') this.draftDomain.saveRecovery();
-    if (this.tier !== 'search' || !this.draftDomain.draftMayIssue()) return;
-    if (detail.text.trim() !== '' && !this.draftDomain.enterResults(detail.previous, detail.text)) return;
-    this.search.type(detail.text);
+    if (this.draftDomain.humanTask !== null || this.tier === 'search') this.draftDomain.saveRecovery();
+    // Preserve the conversation's previous draft when editing a Search away from it.
+    // The existing move keeps its ownership; only Enter submits the new query.
+    if (this.tier === 'search' && !this.search.showing && this.sessions.activeId !== null
+      && this.draftDomain.draftMayIssue() && detail.text.trim() !== '') {
+      this.draftDomain.enterResults(detail.previous, detail.text);
+    }
   }
 
   /** Put text in the composer — or, before its first render, where the composer will take it from. */
@@ -2696,7 +2710,7 @@ export class SearchV3View extends JfElement {
     const session = this.activeSession;
     const contexts = this.contextDomain.turnContexts();
     return html`
-      ${this.sidebarNarrow && !this.sidebarCollapsed ? html`<button
+      ${this.hasConversations && this.sidebarNarrow && !this.sidebarCollapsed ? html`<button
         type="button"
         class="sidebar-backdrop"
         data-testid="sv3-sidebar-backdrop"
@@ -2704,8 +2718,9 @@ export class SearchV3View extends JfElement {
         @click=${this.dismissSidebarSheet}
       ></button>` : nothing}
       <jf-sv3-conversation-export .locked=${this.historyLocked}></jf-sv3-conversation-export>
-      <jf-sv3-sidebar
-        .groups=${sessionGroups}
+      ${this.hasConversations ? html`<jf-sv3-sidebar
+        .groups=${this.historyLocked ? [] : sessionGroups}
+        .locked=${this.historyLocked}
         .renamingId=${this.renamingId}
         ?collapsed=${this.sidebarCollapsed}
         api-base=${this.apiBase}
@@ -2729,9 +2744,9 @@ export class SearchV3View extends JfElement {
         @keydown=${this.onGripKeydown}
         @click=${this.onGripClick}
         @dblclick=${this.resetSidebarWidth}
-      ></button>
+      ></button>` : nothing}
       <div
-        class="column"
+        class="column ${this.hasConversations ? '' : 'no-conversations'}"
         data-testid="sv3-column"
         ?inert=${this.paneOverlay && this.paneTab !== null}
         @sv3-composer-assignment=${this.draftDomain.onHumanAssignment}

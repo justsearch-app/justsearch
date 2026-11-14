@@ -12,6 +12,8 @@
 
 import { isTauriRuntime } from './tauriRuntime';
 
+export type FolderPickerResult = string | null | { readonly error: string };
+
 export interface PickFolderOptions {
   title?: string;
   /** Optional starting directory for the dialog. */
@@ -28,7 +30,7 @@ export interface PickFolderOptions {
  */
 export async function pickFolder(
   options: PickFolderOptions = {},
-): Promise<string | null> {
+): Promise<FolderPickerResult> {
   if (!isTauriRuntime()) return null;
   try {
     const mod = await import('@tauri-apps/plugin-dialog');
@@ -41,7 +43,7 @@ export async function pickFolder(
     if (Array.isArray(chosen)) return chosen[0] ?? null;
     if (typeof chosen === 'string' && chosen.length > 0) return chosen;
     return null;
-  } catch {
-    return null;
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
   }
 }

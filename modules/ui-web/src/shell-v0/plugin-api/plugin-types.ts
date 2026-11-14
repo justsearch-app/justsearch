@@ -1054,7 +1054,7 @@ export interface PluginLayoutState {
 export interface PluginPlatform {
   readonly capabilities: ReadonlySet<string>;
   pickFile: (options?: { multiple?: boolean; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string[] | null>;
-  pickFolder: () => Promise<string | null>;
+  pickFolder: () => Promise<import('../../utils/folderPicker.js').FolderPickerResult>;
   revealInExplorer: (path: string) => Promise<void>;
   openExternal: (url: string) => Promise<void>;
 }

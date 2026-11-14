@@ -136,7 +136,7 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts",
-          "test": "x6 each edit supersedes an older success and an older error body"
+          "test": "x6 a new submit supersedes an older success and an older error body"
         }
       ]
     },
@@ -420,14 +420,14 @@
     },
     {
       "id": "SW-QREC-01",
-      "behavior": "Recent items open only when the focused Search field is empty and support keyboard selection and dismissal.",
+      "behavior": "Recent searches form a native in-flow list on the idle Search screen; an empty list renders nothing.",
       "kind": "works-today",
       "races": [],
       "observations": [
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
-          "test": "Y1 opens only for an empty focused Search bar and owns selection and dismiss keys"
+          "test": "S4-11 empty recents render nothing; successful responses have exact header count and completion time"
         },
         {
           "layer": "real-ui-fixture",
@@ -444,13 +444,13 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
-          "test": "Y2 records only accepted explicit Search actions with exact dedup and an eight item cap"
+          "test": "S4-11 exact dedup and eight-item cap apply only to explicit attempts; typing sends nothing"
         }
       ]
     },
     {
       "id": "SW-QREC-03",
-      "behavior": "Selecting a recent search uses its original text with the current restrictions, while selecting a conversation opens that conversation.",
+      "behavior": "Selecting a recent search uses its original text with the current restrictions; conversations open from their column.",
       "kind": "works-today",
       "races": [
         "second-conversation-or-tab"
@@ -459,13 +459,13 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
-          "test": "Y3 replays operators with current restrictions and selects conversations through navigation"
+          "test": "S4-12 pointer and native keyboard activation replay the query with current restrictions"
         }
       ]
     },
     {
       "id": "SW-QREC-04",
-      "behavior": "Clearing Recents hides the existing population even when an older list response arrives later.",
+      "behavior": "Clearing recent searches empties their memory-only list; a delayed completion cannot repopulate it or delete conversations.",
       "kind": "works-today",
       "races": [
         "late-response"
@@ -474,7 +474,7 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
-          "test": "Y4 Clear before a first delayed list response suppresses every old row"
+          "test": "S4-12 Clear empties only searches and a delayed completion cannot repopulate it"
         }
       ]
     },
@@ -489,7 +489,7 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
-          "test": "Y6 observed lock hides cached optimistic and legacy labels and pre-lock responses until unlock refresh"
+          "test": "S4-16 locked conversation labels never leak into recents or the column"
         },
         {
           "layer": "real-ui-fixture",
@@ -499,12 +499,12 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
-          "test": "Y5 fresh windows forget searches and Clear while profile ABA drops pending responses"
+          "test": "S4-12 profile ABA discards searches and pre-switch completions"
         },
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
-          "test": "R5a Settings workspace profile activation resets searches and Clear and drops pending replies"
+          "test": "S4-12 workspace profile switches discard pending recents and cached conversation rows"
         }
       ]
     },
@@ -519,7 +519,7 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.syntax.test.ts",
-          "test": "x6 each edit supersedes an older success and an older error body"
+          "test": "x6 a new submit supersedes an older success and an older error body"
         },
         {
           "layer": "live-backend",
@@ -579,7 +579,7 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.recents.test.ts",
-          "test": "Y3 replays operators with current restrictions and selects conversations through navigation"
+          "test": "S4-12 pointer and native keyboard activation replay the query with current restrictions"
         },
         {
           "layer": "view",
@@ -3052,7 +3052,7 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.ownCount.test.ts",
-          "test": "before any status: unknown in words, never 0"
+          "test": "unknown and subsequently reported counts do not resurrect corpus chrome"
         },
         {
           "layer": "controller",

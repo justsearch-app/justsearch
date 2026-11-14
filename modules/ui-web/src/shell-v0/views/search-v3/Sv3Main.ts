@@ -1890,7 +1890,7 @@ export class Sv3Main extends JfElement {
   }
 
   private gettingStarted(): TemplateResult | typeof nothing {
-    return this.state === 'hero' ? nothing : html`<jf-getting-started .intro=${false} .host_=${this.host_} .apiBase=${this.apiBase}></jf-getting-started>`;
+    return nothing;
   }
 
   render(): TemplateResult {

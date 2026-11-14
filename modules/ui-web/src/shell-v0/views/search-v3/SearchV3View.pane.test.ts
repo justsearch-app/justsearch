@@ -796,7 +796,7 @@ describe('the two boundaries leave the main column its 640', () => {
     const el = await mount(1400);
     // 1400 − 256 − 640 = 504: a width remembered from a wider window is not restored into a box that
     // rejects it.
-    expect(el.paneWidthPx).toBe(1400 - 256 - SV3_MAIN_MIN_PX);
+    expect(el.paneWidthPx).toBe(560); // No conversation column occupies the empty Search window.
     expect(el.paneWidthPx).toBeGreaterThanOrEqual(SV3_PANE_MIN_PX);
   });
 });
