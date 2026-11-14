@@ -199,9 +199,10 @@ public final class FormatCapabilityExpectedState {
                   "JUSTSEARCH_PPTX_SLIDE_MARKER",
                   "JUSTSEARCH_PPTX_SPEAKER_NOTES_MARKER"),
               counts(0, 0, 0),
-              // S5 (b74f2aa83) records the package's embedded parser callback and depth.
-              1,
-              1,
+              // The package's only embedded part is its preview picture (docProps/thumbnail), which
+              // is not parsed or counted (t-20261114-wordtext S10).
+              0,
+              0,
               EmbeddedIdentityExpectation.NOT_APPLICABLE,
               Classification.PASS,
               FailureClass.NONE,

@@ -10,6 +10,8 @@ import org.apache.tika.extractor.EmbeddedDocumentExtractor;
 import org.apache.tika.extractor.ParsingEmbeddedDocumentExtractor;
 import org.apache.tika.io.TikaInputStream;
 import org.apache.tika.metadata.Metadata;
+import org.apache.tika.metadata.TikaCoreProperties;
+import org.apache.tika.metadata.TikaCoreProperties.EmbeddedResourceType;
 import org.apache.tika.parser.ParseContext;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
@@ -19,6 +21,7 @@ final class EmbeddedResourceBudget implements EmbeddedDocumentExtractor {
   private final TikaExtractionPolicy policy;
   private final long maxExpandedBytes;
   private final ParsingEmbeddedDocumentExtractor delegate;
+  private final ParseContext context;
   private final ContainerExpansionBudget expansion;
   private long expandedBytes;
   private int resources;
@@ -37,12 +40,18 @@ final class EmbeddedResourceBudget implements EmbeddedDocumentExtractor {
     this.maxExpandedBytes = (long) Math.min(
         policy.maxInputBytes(), Math.max(1, inputBytes) * policy.maxCompressionRatio());
     this.delegate = new ParsingEmbeddedDocumentExtractor(context);
+    this.context = context;
     this.expansion = expansion;
     context.set(EmbeddedDocumentExtractor.class, this);
   }
 
   @Override
   public boolean shouldParseEmbedded(Metadata metadata) {
+    String role = metadata.get(TikaCoreProperties.EMBEDDED_RESOURCE_TYPE);
+    String name = metadata.get(TikaCoreProperties.RESOURCE_NAME_KEY);
+    if (EmbeddedResourceType.THUMBNAIL.name().equals(role)
+        || (OfficeContentParser.isPackage(context) && name != null
+            && name.startsWith("/docProps/thumbnail."))) return false;
     requireAvailable();
     if (resources >= policy.maxEmbeddedResources()) fail("EMBEDDED_RESOURCE_LIMIT");
     if (depth >= policy.maxEmbeddedDepth()) fail("EMBEDDED_DEPTH_LIMIT");
@@ -52,7 +61,7 @@ final class EmbeddedResourceBudget implements EmbeddedDocumentExtractor {
   @Override
   public void parseEmbedded(InputStream input, ContentHandler handler, Metadata metadata,
       boolean outputHtml) throws IOException, SAXException {
-    shouldParseEmbedded(metadata);
+    if (!shouldParseEmbedded(metadata)) return;
     resources++;
     depth++;
     maxDepth = Math.max(maxDepth, depth);
@@ -79,7 +88,15 @@ final class EmbeddedResourceBudget implements EmbeddedDocumentExtractor {
         throw new SAXException("Malformed embedded container", malformed);
       }
       try (TikaInputStream bounded = TikaInputStream.get(spool)) {
-        delegate.parseEmbedded(bounded, handler, metadata, outputHtml);
+        // The delegate can recurse through this budget; restore its per-resource setting.
+        boolean writeName = delegate.isWriteFileNameToContent();
+        delegate.setWriteFileNameToContent(!EmbeddedResourceType.INLINE.name().equals(
+            metadata.get(TikaCoreProperties.EMBEDDED_RESOURCE_TYPE)));
+        try {
+          delegate.parseEmbedded(bounded, handler, metadata, outputHtml);
+        } finally {
+          delegate.setWriteFileNameToContent(writeName);
+        }
       }
       requireAvailable();
     } finally {
