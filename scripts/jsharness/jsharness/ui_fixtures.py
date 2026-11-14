@@ -1061,7 +1061,7 @@ async def install_fixtures(ctx, variant: str = "default", color_scheme: str = "d
     if not variant.startswith("first-use"):
         seed = WALKTHROUGH_SEED
         if variant == "agent-live":
-            seed = seed.replace("profiles: {}", "profiles: { default: { id: 'default', label: 'Default', userConfig: {}, activeThemeId: null, pinnedSearches: [], showDeveloperTools: true } }")
+            seed = seed.replace("profiles: {}", "profiles: { default: { id: 'default', label: 'Default', userConfig: { version: 1 }, activeThemeId: null, pinnedSearches: [], showDeveloperTools: true } }")
         await ctx.add_init_script(seed)
     # Variant-gated: only the record-bearing variants want a cold chat surface to auto-restore
     # the fixture conversation (`_thread_body`), so no other step's boot changes.
