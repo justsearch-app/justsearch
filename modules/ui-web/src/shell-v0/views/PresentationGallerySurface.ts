@@ -160,6 +160,7 @@ export class PresentationGallerySurface extends JfElement {
   static styles = [
     surfaceScrollLayoutStyles,
     css`
+      h2 { font-size: var(--font-size-lg); font-variation-settings: "opsz" 32; }
       .grid {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
@@ -182,7 +183,7 @@ export class PresentationGallerySurface extends JfElement {
       .swatch {
         background: var(--swatch-tint);
         block-size: 1.6rem;
-        border-radius: 0.3rem;
+        border-radius: 8px;
         border: 1px solid var(--border-subtle);
       }
       .card-name {
@@ -214,7 +215,7 @@ export class PresentationGallerySurface extends JfElement {
         background: var(--surface-1);
         color: var(--text-primary);
         border: 1px solid var(--border-subtle);
-        border-radius: 0.3rem;
+        border-radius: 8px;
       }
       .msg {
         font-size: var(--font-size-xs);

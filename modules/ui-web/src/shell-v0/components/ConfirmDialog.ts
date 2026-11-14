@@ -73,7 +73,7 @@ export class ConfirmDialog extends JfElement {
     dialog {
       box-sizing: border-box;
       border: 1px solid var(--border-subtle);
-      border-radius: 0.75rem;
+      border-radius: 14px;
       /* Keep the existing wide size (28rem content + borders), with a gap on narrow screens. */
       max-width: calc(28rem + 2px);
       width: calc(100% - 2rem);
@@ -156,7 +156,7 @@ export class ConfirmDialog extends JfElement {
       padding: 0.4rem 0.625rem;
       background: var(--surface-tertiary);
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       color: var(--text-primary);
       font-family: monospace;
       font-size: var(--font-size-sm);

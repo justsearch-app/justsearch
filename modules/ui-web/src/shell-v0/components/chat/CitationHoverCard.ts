@@ -60,7 +60,7 @@ export class CitationHoverCard extends JfElement {
       padding: 0.5rem 0.75rem;
       background: var(--surface-2);
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
       font-size: var(--font-size-sm);
       color: var(--text-primary);

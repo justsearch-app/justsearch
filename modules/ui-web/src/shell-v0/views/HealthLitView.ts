@@ -362,6 +362,7 @@ export class HealthLitView extends JfElement {
     .header h2 {
       margin: 0;
       font-size: var(--font-size-lg);
+      font-variation-settings: "opsz" 32;
       font-weight: 600;
     }
     .conn-badge {
@@ -407,7 +408,7 @@ export class HealthLitView extends JfElement {
     .occurrence-severity {
       font-size: var(--font-size-xs);
       padding: 0 0.25rem;
-      border-radius: 2px;
+      border-radius: 4px;
       align-self: center;
     }
     .occurrence-severity[data-severity='INFO'] {

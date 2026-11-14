@@ -241,6 +241,8 @@ val buildWeb by tasks.registering(conventions.NpmBuildTask::class) {
   scriptName.set("build")
   sourceFiles.from(
     uiWebDir.dir("src"),
+    uiWebDir.dir("public"),
+    uiWebDir.file("index.html"),
     uiWebDir.dir("scripts"),
     uiWebDir.file("package.json"),
     uiWebDir.file("package-lock.json"),
@@ -1593,7 +1595,7 @@ val verifySidecarLegalResources by tasks.registering {
   description = "Require the legal notices shipped alongside the headless Engine"
   val headlessDir = tauriHeadlessResourcesDir
   doLast {
-    listOf("LICENSE", "NOTICE", "THIRD_PARTY_NOTICES", "T3-CODE-NOTICE.md", "LUCIDE-LICENSE.txt")
+    listOf("LICENSE", "NOTICE", "THIRD_PARTY_NOTICES", "T3-CODE-NOTICE.md", "LUCIDE-LICENSE.txt", "INTER-LICENSE.txt")
         .forEach { name ->
           val legalNotice = headlessDir.asFile.resolve("legal/$name")
           if (!legalNotice.isFile) {
@@ -1620,6 +1622,9 @@ val bundleSidecarResources by tasks.registering(Sync::class) {
     rename { "T3-CODE-NOTICE.md" }
   }
   from(rootProject.layout.projectDirectory.file("packaging/legal/LUCIDE-LICENSE.txt")) {
+    into("legal")
+  }
+  from(rootProject.layout.projectDirectory.file("packaging/legal/INTER-LICENSE.txt")) {
     into("legal")
   }
   // Lane F stage A item A13: ONE classpath. The bundle used to carry the Engine's `lib/` plus a

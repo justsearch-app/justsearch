@@ -464,7 +464,7 @@ export class SettingsSurface extends JfElement {
     dialog.delete-dialog::backdrop { background: var(--frame-dialog-dim); }
     .delete-dialog .who { display: flex; align-items: center; gap: var(--jf-space-2); margin: 0; color: var(--text-secondary);
       font-size: var(--font-size-sm); }
-    .delete-dialog .title { margin: var(--jf-space-3) 0; color: var(--text-danger); font-size: var(--font-size-lg);
+    .delete-dialog .title { margin: var(--jf-space-3) 0; color: var(--text-danger); font-size: var(--font-size-lg); font-variation-settings: "opsz" 32;
       font-weight: var(--jf-weight-medium); }
     .delete-dialog .consequences { margin: 0; padding: 0; list-style: none; }
     .delete-dialog .consequences li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--jf-space-3);
@@ -489,7 +489,7 @@ export class SettingsSurface extends JfElement {
       display: flex;
       flex-direction: column;
       color: var(--text-primary);
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: var(--font-native);
     }
     .settings-shell {
       flex: 1;
@@ -547,7 +547,8 @@ export class SettingsSurface extends JfElement {
     }
     .header h2 {
       margin: 0;
-      font-size: var(--font-size-lg);
+      font-size: var(--font-size-headline);
+      font-variation-settings: "opsz" 32;
       font-weight: 600;
     }
     .header .subtitle {
@@ -564,7 +565,7 @@ export class SettingsSurface extends JfElement {
       background: var(--surface-primary);
       color: var(--text-primary);
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       padding: 0.4rem 0.75rem;
       cursor: pointer;
       font-size: var(--font-size-sm);
@@ -676,7 +677,7 @@ export class SettingsSurface extends JfElement {
       gap: 0.25rem;
       padding: 0.25rem 0.5rem;
       border: none;
-      border-radius: 0.375rem;
+      border-radius: 8px;
       background: transparent;
       color: var(--text-link);
       font-family: inherit;
@@ -693,7 +694,7 @@ export class SettingsSurface extends JfElement {
       align-items: center;
       padding: 0.75rem;
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       background: transparent;
       color: var(--text-primary);
       cursor: pointer;
@@ -735,7 +736,7 @@ export class SettingsSurface extends JfElement {
       height: 3.5rem;
       padding: 0;
       border: 1px solid var(--border-subtle);
-      border-radius: 0.75rem;
+      border-radius: 14px;
       background: var(--surface-tertiary);
       cursor: pointer;
       position: relative;
@@ -778,7 +779,7 @@ export class SettingsSurface extends JfElement {
       bottom: 0;
       width: 62%;
       height: 62%;
-      border-top-left-radius: 0.625rem;
+      border-top-left-radius: 8px;
     }
     .theme-tile-neutral {
       display: flex;
@@ -817,7 +818,7 @@ export class SettingsSurface extends JfElement {
       width: 100%;
       padding: 0.375rem;
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
     }
     .theme-rename-input {
       flex: 1;
@@ -843,7 +844,7 @@ export class SettingsSurface extends JfElement {
       background: var(--surface-tertiary);
       color: var(--text-primary);
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       font-family: var(--font-mono);
       font-size: var(--font-size-xs);
       resize: vertical;
@@ -907,7 +908,7 @@ export class SettingsSurface extends JfElement {
       gap: 0.75rem;
       padding: 0.5rem 0.75rem;
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       align-items: flex-start;
       justify-content: space-between;
     }
@@ -943,7 +944,7 @@ export class SettingsSurface extends JfElement {
     :host .follow-os-action { margin-left: 0.5rem; }
     :host .empty-help { margin: 0; }
     :host .plugin-install-row { margin-top: 0.75rem; display: flex; gap: 0.5rem; align-items: center; }
-    :host .plugin-install-input { flex: 1; padding: 0.4rem 0.625rem; background: var(--surface-secondary); border: 1px solid var(--border-subtle); border-radius: 0.375rem; color: var(--text-primary); font-size: var(--font-size-sm); }
+    :host .plugin-install-input { flex: 1; padding: 0.4rem 0.625rem; background: var(--surface-secondary); border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-primary); font-size: var(--font-size-sm); }
     :host .warning-text { color: var(--text-warning); }
     :host .help-start { margin-top: 0; }
     :host .spaced-content { margin-top: 0.75rem; }

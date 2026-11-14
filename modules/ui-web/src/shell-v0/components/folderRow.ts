@@ -70,8 +70,8 @@ export const folderRowStyles = css`
     font-size: var(--font-size-xs); max-width: 24rem; color: var(--text-secondary); overflow-wrap: anywhere; }
   .files-found { color: var(--text-secondary); font-size: var(--font-size-xs); text-align: end; }
   .folder-progress { width: 7rem; height: 3px; border: 0; accent-color: var(--accent-tint); }
-  .folder-progress::-webkit-progress-bar { background: var(--border-subtle); border-radius: 2px; }
-  .folder-progress::-webkit-progress-value { background: var(--accent-tint); border-radius: 2px; }
+  .folder-progress::-webkit-progress-bar { background: var(--border-subtle); border-radius: 4px; }
+  .folder-progress::-webkit-progress-value { background: var(--accent-tint); border-radius: 4px; }
   .folder-details { margin: .8rem 0 .35rem 3.8rem; display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: .4rem 1rem; }
   .folder-details[hidden] { display: none; }

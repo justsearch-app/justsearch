@@ -83,7 +83,7 @@ export class ConversationHistory extends JfElement {
       overflow-y: auto;
       background: var(--surface-2);
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
       padding: 0.25rem 0;
     }

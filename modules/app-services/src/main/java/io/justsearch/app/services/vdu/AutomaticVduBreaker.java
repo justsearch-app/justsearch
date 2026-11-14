@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
  * llama-server for picture reading and completed no document.
  *
  * <p>A pass counts when every document attempt was refused by generation ({@link Cause#REFUSED})
- * or when the vision entry itself failed ({@link Cause#ENTRY_FAILED}). A pass that completes or
+ * or when the vision entry itself failed or its server stopped ({@link Cause#ENTRY_FAILED}). A pass that completes or
  * fails at least one document resets the count; a pass that was cancelled, interrupted by activity,
  * deferred before entry or had nothing to do neither counts nor resets. After {@link #OPEN_AFTER}
  * counted passes in a row the breaker opens: no automatic pass starts, so llama-server is not
@@ -45,7 +45,10 @@ public final class AutomaticVduBreaker {
      * or settings recovery), so every document attempt was turned away.
      */
     REFUSED(VduCapabilityState.REASON_BREAKER_OPEN_REFUSED),
-    /** Launched or relaunched llama-server for picture reading, but the vision entry failed. */
+    /**
+     * Launched or relaunched llama-server for picture reading, but the vision entry failed or the
+     * server stopped before a document finished.
+     */
     ENTRY_FAILED(VduCapabilityState.REASON_BREAKER_OPEN_ENTRY_FAILED);
 
     private final String reasonCode;
@@ -182,12 +185,19 @@ public final class AutomaticVduBreaker {
     return new Result.Neutral();
   }
 
-  /** Classifies a pass that ended with a failure: only a failed vision entry counts. */
+  /**
+   * Classifies a pass that ended with a failure: a failed vision entry and a picture-reading
+   * server that stopped before any document finished count; a stop after one finished is progress.
+   */
   public static Result classify(Throwable failure, String detail) {
     var seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
     for (Throwable current = failure; current != null && seen.add(current); current = current.getCause()) {
       if (current instanceof java.util.concurrent.CancellationException) return new Result.Neutral();
-      if (VduBatchProcessor.isEntryFailure(current)) {
+      if (current instanceof VduProcessor.VisionServerLost lost && lost.finished() > 0) {
+        return new Result.Progress();
+      }
+      if (VduBatchProcessor.isEntryFailure(current)
+          || current instanceof VduProcessor.VisionServerLost) {
         return new Result.Counted(Cause.ENTRY_FAILED, detail);
       }
     }
@@ -215,7 +225,7 @@ public final class AutomaticVduBreaker {
     String what = cause == Cause.REFUSED
         ? "the Engine held generation closed (a settings change in progress or settings recovery),"
             + " so every document was turned away"
-        : "picture-reading mode could not be entered";
+        : "picture-reading mode could not be entered or its server stopped";
     String next = nextTry();
     return "Automatic picture reading is paused after " + OPEN_AFTER
         + " automatic passes in a row made no progress: " + what + seen

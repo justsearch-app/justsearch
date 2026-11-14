@@ -135,7 +135,8 @@ export class BrowseSurface extends JfElement {
     }
     .header h2 {
       margin: 0;
-      font-size: var(--font-size-md);
+      font-size: var(--font-size-headline);
+      font-variation-settings: "opsz" 32;
       font-weight: 600;
       display: flex;
       align-items: center;
@@ -158,7 +159,7 @@ export class BrowseSurface extends JfElement {
       padding: 0.4rem 0.625rem 0.4rem 2rem;
       background: var(--surface-secondary);
       border: 1px solid var(--border-subtle);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       color: var(--text-primary);
       font-size: var(--font-size-sm);
     }

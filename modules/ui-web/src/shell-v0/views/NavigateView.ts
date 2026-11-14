@@ -93,7 +93,7 @@ export class NavigateView extends JfElement {
       gap: 0.75rem;
       box-sizing: border-box;
       color: var(--text-primary);
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: var(--font-native);
     }
     .header {
       font-size: var(--font-size-sm);
@@ -116,7 +116,7 @@ export class NavigateView extends JfElement {
       padding: 0.5rem 0.75rem;
       background: var(--accent-danger-08);
       border: 1px solid var(--accent-danger-30);
-      border-radius: 0.375rem;
+      border-radius: 8px;
       color: var(--text-danger);
       font-size: var(--font-size-sm);
     }

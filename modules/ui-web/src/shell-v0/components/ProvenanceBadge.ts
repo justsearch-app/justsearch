@@ -65,7 +65,7 @@ export class ProvenanceBadge extends JfElement {
       color: var(--text-warning);
       border: 1px solid var(--accent-warning-45);
       font-size: var(--font-size-xs);
-      font-family: system-ui, -apple-system, sans-serif;
+      font-family: var(--font-native);
       user-select: none;
       pointer-events: auto;
       /* Tempdoc 567 §9.4 — respect solid surface mode (--glass-blur-scale:0 zeroes the blur). */

@@ -977,6 +977,9 @@ public final class ChatServerControllerImpl
               || bulkPressure() != PressureSignal.NONE;
         }
       }
+      @Override public boolean serverLost() throws InterruptedException {
+        return actuator.vduServerLost();
+      }
       @Override public void close() {
         if (closed.compareAndSet(false, true)) finishAutomaticVdu(pass, null);
       }
@@ -1340,6 +1343,11 @@ public final class ChatServerControllerImpl
       synchronized (monitor) {
         return desired.terminal() != null || loopEnded;
       }
+    }
+
+    @Override
+    public boolean serverLost() throws InterruptedException {
+      return actuator.vduServerLost();
     }
   }
 

@@ -138,7 +138,7 @@ export const whyThisResultStyles: CSSResult = css`
   .hit-why-signal {
     padding: 0.1rem 0.5rem;
     border: 1px solid var(--border-subtle);
-    border-radius: 1rem;
+    border-radius: 14px;
     background: var(--surface-2);
     white-space: nowrap;
   }

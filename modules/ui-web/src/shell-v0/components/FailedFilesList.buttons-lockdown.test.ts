@@ -69,6 +69,6 @@ it.each(['light','dark','forced'] as const)('L12 failed-file Cancel/Retry use co
       expect(await action.evaluate(el=>{const r=el.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&el.scrollWidth<=el.clientWidth;})).toBe(true);
     }
     expect(await page.getByRole('button',{name:'Other action'}).evaluate(el=>({font:getComputedStyle(el).fontSize,padding:getComputedStyle(el).padding})))
-      .toEqual({font:'16px',padding:'8px 16px'});
+      .toEqual({font:'13px',padding:'8px 16px'});
   } finally {await page.close();}
 },30_000);

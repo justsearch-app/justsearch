@@ -118,6 +118,11 @@ function renderThirdParty(jvm, npm, models, native, cargo = []) {
   L.push('== Rust / Cargo (desktop shell) dependencies ==');
   for (const d of cargo) L.push(`  ${d.name} ${d.version} — ${d.license}`);
   L.push('');
+  L.push('== Bundled fonts ==');
+  L.push('  Inter 4.1 — SIL Open Font License 1.1 — https://github.com/rsms/inter/releases/tag/v4.1');
+  L.push('  Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)');
+  L.push('  Full licence: legal/INTER-LICENSE.txt (web: fonts/OFL.txt)');
+  L.push('');
   L.push('== Bundled ML models ==');
   for (const m of models) L.push(`  ${m.label} (${m.id}) — ${m.license} — ${m.termsUrl}`);
   L.push('');
@@ -282,6 +287,15 @@ function nativeDispositionCheck(native = loadNative(), ledger = readJson(NATIVE_
 // --- Presence checks (the closure half) --------------------------------------
 function presenceChecks() {
   const errors = [];
+  const interLicense = join(REPO_ROOT, 'modules/ui-web/public/fonts/OFL.txt');
+  const packagedInterLicense = join(REPO_ROOT, 'packaging/legal/INTER-LICENSE.txt');
+  for (const file of [interLicense, packagedInterLicense]) {
+    if (!existsSync(file)) errors.push(`missing Inter licence: ${file}`);
+  }
+  if (existsSync(interLicense) && existsSync(packagedInterLicense)
+      && readFileSync(interLicense, 'utf8') !== readFileSync(packagedInterLicense, 'utf8')) {
+    errors.push('packaged Inter licence differs from the shipped font licence');
+  }
   // 1. every model package declares a license
   const reg = readJson(REGISTRY_PROD);
   for (const p of reg.packages || []) {

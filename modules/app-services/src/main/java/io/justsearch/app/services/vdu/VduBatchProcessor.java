@@ -291,6 +291,20 @@ public class VduBatchProcessor {
                         ? BlockReason.ACTIVITY_OR_ENERGY : BlockReason.PICTURE_READING_OFF;
                         break;
                     }
+                    if (!(failure instanceof VduProcessor.DocumentFailure) && visionServerLost()) {
+                        // The server crashed under this document: the engine failed, not the
+                        // document. Its claim goes back to PENDING with the attempt refunded, and
+                        // the pass ends as an engine failure the automatic-pass breaker paces.
+                        LOG.warn("VDU pass ended at {}: the picture-reading server stopped", docId, failure);
+                        var lost = new VduProcessor.VisionServerLost(
+                            VISION_SERVER_LOST_MESSAGE, processed + failed, failure);
+                        if (!knowledgeClient.releaseVduProcessing(docId, attemptId, engineContext)) {
+                            lost.addSuppressed(new IllegalStateException(
+                                "VDU release was not acknowledged by the index"));
+                        }
+                        vduCapabilityState.block(VduCapabilityState.REASON_AI_OFFLINE, rootMessage(failure));
+                        throw lost;
+                    }
                     if (io.justsearch.app.api.chat.GenerationUnavailableException.causedBy(failure)) {
                         // Chat is draining, starting or stopping: the same outcome as AI being
                         // offline. Not this document's failure; the selected unit stays remaining.
@@ -377,6 +391,18 @@ public class VduBatchProcessor {
     /** The chat controller's holds the processor enters VDU mode through, or {@code null}. */
     io.justsearch.app.inference.chat.ChatHolds chatHolds() {
         return vduProcessor.chatHolds();
+    }
+
+    /** The message of the failure a pass ends with when its picture-reading server stopped. */
+    static final String VISION_SERVER_LOST_MESSAGE = "The picture-reading server stopped";
+
+    private boolean visionServerLost() {
+        try {
+            return vduProcessor.visionServerLost();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new CancellationException("VDU pass interrupted");
+        }
     }
 
     /** The message of the failure a pass ends with when entering VDU mode failed. */

@@ -8,11 +8,14 @@ import io.justsearch.agent.api.registry.OperationRecordHandle;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.app.api.BrainRuntimeService;
 import io.justsearch.app.api.OfflineProcessingOutcome;
+import io.justsearch.app.api.chat.ChatRefusal;
+import io.justsearch.app.api.chat.RefusalReason;
 import io.justsearch.core.context.EngineContext;
 import io.justsearch.core.execution.EngineFutures;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletionException;
 import java.util.function.Supplier;
 
 /** Records one captured enrichment pass through actual procedure and ownership cleanup. */
@@ -43,7 +46,7 @@ public final class TriggerOfflineProcessingHandler implements OperationHandler {
         return OperationExecution.finished(result(immediate));
       }
       return new OperationExecution(OperationResult.success("Enrichment pass started", Map.of()),
-          completion.thenApply(TriggerOfflineProcessingHandler::result));
+          completion.handle(TriggerOfflineProcessingHandler::finished));
     } catch (RuntimeException failure) {
       EngineFutures.rethrowCancellation(failure);
       EngineFutures.rethrowExecutorRefusal(failure);
@@ -52,6 +55,26 @@ public final class TriggerOfflineProcessingHandler implements OperationHandler {
           "Unable to start enrichment: " + failure.getMessage(),
           "ENRICHMENT_START_FAILED", Map.of(), true));
     }
+  }
+
+  /** A pass refused because chat is FAILED is a typed outcome; other failures stay failures. */
+  private static OperationResult finished(OfflineProcessingOutcome outcome, Throwable failure) {
+    if (failure == null) return result(outcome);
+    if (chatFailed(failure)) {
+      return OperationResult.failure(
+          "Picture reading needs the AI, which has failed; activate AI and run it again",
+          "CHAT_FAILED", Map.of(), false);
+    }
+    throw failure instanceof CompletionException completion ? completion
+        : new CompletionException(failure);
+  }
+
+  private static boolean chatFailed(Throwable failure) {
+    var seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Throwable, Boolean>());
+    for (Throwable current = failure; current != null && seen.add(current); current = current.getCause()) {
+      if (current instanceof ChatRefusal refusal && refusal.reason() == RefusalReason.FAILED) return true;
+    }
+    return false;
   }
 
   private static OperationResult result(OfflineProcessingOutcome outcome) {

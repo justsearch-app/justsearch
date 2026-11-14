@@ -125,7 +125,7 @@ export class EngineLossTreatment extends JfElement {
       color: var(--text-danger);
     }
     :host([mode='band']) .mark { display: none; }
-    h2 { margin: 0; font-size: var(--font-size-xl); font-weight: var(--jf-weight-medium, 500); overflow-wrap: anywhere; }
+    h2 { margin: 0; font-size: var(--font-size-xl); font-variation-settings: "opsz" 32; font-weight: var(--jf-weight-medium, 500); overflow-wrap: anywhere; }
     :host([mode='band']) h2 { font-size: var(--font-size-md); }
     p { margin: var(--jf-space-2) 0 0; color: var(--text-secondary); line-height: 1.5; overflow-wrap: anywhere; }
     :host([mode='band']) p { margin: 0; }

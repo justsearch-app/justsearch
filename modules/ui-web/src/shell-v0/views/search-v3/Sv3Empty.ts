@@ -78,7 +78,7 @@ export class Sv3Empty extends JfElement {
         pointer-events: none;
         position: absolute;
         inset: 0;
-        border-radius: calc(var(--radius-md) - 1px);
+        border-radius: var(--radius-md);
         box-shadow: var(--empty-tile-edge);
       }
       /* Individual transform properties rather than the shorthand: the spec composes translate,
@@ -106,6 +106,7 @@ export class Sv3Empty extends JfElement {
 
       .title {
         font-size: var(--font-size-sv3-xl);
+        font-variation-settings: "opsz" 32;
         font-weight: 600;
       }
       /* Only ever the gap AFTER a title — a description standing alone owns its own position. */

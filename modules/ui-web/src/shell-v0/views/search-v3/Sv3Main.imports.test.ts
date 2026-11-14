@@ -280,7 +280,7 @@ const MD_PROSE = [
 ] as const;
 
 /** The shipped ramp steps the variant's headings read directly — h1/h2/h3 (h4-h6 take `-sm`). */
-const MD_PROSE_RAMP = ['--font-size-xl', '--font-size-lg', '--font-size-md'] as const;
+const MD_PROSE_RAMP = ['--font-size-xl', '--font-size-md', '--font-size-sm'] as const;
 
 /**
  * The citation mark's own vocabulary (tempdoc 822 citation-mark presentation §5.2/§5.3). Unlike the
@@ -411,7 +411,7 @@ describe('the three imported components read NO token the window leaves unbridge
     // numbers, or they read a token this bridge has already re-pointed one line above.
     const KEEPS_VARIANT: Readonly<Record<string, string>> = {
       '--md-heading-weight':
-        'the variant default (700 since tempdoc 873 §2) is the value this window wants, and it is ' +
+        'the variant default (500 since slice 2b) is the value this window wants, and it is ' +
         'wanted on every prose surface — re-pointing it here would fork one window off the shared ' +
         'decision instead of carrying it',
       '--md-heading-line-height': 'the variant default (1.3) is already the spec value',
@@ -446,38 +446,25 @@ describe('the three imported components read NO token the window leaves unbridge
     // The spec's scale IS this window's ramp, step for step, which is why no
     // rem literal of the spec's is copied into the shared renderer (design §2.1).
     expect(scope.get('--font-size-xl')).toBe('var(--font-size-sv3-xl)');
-    expect(scope.get('--font-size-lg')).toBe('var(--font-size-sv3-lg)');
+    expect(scope.get('--font-size-sm')).toBe('var(--font-size-sv3-sm)');
     expect(scope.get('--font-size-md')).toBe('var(--font-size-sv3-base)');
     expect(TOKENS.get('--font-size-sv3-xl')).toBe('1.25rem'); //   spec h1
-    expect(TOKENS.get('--font-size-sv3-lg')).toBe('1.125rem'); //  spec h2
-    expect(TOKENS.get('--font-size-sv3-base')).toBe('1rem'); //    spec h3
+    expect(TOKENS.get('--font-size-sv3-base')).toBe('15px'); //    h2
+    expect(TOKENS.get('--font-size-sv3-sm')).toBe('13px'); //      h3-h6
   });
 
-  it('lifts the answer prose to 15px WITHOUT dragging the window ramp with it (873 §4)', () => {
-    // Tempdoc 873 §4. `--font-size-sm` is the ONE name that carries both halves of the body-size
-    // change: the renderer's `:host` reads it for the block's own `font-size`, and the variant's
-    // h4-h6 read it too. So this single re-point lifts body text off 14px and, in the same move,
-    // stops the ramp's bottom step from landing BELOW the body it leads — h4-h6 sit AT body size,
-    // distinguished by weight, which is what that step has always meant.
+  it('keeps answer prose at 15px and document headings on their own ramp', () => {
     const prose = bridgeFor(MAIN, '\\.sv3-markdown');
-    expect(prose.get('--font-size-sm')).toBe('0.9375rem');
-
-    // The containment half, and the reason this is not just "make the chat bigger": the window's
-    // own ramp step is untouched, so every OTHER surface — tool cards, the reasoning trace, the
-    // sources panel, the hover card — stays at 14px. A future edit that lifted the token instead
-    // of the bridge would pass the line above and fail this one.
-    expect(TOKENS.get('--font-size-sv3-sm')).toBe('0.875rem');
+    expect(MAIN.match(/\.sv3-markdown\s*\{([^}]+)\}/)?.[1]).toContain('font-size: var(--font-size-sv3-base)');
+    expect(prose.get('--font-size-sm')).toBe('var(--font-size-sv3-sm)');
+    expect(TOKENS.get('--font-size-sv3-sm')).toBe('13px');
     for (const tag of ['jf-tool-call-card', 'jf-reasoning-block', 'jf-citation-hover-card']) {
       expect(bridgeFor(MAIN, tag).get('--font-size-sm'), tag).toBe('var(--font-size-sv3-sm)');
     }
-    // …and the shared colour/size bridge (which `.sv3-citations` rides) still carries the 14px
-    // step: the re-point lives in the `.sv3-markdown`-only rule, which is later and therefore wins
-    // for the answer prose alone.
     expect(bridgeFor(MAIN, '\\.sv3-citations').get('--font-size-sm')).toBe(
       'var(--font-size-sv3-sm)',
     );
   });
-
 
   it('caps the answer column at the spec measure, on the window and not in the renderer', () => {
     // Tempdoc 822 §2.5 — the measure is the COLUMN's property; the shipped chat sets it on its own
@@ -573,7 +560,7 @@ const CITE_BRIDGE: Readonly<Record<string, string>> = {
   '--md-cite-region-bg': 'var(--sv3-selected-region)',
   '--md-cite-pad-x-rest': '0.25em',
   '--md-cite-pad-x': '0.25em',
-  '--md-cite-radius': '0.25em',
+  '--md-cite-radius': '4px',
   '--md-cite-region-pad-x': '0.25em',
   '--md-cite-region-inset-x': '-0.25em',
   '--cp-selected-region': 'var(--sv3-selected-region)',
@@ -612,7 +599,7 @@ describe('the citation-selection bridge exists and points at the window\'s own m
   it('resolves every bridged colour through the token sheet in BOTH themes', () => {
     // A `--sv3-*` target that does not exist would leave the property invalid-at-computed-value and
     // the rule would paint its fallback — the silent revert again, one layer down.
-    const colours = Object.keys(CITE_BRIDGE).filter((n) => !CITE_BRIDGE[n]?.endsWith('em'));
+    const colours = Object.keys(CITE_BRIDGE).filter((n) => !/(?:em|px)$/.test(CITE_BRIDGE[n] ?? ''));
     for (const theme of ['dark', 'light'] as const) {
       const themed = themeScope(theme, scope);
       for (const name of colours) {
