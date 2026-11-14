@@ -119,6 +119,8 @@ function cleanSnippet(text: string, path: string): string {
       .replace(/(\*\*|__)(.*?)\1/g, '$2')
       .replace(/(\*|_)([^\n]*?)\1/g, '$2')
       .replace(/^\s*[-:| ]+\|[-:| ]*$/gm, '')
+      // Thematic breaks, incl. StructuredDocument.appendPageBreak's "---" between pages; snippets may flatten lines.
+      .replace(/(^|\s)-{3,}(?=\s|$)/g, '$1')
       .replace(/\|/g, ' ');
   }
   return clean.replace(/\s+/g, ' ').trim();
