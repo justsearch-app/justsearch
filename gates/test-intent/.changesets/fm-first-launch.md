@@ -48,8 +48,8 @@ never licenses an expected-value change.
 The six wholly new tests are not items in these entries:
 `chrome/FirstMinutes.app-lockdown.test.ts`, `state/FirstMinutes.reading.test.ts`,
 `views/HelpSurface.firstMinutes.test.ts`,
-`views/search-v3/FirstMinutes.availability.test.ts`,
-`views/search-v3/FirstMinutes.test.ts` (all under
+`views/search-v3/first-minutes/FirstMinutes.availability.test.ts`,
+`views/search-v3/first-minutes/FirstMinutes.test.ts` (all under
 `modules/ui-web/src/shell-v0/`), and
 `modules/ui-web/src/utils/folderPicker.firstMinutes.test.ts`.
 Per-entry file/test pointers identify actual assertions read in them and delimit
@@ -910,7 +910,7 @@ Repair follow-through (current bounded assignment, 2026-11-14): the count lifeti
           "reason": "R7/D3/C3 gate new mode offers on known installed/live CUDA readiness; D4 gates Structured/Delegate on developer tools. The new fixture supplies those prerequisites; it does not derive expected output from the candidate."
         }
       ],
-      "checkLimits": "Accepted structured output, incompatibility, transport/stream failure and request assertions are unchanged. Preconditions changed, so this is not claimed as an Adaptation retaining every old input. The fixture no longer covers offering those modes without known install/CUDA/developer state. Fixture cleanup is restored: reset AI/install observations and restore the previous developer preference after removing views. The touched and full unit suites pass. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.availability.test.ts#S4-14 developer tools reveal Structured/Delegate only with answers available checks positive mode visibility; its uninstalled, unknown-install, no-cuda, unknown-gpu, stale, off, failed and loading cases check that no new Ask is offered. Those checks do not prove this suite leaves no state behind."
+      "checkLimits": "Accepted structured output, incompatibility, transport/stream failure and request assertions are unchanged. Preconditions changed, so this is not claimed as an Adaptation retaining every old input. The fixture no longer covers offering those modes without known install/CUDA/developer state. Fixture cleanup is restored: reset AI/install observations and restore the previous developer preference after removing views. The touched and full unit suites pass. modules/ui-web/src/shell-v0/views/search-v3/first-minutes/FirstMinutes.availability.test.ts#S4-14 developer tools reveal Structured/Delegate only with answers available checks positive mode visibility; its uninstalled, unknown-install, no-cuda, unknown-gpu, stale, off, failed and loading cases check that no new Ask is offered. Those checks do not prove this suite leaves no state behind."
     },
     {
       "items": [
@@ -1052,7 +1052,7 @@ Repair follow-through (current bounded assignment, 2026-11-14): the count lifeti
           "reason": "D4/D5 and C1 distinguish a new-mode offer from an existing conversational task, keeping Ask controls while Search loses send/effort."
         }
       ],
-      "checkLimits": "The corpus-navigation boundary check is deleted without a replacement Library-navigation assertion in this file. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.test.ts#S4-3 native first-launch selection adds once immediately, without confirmation and #S4-20 Library selection still requires confirmation and keeps Collection cover adding/confirmation rather than that retired navigation. Direct tier assignment bypasses availability entry routes; it preserves downstream control checks only. No new mode-offer claim follows from it."
+      "checkLimits": "The corpus-navigation boundary check is deleted without a replacement Library-navigation assertion in this file. modules/ui-web/src/shell-v0/views/search-v3/first-minutes/FirstMinutes.test.ts#S4-3 native first-launch selection adds once immediately, without confirmation and #S4-20 Library selection still requires confirmation and keeps Collection cover adding/confirmation rather than that retired navigation. Direct tier assignment bypasses availability entry routes; it preserves downstream control checks only. No new mode-offer claim follows from it."
     },
     {
       "items": [
@@ -1744,7 +1744,7 @@ Repair follow-through (current bounded assignment, 2026-11-14): the count lifeti
           "reason": "H4/D5 separate draft editing from submitted search state. Alpha remains the last submitted query when no new search is requested; this is a derived consequence of explicit-submit behavior, not a request to label alpha as results of the empty draft."
         }
       ],
-      "checkLimits": "Changed oracle: preserving alpha results on a cleared unsubmitted draft replaces the former cancellation/empty-results assertion; it does not verify every stale-result/draft distinction or new-query label. chatUnavailable explicitly documents unavailable chat with CUDA; true no-CUDA gating stays in FirstMinutes.availability.test.ts. Teardown resets AI/install state and restores the prior developer preference; full and touched unit runs pass. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.test.ts#S4-13 Search has a magnifier and headline label, with no prompt, send or effort checks replacement anatomy/name; #S4-13 newlines are stopped in Search, modifier chords never silently Delegate; restored drafts survive checks preserved multiline drafts and ignored modifier/IME Enter events (it does not actually paste or assert newlines cannot enter); #S4-14 restored ask always offers Search without discarding draft/schema checks existing-mode recovery. FirstMinutes.availability.test.ts covers true no-CUDA/uninstalled/unknown gating. FirstMinutes.app-lockdown.test.ts now uses native clipboard paste and requires newlines to become spaces without dispatch; a restored multiline draft keeps its exact bytes and fits its existing bounded geometry. The restored legacy multiline case is not claimed to be a newly typed single-line draft."
+      "checkLimits": "Changed oracle: preserving alpha results on a cleared unsubmitted draft replaces the former cancellation/empty-results assertion; it does not verify every stale-result/draft distinction or new-query label. chatUnavailable explicitly documents unavailable chat with CUDA; true no-CUDA gating stays in FirstMinutes.availability.test.ts. Teardown resets AI/install state and restores the prior developer preference; full and touched unit runs pass. modules/ui-web/src/shell-v0/views/search-v3/first-minutes/FirstMinutes.test.ts#S4-13 Search has a magnifier and headline label, with no prompt, send or effort checks replacement anatomy/name; #S4-13 newlines are stopped in Search, modifier chords never silently Delegate; restored drafts survive checks preserved multiline drafts and ignored modifier/IME Enter events (it does not actually paste or assert newlines cannot enter); #S4-14 restored ask always offers Search without discarding draft/schema checks existing-mode recovery. FirstMinutes.availability.test.ts covers true no-CUDA/uninstalled/unknown gating. FirstMinutes.app-lockdown.test.ts now uses native clipboard paste and requires newlines to become spaces without dispatch; a restored multiline draft keeps its exact bytes and fits its existing bounded geometry. The restored legacy multiline case is not claimed to be a newly typed single-line draft."
     },
     {
       "items": [
@@ -2007,7 +2007,7 @@ Repair follow-through (current bounded assignment, 2026-11-14): the count lifeti
           "reason": "R7/D3/C3 gate new mode offers on known installed/live CUDA readiness; D4 gates Structured/Delegate on developer tools. The new fixture supplies those prerequisites; it does not derive expected output from the candidate."
         }
       ],
-      "checkLimits": "The chat-unavailable case also restores install/developer flags after reset, without feeding live CUDA/chat availability; its schema/instruction retention and zero-dispatch assertions remain. The fixture still exercises unavailable chat, not a new successful Ask offer. Preconditions changed, so this is not claimed as an Adaptation retaining every old input. The fixture no longer covers offering those modes without known install/CUDA/developer state. Fixture cleanup is restored: reset AI/install observations and restore the previous developer preference after removing views. The touched and full unit suites pass. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.availability.test.ts#S4-14 developer tools reveal Structured/Delegate only with answers available checks positive mode visibility; its uninstalled, unknown-install, no-cuda, unknown-gpu, stale, off, failed and loading cases check that no new Ask is offered. Those checks do not prove this suite leaves no state behind. Structured extraction uses its surviving pointer send and requires the send control; the schema-field modifier-key check remains."
+      "checkLimits": "The chat-unavailable case also restores install/developer flags after reset, without feeding live CUDA/chat availability; its schema/instruction retention and zero-dispatch assertions remain. The fixture still exercises unavailable chat, not a new successful Ask offer. Preconditions changed, so this is not claimed as an Adaptation retaining every old input. The fixture no longer covers offering those modes without known install/CUDA/developer state. Fixture cleanup is restored: reset AI/install observations and restore the previous developer preference after removing views. The touched and full unit suites pass. modules/ui-web/src/shell-v0/views/search-v3/first-minutes/FirstMinutes.availability.test.ts#S4-14 developer tools reveal Structured/Delegate only with answers available checks positive mode visibility; its uninstalled, unknown-install, no-cuda, unknown-gpu, stale, off, failed and loading cases check that no new Ask is offered. Those checks do not prove this suite leaves no state behind. Structured extraction uses its surviving pointer send and requires the send control; the schema-field modifier-key check remains."
     },
     {
       "items": [
@@ -2071,7 +2071,7 @@ Repair follow-through (current bounded assignment, 2026-11-14): the count lifeti
           "reason": "R7/D3/C3 gate new mode offers on known installed/live CUDA readiness; D4 gates Structured/Delegate on developer tools. The new fixture supplies those prerequisites; it does not derive expected output from the candidate."
         }
       ],
-      "checkLimits": "Structured partial/terminal outcome and extraction-scope assertions are unchanged. Preconditions changed, so this is not claimed as an Adaptation retaining every old input. The fixture no longer covers offering those modes without known install/CUDA/developer state. Fixture cleanup is restored: reset AI/install observations and restore the previous developer preference after removing views. The touched and full unit suites pass. modules/ui-web/src/shell-v0/views/search-v3/FirstMinutes.availability.test.ts#S4-14 developer tools reveal Structured/Delegate only with answers available checks positive mode visibility; its uninstalled, unknown-install, no-cuda, unknown-gpu, stale, off, failed and loading cases check that no new Ask is offered. Those checks do not prove this suite leaves no state behind."
+      "checkLimits": "Structured partial/terminal outcome and extraction-scope assertions are unchanged. Preconditions changed, so this is not claimed as an Adaptation retaining every old input. The fixture no longer covers offering those modes without known install/CUDA/developer state. Fixture cleanup is restored: reset AI/install observations and restore the previous developer preference after removing views. The touched and full unit suites pass. modules/ui-web/src/shell-v0/views/search-v3/first-minutes/FirstMinutes.availability.test.ts#S4-14 developer tools reveal Structured/Delegate only with answers available checks positive mode visibility; its uninstalled, unknown-install, no-cuda, unknown-gpu, stale, off, failed and loading cases check that no new Ask is offered. Those checks do not prove this suite leaves no state behind."
     },
     {
       "items": [
@@ -2462,3 +2462,14 @@ Repair follow-through (current bounded assignment, 2026-11-14): the count lifeti
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1da53-8955-7bf1-8814-740622723e23",
+  "verdict": "reject",
+  "digest": "sha256:62d4a740e28e43503eb0b391c1afe9efc2d9bac37a5531c51135026c5b30397b",
+  "note": "FirstMinutes.availability.test.ts and FirstMinutes.test.ts are not isolated: existing SearchV3View.honesty.test.ts, SearchV3View.ask.test.ts and sv3-sessions.test.ts read them as source-scan inputs. They need full test-intent entries or relocation outside those scan domains; do not weaken the scanners."
+}
+```

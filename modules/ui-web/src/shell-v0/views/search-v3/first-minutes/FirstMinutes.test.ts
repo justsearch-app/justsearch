@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { Sv3Composer } from './Sv3Composer.js';
-import { setFirstUseRoots } from '../../state/firstUse.js';
-import { __resetAiStateForTest } from '../../state/aiStateStore.js';
-import { setShowDeveloperTools } from '../../state/developerToolsState.js';
-import { FolderAddFlow, emptyFolderAddState } from '../../controllers/FolderAddFlow.js';
-import type { PluginHostApi } from '../../plugin-api/plugin-types.js';
+import { Sv3Composer } from '../Sv3Composer.js';
+import { setFirstUseRoots } from '../../../state/firstUse.js';
+import { __resetAiStateForTest } from '../../../state/aiStateStore.js';
+import { setShowDeveloperTools } from '../../../state/developerToolsState.js';
+import { FolderAddFlow, emptyFolderAddState } from '../../../controllers/FolderAddFlow.js';
+import type { PluginHostApi } from '../../../plugin-api/plugin-types.js';
 
 beforeEach(() => { __resetAiStateForTest(); setFirstUseRoots(null, new Map()); setShowDeveloperTools(false); });
 afterEach(() => { document.body.replaceChildren(); vi.restoreAllMocks(); });

@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { Sv3Composer } from './Sv3Composer.js';
-import * as store from '../../state/aiStateStore.js';
-import { known, UNKNOWN } from '../../state/known.js';
-import { setFirstUseRoots } from '../../state/firstUse.js';
-import { setShowDeveloperTools } from '../../state/developerToolsState.js';
+import { Sv3Composer } from '../Sv3Composer.js';
+import * as store from '../../../state/aiStateStore.js';
+import { known, UNKNOWN } from '../../../state/known.js';
+import { setFirstUseRoots } from '../../../state/firstUse.js';
+import { setShowDeveloperTools } from '../../../state/developerToolsState.js';
 let snapshot: store.AiState;
 beforeEach(() => {
   store.__resetAiStateForTest(); setFirstUseRoots(null, new Map()); setShowDeveloperTools(false);
