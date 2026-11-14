@@ -524,6 +524,46 @@
       "uiShotStep": "engine-loss-600x400-forced",
       "knownRules": [],
       "note": "S5c: the same at 600x400 in forced colours."
+    },
+    {
+      "surface": "fm-results-dark",
+      "uiShotStep": "fm-results-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "fm-results-light",
+      "uiShotStep": "fm-results-light",
+      "knownRules": []
+    },
+    {
+      "surface": "fm-pane-dark",
+      "uiShotStep": "fm-pane-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "fm-pane-light",
+      "uiShotStep": "fm-pane-light",
+      "knownRules": []
+    },
+    {
+      "surface": "fm-empty-dark",
+      "uiShotStep": "fm-empty-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "fm-empty-light",
+      "uiShotStep": "fm-empty-light",
+      "knownRules": []
+    },
+    {
+      "surface": "fm-pane-narrow-dark",
+      "uiShotStep": "fm-pane-narrow-dark",
+      "knownRules": []
+    },
+    {
+      "surface": "fm-pane-narrow-light",
+      "uiShotStep": "fm-pane-narrow-light",
+      "knownRules": []
     }
   ]
 }

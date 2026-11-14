@@ -66,6 +66,8 @@ export interface SearchHit {
    *  `default` for the user's own documents; a named value (e.g. `justsearch-help`) marks the
    *  row so app-internal docs are distinguishable in the result list. */
   collection?: string;
+  modifiedAt?: number;
+  sizeBytes?: number;
 }
 
 /** Tempdoc 577 Phase 5 — which execution pass produced the current results. */
@@ -695,6 +697,10 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
         // Tempdoc 811 (C-1a): the corpus marker's input — the row says which collection it came
         // from when that is not the user's own documents.
         collection: r.fields?.collection,
+        ...(r.fields?.modified_at?.trim() && Number.isSafeInteger(Number(r.fields.modified_at)) && Math.abs(Number(r.fields.modified_at)) <= 8.64e15
+          ? { modifiedAt: Number(r.fields.modified_at) } : {}),
+        ...(r.fields?.size_bytes?.trim() && Number.isSafeInteger(Number(r.fields.size_bytes)) && Number(r.fields.size_bytes) >= 0
+          ? { sizeBytes: Number(r.fields.size_bytes) } : {}),
       };
     });
     // Tempdoc 564 Phase 3: validate the raw trace JSON against the generated SearchTrace Zod once,

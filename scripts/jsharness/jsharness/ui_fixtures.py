@@ -198,6 +198,9 @@ def _indexed_roots_body(variant: str) -> str:
     `enriching` arm), never from the row — the wire row carries counts only.
 
     Every other variant keeps `_BODY_INDEXED_ROOTS` (the empty list), unchanged."""
+    if variant in ("fm-results", "fm-empty"):
+        return json.dumps({"items": [{"pathHash": "fm-documents", "collection": "default",
+            "status": "indexed", "inFlightCount": 0, "failedCount": 0, "walkCompleted": True}], "count": 1})
     if variant == "first-use-reading":
         return json.dumps({"items": [{"pathHash": "first-use-documents", "collection": "default",
             "status": "indexing", "inFlightCount": 8, "failedCount": 0, "walkCompleted": False}], "count": 1})
@@ -606,6 +609,24 @@ _SV3_RESULTS_COUNT = 24
 
 def _search_body(variant: str) -> str:
     """The search response for a variant. 'empty' = the zero-results edge state."""
+    if variant in ("fm-results", "fm-empty"):
+        d = json.loads(_BODY_SEARCH)
+        rows = [
+            ("message.eml", "email", "The turquoise telescope is ready for inspection."),
+            ("schedule.docx", "document", "The silver pelican inspection is scheduled for Friday."),
+            ("scanned-delivery.pdf", "pdf", "--- OCR page 1 --- Harbour inspection. Cobalt marmalade delivery record. The warehouse received twelve crates. Inspection complete. No damage found."),
+            ("inspection.md", "markdown", "# Inspection\n**Inspection** [notes](https://example.test) and `delivery` records."),
+            ("inspect.ts", "code", "if (inspection.ready) { report(`inspection | complete`); }"),
+        ]
+        d["results"] = [{"id": f"fm-{i}", "score": 1, "fields": {"path": f"/home/user/Documents/{name}",
+            "file_kind": kind, "content_preview": text, "modified_at": "1794484800000", "size_bytes": "70656"}}
+            for i, (name, kind, text) in enumerate(rows)] if variant == "fm-results" else []
+        d.update({"matchCount": len(d["results"]), "totalHits": len(d["results"]), "processingTimeMs": 40,
+            "facets": {"file_kind": {"document": 1, "pdf": 1, "markdown": 1, "code": 1, "email": 1}} if d["results"] else {},
+            "searchTrace": {"version": 1, "effectiveMode": "TEXT", "stages": [
+                {"id": "sparse-retrieval", "status": "executed"}, {"id": "dense-retrieval", "status": "skipped"},
+                {"id": "splade-retrieval", "status": "skipped"}, {"id": "fusion", "status": "skipped", "ms": 40}]}})
+        return json.dumps(d)
     if variant == "empty":
         d = json.loads(_BODY_SEARCH)
         d["results"] = []
@@ -637,6 +658,11 @@ def _status_body(variant: str) -> str:
     Degraded variants have a real warning code, indexed content, and authoritative READY
     chat operation; only those variants claim that a human Ask or Delegate is available.
     """
+    if variant in ("fm-results", "fm-empty"):
+        d = json.loads(_status_body("first-use-reading"))
+        d["worker"]["core"].update({"indexState": "IDLE", "pendingJobs": 0,
+            "ownSearchableDocuments": 8, "indexedDocuments": 8, "searchableDocuments": 8})
+        return json.dumps(d)
     if variant.startswith("first-use"):
         d = json.loads(_BODY_STATUS)
         reading = variant == "first-use-reading"
@@ -847,6 +873,11 @@ def fixture_body(url: str, variant: str = "default") -> str:
                 "engineState": "Down", "engineReason": "not-installed", "chatEnabledSpec": False})
             status["aiReady"] = False
             return json.dumps(status)
+    if variant in ("fm-results", "fm-empty") and "/api/preview" in url:
+        return json.dumps({"content": "Harbour inspection.\n\nCobalt marmalade delivery record.\n\nThe warehouse received twelve crates. Inspection complete. No damage found.\n" * 12,
+            "textProvenance": "ocr", "visualExtractionEvidence": {"pageCount": 1}, "truncated": False})
+    if variant in ("fm-results", "fm-empty") and "/api/path-hash/resolve" in url:
+        return json.dumps({"path": "/home/user/Documents"})
     if "/api/messages/registry-surface/en" in url:
         # Keep the Search copy in its production catalog, including cold async boot.
         catalog = Path(__file__).resolve().parents[3] / "modules/app-api/src/main/resources/messages/registry-surface.en.properties"

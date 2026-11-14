@@ -1,0 +1,190 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-14T16:52:10.333Z",
+  "revision": "f5fd95ca9d00bf962e4655ff6056a48b0c8e1417",
+  "tree": "5a8015c3cc9c66de4bde7940f7f630a371f6e50e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts\" \"src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cusc8iw6/tmp/test-intent-vitest-4-1794675128301.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2029
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.firstMinutes.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:b8c40617a754220dd3eae2e1a483309aedc9c1c7ff3fe6a3e1daadf6b59b6304",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S5-1 shows files mode and seconds in that order from executed legs",
+          "status": "passed"
+        },
+        {
+          "name": "S5-1 retains available versus displayed and capped counts as files",
+          "status": "passed"
+        },
+        {
+          "name": "S5-2 cleans Markdown before display and preserves raw source and code punctuation",
+          "status": "passed"
+        },
+        {
+          "name": "S5-2 keeps copy and explanation out of the default row and exposes a date",
+          "status": "passed"
+        },
+        {
+          "name": "S5-3 uses known library roots to hide a redundant folder trail",
+          "status": "passed"
+        },
+        {
+          "name": "S5-5 shows All and Type as text and keeps other facets behind More filters",
+          "status": "passed"
+        },
+        {
+          "name": "S5-5 pending responses retain known Type values without old counts",
+          "status": "passed"
+        },
+        {
+          "name": "S5-5 date presets use local day boundaries and clear the opposite bound",
+          "status": "passed"
+        },
+        {
+          "name": "S5-6 row md copy keeps raw text chosen files and focus",
+          "status": "passed"
+        },
+        {
+          "name": "S5-6 row json copy keeps raw text chosen files and focus",
+          "status": "passed"
+        },
+        {
+          "name": "S5-16 Markdown is cleaned before truncation and raw export inputs stay untouched",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/DetailsRestore.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c2a5f4e9388fa3d684d14f7ca11467d715510b0574d58edb76463f875263f5de",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S5-8 restored Context outside Ask falls back without changing saved memory: /saved.md",
+          "status": "passed"
+        },
+        {
+          "name": "S5-8 restored Context outside Ask falls back without changing saved memory: ",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsEmpty.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f7535410438488fc4e63a84b428cde34fa76b742259d0124bddd31aba7ccb21b",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S5-12 literal-only empty screen explains words without repeating the query",
+          "status": "passed"
+        },
+        {
+          "name": "S5-12 unknown execution uses the general empty message and no AI advice",
+          "status": "passed"
+        },
+        {
+          "name": "S5-5 empty filtered results retain removable restrictions and offer Clear filters",
+          "status": "passed"
+        },
+        {
+          "name": "S5-12 known optional models show navigation only, installing=false",
+          "status": "passed"
+        },
+        {
+          "name": "S5-12 known optional models show navigation only, installing=true",
+          "status": "passed"
+        },
+        {
+          "name": "S5-12 ready models or learned execution suppress AI advice as availability changes",
+          "status": "passed"
+        },
+        {
+          "name": "S5-15 loading never presents nothing found",
+          "status": "passed"
+        },
+        {
+          "name": "S5-15 unreachable never presents nothing found",
+          "status": "passed"
+        },
+        {
+          "name": "S5-15 idle never presents nothing found",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsLayout.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e1a966117b33167442500a0491cbea19aabddbaf10636daa81865591c5b15f83",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S5-4 Search results move the mounted editor to the top and Ask keeps its dock",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/first-minutes/ResultsPane.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c8ebf6cead0211980f8410620392910f89786a48e93ff88067745880a3b3efbc",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S5-8 hides Show in folder in a browser",
+          "status": "passed"
+        },
+        {
+          "name": "S5-8 default reader omits source controls and extraction diagnostics",
+          "status": "passed"
+        },
+        {
+          "name": "S5-8 reader shows full folder pages size and one scan note with document text",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:bf8635a5fbb8e46b3744f0ac40663ade4b09e40576430cddaabcbc4baeee8cf5"
+}

@@ -34,17 +34,18 @@ export const FACET_LABELS: Record<string, string> = {
 export function renderFacetChips(
   facets: SearchFacetCounts | null | undefined,
   selections: Record<string, string[]>,
-  opts: { onToggle: (field: string, value: string) => void },
+  opts: { onToggle: (field: string, value: string) => void; fields?: readonly string[]; pendingValues?: SearchFacetCounts | null },
 ): TemplateResult | typeof nothing {
   const hasAny =
-    (facets && Object.keys(facets).length > 0) || Object.keys(selections).length > 0;
+    (facets && Object.keys(facets).length > 0) || Object.keys(selections).length > 0 || !!opts.pendingValues;
   if (!hasAny) return nothing;
   const groups: TemplateResult[] = [];
-  for (const field of Object.keys(FACET_LABELS)) {
+  for (const field of opts.fields ?? Object.keys(FACET_LABELS)) {
     const counts = facets?.[field] ?? {};
     const selected = selections[field] ?? [];
     // Top values by count, plus any selected value not in the current counts.
-    const values = Object.entries(counts)
+    const values = Object.entries(facets?.[field] ?? opts.pendingValues?.[field] ?? {})
+      .filter(([, count]) => count > 0)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 6)
       .map(([v]) => v);
@@ -98,9 +99,9 @@ export const facetChipStyles: CSSResult = css`
     padding: 0.1rem 0.5rem;
     font-size: var(--font-size-xs);
     font-family: inherit;
-    border: 1px solid var(--border-subtle);
-    border-radius: 14px;
-    background: var(--surface-2);
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
     color: var(--text-secondary);
     cursor: pointer;
   }
@@ -112,9 +113,9 @@ export const facetChipStyles: CSSResult = css`
     outline: 2px solid transparent;
   }
   .facet-chip.selected {
-    background: var(--surface-active);
+    background: transparent;
     color: var(--text-primary);
-    border-color: var(--accent-command);
+    font-weight: 500;
   }
   /* Forced colors (Windows High Contrast) erase the selected chip's fill, so it takes the selection
      pair ('forced-color-adjust: none' keeps the browser's Canvas backplate from landing behind its

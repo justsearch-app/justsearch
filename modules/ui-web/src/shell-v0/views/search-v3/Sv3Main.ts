@@ -384,6 +384,7 @@ export class Sv3Main extends JfElement {
         flex-direction: column;
         gap: var(--space-1);
       }
+      :host([results-top]) .scroller { padding-block-start: var(--space-4); padding-block-end: var(--floating-content-inset); scroll-padding-block-end: var(--space-4); }
       /* ── The transcript ────────────────────────────────────────────────────
          One measure for the whole conversation, centred, matching the composer's own box: the
          design spec gives the timeline root the same 'max-w-3xl' its composer uses, so a turn and
@@ -1335,6 +1336,7 @@ export class Sv3Main extends JfElement {
   ];
 
   static properties = {
+    resultsTop: { type: Boolean, reflect: true, attribute: 'results-top' },
     host_: { attribute: false },
     state: { type: String, reflect: true },
     view: { attribute: false },
@@ -1382,6 +1384,7 @@ export class Sv3Main extends JfElement {
   };
 
   declare state: Sv3ComposerState;
+  declare resultsTop: boolean;
   /** Search mode's result list (WP1.1); `idle` whenever the window is not showing it. */
   declare view: Sv3ResultsView;
   declare forgetAvailable: boolean;
@@ -1586,6 +1589,7 @@ export class Sv3Main extends JfElement {
    * default is pinned to px by `sv3-occlusion.test.ts` for exactly this reason.
    */
   private occludedEndPx(): number {
+    if (this.resultsTop) return 0;
     const el = this.scroller;
     if (el === null) return 0;
     const px = Number.parseFloat(
@@ -1902,7 +1906,7 @@ export class Sv3Main extends JfElement {
     if (this.resultsArmRendered) {
       return html`<div class="scroller sv3-scroller" data-testid="sv3-main-scroller">
         ${this.gettingStarted()}
-        <jf-sv3-results .view=${view} .forgetAvailable=${this.forgetAvailable}></jf-sv3-results>
+        <jf-sv3-results .view=${view} .host_=${this.host_} .apiBase=${this.apiBase} .forgetAvailable=${this.forgetAvailable}></jf-sv3-results>
       </div>`;
     }
     // THE LOCK COMES FIRST, and it replaces the transcript rather than covering it (inventory E4):

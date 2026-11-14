@@ -102,6 +102,25 @@ export function collectionBadgeFor(collection: string | undefined): CollectionBa
 
 const SNIPPET_MAX = 240;
 
+/** Display only. Stored snippets and citation offsets always keep the original text. */
+function cleanSnippet(text: string, path: string): string {
+  let clean = text.replace(/---\s*OCR page \d+\s*---/gi, ' ');
+  if (/\.(md|markdown|mdx)$/i.test(path)) {
+    clean = clean
+      .replace(/!?(?:\[([^\]]*)\])\([^)]*\)/g, '$1')
+      .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+      .replace(/^\s*(?:>\s*)+(?:[-+*]\s+)?/gm, '')
+      .replace(/^\s*(?:[-+*]|\d+[.)])\s+/gm, '')
+      .replace(/^\s*```[^\n]*|^\s*~~~[^\n]*/gm, '')
+      .replace(/(`+)(.*?)\1/g, '$2')
+      .replace(/(\*\*|__)(.*?)\1/g, '$2')
+      .replace(/(\*|_)([^\n]*?)\1/g, '$2')
+      .replace(/^\s*[-:| ]+\|[-:| ]*$/gm, '')
+      .replace(/\|/g, ' ');
+  }
+  return clean.replace(/\s+/g, ' ').trim();
+}
+
 /** Closed file_kind → ResultKind mapping; mime_base disambiguates the rest. */
 function deriveKind(fileKind: string | undefined, mimeBase: string | undefined): ResultKind {
   switch (fileKind) {
@@ -146,7 +165,7 @@ export function projectResultView(hit: ResultViewInput): SearchResultView {
   const kind = deriveKind(hit.kind, hit.mimeBase);
   const excerpt = hit.excerptRegions?.find((r) => (r.text ?? '').trim().length > 0);
   const snippetRaw = excerpt?.text ?? hit.snippet ?? '';
-  const snippet = snippetRaw.trim() ? truncateAtWord(snippetRaw) : '';
+  const snippet = truncateAtWord(cleanSnippet(snippetRaw, hit.path));
   const collection = collectionBadgeFor(hit.collection);
   return {
     kind,

@@ -79,6 +79,8 @@ import { highlightCodeBlocks } from '../markdown/markdownHighlight.js';
 import { markScrollableRegions } from '../markdown/markdownScrollRegions.js';
 import { formatDisplayPath, formatLocationBreadcrumb } from '../searchResults/resultRowPresentation.js';
 import { isAdvancedMode, subscribeUiMode } from '../../state/uiModeState.js';
+import { formatBytes } from '../../display/format.js';
+import { getShowDeveloperTools, subscribeShowDeveloperTools } from '../../state/developerToolsState.js';
 import { authorizedFetch } from '../../api/authorizedFetch.js';
 import { copyToClipboard } from '../../utils/clipboardCopy.js';
 import { revealLocalPath } from '../../plugin-api/capabilities/platform.js';
@@ -228,6 +230,7 @@ function prefersReducedMotion(): boolean {
 export class DocumentPane extends JfElement {
   static properties = {
     docPath: { attribute: false },
+    sizeBytes: { attribute: false },
     apiBase: { type: String, attribute: 'api-base' },
     highlightRange: { attribute: false },
     chunkRange: { attribute: false },
@@ -253,6 +256,7 @@ export class DocumentPane extends JfElement {
   };
 
   declare docPath: string | null;
+  declare sizeBytes: number | undefined;
   declare apiBase: string;
   declare highlightRange: DocumentLineRange | null;
   declare chunkRange: DocumentLineRange | null;
@@ -330,16 +334,19 @@ export class DocumentPane extends JfElement {
 
   /** Tempdoc 738 — re-render the disclosure-gated path header on Simple/Detailed change. */
   private uiModeUnsubscribe: (() => void) | null = null;
+  private developerUnsubscribe: (() => void) | null = null;
 
   override connectedCallback(): void {
     super.connectedCallback();
     this.uiModeUnsubscribe = subscribeUiMode(() => this.requestUpdate());
+    this.developerUnsubscribe = subscribeShowDeveloperTools(() => this.requestUpdate());
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
     ++this.loadToken;
     this.uiModeUnsubscribe?.();
+    this.developerUnsubscribe?.();
     this.uiModeUnsubscribe = null;
     if (this.scrollDebounceTimer) {
       clearTimeout(this.scrollDebounceTimer);
@@ -795,6 +802,7 @@ export class DocumentPane extends JfElement {
       color: var(--text-primary);
       font-family: var(--font-native);
     }
+    .scan-note { margin: 0; padding: var(--jf-space-2) var(--jf-space-4); font-size: var(--font-size-sm); color: var(--text-secondary); }
     .header {
       flex-shrink: 0;
       display: flex;
@@ -815,10 +823,10 @@ export class DocumentPane extends JfElement {
       flex: 1;
       min-width: 0;
       font-size: var(--font-size-sm);
-      font-weight: 600;
-      font-family: monospace;
-      overflow: hidden;
-      white-space: nowrap;
+      font-weight: 400;
+      font-family: inherit;
+      overflow-wrap: anywhere;
+      color: var(--text-secondary);
     }
     .toggle-group {
       flex-shrink: 0;
@@ -904,7 +912,7 @@ export class DocumentPane extends JfElement {
     }
     .preview-source strong {
       color: var(--text-primary);
-      font-weight: 600;
+      font-weight: 500;
     }
     .preview-source-detail {
       color: var(--text-tertiary);
@@ -999,6 +1007,7 @@ export class DocumentPane extends JfElement {
       padding: 0.1rem 0.4rem;
       margin-left: -0.4rem;
     }
+    pre.source.readable { font-family: inherit; font-size: var(--font-size-sm); }
     pre.source {
       margin: 0;
       font-family: ui-monospace, 'SF Mono', monospace;
@@ -1051,6 +1060,20 @@ export class DocumentPane extends JfElement {
       }
     }
   `];
+
+  private documentMetadata(): string {
+    const path = this.docPath ?? '';
+    const at = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+    let folder = at < 0 ? '' : path.slice(0, at || 1);
+    if (/^[A-Za-z]:$/.test(folder)) folder += path[at];
+    const pages = this.evidence?.pageCount;
+    const size = this.sizeBytes;
+    return [folder,
+      typeof pages === 'number' && Number.isInteger(pages) && pages > 0 ? `${pages} ${pages === 1 ? 'page' : 'pages'}` : '',
+      typeof size === 'number' && Number.isFinite(size) && size >= 0
+        ? formatBytes(size) : '',
+    ].filter(Boolean).join(' · ');
+  }
 
   private renderToggle(): TemplateResult {
     const isMd = this.docPath ? isMarkdownPath(this.docPath) : false;
@@ -1213,7 +1236,7 @@ export class DocumentPane extends JfElement {
   private renderSourceMode(): TemplateResult {
     const lines = this.content.split('\n');
     return html`
-      <pre class="source">${lines.map((line, i) => {
+      <pre class=${getShowDeveloperTools() ? 'source' : 'source readable'}>${lines.map((line, i) => {
         const tier = this.highlightTier(i, i);
         return html`<span
           data-line="${i}"
@@ -1245,7 +1268,10 @@ export class DocumentPane extends JfElement {
         </div>` : nothing}`;
     }
     return html`
-      ${this.renderCitationHeader()}${this.renderProvenanceLine()}${this.renderSpanNotice()}${this.renderAnchorNotice()}${this.renderWindowNote()}
+      ${getShowDeveloperTools() ? html`${this.renderCitationHeader()}${this.renderProvenanceLine()}` : nothing}
+      ${['ocr', 'vdu'].includes((this.provenance ?? '').toLowerCase())
+        ? html`<p class="scan-note">Read from a scan. A few words may be wrong.</p>` : nothing}
+      ${this.renderSpanNotice()}${this.renderAnchorNotice()}${this.renderWindowNote()}
       <div
         class="scroll-region"
         tabindex="0"
@@ -1254,7 +1280,7 @@ export class DocumentPane extends JfElement {
         @scroll=${this.handleScroll}
       >
         ${this.content
-          ? this.mode === 'rendered'
+          ? (getShowDeveloperTools() ? this.mode === 'rendered' : isMarkdownPath(this.docPath ?? ''))
             ? this.renderRenderedMode()
             : this.renderSourceMode()
           : html`<div class="empty">No preview available.</div>`}
@@ -1273,10 +1299,11 @@ export class DocumentPane extends JfElement {
         <div class="path" title=${this.docPath}>
           ${/* Tempdoc 738 (C4) — Simple shows the humanized folder breadcrumb; Detailed the full path
                 (the full path stays reachable via the title tooltip in both). */ ''}
-          ${isAdvancedMode() ? formatDisplayPath(this.docPath) : formatLocationBreadcrumb(this.docPath)}
+          ${getShowDeveloperTools() ? (isAdvancedMode() ? formatDisplayPath(this.docPath) : formatLocationBreadcrumb(this.docPath))
+            : this.documentMetadata()}
         </div>
       </div>
-      ${this.renderToggle()} ${this.renderBody()}
+      ${getShowDeveloperTools() ? this.renderToggle() : nothing} ${this.renderBody()}
     `;
   }
 }

@@ -7,6 +7,7 @@ import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { FolderAddFlow, emptyFolderAddState, focusFolderAdd } from '../controllers/FolderAddFlow.js';
 import { pickFolder } from '../../utils/folderPicker.js';
 import './Button.js';
+import { icon } from './Icon.js';
 
 const mounted = new Set<GettingStarted>();
 let addState = emptyFolderAddState();
@@ -33,14 +34,15 @@ export function resetFirstUseAddForTest(): void {
   addFlow?.dispose(); addFlow = null; addState = emptyFolderAddState(); api = undefined; opener = null;
 }
 export class GettingStarted extends JfElement {
-  static properties = { host_: { attribute: false }, apiBase: { type: String }, intro: { type: Boolean }, suggestions: { state: true } };
+  static properties = { host_: { attribute: false }, apiBase: { type: String }, intro: { type: Boolean }, searchEmpty: { type: Boolean }, suggestions: { state: true } };
   declare host_: PluginHostApi | undefined;
   declare apiBase: string;
   declare intro: boolean;
+  declare searchEmpty: boolean;
   declare private suggestions: SuggestedRoot[];
   private stop: (() => void) | undefined;
   private suggestionAbort: AbortController | null = null;
-  constructor() { super(); this.apiBase = ''; this.intro = true; this.suggestions = []; }
+  constructor() { super(); this.apiBase = ''; this.intro = true; this.searchEmpty = false; this.suggestions = []; }
   static styles = css`
     :host { display: block; min-inline-size: 0; color: var(--text-primary); font-size: var(--font-size-sm); }
     .intro { text-align: center; padding-block-end: 30px; }
@@ -65,13 +67,17 @@ export class GettingStarted extends JfElement {
     input:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); }
     .message, .error, .add-preview { overflow-wrap: anywhere; margin-block: var(--jf-space-2); }
     .error { color: var(--text-danger); }
+    .folder-row { display: flex; align-items: center; gap: var(--jf-space-3); padding-block: var(--jf-space-3); border-block: 1px solid var(--border-subtle); }
+    .folder-row p { flex: 1; margin: 0; color: var(--text-primary); }
+    .folder-row button { flex: none; border: 0; border-radius: 4px; padding: var(--jf-space-1); background: transparent; color: var(--text-primary); font: inherit; font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; }
+    .folder-row button:focus-visible { outline: 2px solid var(--focus-ring-color); }
     @media (forced-colors: active) { .mark, .error, .path, p { color: CanvasText; } .card, input { border-color: CanvasText; } }
   `;
   override connectedCallback(): void {
     super.connectedCallback(); mounted.add(this);
     if (!opener?.isConnected && (addState.showManualInput || addState.addBusy || addState.error)) opener = this;
     this.stop = subscribeFirstUse(() => this.requestUpdate());
-    this.loadSuggestions();
+    if (!this.searchEmpty) this.loadSuggestions();
   }
   override disconnectedCallback(): void {
     mounted.delete(this); this.stop?.(); this.stop = undefined;
@@ -102,7 +108,7 @@ export class GettingStarted extends JfElement {
     if (!view.reading && !(view.waiting ?? 0)) addState.actionMessage = null;
     // An in-flight add/error is kept accessible even while a new observation is settling.
     const pending = addState.showManualInput || addState.addBusy || !!addState.error;
-    if (!pending && !(this.intro && view.empty)) return nothing;
+    if (!pending && !(this.intro && view.empty) && !this.searchEmpty) return nothing;
     const paths = firstUseWatchedPaths();
     const watched = paths === null ? null : new Set(paths.map(normalizePath));
     const suggestions = watched === null ? [] : this.suggestions.filter((s, i, all) =>
@@ -110,6 +116,12 @@ export class GettingStarted extends JfElement {
       && all.findIndex(other => normalizePath(other.path) === normalizePath(s.path)) === i);
     const empty = this.intro && view.empty;
     return html`
+      ${this.searchEmpty ? html`<div class="folder-row"><span aria-hidden="true">${icon({ name: 'folder', size: 18 })}</span>
+        <p>${view.searchable !== null && view.roots !== null
+          ? `${view.searchable.toLocaleString()} ${view.searchable === 1 ? 'file' : 'files'} in ${view.roots.toLocaleString()} ${view.roots === 1 ? 'folder' : 'folders'} can be searched`
+          : 'Only the folders you added are searched'}</p>
+        <button type="button" data-add-folder ?disabled=${addState.addBusy} @click=${() => this.add()}>Add a folder</button>
+      </div>` : nothing}
       ${empty ? html`<section class="intro" aria-label="Start searching your files">
         <h1 data-testid="first-use-headline">Nothing to search yet</h1>
         <p>Add the folders you want JustSearch to read. Your files stay where they are, and nothing leaves this computer.</p>

@@ -18,14 +18,16 @@
     "filters-chips", "search-simple-mode", "search-advanced-mode",
     "multi-select", "row-hover", "snippets-expanded", "selection-preserved",
     "search-results-light", "search-results-compact", "search-results-rich",
-    "sv3-search-results"
+    "sv3-search-results",
+    "fm-results-dark", "fm-results-light", "fm-pane-dark", "fm-pane-light", "fm-empty-dark", "fm-empty-light", "fm-pane-narrow-dark", "fm-pane-narrow-light"
   ],
   "shell-v0/views/searchResultViewModel.ts": [
     "search-results", "search-results-rich", "snippets-expanded"
   ],
   "shell-v0/components/documentPane/DocumentPane.ts": [
     "inspector-open", "citation-highlight", "sv3-citation-selected",
-    "sv3-citation-dropped", "chat-occlusion", "qa-response"
+    "sv3-citation-dropped", "chat-occlusion", "qa-response",
+    "fm-results-dark", "fm-results-light", "fm-pane-dark", "fm-pane-light", "fm-empty-dark", "fm-empty-light", "fm-pane-narrow-dark", "fm-pane-narrow-light"
   ],
   "shell-v0/views/SummarizeView.ts": [
     "streaming", "summarize-done"
@@ -47,7 +49,9 @@
     "chat-mode", "qa-response", "chat-budget",
     "chat-model-only", "chat-structured"
   ],
-  "shell-v0/views/search-v3/Sv3Results.ts": ["sv3-search-results"],
+  "shell-v0/views/search-v3/Sv3Results.ts": ["sv3-search-results",
+    "fm-results-dark", "fm-results-light", "fm-pane-dark", "fm-pane-light", "fm-empty-dark", "fm-empty-light", "fm-pane-narrow-dark", "fm-pane-narrow-light"
+  ],
   "shell-v0/views/search-v3/sv3-search.ts": [
     "sv3-filters-hero-normal-dark", "sv3-filters-hero-normal-light", "sv3-filters-hero-normal-forced", "sv3-filters-hero-narrow-dark", "sv3-filters-hero-narrow-light", "sv3-filters-hero-narrow-forced", "sv3-filters-hero-1280x720-dark", "sv3-filters-hero-1280x720-light", "sv3-filters-hero-1280x720-forced", "sv3-filters-hero-600x400-dark", "sv3-filters-hero-600x400-light", "sv3-filters-hero-600x400-forced", "sv3-filters-docked-normal-dark", "sv3-filters-docked-normal-light", "sv3-filters-docked-normal-forced", "sv3-filters-docked-narrow-dark", "sv3-filters-docked-narrow-light", "sv3-filters-docked-narrow-forced", "sv3-filters-docked-1280x720-dark", "sv3-filters-docked-1280x720-light", "sv3-filters-docked-1280x720-forced", "sv3-filters-docked-600x400-dark", "sv3-filters-docked-600x400-light", "sv3-filters-docked-600x400-forced","sv3-search-results"],
   "shell-v0/views/search-v3/sv3-tokens.css.ts": [
@@ -61,7 +65,8 @@
   ],
   "shell-v0/views/search-v3/Sv3Pane.ts": [
     "sv3-citation-selected", "sv3-citation-dropped", "chat-occlusion",
-    "qa-response"
+    "qa-response",
+    "fm-results-dark", "fm-results-light", "fm-pane-dark", "fm-pane-light", "fm-empty-dark", "fm-empty-light", "fm-pane-narrow-dark", "fm-pane-narrow-light"
   ],
   "shell-v0/views/search-v3/SearchV3View.ts": [
     "sv3-ask-stop-late-response", "sv3-run-activity-steering", "sv3-run-budget", "sv3-run-approval", "sv3-run-approval-failure", "sv3-run-halt", "sv3-run-halt-failure", "sv3-run-halt-timeout",
@@ -73,7 +78,8 @@
     "chat-wide-docked", "chat-mode", "qa-response",
     "chat-budget", "chat-model-only", "chat-structured",
     "sv3-recents-hero-normal-dark", "sv3-recents-hero-normal-light", "sv3-recents-hero-normal-forced", "sv3-recents-hero-narrow-dark", "sv3-recents-hero-narrow-light", "sv3-recents-hero-narrow-forced",
-    "sv3-recents-hero-1280x720-dark", "sv3-recents-hero-1280x720-light", "sv3-recents-hero-1280x720-forced", "sv3-recents-hero-760x720-dark", "sv3-recents-hero-760x720-light", "sv3-recents-hero-760x720-forced", "sv3-recents-hero-600x400-dark", "sv3-recents-hero-600x400-light", "sv3-recents-hero-600x400-forced"
+    "sv3-recents-hero-1280x720-dark", "sv3-recents-hero-1280x720-light", "sv3-recents-hero-1280x720-forced", "sv3-recents-hero-760x720-dark", "sv3-recents-hero-760x720-light", "sv3-recents-hero-760x720-forced", "sv3-recents-hero-600x400-dark", "sv3-recents-hero-600x400-light", "sv3-recents-hero-600x400-forced",
+    "fm-results-dark", "fm-results-light", "fm-pane-dark", "fm-pane-light", "fm-empty-dark", "fm-empty-light", "fm-pane-narrow-dark", "fm-pane-narrow-light"
   ],
   "shell-v0/views/search-v3/Sv3Composer.ts": [
     "sv3-filters-hero-normal-dark", "sv3-filters-hero-normal-light", "sv3-filters-hero-normal-forced", "sv3-filters-hero-narrow-dark", "sv3-filters-hero-narrow-light", "sv3-filters-hero-narrow-forced", "sv3-filters-hero-1280x720-dark", "sv3-filters-hero-1280x720-light", "sv3-filters-hero-1280x720-forced", "sv3-filters-hero-600x400-dark", "sv3-filters-hero-600x400-light", "sv3-filters-hero-600x400-forced", "sv3-filters-docked-normal-dark", "sv3-filters-docked-normal-light", "sv3-filters-docked-normal-forced", "sv3-filters-docked-narrow-dark", "sv3-filters-docked-narrow-light", "sv3-filters-docked-narrow-forced", "sv3-filters-docked-1280x720-dark", "sv3-filters-docked-1280x720-light", "sv3-filters-docked-1280x720-forced", "sv3-filters-docked-600x400-dark", "sv3-filters-docked-600x400-light", "sv3-filters-docked-600x400-forced",

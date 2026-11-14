@@ -96,7 +96,7 @@ afterEach(() => {
 it('S4-11 empty recents render nothing; successful responses have exact header count and completion time', async () => {
   const el = await mount(); await focusEmpty(el); expect(list(el)).toBeNull();
   await search(el, 'budget'); await focusEmpty(el);
-  expect(labels(el)).toEqual(['budget']); expect(list(el)!.textContent).toContain('0 matches');
+  expect(labels(el)).toEqual(['budget']); expect(list(el)!.textContent).toContain('0 files');
   expect(list(el)!.querySelector('time')!.getAttribute('datetime')).toBeTruthy();
   field(el).blur(); await settle(el); expect(list(el)).not.toBeNull();
   expect(field(el).hasAttribute('aria-activedescendant')).toBe(false);
@@ -112,7 +112,7 @@ it('S4-12 pointer activation replay the query with current restrictions', async 
 it('S4-11 failed and invalid attempts show the query without a count', async () => {
   const el = await mount();
   for (const query of ['failed','"']) { await search(el,query); await focusEmpty(el); expect(labels(el)[0]).toBe(query);
-    expect(options(el)[0]!.querySelector('.recent-meta')!.textContent).not.toContain('matches'); }
+    expect(options(el)[0]!.querySelector('.recent-meta')!.textContent).not.toContain('files'); }
 });
 it('S4-11 exact dedup and eight-item cap apply only to explicit attempts; typing sends nothing', async () => {
   const el = await mount();
@@ -146,7 +146,7 @@ it('S4-11 superseded attempts keep their query and never acquire another attempt
   const el=await mount(); holdSearches=true; await search(el,'old'); await search(el,'new');
   holdSearches=false; heldSearches.splice(0).reverse().forEach(release=>release()); await settle(el); await focusEmpty(el);
   expect(labels(el)).toEqual(['new','old']);
-  expect(options(el)[0]!.textContent).toContain('0 matches'); expect(options(el)[1]!.textContent).not.toContain('matches');
+  expect(options(el)[0]!.textContent).toContain('0 files'); expect(options(el)[1]!.textContent).not.toContain('files');
 });
 it('S4-12 new windows forget searches; conversations remain only in the column', async () => {
   rows=[row('saved')]; const el=await mount(); await search(el,'private'); await focusEmpty(el);
@@ -289,7 +289,7 @@ it('S4-11 recent count equals the rendered header and time belongs to response c
   const main=el.shadowRoot!.querySelector('jf-sv3-main')!; await main.updateComplete;
   const results=main.shadowRoot!.querySelector('jf-sv3-results')!; await results.updateComplete;
   const card=results.shadowRoot!.querySelector<HTMLElement & {updateComplete: Promise<unknown>}>('jf-results-card')!; await card.updateComplete;
-  const header=card.shadowRoot!.querySelector('.meta-info')!.textContent!.replace(/\s+/g,' ').trim().replace(/ · found in \S+$/,'');
+  const header=card.shadowRoot!.querySelector('.meta-info')!.textContent!.replace(/\s+/g,' ').trim().replace(/ · [\d.]+ s$/,'');
   await focusEmpty(el);
   const meta=options(el)[0]!.querySelector('.recent-meta')!;
   expect(meta.textContent!.split(' · ')[0]!.trim()).toBe(header);

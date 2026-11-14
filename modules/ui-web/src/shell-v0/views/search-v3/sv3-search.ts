@@ -21,6 +21,7 @@ import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import { localizeResourceKey } from '../../../i18n/resourceCatalog.js';
 import {
   getScopeChips,
+  clearScopeChips,
   removeScopeChip,
   invalidateSearchRestrictions,
   setQuery,
@@ -33,6 +34,7 @@ import {
 } from '../../state/searchState.js';
 import {
   getFacetSelections,
+  clearFacetSelections,
   getFilters,
   restrictionWire,
   setFilters,
@@ -214,6 +216,7 @@ export interface Sv3ResultsView {
   /** The store snapshot the shared card renders — only ever the CURRENT query's. */
   readonly snapshot: SearchState | null;
   readonly failure: string;
+  readonly restrictionError?: string;
   readonly selectedIds: ReadonlySet<string>;
   readonly chosenCount: number;
   readonly facetSelections: Record<string, string[]>;
@@ -311,6 +314,15 @@ export class Sv3SearchController implements ReactiveController {
       && this.host.draft().humanTask === null && !this.host.draft().draftReview && this.host.draft().draftMayIssue(false)) this.rerun();
   }
 
+  clearResultFilters(): void {
+    if (this.host.draft().humanTask !== null || this.host.historyLocked() || !this.host.draft().draftMayIssue(false)) return;
+    clearScopeChips();
+    clearFacetSelections();
+    const datesChanged = Object.keys(restrictionWire(getFilters())).length > 0;
+    if (datesChanged) setFilters({});
+    else if (this.showing) this.rerun();
+  }
+
   onResultsFilterRemove(filter: Sv3ActiveFilter | undefined): void {
     if (filter === undefined) return;
     if (filter.kind === 'date' || filter.kind === 'folder' || filter.kind === 'size') {
@@ -323,10 +335,11 @@ export class Sv3SearchController implements ReactiveController {
   }
 
   /** The card's facet chips — the default window's handler, on the same store. */
-  onCardFacetToggle(detail: { field: string; value: string } | undefined): void {
+  onCardFacetToggle(detail: { field: string; value: string | null } | undefined): void {
     if (detail === undefined) return;
     if (this.host.draft().draftReview ? !this.hasPlace : !this.host.draft().draftMayIssue()) return;
-    toggleFacetValue(detail.field, detail.value);
+    if (detail.value === null) for (const value of getFacetSelections()[detail.field] ?? []) toggleFacetValue(detail.field, value);
+    else toggleFacetValue(detail.field, detail.value);
     this.rerun();
   }
 
@@ -690,14 +703,19 @@ export class Sv3SearchController implements ReactiveController {
       facetSelections: this.facets,
       filters: sv3ActiveFilters(this.chips, this.dates, this.facets),
       askAvailability,
+      restrictionError: snapshot.errorInfo?.status === 400 && snapshot.errorInfo.code !== 'SEARCH_SYNTAX_INVALID' ? snapshot.errorInfo.message : '',
     };
     // In flight beats every earlier conclusion; a failure beats rows that answered something else;
     // and rows that answered an earlier query are never shown as this one's.
     if (snapshot.isSearching) return { ...base, status: 'loading', snapshot: null, failure: '' };
+    if (snapshot.errorInfo?.code === 'SEARCH_SYNTAX_INVALID') {
+      return { ...base, status: 'unreachable', snapshot: null, failure: snapshot.errorInfo.message };
+    }
     if (typeof snapshot.error === 'string' && snapshot.error !== '') {
       return { ...base, status: 'unreachable', snapshot: null, failure: snapshot.error };
     }
-    if (sv3ResultsStale(snapshot, this.answered) || this.restrictionsStale) {
+    if (sv3ResultsStale(snapshot, this.answered) || this.restrictionsStale
+      || (snapshot.isRefining || snapshot.countsPending) && snapshot.results.length === 0) {
       return { ...base, status: 'loading', snapshot: null, failure: '' };
     }
     return {

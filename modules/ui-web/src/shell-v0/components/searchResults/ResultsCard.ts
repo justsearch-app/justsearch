@@ -38,6 +38,12 @@ import {
   highlightTerms,
   highlightStyles,
 } from './resultRowPresentation.js';
+import { formatDateTime } from '../../display/format.js';
+import { getShowDeveloperTools, subscribeShowDeveloperTools } from '../../state/developerToolsState.js';
+import { getFirstUse, subscribeFirstUse } from '../../state/firstUse.js';
+import { getFilters, setFilterRange, subscribeFilters } from '../../state/searchFiltersState.js';
+import { searchExecution } from './searchExecution.js';
+import '../../views/search-v3/Sv3Filters.js';
 import { matchCountLabel } from './matchCountLabel.js';
 import { isAdvancedMode, subscribeUiMode } from '../../state/uiModeState.js';
 import { renderFacetChips, facetChipStyles } from './facetChips.js';
@@ -65,6 +71,7 @@ import { copyToClipboard } from '../../utils/clipboardCopy.js';
 import { formatRelative } from '../../utils/relativeTime.js';
 import type { Availability } from '../../state/availability.js';
 import type { SearchTrace } from '../../../api/generated/index.js';
+import type { SearchFacetCounts } from '../../state/searchState.js';
 import '../Control.js';
 
 /** Structural hit shape — satisfied by both SearchHit (state) and SearchHitSnapshot (plugin API). */
@@ -73,6 +80,9 @@ export interface CardHit {
   readonly title: string;
   readonly path: string;
   readonly trace?: unknown;
+  readonly modifiedAt?: number;
+  readonly sizeBytes?: number;
+  readonly snippet?: string;
   /** Tempdoc 811 (C-1a) — the corpus the hit came from; drives the row's collection pill. */
   readonly collection?: string;
 }
@@ -161,6 +171,9 @@ function plainRetrievalModeLabel(mode: string | null | undefined): string | null
 export class ResultsCard extends JfElement {
   static properties = {
     snapshot: { attribute: false },
+    moreFiltersOpen: { state: true },
+    whyId: { state: true },
+    filterError: { type: String },
     facetSelections: { attribute: false },
     selectedIds: { attribute: false },
     askAvailability: { attribute: false },
@@ -179,6 +192,9 @@ export class ResultsCard extends JfElement {
   };
 
   declare snapshot: CardSnapshot | null;
+  declare private moreFiltersOpen: boolean;
+  declare private whyId: string | null;
+  declare filterError: string;
   declare facetSelections: Record<string, string[]>;
   declare selectedIds: ReadonlySet<string>;
   /** null hides the Ask AI control (hosts that cannot escalate). */
@@ -207,6 +223,8 @@ export class ResultsCard extends JfElement {
   private anchorIndex = -1;
   private refinedStampTimer: ReturnType<typeof setTimeout> | null = null;
   private wasSettling = false;
+  /** Names may survive a pending response; its previous counts may not. */
+  private lastFacets: SearchFacetCounts | null = null;
   /**
    * Search Thread Round-2 R2 — `jf-control.onActivate` takes no arguments (it can't forward the
    * originating MouseEvent), so the Ask AI control's modifier detection happens via a CAPTURE-phase
@@ -220,6 +238,9 @@ export class ResultsCard extends JfElement {
   constructor() {
     super();
     this.snapshot = null;
+    this.moreFiltersOpen = false;
+    this.whyId = null;
+    this.filterError = '';
     this.facetSelections = {};
     this.selectedIds = new Set<string>();
     this.askAvailability = null;
@@ -236,15 +257,19 @@ export class ResultsCard extends JfElement {
   }
 
   /** Tempdoc 738 — re-render the disclosure-gated meta line + result locations on Simple/Detailed change. */
+  private stops: Array<() => void> = [];
   private uiModeUnsubscribe: (() => void) | null = null;
 
   override connectedCallback(): void {
     super.connectedCallback();
+    this.stops = [subscribeShowDeveloperTools(() => this.requestUpdate()), subscribeFirstUse(() => this.requestUpdate()), subscribeFilters(() => this.requestUpdate())];
     this.uiModeUnsubscribe = subscribeUiMode(() => this.requestUpdate());
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    this.stops.forEach(stop => stop());
+    this.stops = [];
     this.uiModeUnsubscribe?.();
     this.uiModeUnsubscribe = null;
     if (this.refinedStampTimer !== null) {
@@ -261,7 +286,9 @@ export class ResultsCard extends JfElement {
    */
   override willUpdate(changed: Map<PropertyKey, unknown>): void {
     super.willUpdate?.(changed);
+    if (changed.has('filterError') && this.filterError) this.moreFiltersOpen = true;
     const s = this.snapshot;
+    if (s && !s.isSearching && !s.countsPending) this.lastFacets = s.facets as SearchFacetCounts | null ?? null;
     const settling = !!s && (s.isRefining === true || s.passStage === 'quick' || s.isSearching);
     if (settling) {
       this.wasSettling = true;
@@ -375,6 +402,9 @@ export class ResultsCard extends JfElement {
               },
             ]
           : []),
+        { id: 'why-result', label: 'Why this result', icon: 'info', category: 'system', enabled: Array.isArray(hit.trace) && hit.trace.length > 0 },
+        { id: 'copy-row-md', label: 'Copy as Markdown', icon: 'copy', category: 'system', enabled: true },
+        { id: 'copy-row-json', label: 'Copy as JSON', icon: 'copy', category: 'system', enabled: true },
       ],
       anchor,
       context: 'search-result-row',
@@ -383,6 +413,23 @@ export class ResultsCard extends JfElement {
           { id: hit.id, path: hit.path, scope, invoker }) } : hit,
       addressable,
     });
+    const actions = this.renderRoot.querySelector<HTMLElement>(`[data-addressable-id="${CSS.escape(hit.id)}"] .row-actions`);
+    actions?.focus();
+    if (result === 'why-result') {
+      this.whyId = this.whyId === hit.id ? null : hit.id;
+      await this.updateComplete;
+      const disclosure = actions?.closest('.row')?.querySelector<HTMLDetailsElement>('details');
+      if (disclosure) disclosure.open = true;
+      return;
+    }
+    if (result === 'copy-row-md' || result === 'copy-row-json') {
+      const hits = [hit] as import('../../state/searchState.js').SearchHit[];
+      try {
+        const copied = await this.copyText(result === 'copy-row-md' ? formatAsMarkdown(hits) : formatAsJson(hits));
+        this.copyReceipt.flash(copied === false ? 'Copy failed' : 'Copied!', { key: hit.id });
+      } catch { this.copyReceipt.flash('Copy failed', { key: hit.id }); }
+      return;
+    }
     if (result === 'ask-about-this') {
       this.emitCard('card-scope-file', { id: hit.id, path: hit.path, title: hit.title });
       return;
@@ -431,10 +478,9 @@ export class ResultsCard extends JfElement {
   }
 
   private renderRetrievalMode(): unknown {
-    const mode = (this.snapshot?.searchTrace as SearchTrace | null | undefined)?.effectiveMode;
-    const label = this.modeLabel(mode);
-    if (label == null) return nothing;
-    return html` <span class="retrieval-mode" data-testid="retrieval-mode" data-mode=${mode}>· ${label}</span>`;
+    const execution = searchExecution(this.snapshot?.searchTrace);
+    const label = execution === 'words' ? 'by words' : execution === 'meaning' ? 'by words and meaning' : null;
+    return label === null ? nothing : html`<span class="retrieval-mode" data-testid="retrieval-mode"> · ${label}</span>`;
   }
 
   /**
@@ -460,7 +506,7 @@ export class ResultsCard extends JfElement {
 
   /** Tempdoc 738 (C2) — plain latency for Simple mode ("found in 0.02s"), hiding the raw ms timing. */
   private static formatLatencyPlain(ms: number): string {
-    return `${(ms / 1000).toFixed(2)}s`;
+    return `${(ms / 1000).toFixed(2)} s`;
   }
 
   private renderMeta(): TemplateResult {
@@ -489,28 +535,26 @@ export class ResultsCard extends JfElement {
                 ? 'Searching your documents — almost there…'
                 : 'Searching…'}`
           : s.results.length > 0
-            ? html`${s.countsPending ? `${s.results.length} results · counts pending` : matchCountLabel(
+            ? html`${s.countsPending ? `${s.results.length} files · counts pending` : matchCountLabel(
                 s.matchCount,
                 s.results.length,
                 (s.searchTrace as SearchTrace | null | undefined)?.effectiveMode === 'VECTOR',
                 s.totalHits,
                 s.facetsTruncated,
-              )}${s.processingTimeMs != null
-                ? isAdvancedMode()
-                  ? html` · ${ResultsCard.formatLatency(s.processingTimeMs)}`
-                  : html` · found in ${ResultsCard.formatLatencyPlain(s.processingTimeMs)}`
-                : nothing}${this.renderRetrievalMode()}${this.renderRerankDrop()}${s.isRefining
+              )}${this.renderRetrievalMode()}${s.processingTimeMs != null
+                ? html` · ${getShowDeveloperTools() ? ResultsCard.formatLatency(s.processingTimeMs) : ResultsCard.formatLatencyPlain(s.processingTimeMs)}`
+                : nothing}${getShowDeveloperTools() ? this.renderRerankDrop() : nothing}${s.isRefining
                 ? html` <span class="meta-refining" data-testid="meta-refining"
                     >${icon({ name: 'loader-2', size: 10, spin: true })} refining…</span
                   >`
                 : s.passStage === 'quick'
                   ? html` <span class="meta-refining" data-testid="meta-quick">· quick results</span>`
-                  : this.refinedStampVisible
+                  : this.refinedStampVisible && getShowDeveloperTools()
                     ? html` <span class="meta-refined" data-testid="meta-refined">refined ✓</span>`
                     : nothing}`
-            : html`<span class="meta-empty">No matches for "${s.query}"</span>`}
+            : html`<span class="meta-empty">0 files</span>`}
       </div>
-      ${s.results.length > 0
+      ${s.results.length > 0 && getShowDeveloperTools()
         ? html`<div class="copy-actions" data-testid="copy-actions">
             ${this.renderCopyBtn('md', 'Copy as Markdown', 'MD')}
             ${this.renderCopyBtn('json', 'Copy as JSON', 'JSON')}
@@ -555,6 +599,7 @@ export class ResultsCard extends JfElement {
     const selected = isLive && this.selectedIds.has(hit.id);
     const view = projectResultView(hit as unknown as ResultViewInput);
     const query = this.snapshot?.query ?? '';
+    const roots = getFirstUse().roots;
     return html`
       <div
         class=${selected ? 'row selected' : 'row'}
@@ -594,7 +639,7 @@ export class ResultsCard extends JfElement {
           ${/* Tempdoc 811 (C-1a) — the corpus marker: a hit from a named non-default collection
                 says so on the row, so the built-in help docs JustSearch ships (UIX-015) are not
                 silently indistinguishable from the user's own documents. */ ''}
-          ${view.collection
+          ${view.collection && (getShowDeveloperTools() || view.collection.collection === 'justsearch-help')
             ? html`<span
                 class="collection-pill"
                 data-testid="collection-pill"
@@ -603,6 +648,8 @@ export class ResultsCard extends JfElement {
                 title=${view.collection.title}
               >${view.collection.label}</span>`
             : nothing}
+          ${typeof hit.modifiedAt === 'number' && Number.isFinite(hit.modifiedAt) && Math.abs(hit.modifiedAt) <= 8.64e15
+            ? html`<time datetime=${new Date(hit.modifiedAt).toISOString()} title=${formatDateTime(new Date(hit.modifiedAt))}>${new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' }).format(new Date(hit.modifiedAt))}</time>` : nothing}
           ${isLive
             ? html`<button
                 class="row-actions"
@@ -617,18 +664,19 @@ export class ResultsCard extends JfElement {
               >⋯</button>`
             : nothing}
         </div>
-        <div class="path" title=${hit.path}>
+        ${roots !== null && roots <= 1 ? nothing : html`<div class="path" title=${hit.path}>
           ${/* Tempdoc 738 (C4) — Simple shows the humanized breadcrumb (empty for a root file, which is
                 fine — the filename is already the row title); Detailed shows the full path. No raw-path
                 fallback in Simple, so a drive-root file can't re-leak the raw path (728 review §1). */ ''}
           ${isAdvancedMode() ? formatDisplayPath(hit.path) : formatLocationBreadcrumb(hit.path)}
-        </div>
+        </div>`}
         ${view.snippet
           ? html`<div class="snippet" data-snippet-source=${view.snippetSource}>
               ${highlightTerms(view.snippet, query)}
             </div>`
           : nothing}
-        ${renderWhyDisclosure(hit as unknown as WhyHit)}
+        ${this.whyId === hit.id ? renderWhyDisclosure(hit as unknown as WhyHit) : nothing}
+        ${this.copyReceipt.active?.key === hit.id ? html`<span class="row-receipt" role="status">${this.copyReceipt.active.message}</span>` : nothing}
       </div>
     `;
   }
@@ -736,6 +784,36 @@ export class ResultsCard extends JfElement {
     </button>`;
   }
 
+  private renderFilters(): TemplateResult {
+    const dates = getFilters();
+    const from = dates.modifiedFromMs, to = dates.modifiedToMs;
+    const start = new Date(); start.setHours(0, 0, 0, 0);
+    const preset = !to && [7, 30, 365].find(days => { const day = new Date(start); day.setDate(day.getDate() - days); return from === day.getTime(); });
+    const label = !from && !to ? 'Any time' : preset ? String(preset) : 'Custom dates';
+    const facets = this.snapshot?.facets as Parameters<typeof renderFacetChips>[0];
+    return html`<div class="result-filters" role="group" aria-label="Result filters">
+      <button type="button" class="text-filter" data-testid="type-all" aria-pressed=${String(!(this.facetSelections.file_kind?.length))}
+        @click=${() => this.emitCard('card-facet-toggle', { field: 'file_kind', value: null })}>All</button>
+      ${renderFacetChips(this.snapshot?.countsPending ? null : facets, this.facetSelections,
+        { fields: ['file_kind'], pendingValues: this.snapshot?.countsPending ? this.lastFacets : null,
+          onToggle: (field, value) => this.emitCard('card-facet-toggle', { field, value }) })}
+      <select class=${label === 'Any time' ? 'text-filter' : 'text-filter active'} aria-label="Modified date"
+        @change=${(event: Event) => {
+          const value = (event.target as HTMLSelectElement).value;
+          if (value === 'any') setFilterRange(undefined, undefined);
+          else if (value !== 'custom') {
+            const day = new Date(); day.setHours(0, 0, 0, 0); day.setDate(day.getDate() - Number(value));
+            setFilterRange(day.getTime(), undefined);
+          }
+        }}>
+        <option value="any" .selected=${label === 'Any time'}>Any time</option><option value="7" .selected=${label === '7'}>Past week</option><option value="30" .selected=${label === '30'}>Past month</option><option value="365" .selected=${label === '365'}>Past year</option>
+        ${label === 'Custom dates' ? html`<option value="custom" .selected=${true}>Custom dates</option>` : nothing}
+      </select>
+      <button type="button" class="text-filter" data-testid="more-filters" aria-expanded=${String(this.moreFiltersOpen)}
+        @click=${() => { this.moreFiltersOpen = !this.moreFiltersOpen; }}>More filters</button>
+    </div>`;
+  }
+
   override render(): TemplateResult | typeof nothing {
     // Search Thread S4-final — a frozen card renders entirely through its own template (the
     // provenance header replaces the live meta line; no facets/copy/Ask AI on a frozen record).
@@ -745,10 +823,14 @@ export class ResultsCard extends JfElement {
     const results = s?.results ?? [];
     if (!s || (!s.isSearching && results.length === 0 && !(s.query ?? '').trim())) return nothing;
     return html`
-      ${this.renderMeta()}
-      ${renderFacetChips((s.countsPending ? null : s.facets) as Parameters<typeof renderFacetChips>[0], this.facetSelections, {
-        onToggle: (field, value) => this.emitCard('card-facet-toggle', { field, value }),
-      })}
+      <div class="result-head">${this.renderMeta()}${this.renderFilters()}</div>
+      ${this.moreFiltersOpen ? html`<div class="more-filters">
+        <jf-sv3-filters .open=${true} .serverError=${this.filterError}
+          @sv3-filters-close=${() => { this.moreFiltersOpen = false; this.renderRoot.querySelector<HTMLElement>('[data-testid="more-filters"]')?.focus(); }}></jf-sv3-filters>
+        ${renderFacetChips((s.countsPending ? null : s.facets) as Parameters<typeof renderFacetChips>[0], this.facetSelections,
+          { fields: ['mime_base', 'language', 'meta_author'], pendingValues: s.countsPending ? this.lastFacets : null,
+            onToggle: (field, value) => this.emitCard('card-facet-toggle', { field, value }) })}
+      </div>` : nothing}
       ${results.length > 0
         ? html`<div class="results-list" role="list" id="search-results-list" aria-label="Search results">
             ${repeat(
@@ -769,6 +851,18 @@ export class ResultsCard extends JfElement {
       :host {
         display: block;
       }
+      .result-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-2); }
+      .result-head .meta { flex: 1 1 auto; padding: 0; margin: 0; }
+      .result-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-2); }
+      .result-filters .facet-row { margin: 0; }
+      .result-filters .facet-group-label { display: none; }
+      .text-filter { font: inherit; font-size: var(--font-size-xs); font-weight: 400; color: var(--text-secondary); border: 0; border-radius: 4px; background: transparent; padding: var(--jf-space-1); cursor: pointer; }
+      .text-filter.active, .text-filter[aria-pressed='true'], .text-filter[aria-expanded='true'], [data-testid='more-filters'] { font-weight: 500; color: var(--text-primary); }
+      .text-filter:focus-visible { outline: 2px solid var(--focus-ring-color); }
+      .row time { margin-inline-start: auto; color: var(--text-secondary); font-size: var(--font-size-xs); font-weight: 400; flex: none; }
+      .hit-why summary, .hit-why-explain { color: var(--text-primary); font-weight: 500; }
+      .hit-why-signal, .hit-why-explain { border: 0; background: transparent; }
+      .row-receipt { color: var(--text-secondary); font-size: var(--font-size-xs); }
       .meta {
         margin-top: 0.4rem;
         padding: 0 1.25rem;
@@ -794,12 +888,10 @@ export class ResultsCard extends JfElement {
       /* Search Thread S1 — the two-stage search's terminal stamp: a brief, calm
          confirmation that the refined pass settled, decaying to the mode text. */
       .meta-refined {
-        color: var(--text-success);
-        font-weight: 600;
+        color: var(--text-secondary);
+        font-weight: 500;
       }
-      .meta-empty {
-        opacity: 0.6;
-      }
+      .meta-empty { color: var(--text-secondary); }
       .retrieval-mode {
         color: var(--text-tertiary);
       }
@@ -840,7 +932,7 @@ export class ResultsCard extends JfElement {
         color: var(--text-success);
         border-color: var(--accent-success);
         background: var(--accent-success-16);
-        font-weight: 600;
+        font-weight: 500;
       }
       .copy-actions jf-control.copy-btn {
         border: none;
@@ -867,7 +959,7 @@ export class ResultsCard extends JfElement {
         padding: 0.5rem 0;
       }
       .row {
-        padding: 0.625rem 1.25rem;
+        padding: var(--jf-space-3) 0;
         cursor: pointer;
         border-left: 2px solid transparent;
       }
@@ -882,7 +974,7 @@ export class ResultsCard extends JfElement {
         display: flex;
         align-items: center;
         gap: 0.4rem;
-        color: var(--text-link);
+        color: var(--text-primary);
         font-size: var(--font-size-sm);
         font-weight: 500;
         overflow: hidden;
@@ -910,8 +1002,8 @@ export class ResultsCard extends JfElement {
       .row .collection-pill {
         flex-shrink: 0;
         padding: 0.05rem 0.45rem;
-        border: 1px solid var(--border-subtle);
-        border-radius: 14px;
+        border: 0;
+        border-radius: 4px;
         background: var(--surface-2);
         color: var(--text-tertiary);
         font-size: var(--font-size-xs);
@@ -920,20 +1012,20 @@ export class ResultsCard extends JfElement {
       }
       .row .collection-pill[data-tone='help'] {
         background: var(--surface-active);
-        border-color: var(--accent-command);
+        border-color: var(--border-subtle);
         color: var(--text-primary);
       }
       .row .path {
         font-size: var(--font-size-xs);
         color: var(--text-secondary);
-        font-family: monospace;
+        font-family: inherit;
         margin-top: 0.125rem;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
       .row .snippet {
-        font-size: var(--font-size-xs);
+        font-size: var(--font-size-sm);
         color: var(--text-secondary);
         margin-top: 0.25rem;
         line-height: 1.4;
@@ -943,7 +1035,7 @@ export class ResultsCard extends JfElement {
         overflow: hidden;
       }
       .row .row-actions {
-        margin-left: auto;
+        margin-inline-start: auto;
         padding: 0 0.4rem;
         font-size: var(--font-size-sm);
         font-family: inherit;
@@ -956,8 +1048,9 @@ export class ResultsCard extends JfElement {
         opacity: 0;
         flex-shrink: 0;
       }
+      .row time + .row-actions { margin-inline-start: var(--jf-space-1); }
       .row:hover .row-actions,
-      .row .row-actions:focus-visible {
+      .row:focus-within .row-actions {
         opacity: 1;
       }
       .row .row-actions:hover,
@@ -997,7 +1090,7 @@ export class ResultsCard extends JfElement {
         white-space: nowrap;
       }
       .provenance-actor {
-        font-weight: 600;
+        font-weight: 500;
         color: var(--text-primary);
       }
       .provenance-query {

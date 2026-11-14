@@ -1150,7 +1150,11 @@ export class Sv3Composer extends JfElement {
           transform: none;
         }
       }
-      :host([tier='search']) .band { max-inline-size: 640px; }
+      :host([results]) { padding-block: 0; }
+      :host([results]) .band { max-inline-size: var(--measure-prose); }
+      :host([results]) .search-field .field { padding: 0; }
+      :host([results]) .disclosures { display: none; }
+      :host([tier='search']:not([results])) .band { max-inline-size: 640px; }
       :host([tier='search'][state='hero']) { padding-block: 0; }
       :host([state='hero']) { overflow-y: auto; }
       :host([state='hero']) .band { margin-block: auto; padding-block: var(--space-8); }
@@ -1190,6 +1194,7 @@ export class Sv3Composer extends JfElement {
   declare apiBase: string;
   private stopFirstUse: (() => void) | undefined;
   static properties = {
+    results: { type: Boolean, reflect: true },
     host_: { attribute: false },
     apiBase: { type: String },
     state: { type: String, reflect: true },
@@ -1302,6 +1307,7 @@ export class Sv3Composer extends JfElement {
    * the modifier first and this property second.
    */
   declare tier: Sv3ComposerTier;
+  declare results: boolean;
   /**
    * WP1.1 — the files the next Ask is limited to, in the reader's words, or `''` for none. Shown
    * in Ask mode only, because only an Ask carries it, with the one control that drops it.
@@ -1723,7 +1729,7 @@ export class Sv3Composer extends JfElement {
           <div class="footer">
             <div class="controls" @focusout=${this.onControlsFocusOut}>
               ${this.tierControl()}${this.tier === 'search' ? nothing : this.effortControl()}
-              ${this.tier === 'search' && this.state === 'hero' && !getShowDeveloperTools() && !this.filtersOpen && !this.filterNote && !this.filterError ? nothing : html`<button type="button" class="composer-control" data-testid="sv3-filters-trigger"
+              ${this.results || this.tier === 'search' && this.state === 'hero' && !getShowDeveloperTools() && !this.filtersOpen && !this.filterNote && !this.filterError ? nothing : html`<button type="button" class="composer-control" data-testid="sv3-filters-trigger"
                 aria-expanded=${String(this.filtersOpen)} aria-controls="sv3-filters"
                 @click=${() => { this.filtersOpen = !this.filtersOpen; this.effortMenuOpen = false; this.tierMenuOpen = false; }}>${localizeResourceKey('search.filters')}</button>`}
               ${this.tier === 'search' ? nothing : this.modelLabelFact()}
@@ -1739,7 +1745,7 @@ export class Sv3Composer extends JfElement {
         </div>
       ${this.state === 'hero' && this.tier === 'search' ? this.corpusLine() : nothing}
       ${this.filterNote && !this.filtersOpen ? html`<p class="notice" data-testid="sv3-filter-note">${this.filterNote}</p>` : nothing}
-      <div class="disclosures"><jf-sv3-filters id="sv3-filters" .open=${this.filtersOpen} .note=${this.filterNote} .serverError=${this.filterError}
+      <div class="disclosures"><jf-sv3-filters ?hidden=${this.results} id="sv3-filters" .open=${this.results ? false : this.filtersOpen} .note=${this.filterNote} .serverError=${this.results ? '' : this.filterError}
         @sv3-filters-close=${() => { this.filtersOpen = false; this.focusTrigger('sv3-filters-trigger'); }}></jf-sv3-filters>
       ${this.recentList()}</div>
       <jf-getting-started .intro=${false} .host_=${this.host_} .apiBase=${this.apiBase ?? ''}></jf-getting-started>

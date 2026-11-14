@@ -543,6 +543,16 @@ export class SearchV3View extends JfElement {
            wheel-scrollable right up to the glass edge. */
         pointer-events: none;
       }
+      :host([search-results]) .reading-column { reading-flow: flex-visual; }
+      :host([search-results]) .reading-column > .dock {
+        order: -1;
+        position: static;
+        flex: none;
+        padding-block-start: var(--space-6);
+      }
+      :host([search-results]) .dock::after { display: none; }
+      :host([search-results]) jf-sv3-context-bar { display: none; }
+      :host([search-results]) jf-sv3-pane { --details-overlay-top: var(--sv3-composer-occlusion); }
       /* Recovery has its own bounded row, like indexing/origin notices. It must not
          share the hero's absolute positioning or the transcript's floating dock. */
       .column > .recovery-notice {
@@ -1584,6 +1594,7 @@ export class SearchV3View extends JfElement {
    * reason.
    */
   protected override willUpdate(changed: Map<string, unknown>): void {
+    this.toggleAttribute('search-results', this.searchAtTop);
     const previousSessions = changed.get('sessions') as Sv3SessionList | undefined;
     if (previousSessions && previousSessions.activeId !== this.sessions.activeId) this.search.leaveForgetPlacement();
     if (changed.has('sessions')) { this.details.upgradeOpenPaneAnchor(); this.details.syncConversation(); }
@@ -2351,7 +2362,7 @@ export class SearchV3View extends JfElement {
   }
 
   private onCardFacetToggle(event: Event): void {
-    this.search.onCardFacetToggle((event as CustomEvent<{ field: string; value: string }>).detail);
+    this.search.onCardFacetToggle((event as CustomEvent<{ field: string; value: string | null }>).detail);
   }
 
   private onCardSelection(event: Event): void {
@@ -2649,6 +2660,8 @@ export class SearchV3View extends JfElement {
    * (Phase F8), so a closed pane is not an inert region holding a stale document, a focusable node
    * and a second reader of the api base.
    */
+  private get searchAtTop(): boolean { return this.tier === 'search' && this.composerState === 'docked' && this.search.showing && !!this.search.snapshot?.query.trim(); }
+
   private pane(): TemplateResult | typeof nothing {
     if (this.paneTab === null) return nothing;
     // The grip is not rendered at all in the overlay presentation, rather than hidden: an overlaid
@@ -2671,6 +2684,7 @@ export class SearchV3View extends JfElement {
       ${keyed(this.paneSource?.sourceUnavailable ? this.paneSource : null, html`<jf-sv3-pane
         data-testid="sv3-pane"
         .docPath=${this.paneDocPath}
+        .sizeBytes=${this.search.snapshot?.results.find(hit => hit.path === this.paneDocPath)?.sizeBytes}
         .highlightRange=${this.paneHighlight}
         .citation=${this.paneCitation}
         .citationHeader=${this.paneCitationHeader}
@@ -2756,7 +2770,7 @@ export class SearchV3View extends JfElement {
       <div
         class="column ${this.hasConversations ? '' : 'no-conversations'}"
         data-testid="sv3-column"
-        ?inert=${this.paneOverlay && this.paneTab !== null}
+        ?inert=${this.paneOverlay && this.paneTab !== null && !this.searchAtTop}
         @sv3-composer-assignment=${this.draftDomain.onHumanAssignment}
         @sv3-composer-state-request=${this.onStateRequest}
         @sv3-schema-change=${(event: CustomEvent<{ text: string }>) => this.draftDomain.changeSchema(event.detail.text)}
@@ -2764,6 +2778,7 @@ export class SearchV3View extends JfElement {
         @sv3-composer-draft=${this.onComposerDraft}
         @sv3-composer-scope-clear=${() => this.draftDomain.clearScope()}
         @sv3-results-filter-remove=${this.onResultsFilterRemove}
+        @sv3-results-filters-clear=${() => this.search.clearResultFilters()}
         @sv3-results-ask=${this.onResultsAsk}
         @sv3-results-clear-selection=${() => { this.draftDomain.revokeHumanTask(); this.search.select([]); }}
         @card-open=${this.onCardOpen}
@@ -2797,7 +2812,7 @@ export class SearchV3View extends JfElement {
         </div>` : nothing}
         ${this.renderBranchOrigin()}
         ${this.recoveryNotice()}
-        <div class="column">
+        <div class="column reading-column">
         ${this.search.forgetNotice ? html`<div role="status" aria-live="polite" data-testid="sv3-forget-notice">
           <span class="forget-notice">${this.search.forgetNotice}</span>
           <jf-button label="Review in Library" .onActivate=${() => requestSurfaceNavigation('core.library-surface')}>Review in Library</jf-button>
@@ -2806,6 +2821,8 @@ export class SearchV3View extends JfElement {
           .apiBase=${this.apiBase} .host_=${this.host_}
           state=${this.composerState}
           .view=${results}
+          ?results-top=${this.searchAtTop}
+          ?inert=${this.searchAtTop && this.paneOverlay && this.paneTab !== null}
           .forgetAvailable=${this.search.forgetAvailable && !this.search.forgetBusy}
           .turns=${turns}
           .conversationId=${session?.id ?? ''}
@@ -2862,6 +2879,7 @@ export class SearchV3View extends JfElement {
           .corpus=${projectSv3Corpus(this.aiSnapshot)}
           effort=${this.effort}
           tier=${this.tier}
+          ?results=${this.searchAtTop}
           .searchError=${this.search.snapshot?.errorInfo?.code === 'SEARCH_SYNTAX_INVALID' ? this.search.snapshot.error ?? '' : ''}
           .schemaDraft=${this.draftDomain.schemaDraft}
           .filterNote=${this.filterNote}

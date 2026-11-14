@@ -24,8 +24,8 @@ export function matchCountLabel(
   truncated = false,
 ): string {
   if (rankedOnly) {
-    if (shown >= ranked || ranked <= 0) return `Top ${shown.toLocaleString()} ranked`;
-    return `Top ${shown.toLocaleString()} of ${ranked.toLocaleString()} ranked`;
+    if (shown >= ranked || ranked <= 0) return `${shown.toLocaleString()} ranked ${shown === 1 ? 'file' : 'files'}`;
+    return `Showing ${shown.toLocaleString()} of ${ranked.toLocaleString()} ranked files`;
   }
   // §16.2 (M+): when the match scan hit its `maxDocsScanned` cap, `matched` is a lower bound, not
   // an exact count. Render "M+" (the Elasticsearch `track_total_hits` `gte` / Lucene
@@ -38,9 +38,9 @@ export function matchCountLabel(
   // matched exactly. The invariant: the headline's first number always equals the rendered rows,
   // or names both truthfully.
   if (shown > matched && !truncated) {
-    return `${shown.toLocaleString()} ${shown === 1 ? 'result' : 'results'} · ${m} matched exactly`;
+    return `${shown.toLocaleString()} ${shown === 1 ? 'file' : 'files'} · ${m} matched by words`;
   }
-  const noun = matched === 1 && !truncated ? 'match' : 'matches';
+  const noun = matched === 1 && !truncated ? 'file' : 'files';
   if (shown >= matched) return `${m} ${noun}`;
-  return `Top ${shown.toLocaleString()} of ${m} ${noun}`;
+  return `Showing ${shown.toLocaleString()} of ${m} ${noun}`;
 }

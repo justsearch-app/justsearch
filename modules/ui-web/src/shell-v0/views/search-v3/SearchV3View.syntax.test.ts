@@ -111,7 +111,7 @@ it('x5 withholds prior counts and facets while the new query awaits its Engine c
   await main.updateComplete;
   const results = main.shadowRoot!.querySelector('jf-sv3-results') as Mounted;
   await results.updateComplete;
-  expect(results.shadowRoot!.querySelector('jf-results-card')).toBeNull();
+  expect(results.shadowRoot!.querySelector('jf-results-card')?.shadowRoot?.querySelector('[data-testid="search-result-row"]')).toBeNull();
   expect(getSearchState().isRefining).toBe(true);
   expect(getSearchState().isSearching).toBe(false);
   release(good('new')); await settle(view);

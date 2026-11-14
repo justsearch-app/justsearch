@@ -67,6 +67,11 @@ export class Sv3DetailsDomain {
   /** The conversation {@link syncConversation} last saw. */
   private conversation: string | null = null;
   private restorePending = false;
+  private restoring = false;
+
+  private get insideAsk(): boolean {
+    return activeTurns(this.host.sessions()).some(turn => turn.kind === 'ask');
+  }
   private excludedSeen: readonly string[] | undefined = undefined;
   private selected: SelectedItem | null = null;
 
@@ -143,6 +148,7 @@ export class Sv3DetailsDomain {
    * closes it, as it always did. No document is needed, so this writes the tab and not `openPane`.
    */
   openContext(): void {
+    if (!this.insideAsk) return;
     const pane = this.host.pane();
     if (pane.paneTab === SV3_PANE_CONTEXT_TAB) {
       this.host.dismissPane();
@@ -172,7 +178,7 @@ export class Sv3DetailsDomain {
     const unsourced = paneSource === null || paneSource.sourceIndex === SV3_SOURCE_INDEX_ABSENT;
     const reading: DetailsTab[] = paneDocPath !== null && (unsourced || sources.length === 0)
       ? [{ id: SV3_PANE_DOCUMENT_TAB, label: filenameOf(paneDocPath), title: paneDocPath }] : [];
-    return [...sources, ...reading, { id: SV3_PANE_CONTEXT_TAB, label: 'Context', title: 'What the assistant sees' }, ...pluginDetailsTabs()];
+    return [...sources, ...reading, ...(this.insideAsk ? [{ id: SV3_PANE_CONTEXT_TAB, label: 'Context', title: 'What the assistant sees' }] : []), ...pluginDetailsTabs()];
   }
 
   /** What plugin tabs are told is selected: the document on show. One object per document, so a
@@ -234,7 +240,7 @@ export class Sv3DetailsDomain {
   remember(open: boolean): void {
     const id = this.host.sessions().activeId;
     const { paneTab, paneDocPath, paneSource } = this.host.pane();
-    if (id === null || paneTab === null || this.host.sharedInspector()) return;
+    if (this.restoring || id === null || paneTab === null || this.host.sharedInspector()) return;
     rememberDetails(id, { open, tab: paneTab, docPath: paneDocPath ?? '',
       turnId: paneSource?.turnId ?? '', sourceIndex: paneSource?.sourceIndex ?? SV3_SOURCE_INDEX_ABSENT });
   }
@@ -265,16 +271,20 @@ export class Sv3DetailsDomain {
     const pane = this.host.pane();
     if (memory === null || !memory.open || pane.paneTab !== null) { this.restorePending = false; return; }
     const turns = activeTurns(sessions);
-    if (turns.length === 0) return;
+    if (turns.length === 0 && !sessionById(sessions, id)?.history) return;
     this.restorePending = false;
     const turn = turns.find(candidate => candidate.id === memory.turnId) ?? null;
-    if (memory.sourceIndex !== SV3_SOURCE_INDEX_ABSENT) this.selectSource(turn, memory.sourceIndex);
-    else if (memory.docPath !== '') this.host.openPane({ docPath: memory.docPath, anchor: null, turnId: '', sourceIndex: SV3_SOURCE_INDEX_ABSENT });
-    if (memory.tab === SV3_PANE_CONTEXT_TAB || pluginDetailsTabs().some(tab => tab.id === memory.tab)) {
-      this.host.preparePaneBox();
-      pane.paneTab = memory.tab;
-      this.remember(true);
-    }
+    this.restoring = true;
+    try {
+      if (memory.tab === SV3_PANE_CONTEXT_TAB && !this.insideAsk) {
+        if (memory.docPath !== '') this.host.openPane({ docPath: memory.docPath, anchor: null, turnId: '', sourceIndex: SV3_SOURCE_INDEX_ABSENT });
+      } else if (memory.sourceIndex !== SV3_SOURCE_INDEX_ABSENT) this.selectSource(turn, memory.sourceIndex);
+      else if (memory.docPath !== '') this.host.openPane({ docPath: memory.docPath, anchor: null, turnId: '', sourceIndex: SV3_SOURCE_INDEX_ABSENT });
+      if (memory.tab === SV3_PANE_CONTEXT_TAB && this.insideAsk || pluginDetailsTabs().some(tab => tab.id === memory.tab)) {
+        this.host.preparePaneBox();
+        pane.paneTab = memory.tab;
+      }
+    } finally { this.restoring = false; }
   }
 
   /** A plugin tab that left takes the pane back to what it was reading rather than to a blank tab. */
@@ -283,7 +293,7 @@ export class Sv3DetailsDomain {
     const tab = pane.paneTab;
     if (tab?.startsWith('plugin:') && !pluginDetailsTabs().some(candidate => candidate.id === tab)) {
       const source = pane.paneSource;
-      pane.paneTab = pane.paneDocPath === null ? SV3_PANE_CONTEXT_TAB
+      pane.paneTab = pane.paneDocPath === null ? this.insideAsk ? SV3_PANE_CONTEXT_TAB : null
         : source !== null && source.sourceIndex !== SV3_SOURCE_INDEX_ABSENT ? sv3SourceTab(source.sourceIndex) : SV3_PANE_DOCUMENT_TAB;
     }
     this.host.requestUpdate();

@@ -4,6 +4,9 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import { setUiMode, __resetUiModeForTest } from '../../state/uiModeState.js';
 import './DocumentPane.js';
+import { setShowDeveloperTools } from '../../state/developerToolsState.js';
+beforeEach(() => setShowDeveloperTools(true));
+afterEach(() => setShowDeveloperTools(false));
 import type { DocumentPane } from './DocumentPane.js';
 import {
   citationHeader,

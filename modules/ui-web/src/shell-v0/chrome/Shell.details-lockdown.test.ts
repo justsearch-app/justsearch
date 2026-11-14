@@ -62,6 +62,7 @@ __seedForTest({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', pr
 ] });
 document.body.append(document.createElement('jf-shell'));
 window.inspector = await import('/src/shell-v0/state/inspectorState.ts');
+window.developerTools = await import('/src/shell-v0/state/developerToolsState.ts');
 window.tabs = await import('/src/shell-v0/commands/InspectorTabRegistry.ts');
 const { getSurface } = await import('/src/api/registry/SurfaceCatalogClient.ts');
 const stage = () => document.querySelector('jf-shell').shadowRoot.querySelector('jf-stage');
@@ -628,6 +629,7 @@ describe('X1 the reader\u2019s quiet highlight', () => {
     await page.evaluate(mode => document.documentElement.setAttribute('data-theme', mode), theme);
     await conversed(page, 2);
     await openWithEnter(page);
+    await page.evaluate(() => (window as unknown as { developerTools: { setShowDeveloperTools(show: boolean): void } }).developerTools.setShowDeveloperTools(true));
     await page.getByRole('radio', { name: view }).click();
     await page.locator('jf-document-pane .hl-weak').first().waitFor({ timeout: 10_000 });
     await settle(page, 400);

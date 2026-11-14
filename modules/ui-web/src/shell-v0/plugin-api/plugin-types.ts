@@ -629,6 +629,8 @@ export interface SearchSnapshot {
 }
 
 export interface SearchHitSnapshot {
+  readonly modifiedAt?: number;
+  readonly sizeBytes?: number;
   readonly docId: string;
   readonly score: number;
   readonly fields: Readonly<Record<string, string>>;
