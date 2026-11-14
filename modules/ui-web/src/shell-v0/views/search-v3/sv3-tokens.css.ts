@@ -246,7 +246,6 @@ export const sv3Tokens = css`
     --composer-field-min-docked: 1lh;
     --composer-field-max: 12.5rem;
     --floating-content-inset: 0.75rem;
-    --workspace-topbar-height: 52px;
     --workspace-controls-top: 0px;
     /* Plain constants until Tauri window metrics feed them; the reference Electron window-controls
        env() values do not port, only this token indirection does. */

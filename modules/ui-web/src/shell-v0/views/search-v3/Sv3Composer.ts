@@ -232,14 +232,12 @@ export class Sv3Composer extends JfElement {
       }
 
       /* HERO and DOCKED are both overlays over the content region since 859 §B; what distinguishes
-         them is WHERE and HOW MUCH. Hero owns the whole region below the topbar and centres itself
-         in it — hence the flex centring and the topbar-token top inset, rather than a repeated
-         number. Docked is bottom-anchored and publishes its measured height as the transcript's
+         them is WHERE and HOW MUCH. Hero owns the whole content region and centres itself in it. Docked is bottom-anchored and publishes its measured height as the transcript's
          occluded band; its positioning lives on the window's '.dock', not here, because the context
          bar rides with it and the pair has to be ONE observable box. */
       :host([state='hero']) {
         position: absolute;
-        inset: var(--workspace-topbar-height) 0 0 0;
+        inset: 0;
         z-index: var(--z-overlay);
         display: flex;
         justify-content: center;
@@ -285,7 +283,7 @@ export class Sv3Composer extends JfElement {
       .disclosures:has(jf-sv3-filters[open]) .recents { margin-block-start: var(--space-1); }
       .disclosures:has(jf-sv3-filters[open]) .recent-heading { flex-wrap: wrap; }
 
-      :host([state='docked']) .band:has(jf-sv3-filters[open]) { max-block-size: calc(100dvh - var(--workspace-topbar-height) - var(--space-16)); }
+      :host([state='docked']) .band:has(jf-sv3-filters[open]) { max-block-size: calc(100dvh - var(--frame-topbar-height) - var(--space-16)); }
       .band {
         position: relative;
         width: 100%;

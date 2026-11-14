@@ -188,8 +188,8 @@ const layout = (page: Page) => page.evaluate(() => {
   walk(shell.querySelector('jf-top-bar')!.shadowRoot!);
   const buttons = [...shell.querySelector('jf-engine-loss')!.shadowRoot!.querySelectorAll('jf-button')].map(b => b.getBoundingClientRect());
   const overlaps = buttons.some((a, i) => buttons.some((b, j) => j > i && a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1));
-  const gear = shell.querySelector('jf-top-bar')!.shadowRoot!.querySelector<HTMLElement>('[data-surface-id="core.settings-surface"]');
-  const box = gear?.getBoundingClientRect();
+  const menu = shell.querySelector('jf-top-bar')!.shadowRoot!.querySelector<HTMLElement>('.more-trigger');
+  const box = menu?.getBoundingClientRect();
   let hit: Element | null = box ? document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2) : null;
   while (hit?.shadowRoot) {
     const inner = box ? hit.shadowRoot.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2) : null;
@@ -201,7 +201,7 @@ const layout = (page: Page) => page.evaluate(() => {
     if ((at as Element).localName === 'jf-top-bar') { inBar = true; break; }
     if (at === document.documentElement) break;
   }
-  return { outside, overlaps, sideways: document.scrollingElement!.scrollWidth > innerWidth, settingsReachable: inBar };
+  return { outside, overlaps, sideways: document.scrollingElement!.scrollWidth > innerWidth, menuReachable: inBar };
 });
 
 describe('X1 X2 SC9 the treatment at every size and palette', { timeout: 120_000 }, () => {
@@ -221,7 +221,7 @@ describe('X1 X2 SC9 the treatment at every size and palette', { timeout: 120_000
     expect(placed.outside, 'nothing leaves the window sideways').toEqual([]);
     expect(placed.sideways).toBe(false);
     expect(placed.overlaps, 'the actions do not overlap').toBe(false);
-    expect(placed.settingsReachable, 'Settings in the top bar is not covered').toBe(true);
+    expect(placed.menuReachable, 'Menu in the top bar is not covered').toBe(true);
     for (const { text, ratio } of await contrasts(page)) expect(ratio, `contrast of "${text}"`).toBeGreaterThanOrEqual(4.5);
     // Keyboard: every action is reached in order with a visible focus ring.
     for (const name of ['Try again', 'Open Health', 'Copy report']) {
@@ -234,6 +234,14 @@ describe('X1 X2 SC9 the treatment at every size and palette', { timeout: 120_000
       expect(box.left >= 0 && box.right <= width, `${name} is inside the window`).toBe(true);
     }
     expect(await section(page).evaluate(el => el.getAnimations({ subtree: true }).length), 'no motion').toBe(0);
+    await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    const settings = page.getByRole('menuitem', { name: 'Settings', exact: true });
+    expect(await settings.count(), 'Settings is present during the outage').toBe(1);
+    expect(await settings.isVisible(), 'Settings is visible during the outage').toBe(true);
+    expect(await settings.isEnabled(), 'Settings is enabled during the outage').toBe(true);
+    await settings.click();
+    await expect.poll(() => page.locator('jf-settings-window dialog').evaluate(el =>
+      (el as HTMLDialogElement).open && el.matches(':modal')), { timeout: 4_000 }).toBe(true);
   });
 
   it('adds no axe violation, in both themes and forced colours', async () => {

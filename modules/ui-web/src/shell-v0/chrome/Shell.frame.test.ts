@@ -193,7 +193,9 @@ describe('FR5 saved layouts map onto the frame', () => {
     await invokeAction('core.action.shell.go-to-brain');
     await settle(shell);
     expect(shell.activeId).toBe(BRAIN);
-    // Settings and More stay in every layout.
+    // Menu and its Settings entry stay in every layout.
+    bar(shell).shadowRoot!.querySelector<HTMLButtonElement>('.more-trigger')!.click();
+    await bar(shell).updateComplete;
     expect(bar(shell).shadowRoot!.querySelector('[data-surface-id="core.settings-surface"]')).not.toBeNull();
   });
 

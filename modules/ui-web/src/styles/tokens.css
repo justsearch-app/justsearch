@@ -56,9 +56,9 @@
   --frame-status-ring: 1rem;
   --frame-status-dim: rgba(var(--p-shadow), 0.28);
   /* Frame top bar (shell slice 2): the one bar holding the brand, the area switcher, the status
-     pill, Settings and More. Theme-independent dimensions; colours come from the role tokens. */
-  --frame-topbar-height: 3.5rem;
-  --frame-brand-dot: 0.5625rem;
+     pill and Menu. Theme-independent dimensions; colours come from the role tokens. */
+  --frame-topbar-height: 2.75rem;
+  --frame-brand-dot: 0.5rem;
   --frame-brand-halo: 0.25rem;
   --frame-control-size: 2.25rem;
   --frame-control-radius: 0.5rem;

@@ -56,7 +56,7 @@ describe('status pill drawing', () => {
     expect(trigger().textContent).not.toMatch(/\(\d\)/);
   });
 
-  it('working with a known fraction draws a ring instead of "· N%" text; unknown fractions draw none', async () => {
+  it('working with a known fraction draws a ring and "· N%" text; unknown fractions draw none', async () => {
     pill.status.ai = ai({ installStatus: { state: 'running', totalBytes: 100, downloadedBytes: 40 }, installObservationLive: true,
       aiEngine: { kind: 'installing', stability: { kind: 'settled' }, installFailure: null } } as unknown as Partial<AiState>);
     await flush();
@@ -64,8 +64,8 @@ describe('status pill drawing', () => {
     const ring = trigger().querySelector('svg.ring')!;
     expect(ring.getAttribute('data-percent')).toBe('40');
     expect(ring.querySelector('.arc')!.getAttribute('stroke-dasharray')).toBe('40 100');
-    expect(trigger().querySelector('.label')!.textContent).toBe('Installing AI models');
-    expect(trigger().textContent).not.toContain('%');
+    expect(trigger().querySelector('.label')!.textContent).toBe('Installing AI models · 40%');
+    expect(trigger().textContent).toContain('40%');
     expect(trigger().getAttribute('aria-label')).toBe('Installing AI models · 40%');
     pill.status.ai = ai({ installStatus: { state: 'running' }, installObservationLive: true,
       aiEngine: { kind: 'installing', stability: { kind: 'settled' }, installFailure: null } } as unknown as Partial<AiState>);
@@ -75,10 +75,17 @@ describe('status pill drawing', () => {
   });
 
   it('below 1000 px the pill is an icon (badge or dot) with the same accessible name, without truncated text', async () => {
-    expect(trigger().querySelector('.label')!.textContent).toBe('Up to date');
+    expect(trigger().querySelector('.label')).toBeNull();
     viewport(900); await flush();
     expect(trigger().querySelector('.label')).toBeNull();
-    expect(trigger().querySelector('.symbol')!.textContent).toBe('●');
+    expect(trigger().querySelector('.symbol')!.textContent).toBe('');
+    // The calm dot is drawn by CSS on the empty symbol: a filled, round, success-coloured box of --frame-status-dot.
+    expect(trigger().querySelector('.symbol')!.closest('.calm')).not.toBeNull();
+    const calmDotRule = /\.calm \.symbol \{([^}]*)\}/.exec(
+      ([] as { cssText: string }[]).concat(StatusPill.styles as never).map(c => c.cssText).join(' ').replace(/\s+/g, ' '))?.[1] ?? '';
+    expect(calmDotRule).toMatch(/inline-size: var\(--frame-status-dot\).*block-size: var\(--frame-status-dot\)/);
+    expect(calmDotRule).toMatch(/background: var\(--text-success\)/);
+    expect(calmDotRule).toMatch(/border-radius: var\(--frame-pill-radius\)/);
     expect(trigger().getAttribute('aria-label')).toBe('Up to date');
     proposeEffect({ kind: 'navigate', to: '#one' }, CORE_PROVENANCE, 'agent'); await flush();
     expect(trigger().querySelector('.label')).toBeNull();

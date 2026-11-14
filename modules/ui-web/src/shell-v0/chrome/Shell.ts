@@ -602,7 +602,8 @@ export class Shell extends JfElement {
       box-sizing: border-box;
       color: var(--text-primary);
       font-family: var(--font-native);
-      background: var(--surface-1);
+      /* The page background: the bar and every area sit on it (design rule: the bar is on the page's own background). */
+      background: var(--surface-0);
     }
     jf-top-bar {
       grid-area: topbar;

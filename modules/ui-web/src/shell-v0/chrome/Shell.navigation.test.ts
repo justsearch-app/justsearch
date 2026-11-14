@@ -386,6 +386,8 @@ describe('C9 / FR3 the Settings section is part of the address', () => {
       await area(shell, LIBRARY);
       const length = window.history.length;
       settingsWindow(shell).querySelector('*');
+      shell.shadowRoot!.querySelector('jf-top-bar')!.shadowRoot!.querySelector<HTMLButtonElement>('.more-trigger')!.click();
+      await settle(shell);
       shell.shadowRoot!.querySelector('jf-top-bar')!.shadowRoot!
         .querySelector<HTMLButtonElement>('[data-surface-id="core.settings-surface"]')!.click();
       await settle(shell);
@@ -417,6 +419,8 @@ describe('C9 / FR3 the Settings section is part of the address', () => {
   it('browser Back closes Settings once and keeps the area; Forward reopens it', async () => {
     const shell = await mount();
     await area(shell, BRAIN);
+    shell.shadowRoot!.querySelector('jf-top-bar')!.shadowRoot!.querySelector<HTMLButtonElement>('.more-trigger')!.click();
+      await settle(shell);
     shell.shadowRoot!.querySelector('jf-top-bar')!.shadowRoot!
       .querySelector<HTMLButtonElement>('[data-surface-id="core.settings-surface"]')!.click();
     await settle(shell);
@@ -428,6 +432,8 @@ describe('C9 / FR3 the Settings section is part of the address', () => {
 
   it('a deep link arriving while Settings is open closes it and lands on the window and tab', async () => {
     const shell = await mount();
+    shell.shadowRoot!.querySelector('jf-top-bar')!.shadowRoot!.querySelector<HTMLButtonElement>('.more-trigger')!.click();
+      await settle(shell);
     shell.shadowRoot!.querySelector('jf-top-bar')!.shadowRoot!
       .querySelector<HTMLButtonElement>('[data-surface-id="core.settings-surface"]')!.click();
     await settle(shell);

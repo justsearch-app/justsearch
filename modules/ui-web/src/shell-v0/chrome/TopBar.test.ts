@@ -45,8 +45,8 @@ async function openMore(bar: TopBar): Promise<void> {
 
 afterEach(() => { document.querySelectorAll('jf-top-bar').forEach(el => el.remove()); });
 
-describe('FR1 the top bar: brand, switcher, status slot, Settings, More', () => {
-  it('renders the brand, three areas in order with the active one current, a status slot, Settings and More', async () => {
+describe('FR1 the top bar: brand, switcher, status slot and Menu', () => {
+  it('renders the brand, three areas in order with the active one current, a status slot and Menu', async () => {
     const bar = await mount();
     expect(q(bar, '.brand')!.textContent!.trim()).toBe('JustSearch');
     expect(q(bar, 'nav')!.getAttribute('aria-label')).toBe('Areas');
@@ -54,6 +54,8 @@ describe('FR1 the top bar: brand, switcher, status slot, Settings, More', () => 
     expect(segments.map(s => s.getAttribute('aria-label'))).toEqual(['Search', 'Library', 'AI Brain']);
     expect(segments.map(s => s.getAttribute('aria-current'))).toEqual([null, 'page', null]);
     expect(q(bar, 'slot[name="status"]')).not.toBeNull();
+    expect(q(bar, '.settings-trigger')).toBeNull();
+    await openMore(bar);
     expect(q(bar, '[data-surface-id="core.settings-surface"]')!.getAttribute('aria-label')).toBe('Settings');
     expect(q(bar, '.more-trigger')!.getAttribute('aria-haspopup')).toBe('menu');
   });
@@ -69,6 +71,7 @@ describe('FR1 the top bar: brand, switcher, status slot, Settings, More', () => 
     const bar = await mount();
     const seen = selections(bar);
     all(bar, 'nav .segment')[2]!.click();
+    await openMore(bar);
     q<HTMLButtonElement>(bar, '[data-surface-id="core.settings-surface"]')!.click();
     await openMore(bar);
     q<HTMLButtonElement>(bar, '[role="menu"] [data-surface-id="core.system-surface"]')!.click();
@@ -80,7 +83,7 @@ describe('FR1 the top bar: brand, switcher, status slot, Settings, More', () => 
 
   it('every area and window is addressable by exactly one data-surface-id while a menu is closed', async () => {
     const bar = await mount();
-    for (const id of ['core.search-v3-surface', 'core.library-surface', 'core.brain-surface', 'core.settings-surface']) {
+    for (const id of ['core.search-v3-surface', 'core.library-surface', 'core.brain-surface']) {
       expect(all(bar, `[data-surface-id="${id}"]`), id).toHaveLength(1);
     }
   });
@@ -94,17 +97,17 @@ describe('FR7 the More (⋯) menu', () => {
     });
     await openMore(bar);
     const menu = q(bar, '[role="menu"]')!;
-    expect(menu.getAttribute('aria-label')).toBe('More');
+    expect(menu.getAttribute('aria-label')).toBe('Menu');
     const rows = all(bar, '[role="menu"] [role="menuitem"]');
     expect(rows.map(r => r.querySelector('.item-label')!.textContent)).toEqual(
-      ['System', 'Help & shortcuts', 'About JustSearch', 'Acme notes']);
-    expect(rows[0]!.querySelector('.item-detail')!.textContent).toBe('Health, Activity, Logs');
-    expect(rows[1]!.querySelector('kbd')!.textContent).toBe('F1');
-    expect(rows[1]!.getAttribute('aria-keyshortcuts')).toBe('F1');
+      ['Settings', 'System', 'Help & shortcuts', 'About JustSearch', 'Acme notes']);
+    expect(rows[1]!.querySelector('.item-detail')!.textContent).toBe('Health, Activity, Logs');
+    expect(rows[2]!.querySelector('kbd')!.textContent).toBe('F1');
+    expect(rows[2]!.getAttribute('aria-keyshortcuts')).toBe('F1');
     const groups = all(bar, '[role="menu"] [role="group"]');
     expect(groups.map(g => g.getAttribute('aria-label') ?? bar.shadowRoot!.getElementById(g.getAttribute('aria-labelledby')!)!.textContent))
       .toEqual(['App', 'More']);
-    expect(rows[3]!.getAttribute('data-surface-id')).toBe('vendor.acme.notes-surface');
+    expect(rows[4]!.getAttribute('data-surface-id')).toBe('vendor.acme.notes-surface');
     expect(q(bar, '[data-menu-action="copy-link"]'), 'developer tools stay hidden').toBeNull();
   });
 
@@ -190,6 +193,7 @@ describe('FR2 / FR5 the switcher at the minimal size and under a layout that hid
   it('switcherVisible=false hides the switcher (and its navigation landmark); Settings and More stay', async () => {
     const bar = await mount(b => { b.switcherVisible = false; });
     expect(q(bar, 'nav')!.hidden).toBe(true);
+    await openMore(bar);
     expect(q(bar, '[data-surface-id="core.settings-surface"]')).not.toBeNull();
     expect(q(bar, '.more-trigger')).not.toBeNull();
   });

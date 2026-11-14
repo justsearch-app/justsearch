@@ -24,3 +24,8 @@ if (!customElements.get('jf-interaction-retrospective-panel')) customElements.de
 if (!customElements.get('jf-failed-jobs-drawer')) customElements.define('jf-failed-jobs-drawer', class extends HTMLElement {
   connectedCallback(): void { this.hidden = true; }
 });
+
+// Search's former title band remains a valid saved presentation token. The frame owns its bar.
+if (!customElements.get('jf-sv3-topbar')) customElements.define('jf-sv3-topbar', class extends HTMLElement {
+  connectedCallback(): void { this.hidden = true; }
+});

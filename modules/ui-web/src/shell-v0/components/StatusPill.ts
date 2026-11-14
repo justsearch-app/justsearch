@@ -74,6 +74,11 @@ export class StatusPill extends JfElement {
       border-radius: var(--frame-pill-radius); background: transparent; font: inherit; cursor: pointer; }
     jf-status-badge { min-width: 0; max-width: 100%; }
     jf-status-badge::part(badge) { min-width: 0; max-width: 100%; box-sizing: border-box; }
+    .trigger.calm jf-status-badge::part(badge) { inline-size: 1.875rem; block-size: 1.875rem;
+      padding: 0; justify-content: center; background: transparent; border-color: transparent; }
+    .trigger[aria-expanded='true'] jf-status-badge::part(badge) { background: var(--surface-2); border-color: var(--border-emphasized); }
+    .calm .symbol { inline-size: var(--frame-status-dot); block-size: var(--frame-status-dot);
+      border-radius: var(--frame-pill-radius); background: var(--text-success); }
     .transient-action { font: inherit; font-weight: 500; color: var(--text-primary); background: var(--surface-2); border: 0; border-radius: var(--frame-pill-radius); padding: var(--jf-space-1) var(--jf-space-2); }
     /* Measure the full words; notices that need more than two lines move below the bar. */
     .beside-notice { align-self: center; flex: 0 1 auto; min-width: 0; max-width: var(--frame-menu-width); padding-inline: var(--jf-space-2);
@@ -86,17 +91,19 @@ export class StatusPill extends JfElement {
     .transient-action { white-space: nowrap; flex: none; }
     .content { display: inline-flex; align-items: center; gap: var(--jf-space-2); min-width: 0; }
     .trigger.stale { outline: var(--frame-hairline) dashed var(--border-emphasized); }
-    /* The status words stay whole. In the minimal bar (the top bar's room below 45rem) the action has its own row. */
+    /* The status words stay whole. Keep the minimal bar's action inline so it fits the 44px bar;
+       notices that cannot share that row use the existing below-bar placement. */
     .label { white-space: nowrap; flex: none; }
     .notice-below { display: none; }
     @container (max-width: 44.9375rem) {
-      :host { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; }
+      :host { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
       .label, .trigger.notice .label { display: none; }
       .trigger { grid-column: 1; grid-row: 1; }
       .beside-notice, .notice-below { grid-column: 2; grid-row: 1; display: block;
         min-width: 0; padding-inline: var(--jf-space-1); font-size: var(--font-size-xs); line-height: 1.2;
         color: var(--text-secondary); }
-      .transient-action { grid-column: 1 / -1; grid-row: 2; justify-self: end; font-size: var(--font-size-xs); }
+      .transient-action kbd { display: none; }
+      .transient-action { grid-column: 3; grid-row: 1; justify-self: end; font-size: var(--font-size-xs); }
     }
     :host([notice-under]) .trigger.notice .label { display: none; }
     :host([notice-under]) .beside-notice, :host([notice-under]) .notice-below {
@@ -127,7 +134,7 @@ export class StatusPill extends JfElement {
     kbd { font: inherit; font-size: var(--font-size-xs); color: var(--text-secondary); margin-inline-start: var(--jf-space-2); }
     @media (forced-colors: active) {
       .trigger { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
-      .symbol { color: ButtonText !important; } button:focus-visible { outline-color: Highlight; }
+      .symbol { color: ButtonText !important; } .calm .symbol { background: ButtonText; forced-color-adjust: none; } button:focus-visible { outline-color: Highlight; }
       .count, .count.problems { background: ButtonText; color: ButtonFace; forced-color-adjust: none; }
       .ring .track { stroke: GrayText; } .ring .arc { stroke: ButtonText; }
       .overlay { background: transparent; }
@@ -151,6 +158,7 @@ export class StatusPill extends JfElement {
     if (typeof ResizeObserver !== 'undefined') this.noticeResize = new ResizeObserver(this.relayout);
   }
   override disconnectedCallback(): void {
+    this.parentElement?.style.removeProperty('--frame-status-notice-space');
     super.disconnectedCallback();
     if (connectedPill === this) connectedPill = null;
     document.removeEventListener('keydown', this.keydown);
@@ -224,18 +232,32 @@ export class StatusPill extends JfElement {
   /** Recheck the inline slot on text, font or frame-size changes, including a return from below. */
   private readonly placeNotice = (): void => {
     this.removeAttribute('notice-under');
-    const notice = this.shadowRoot?.querySelector<HTMLElement>('.beside-notice')
-      ?? this.shadowRoot?.querySelector<HTMLElement>(window.innerWidth < 720 ? '.notice-below' : '.trigger.notice .label');
-    if (!notice || !this.parentElement) return;
+    const barHost = this.parentElement;
+    const beside = this.shadowRoot?.querySelector<HTMLElement>('.beside-notice');
+    const below = this.shadowRoot?.querySelector<HTMLElement>('.notice-below');
+    const notice = beside ?? (below && getComputedStyle(below).display !== 'none'
+      ? below : this.shadowRoot?.querySelector<HTMLElement>('.trigger.notice .label'));
+    if (!notice || !barHost) {
+      barHost?.style.removeProperty('--frame-status-notice-space');
+      return;
+    }
     const box = notice.getBoundingClientRect();
-    const bar = this.parentElement.getBoundingClientRect();
+    const bar = barHost.getBoundingClientRect();
     const style = getComputedStyle(notice);
     const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
     if (box.width > 0 && box.height <= lineHeight * 2 + 1
-      && notice.scrollWidth <= notice.clientWidth + 1 && box.top >= bar.top && box.bottom <= bar.bottom) return;
+      && notice.scrollWidth <= notice.clientWidth + 1 && box.top >= bar.top && box.bottom <= bar.bottom) {
+      barHost.style.removeProperty('--frame-status-notice-space');
+      return;
+    }
     this.style.setProperty('--frame-status-notice-top', `${bar.bottom}px`);
     this.setAttribute('notice-under', '');
+    // The bar's own boundary stays 44px. Its grid track also includes this margin, so the
+    // fallback occupies space above the stage instead of covering the window's controls.
+    const height = notice.getBoundingClientRect().height;
+    barHost.style.setProperty('--frame-status-notice-space', `${height}px`);
   };
+
   toggle(): void { if (this.open) this.close(); else if (!modalOwnsFocus()) this.open = true; }
   close(restoreFocus = true): void {
     if (!this.open) return;
@@ -410,6 +432,7 @@ export class StatusPill extends JfElement {
     const placement = notice ? transientPlacement(pill, notice.event.classId) : 'hidden';
     const transient = placement === 'pill' ? notice : undefined;
     const beside = placement === 'beside' ? notice : undefined;
+    const calm = !transient && pill.kind === 'calm';
     const label = transient?.toast?.message ?? `${pill.label}${pill.percent != null ? ` · ${pill.percent}%` : ''}`;
     const symbols = { calm: '●', working: '◌', needs: '!', problems: '!', unreachable: '×', limited: '!', finished: '✓', unknown: '?' };
     // ref-09: the count sits in a badge and the words follow it; a known fraction draws a ring.
@@ -419,19 +442,18 @@ export class StatusPill extends JfElement {
       : !transient && pill.kind === 'working' && pill.percent != null
         ? html`<svg class="ring" viewBox="0 0 20 20" aria-hidden="true" data-percent=${pill.percent}><circle class="track" cx="10" cy="10" r="8"></circle>
           <circle class="arc" cx="10" cy="10" r="8" pathLength="100" stroke-dasharray="${pill.percent} 100" transform="rotate(-90 10 10)"></circle></svg>`
-        : html`<span class="symbol" aria-hidden="true">${symbols[pill.kind]}</span>`;
+        : html`<span class="symbol" aria-hidden="true">${calm ? nothing : symbols[pill.kind]}</span>`;
     const text = transient?.toast?.message ?? (pill.kind === 'needs' && pill.count != null ? (pill.count === 1 ? 'Needs you' : 'Need you')
-      : pill.kind === 'problems' && pill.count != null ? 'Problems right now' : pill.label);
+      : pill.kind === 'problems' && pill.count != null ? 'Problems right now' : label);
     const shown = transient ?? beside;
     // DE6 — the notice's action shows while it can still run; a real reversal carries the Ctrl+Z hint.
     const action = shown && toastActionAvailable(shown) ? shown : undefined;
     const undo = action?.toast?.reversal === true;
     return html`<button type="button" class="trigger ${transient ? 'notice' : pill.kind} ${pill.stale ? 'stale' : ''}"
-      aria-label=${label} aria-expanded=${this.open} aria-haspopup="dialog" title=${transient?.toast?.message ?? "What's going on · Ctrl+Shift+S"}
+      aria-label=${label} aria-expanded=${this.open} aria-haspopup="dialog" title=${calm ? label : transient?.toast?.message ?? "What's going on · Ctrl+Shift+S"}
       @click=${() => this.toggle()} @mouseenter=${() => this.status.pauseTransient(true)} @mouseleave=${() => this.status.pauseTransient(false)}
       @focus=${() => this.status.pauseTransient(true)} @blur=${() => this.status.pauseTransient(false)}>
-      <jf-status-badge .tone=${pill.kind === 'needs' || pill.kind === 'limited' ? 'warning' : pill.kind === 'unreachable' || pill.kind === 'problems' ? 'error' : 'neutral'}><span class="content">${icon}${this.narrow && !transient ? nothing : html`<span class="label">${text}</span>`}
-      ${pill.kind === 'calm' && plugins.length ? html`<span aria-label="Plugin status items">${plugins.length}</span>` : nothing}</span></jf-status-badge></button>
+      <jf-status-badge .tone=${pill.kind === 'needs' || pill.kind === 'limited' ? 'warning' : pill.kind === 'unreachable' || pill.kind === 'problems' ? 'error' : 'neutral'}><span class="content">${icon}${calm || this.narrow && !transient ? nothing : html`<span class="label">${text}</span>`}</span></jf-status-badge></button>
       ${beside?.toast ? html`<span class="beside-notice" role="note" aria-label=${beside.toast.message} data-testid="status-notice" title=${beside.toast.message} @mouseenter=${() => this.status.pauseTransient(true)}
         @mouseleave=${() => this.status.pauseTransient(false)}>${beside.toast.message}</span>` : nothing}
       ${transient?.toast ? html`<span class="notice-below" role="note" title=${transient.toast.message} aria-label=${transient.toast.message}>${transient.toast.message}</span>` : nothing}

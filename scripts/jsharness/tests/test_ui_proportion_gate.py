@@ -511,7 +511,7 @@ class TestRegisterAndCaptureAgreeOnSelectors:
 
         sels = ui_measure._find_proportion_baseline().get("chat-occlusion") or []
         assert "button.trigger.notice" in sels
-        assert '[data-testid="sv3-topbar"]' in sels, "the overlap counterpart must be captured, not just named"
+        assert 'jf-top-bar' in sels, "the overlap counterpart must be captured, not just named"
         assert '[data-testid="sv3-main-scroller"]' in sels
 
     def test_registered_selectors_have_no_duplicates(self):

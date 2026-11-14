@@ -12,7 +12,6 @@ import { describe, it, expect } from 'vitest';
 import { sv3Tokens } from './sv3-tokens.css.js';
 import { sv3Shared } from './sv3-shared-styles.js';
 import { SearchV3View } from './SearchV3View.js';
-import { Sv3Topbar } from './Sv3Topbar.js';
 import { Sv3Sidebar } from './Sv3Sidebar.js';
 import { Sv3SessionRow } from './Sv3SessionRow.js';
 import { Sv3Main } from './Sv3Main.js';
@@ -79,7 +78,6 @@ describe('the geometry tokens the window is built from', () => {
       '--command-shell-inset: 0.5rem',
       '--command-content-inset: 1rem',
       '--floating-content-inset: 0.75rem',
-      '--workspace-topbar-height: 52px',
       '--sidebar-width: 16rem',
       // The collapsed icon rail (tempdoc 822 Phase F5).
       '--sidebar-width-icon: 3rem',
@@ -139,15 +137,6 @@ describe('the geometry tokens the window is built from', () => {
 });
 
 describe('every region reads the tokens rather than re-hardcoding them', () => {
-  it('the topbar takes its height from the workspace token, both floor and ceiling', () => {
-    const styles = styleTextOf(Sv3Topbar);
-    expect(styles).toContain('height: var(--workspace-topbar-height)');
-    expect(styles).toContain('min-height: var(--workspace-topbar-height)');
-    expect(styles).not.toContain('52px');
-    // The icon controls read the control knob, not the surface ladder.
-    expect(styles).toContain('border-radius: var(--control-radius)');
-    expect(styles).toContain('background: var(--toolbar-control-hover)');
-  });
 
   it('the sidebar row reads the control radius and the second-level inset', () => {
     const styles = styleTextOf(Sv3SessionRow);
@@ -197,8 +186,8 @@ describe('every region reads the tokens rather than re-hardcoding them', () => {
     // ladder step the SPEC's composer control uses (px-2.5), since Phase F10 moved the row from
     // the placeholder chips' menu-button referent to `ComposerControl`'s own.
     expect(styles).toContain('padding-inline: calc(var(--space-2-5) - 1px)');
-    // The hero composer hangs off the topbar's own height rather than a second copy of 52px.
-    expect(styles).toContain('inset: var(--workspace-topbar-height) 0 0 0');
+    // The hero uses the full Search content region after the title band retires.
+    expect(styles).toContain('inset: 0;');
     expect(styles).not.toContain('52px');
   });
 
@@ -270,14 +259,7 @@ describe('the sized regions render at exactly their token, not the token plus tr
     expect(host).not.toContain('margin');
   });
 
-  it('the topbar keeps its rule inside the 52px band', () => {
-    const host = hostRuleOf(styleTextOf(Sv3Topbar));
-    expect(host).toContain('height: var(--workspace-topbar-height)');
-    expect(host).toContain('border-bottom: 1px solid var(--toolbar-border)');
-    expect(host).not.toContain('margin');
-    // A max-height below the declared height would shrink the band instead.
-    expect(host).not.toContain('max-height');
-  });
+
 });
 
 /**
