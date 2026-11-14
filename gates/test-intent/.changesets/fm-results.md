@@ -555,3 +555,13 @@ A real Chromium date-choice probe exposed focus loss during the temporary cache 
   "digest": "sha256:1d60e7801ddcb908d429fa7316889397e9847359b86abd27f3c91b8c26b242de"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-2sm6ca5-test-intent",
+  "verdict": "accept",
+  "digest": "sha256:5fafdba00413f831a6d6da10fd8d892bc908ea24fd25855909b3386f469b636a"
+}
+```
