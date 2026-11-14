@@ -16,23 +16,26 @@
         overflow: auto; overflow-wrap: anywhere;
       }
       :is(#boot-frame, #boot-failure) * { box-sizing: border-box; }
-      #boot-frame { pointer-events: none; }
+      #boot-frame { pointer-events: none; background: var(--boot-frame-background, var(--surface-0)); }
       .boot-topbar {
-        --boot-topbar-padding: var(--jf-space-6);
+        --boot-topbar-padding: var(--jf-space-4);
         display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center;
-        min-height: var(--frame-topbar-height); gap: var(--jf-space-3); padding-block: var(--jf-space-2);
+        height: var(--frame-topbar-height); gap: var(--jf-space-4);
         padding-inline: var(--boot-topbar-padding) calc(var(--boot-topbar-padding) + var(--window-controls-inline, 0rem));
-        background: var(--boot-frame-raised, var(--surface-1)); border-bottom: var(--frame-hairline) solid var(--boot-frame-border, var(--border-subtle));
+        background: inherit; border-bottom: var(--frame-hairline) solid var(--boot-frame-border, var(--border-subtle));
         color: var(--boot-frame-muted, var(--text-secondary)); font-size: var(--font-size-sm);
       }
       .boot-brand, .boot-areas, .boot-end, .boot-pill { display: flex; align-items: center; gap: var(--jf-space-3); }
-      .boot-end { justify-content: flex-end; }
-      .boot-brand { color: var(--boot-frame-text, var(--text-primary)); font-size: var(--font-size-md); font-weight: var(--jf-weight-semibold); }
+      .boot-end { justify-content: flex-end; gap: calc(var(--jf-space-1) / 2); }
+      .boot-brand { color: var(--boot-frame-muted, var(--text-secondary)); font-size: var(--font-size-sm); font-weight: var(--jf-weight-medium); gap: var(--jf-space-2); white-space: nowrap; }
       .boot-dot { display: inline-block; width: var(--frame-brand-dot); height: var(--frame-brand-dot); flex: none;
         border-radius: var(--frame-pill-radius); background: var(--boot-frame-muted, var(--text-secondary)); }
-      .boot-areas, .boot-pill { border: var(--frame-hairline) solid var(--boot-frame-border, var(--border-subtle)); border-radius: var(--frame-pill-radius); padding: var(--jf-space-1) var(--jf-space-4); }
-      .boot-areas { gap: var(--jf-space-6); flex-wrap: wrap; }
-      .boot-symbol { font-size: var(--font-size-xl); font-variation-settings: "opsz" 32; }
+      .boot-areas { gap: var(--frame-hairline); padding: calc(var(--jf-space-1) / 2);
+        background: var(--boot-frame-raised, var(--surface-1)); border: var(--frame-hairline) solid var(--boot-frame-border, var(--border-subtle)); border-radius: var(--frame-pill-radius); white-space: nowrap; }
+      .boot-areas span { padding: var(--jf-space-1) calc(var(--jf-space-4) - var(--jf-space-1) / 2); font-weight: var(--jf-weight-medium); }
+      .boot-areas span:first-child { color: var(--boot-frame-text, var(--text-primary)); background: var(--surface-2); border-radius: var(--frame-pill-radius); }
+      .boot-pill { padding: var(--jf-space-1) var(--jf-space-2); border: var(--frame-hairline) solid var(--boot-frame-border, var(--border-subtle)); border-radius: var(--frame-pill-radius); }
+      .boot-symbol { display: inline-grid; place-items: center; inline-size: 1.875rem; block-size: 1.875rem; }
       #boot-failure { display: grid; align-items: safe center; justify-items: center; padding: var(--jf-space-6); }
       .boot-message { width: 100%; max-width: var(--measure-prose); text-align: center; min-width: 0; }
       .boot-message .boot-brand { justify-content: center; }
@@ -48,8 +51,12 @@
       .boot-meta { margin-top: var(--jf-space-8); color: var(--boot-frame-muted, var(--text-secondary)); }
       #boot-report { width: 100%; min-height: var(--frame-topbar-height); margin-top: var(--jf-space-4); font: inherit;
         color: inherit; background: var(--boot-frame-raised, var(--surface-2)); border: var(--frame-hairline) solid var(--boot-frame-border, var(--border-subtle)); }
-      @media (max-width: 900px) { .boot-topbar { display: flex; justify-content: space-between; flex-wrap: wrap; } }
-      @media (max-width: 600px) { .boot-topbar { --boot-topbar-padding: var(--jf-space-3); } .boot-areas { gap: var(--jf-space-3); } }
+      @media (max-width: 719px) {
+        .boot-topbar { --boot-topbar-padding: var(--jf-space-3); gap: var(--jf-space-2); }
+        .boot-brand .boot-name { display: none; }
+        .boot-areas span { padding-inline: var(--jf-space-2); }
+        .boot-pill { font-size: var(--font-size-xs); }
+      }
       /* Desktop window layer (decorations are off): outside #root, so every root replacement keeps it. */
       :root[data-window-controls] { --window-controls-inline: calc(3 * var(--frame-window-control-size) + 2 * var(--frame-window-control-gap) + var(--frame-window-control-inset)); }
       #window-controls {
@@ -63,8 +70,8 @@
       :root:has(#root > :is(#boot-frame, #boot-failure)) #window-controls {
         --window-control-ink: var(--boot-frame-muted, var(--text-secondary)); --window-control-strong: var(--boot-frame-text, var(--text-primary));
       }
-      /* The frame's bar is raised and the failure page is not: the hover fill is the other surface. */
-      :root:has(#root > #boot-frame) #window-controls { --window-control-fill: var(--boot-frame-background, var(--surface-0)); }
+      /* Hover uses the raised surface over the page background. */
+      :root:has(#root > #boot-frame) #window-controls { --window-control-fill: var(--boot-frame-raised, var(--surface-2)); }
       :root:has(#root > #boot-failure) #window-controls { --window-control-fill: var(--boot-frame-raised, var(--surface-1)); }
       #window-controls button {
         display: inline-grid; place-items: center; box-sizing: border-box; inline-size: var(--frame-window-control-size); block-size: var(--frame-window-control-size);
@@ -100,9 +107,9 @@
     <div id="root">
       <div id="boot-frame">
         <div class="boot-topbar" aria-hidden="true">
-          <span class="boot-brand"><span class="boot-dot"></span>JustSearch</span>
-          <div class="boot-areas"><span>⌕ Search</span><span>▱ Library</span><span>▧ AI Brain</span></div>
-          <div class="boot-end"><span class="boot-pill">Starting</span><span class="boot-symbol">⚙</span><span class="boot-symbol">⋯</span></div>
+          <span class="boot-brand"><span class="boot-dot"></span><span class="boot-name">JustSearch</span></span>
+          <div class="boot-areas"><span>Search</span><span>Library</span><span>AI Brain</span></div>
+          <div class="boot-end"><span class="boot-pill">Starting</span><span class="boot-symbol">⋯</span></div>
         </div>
         <span role="status" aria-label="Starting"></span>
       </div>

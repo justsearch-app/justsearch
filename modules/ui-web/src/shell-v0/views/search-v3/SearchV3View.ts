@@ -355,6 +355,8 @@ export class SearchV3View extends JfElement {
     sv3Tokens,
     sv3Shared,
     css`
+      /* Search sits on the app's page background, the same one the top bar uses (design: #0a0a0c dark). */
+      :host, :host([theme='light']) { --background: var(--surface-0); }
       :host {
         display: flex;
         height: 100%;

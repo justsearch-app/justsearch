@@ -102,6 +102,7 @@ export class StatusPill extends JfElement {
       .beside-notice, .notice-below { grid-column: 2; grid-row: 1; display: block;
         min-width: 0; padding-inline: var(--jf-space-1); font-size: var(--font-size-xs); line-height: 1.2;
         color: var(--text-secondary); }
+      .transient-action kbd { display: none; }
       .transient-action { grid-column: 3; grid-row: 1; justify-self: end; font-size: var(--font-size-xs); }
     }
     :host([notice-under]) .trigger.notice .label { display: none; }
@@ -157,6 +158,7 @@ export class StatusPill extends JfElement {
     if (typeof ResizeObserver !== 'undefined') this.noticeResize = new ResizeObserver(this.relayout);
   }
   override disconnectedCallback(): void {
+    this.parentElement?.style.removeProperty('--frame-status-notice-space');
     super.disconnectedCallback();
     if (connectedPill === this) connectedPill = null;
     document.removeEventListener('keydown', this.keydown);
@@ -230,18 +232,32 @@ export class StatusPill extends JfElement {
   /** Recheck the inline slot on text, font or frame-size changes, including a return from below. */
   private readonly placeNotice = (): void => {
     this.removeAttribute('notice-under');
-    const notice = this.shadowRoot?.querySelector<HTMLElement>('.beside-notice')
-      ?? this.shadowRoot?.querySelector<HTMLElement>(window.innerWidth < 720 ? '.notice-below' : '.trigger.notice .label');
-    if (!notice || !this.parentElement) return;
+    const barHost = this.parentElement;
+    const beside = this.shadowRoot?.querySelector<HTMLElement>('.beside-notice');
+    const below = this.shadowRoot?.querySelector<HTMLElement>('.notice-below');
+    const notice = beside ?? (below && getComputedStyle(below).display !== 'none'
+      ? below : this.shadowRoot?.querySelector<HTMLElement>('.trigger.notice .label'));
+    if (!notice || !barHost) {
+      barHost?.style.removeProperty('--frame-status-notice-space');
+      return;
+    }
     const box = notice.getBoundingClientRect();
-    const bar = this.parentElement.getBoundingClientRect();
+    const bar = barHost.getBoundingClientRect();
     const style = getComputedStyle(notice);
     const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
     if (box.width > 0 && box.height <= lineHeight * 2 + 1
-      && notice.scrollWidth <= notice.clientWidth + 1 && box.top >= bar.top && box.bottom <= bar.bottom) return;
+      && notice.scrollWidth <= notice.clientWidth + 1 && box.top >= bar.top && box.bottom <= bar.bottom) {
+      barHost.style.removeProperty('--frame-status-notice-space');
+      return;
+    }
     this.style.setProperty('--frame-status-notice-top', `${bar.bottom}px`);
     this.setAttribute('notice-under', '');
+    // The bar's own boundary stays 44px. Its grid track also includes this margin, so the
+    // fallback occupies space above the stage instead of covering the window's controls.
+    const height = notice.getBoundingClientRect().height;
+    barHost.style.setProperty('--frame-status-notice-space', `${height}px`);
   };
+
   toggle(): void { if (this.open) this.close(); else if (!modalOwnsFocus()) this.open = true; }
   close(restoreFocus = true): void {
     if (!this.open) return;

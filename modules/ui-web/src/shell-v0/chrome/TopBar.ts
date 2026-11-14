@@ -113,6 +113,7 @@ export class TopBar extends JfElement {
       box-sizing: border-box;
       min-width: 0;
       height: var(--frame-topbar-height);
+      margin-block-end: var(--frame-status-notice-space, 0px);
       padding-inline-end: var(--window-controls-inline, 0rem);
       background: var(--surface-0);
       border-bottom: var(--frame-hairline) solid var(--border-subtle);
