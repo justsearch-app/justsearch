@@ -2473,3 +2473,13 @@ Repair follow-through (current bounded assignment, 2026-11-14): the count lifeti
   "note": "FirstMinutes.availability.test.ts and FirstMinutes.test.ts are not isolated: existing SearchV3View.honesty.test.ts, SearchV3View.ask.test.ts and sv3-sessions.test.ts read them as source-scan inputs. They need full test-intent entries or relocation outside those scan domains; do not weaken the scanners."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1da5c-e419-75b3-a2a7-f5e8d9235361",
+  "verdict": "accept",
+  "digest": "sha256:8f7e217d29d1ffaa481dc4a5453085c02c94fad87a5abaf676a6089c16ecc7db"
+}
+```
