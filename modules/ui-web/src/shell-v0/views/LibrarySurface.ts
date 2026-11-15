@@ -2465,7 +2465,11 @@ export class LibrarySurface extends JfElement {
         ${this.noWatchedFolders() ? nothing : html`<button type="button" class="text-action" data-reread
           aria-disabled=${this.rereadBusy ? 'true' : 'false'}
           aria-expanded=${String(this.rereadConfirmOpen)} aria-controls="reread-confirmation"
-          @click=${() => { if (!this.rereadBusy) this.rereadConfirmOpen = true; }}>Read everything again</button>
+          @click=${() => { if (!this.rereadBusy) this.rereadConfirmOpen = true; }}
+          @keydown=${(event: KeyboardEvent) => {
+            if (event.key !== 'Escape' || event.isComposing || !this.rereadConfirmOpen) return;
+            event.preventDefault(); event.stopPropagation(); this.cancelReread();
+          }}>Read everything again</button>
         <div id="reread-confirmation" class="reread-confirmation" aria-live="polite">${this.rereadConfirmOpen ? html`
           <section role="region" aria-label="Read every watched folder again?" @keydown=${(event: KeyboardEvent) => {
             if (event.key !== 'Escape' || event.isComposing) return;

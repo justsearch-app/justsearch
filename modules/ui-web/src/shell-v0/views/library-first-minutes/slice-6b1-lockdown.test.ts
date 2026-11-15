@@ -111,3 +111,18 @@ it('Escape on either answer closes the ask, runs nothing and returns focus to Re
     expect(await invocations(page)).toBe(0);
   } finally { await page.close(); }
 });
+it('Escape right after opening, with focus still on Read everything again, closes the ask and runs nothing', async () => {
+  const page = await open();
+  try {
+    const action = page.getByRole('button', { name: 'Read everything again', exact: true });
+    const ask = page.getByRole('region', { name: 'Read every watched folder again?', exact: true });
+    await action.focus(); await page.keyboard.press('Enter'); await settle(page);
+    expect(await ask.count()).toBe(1);
+    expect(await focused(page)).toBe('action');
+    await page.keyboard.press('Escape'); await settle(page);
+    expect(await ask.count()).toBe(0);
+    expect(await focused(page)).toBe('action');
+    expect(await action.getAttribute('aria-expanded')).toBe('false');
+    expect(await invocations(page)).toBe(0);
+  } finally { await page.close(); }
+});
