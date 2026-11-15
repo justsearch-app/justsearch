@@ -81,14 +81,18 @@ export class ContextMenu extends JfElement {
 
   static styles = [menuStyles, css`:host { display: contents; }`];
 
+  /** Focus moves into the confirmation dialog; that is not leaving the menu. */
+  private confirming = false;
+
   private async invoke(action: ContextMenuAction): Promise<void> {
     if (action.requiresConfirmation) {
+      this.confirming = true;
       const ok = await confirmAsync({
         title: action.requiresConfirmation.title,
         message: action.requiresConfirmation.message,
         variant: action.requiresConfirmation.variant ?? 'danger',
         confirmLabel: action.requiresConfirmation.confirmLabel,
-      });
+      }).finally(() => { this.confirming = false; });
       if (!ok) {
         this.cancel();
         return;
@@ -111,7 +115,7 @@ export class ContextMenu extends JfElement {
     if (!this.anchor || this.actions.length === 0) return nothing;
     const items = buildItems(this.actions);
     return html`<jf-menu label="File actions" .anchor=${this.anchor}
-      @menu-close=${() => this.cancel()} .content=${html`${items.map(item => {
+      @menu-close=${() => { if (!this.confirming) this.cancel(); }} .content=${html`${items.map(item => {
         if (item.kind === 'separator') return html`<div class="sep" role="separator"></div>`;
         const a = item.action!;
         return html`<button class="item" type="button" role="menuitem" tabindex="-1" ?disabled=${!a.enabled}

@@ -161,18 +161,23 @@ public class IndexingController {
    */
   private static final int MAX_COUNT_FILES = 50_000;
 
-  /** Result of a bounded file count: {@code count} regular files, {@code capped} if the limit hit. */
+  /**
+   * Result of a bounded file count: {@code count} regular files, {@code capped} when the count is a
+   * lower bound — the limit hit, or part of the tree could not be read.
+   */
   private record BoundedCount(long count, boolean capped) {}
 
   /**
    * Counts regular files under {@code root}, terminating early at {@link #MAX_COUNT_FILES}. Mirrors
    * the codebase's idiomatic bounded walk ({@code ExcludesServiceImpl}): a {@link SimpleFileVisitor}
-   * with an early {@code TERMINATE}. Returns {@code count = -1, capped = false} on walk error.
+   * with an early {@code TERMINATE}. An unreadable entry below the root keeps the readable count as a
+   * lower bound ({@code capped}); an unreadable root, or a walk error, is {@code count = -1}.
    */
   private static BoundedCount countFilesBounded(Path root, int cap) {
     final long[] count = {0L};
     final boolean[] capped = {false};
     final boolean[] unreadable = {false};
+    final boolean[] rootUnreadable = {false};
     try {
       Files.walkFileTree(
           root,
@@ -192,6 +197,7 @@ public class IndexingController {
             @Override
             public FileVisitResult visitFileFailed(Path file, java.io.IOException exc) {
               unreadable[0] = true;
+              if (file.equals(root)) rootUnreadable[0] = true;
               return FileVisitResult.CONTINUE;
             }
           });
@@ -199,7 +205,8 @@ public class IndexingController {
       log.warn("Failed to count files under {}", root, e);
       return new BoundedCount(-1L, false);
     }
-    return unreadable[0] ? new BoundedCount(-1L, false) : new BoundedCount(count[0], capped[0]);
+    if (rootUnreadable[0]) return new BoundedCount(-1L, false);
+    return new BoundedCount(count[0], capped[0] || unreadable[0]);
   }
 
   public void handleListRoots(Context ctx) {

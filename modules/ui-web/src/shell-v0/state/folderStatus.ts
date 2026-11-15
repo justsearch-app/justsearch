@@ -30,7 +30,7 @@
 import type { IndexedRootView } from '../../api/generated/schema-types/indexed-root-view.js';
 import type { EnrichmentApplicability } from './indexingProgress.js';
 import { ENRICHMENT_BLOCKED_CAVEAT, ENRICHMENT_CATCHING_UP_CAVEAT } from './enrichmentCoverage.js';
-import { formatFileCount } from '../display/format.js';
+import { formatCount, formatFileCount } from '../display/format.js';
 
 export type FolderState =
   | 'scanning' // walk in progress — files not yet fully enqueued
@@ -81,6 +81,12 @@ export interface FolderStatusContext {
   readonly verifiedRelativeTime: string;
   /** The system `Stability` axis projected to a boolean (`stability.kind === 'provisional'`). */
   readonly provisional: boolean;
+  /**
+   * Whether the provisional state is an observed rebuild of the search data. `false` names another
+   * transition (an Engine outage, a restart), which must not be called "Rebuilding"; absent keeps the
+   * older reading for callers that do not know the cause.
+   */
+  readonly rebuilding?: boolean;
   /**
    * Tempdoc 813 §4 — which parent enrichment stages apply to this deployment, taken from the ONE
    * index-wide progress derivation (`selectIndexingProgress(...).stages`). The wire row carries
@@ -269,10 +275,7 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
     return {
       state: 'unknown',
       glyph: 'pending',
-      metaText:
-        fileCount >= 0
-          ? `${collection} · Rebuilding… · last known ${fileCountText}`
-          : `${collection} · Rebuilding…`,
+      metaText: `${collection} · ${ctx.rebuilding === false ? 'Folder status unconfirmed' : 'Rebuilding…'}${fileCount >= 0 ? ` · last known ${fileCountText}` : ''}`,
       inFlight,
       failed: failedShown,
       failedIsLastKnown,
@@ -307,7 +310,7 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
     return {
       state: 'failed',
       glyph: 'error',
-      metaText: `${collection} · ${walkError}`,
+      metaText: `${collection} · ${walkErrorWords(walkError)}`,
       inFlight,
       failed: failedShown,
       failedIsLastKnown,
@@ -342,7 +345,7 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
             (ctx.indexingPauseReasons ?? [ctx.indexingPauseReason]).includes('schedule') ? 'reading hours' : '',
             (ctx.indexingPauseReasons ?? [ctx.indexingPauseReason]).includes('on_battery') ? 'the battery rule to clear' : '',
             (ctx.indexingPauseReasons ?? [ctx.indexingPauseReason]).includes('user_paused') ? 'Resume' : '',
-          ].filter(Boolean).join(' and ')}` : 'Waiting for Resume' : ctx.retryWaiting ? 'Waiting to retry' : 'Reading'} · ${inFlight.toLocaleString()} remaining${ctx.indexingPaused && deleteDetectionUnverified ? " · couldn't verify deletions — read again to be sure" : ''}`,
+          ].filter(Boolean).join(' and ')}` : 'Waiting for Resume' : ctx.retryWaiting ? 'Waiting to retry' : 'Reading'} · ${formatCount(inFlight)} remaining${ctx.indexingPaused && deleteDetectionUnverified ? " · couldn't verify deletions — read again to be sure" : ''}`,
       inFlight,
       failed: failedShown,
       failedIsLastKnown,
@@ -573,7 +576,30 @@ export interface FolderAttention {
 const WALK_ERROR_WORDS: Readonly<Record<string, string>> = {
   INCOMPLETE_COVERAGE: "The last scan couldn't read every file or subfolder (for example, missing permission). Read again after fixing access.",
   CLIENT_CANCELLED: 'The last scan was cancelled before it finished. Read again to cover the whole folder.',
+  ROOT_NOT_DIRECTORY: 'This folder is missing or is not a folder. Reconnect the drive, or remove it from the library.',
 };
+
+/** Short plain words for the Engine's folder walk codes; the codes themselves are developer detail. */
+const WALK_ERROR_SHORT: Readonly<Record<string, string>> = {
+  ROOT_NOT_DIRECTORY: 'This folder is missing or is not a folder',
+  ROOT_NOT_FILE: 'This folder is missing or is not a folder',
+  ROOT_UNAVAILABLE: 'This folder is missing or is not a folder',
+  INCOMPLETE_COVERAGE: "Some subfolders couldn't be read",
+  CLIENT_CANCELLED: 'The last check was cancelled before it finished',
+  ROOT_IDENTITY_UNAVAILABLE_OR_CHANGED: 'This folder changed since it was added',
+  ROOT_MISMATCH: 'This folder changed since it was added',
+  ROOT_INITIALIZATION_PENDING: 'Getting this folder ready',
+};
+
+/** Whether a walk error is an Engine code rather than words. */
+export function isWalkErrorCode(walkError: string): boolean {
+  return /^[A-Z][A-Z0-9_]+$/.test(walkError.trim());
+}
+
+/** A folder's walk problem in plain words: known codes by name, any other code generically. */
+export function walkErrorWords(walkError: string): string {
+  return WALK_ERROR_SHORT[walkError.trim()] ?? (isWalkErrorCode(walkError) ? "This folder couldn't be read completely" : walkError);
+}
 
 /**
  * The folder conditions behind the Library's "N things need your attention" headline. One source
@@ -585,7 +611,8 @@ export function folderAttention(root: IndexedRootView, status: FolderStatus, nam
   if (status.state === 'unavailable') items.push({ key: `missing:${hash}`, kind: 'missing', title: `${name} can't be found`,
     detail: 'Reconnect the drive or remove it. Last-known read content may still be searchable; read again cannot cover this folder while it is offline.' });
   else if (root.walkError) items.push({ key: `walk:${hash}`, kind: 'walk', title: `${name} needs attention`,
-    detail: WALK_ERROR_WORDS[root.walkError] ?? root.walkError });
+    detail: WALK_ERROR_WORDS[root.walkError]
+      ?? (isWalkErrorCode(root.walkError) ? `${walkErrorWords(root.walkError)}. Check the folder, then read again.` : root.walkError) });
   if (status.failed > 0) items.push({ key: `files:${hash}`, kind: 'files',
     title: `${status.failed} ${status.failed === 1 ? 'file needs' : 'files need'} review · ${name}${status.failedIsLastKnown ? ' · last known' : ''}`,
     detail: 'Review the named files and their reasons, including unreadable sources, exhausted retries and extraction failures.' });

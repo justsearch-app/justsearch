@@ -40,7 +40,7 @@ import '../components/SurfaceTabs.js';
 import type { SurfaceTabs, SurfaceTabItem } from '../components/SurfaceTabs.js';
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { present } from '../display/present.js';
-import { formatFileCount } from '../display/format.js';
+import { formatCount, formatFileCount } from '../display/format.js';
 import { offerReversal, ReversalClosedError } from '../state/ownReversals.js';
 import { FocusKeeper, focusRowsUnder } from '../primitives/focusKeeper.js';
 import '../components/ConfirmBand.js';
@@ -49,7 +49,7 @@ import type { ConfirmBand } from '../components/ConfirmBand.js';
 import { folderName } from '../state/frameStatus.js';
 import { takeIndexingRuleFocus, subscribeIndexingRuleFocus, type IndexingRuleControl } from '../router/indexingRuleIntent.js';
 import { takeMemberTabIntent, subscribeMemberTab } from '../router/memberTabIntent.js';
-import { readIndexedRoots, subscribeIndexedRoots, getIndexedRoots, forgetIndexedRoots } from '../state/indexedRoots.js';
+import { readIndexedRoots, subscribeIndexedRoots, getIndexedRoots, forgetIndexedRoots, withRootCounts } from '../state/indexedRoots.js';
 import { takeLibraryRoot, subscribeLibraryRoot, type LibraryRootRequest } from '../router/libraryRootIntent.js';
 import { resolvePathLazy } from '../hooks/resolvePathLazy.js';
 import { icon } from '../components/Icon.js';
@@ -75,6 +75,7 @@ import { operationOutcomeViewSchema, type OperationOutcomeView } from '../../api
 import {
   folderAttention,
   folderStatus,
+  isWalkErrorCode,
   rootCoverage,
   type FolderStatus,
 } from '../state/folderStatus.js';
@@ -805,9 +806,9 @@ export class LibrarySurface extends JfElement {
     this.developerUnsub = subscribeShowDeveloperTools(show => { this.developer = show; });
     this.rootsUnsub = subscribeIndexedRoots(() => {
       const observation = getIndexedRoots();
-      if (observation.confirmed) this.roots = observation.roots;
-      this.lastKnownFailed = { ...observation.lastKnownFailed };
       this.resolvedPaths = { ...this.resolvedPaths, ...observation.paths };
+      if (observation.confirmed) this.roots = withRootCounts(observation.roots, this.resolvedPaths);
+      this.lastKnownFailed = { ...observation.lastKnownFailed };
     });
     this.rootArrivalUnsub = subscribeLibraryRoot(request => { void this.receiveRoot(request); });
     const rootArrival = takeLibraryRoot();
@@ -1120,6 +1121,7 @@ export class LibrarySurface extends JfElement {
       relativeTime: this.host_.utilities.formatRelativeTime(root.lastIndexedIsoTime ?? ''),
       verifiedRelativeTime: this.host_.utilities.formatRelativeTime(root.lastVerifiedIsoTime ?? ''),
       provisional: this.provisional,
+      rebuilding: this.rebuilding,
       enrichmentStages: this.enrichmentStages,
       enrichmentPending: this.enrichmentPending,
       enrichmentBlocked: this.enrichmentBlocked,
@@ -1147,18 +1149,21 @@ export class LibrarySurface extends JfElement {
     const confirmed = this.indexingActivity.confirmed && !this.rootsUnconfirmed;
     const unknown = !confirmed || this.provisional || fs.state === 'unavailable';
     const files = formatFileCount(root.fileCount, root.fileCountCapped);
-    const statusText = fs.state === 'ready' ? 'Up to date'
+    // Meaning state is said once, in the open row's "Search by meaning" line: a folder that word search
+    // covers, and that nothing else is reading, is up to date.
+    const statusText = fs.state === 'ready' || fs.state === 'keyword-only' || fs.state === 'enriching' && this.enrichmentBlocked ? 'Up to date'
       : fs.state === 'empty' ? 'No files to read'
       : fs.state === 'enriching' ? `Meaning processing${progress?.percent != null ? ` · ${progress.percent}%` : ''}`
       : fs.state === 'failed' && !root.walkError ? 'Files need review'
       : fs.state === 'unverified' ? "Couldn't verify deletions — read again to be sure"
-      : fs.metaText.split(' · ').slice(1).filter(part => !/^(last known )?[\d,]+[+]? files?$|^read |^indexed |^Verified /.test(part)).join(' · ');
+      : fs.metaText.split(' · ').slice(1).filter(part => !/^(last known )?\d[\d.,'\u00a0\u202f\u2019]*[+]? files?$|^read |^indexed |^Verified /.test(part)).join(' · ');
     return {
       expanded: this.expandedFolders.has(pathHash),
-      pathHash, displayPath: name.label, fullPath, pathTitle: name.title, walkError: undefined,
+      pathHash, displayPath: name.label, fullPath, pathTitle: name.title,
+      walkError: this.developer && root.walkError && isWalkErrorCode(root.walkError) ? root.walkError : undefined,
       status: !confirmed && fs.glyph === 'indexed' ? 'pending' : fs.glyph,
       statusText: this.rootsUnconfirmed ? 'Reading status unconfirmed'
-        : !confirmed && fs.state === 'ready' ? this.indexingActivity.summary
+        : !confirmed && statusText === 'Up to date' ? this.indexingActivity.summary
         : statusText,
       metaText: this.removingHashes.has(pathHash) ? 'Removing folder…' : fs.metaText,
       removalBusy: this.removingHashes.has(pathHash),
@@ -1263,11 +1268,10 @@ export class LibrarySurface extends JfElement {
         if (!live) this.error = getIndexedRoots().error;
         return false;
       }
-      const items = observation.roots;
       this.lastKnownFailed = { ...observation.lastKnownFailed };
-      this.roots = items;
-      this.rootsObserved = true;
       this.resolvedPaths = { ...this.resolvedPaths, ...observation.paths };
+      this.roots = withRootCounts(observation.roots, this.resolvedPaths);
+      this.rootsObserved = true;
       // Tempdoc 811 C-2a — only on a full refresh. The probe is a corpus-wide facet scan, far too
       // heavy for the 4-second aiState tick, and non-root sources only change on an ingest.
       if (!live) {
@@ -1936,6 +1940,9 @@ export class LibrarySurface extends JfElement {
       const outcome = parseWireContract(operationOutcomeViewSchema, await response.json(), 'read again outcome');
       if (serial !== this.reindexReadSerial) return;
       this.reindexOutcomeError = outcome.state === 'failed';
+      // The pass changed what each folder last read: read the folders again, counts included, so the
+      // rows' Read times and file counts are the ones after this pass rather than before it.
+      if (outcome.state === 'complete' || outcome.state === 'failed') void readIndexedRoots(path => this.doFetch(path), true, this.apiBase);
       if (outcome.state === 'complete') {
         this.reindexOutcome = 'Read again completed for the recorded request. Current reading activity is shown below.';
         this.reindexOutcomeKey = null;
@@ -1968,7 +1975,7 @@ export class LibrarySurface extends JfElement {
       await this.reindexAccepted(result);
     } catch (err) {
       if (serial !== this.surfaceSerial) return;
-      this.error = `Read again was not confirmed. ${err instanceof Error ? err.message : String(err)} You can retry Read again.`;
+      this.error = `Read again was not confirmed. ${this.actionFailure(err)} You can retry Read again.`;
     }
   }
 
@@ -2073,7 +2080,7 @@ export class LibrarySurface extends JfElement {
           <div class="card-path">
             <span data-testid="library-other-source-name">${source.collection}</span>
           </div>
-          <div class="card-meta">${source.docCount.toLocaleString()} ${noun}</div>
+          <div class="card-meta">${formatCount(source.docCount)} ${noun}</div>
         </div>
         <jf-button
           variant="danger"
@@ -2084,7 +2091,7 @@ export class LibrarySurface extends JfElement {
         </jf-button>
       </div>
       ${this.collectionConfirm === source.collection ? html`<div class="other-source-confirm">
-        <jf-confirm-band heading=${`Remove the ${source.docCount.toLocaleString()} ${noun} added as ${source.collection}?`}
+        <jf-confirm-band heading=${`Remove the ${formatCount(source.docCount)} ${noun} added as ${source.collection}?`}
           consequence="They leave search for good: they were added from outside your watched folders, so nothing adds them back. Files on disk are not touched."
           action-label=${`Remove ${source.collection}`}
           @confirm-band-confirm=${() => void this.confirmRemoveCollection(source)}
@@ -2105,7 +2112,8 @@ export class LibrarySurface extends JfElement {
       const hash = root.pathHash ?? '';
       const name = folderRowLabel(hash, this.resolvedPaths[hash]).label;
       const status = this.rowStatus(root);
-      for (const item of folderAttention(root, status, name)) items.push({ key: item.key, title: item.title, detail: item.detail,
+      for (const item of folderAttention(root, status, name)) items.push({ key: item.key, title: item.title,
+        detail: item.kind === 'walk' && this.developer && root.walkError && isWalkErrorCode(root.walkError) ? `${item.detail} (${root.walkError})` : item.detail,
         band: item.kind === 'missing' || item.kind === 'walk' ? this.attentionBand(hash) : nothing,
         actions: item.kind === 'missing' ? html`<jf-operation context="button" operation-id="core.reconcile-root" .args=${{ pathHash: hash }} api-base=${this.apiBase}
           @op-success=${() => void this.refresh({ force: true })}></jf-operation>
@@ -2150,7 +2158,8 @@ export class LibrarySurface extends JfElement {
           ${item.band ?? nothing}
         </section>`)}
       ${this.indexingActivity.confirmed && this.indexingActivity.detail && !this.indexProgress.pause
-        && (['waiting', 'blocked'].includes(this.indexProgress.phase) || this.indexingActivity.enrichmentDeferred || this.indexingActivity.detail.includes('shares time'))
+        && this.indexProgress.phase !== 'blocked'
+        && (this.indexProgress.phase === 'waiting' || this.indexingActivity.enrichmentDeferred || this.indexingActivity.detail.includes('shares time'))
         ? html`<p class="reading-detail">${this.indexingActivity.detail}</p>` : nothing}
       ${this.renderReindexDecision()}
       ${(this.unfinishedForgets?.items.length ?? 0) > 0 || this.forgetReadStatus === 'unavailable' || this.forgetMessage ? this.renderUnfinishedForgets() : nothing}
@@ -2179,7 +2188,7 @@ export class LibrarySurface extends JfElement {
         : count ? `${count} ${count === 1 ? 'thing needs' : 'things need'} your attention`
           : this.provisional ? this.provisionalHeadline
             : !this.indexingActivity.confirmed ? this.indexingActivity.summary
-              : ['indexing', 'waiting', 'blocked'].includes(this.indexProgress.phase) ? this.indexingActivity.summary
+              : ['indexing', 'waiting'].includes(this.indexProgress.phase) ? this.indexingActivity.summary
               : !this.roots.length ? (documents.known && documents.value > 0 || this.otherSources.sources.some(source => source.docCount > 0) ? 'Your files are searchable' : 'Add a folder to start searching')
                 : !documents.known ? ownUnknown
                   : documents.value === 0 ? 'Reading your files' : 'Your files are searchable';
@@ -2202,6 +2211,19 @@ export class LibrarySurface extends JfElement {
     return `Not known${fallback}`;
   }
 
+  /**
+   * Why a Library action was not confirmed, in the app's words. The Engine's own message names
+   * operations ("core.reindex") and codes; those stay behind developer tools.
+   */
+  private actionFailure(error: unknown): string {
+    const message = (error instanceof Error ? error.message : String(error)).trim();
+    const unreachable = error instanceof OperationError && ['NETWORK_ERROR', 'SERIALIZATION_ERROR'].includes(error.errorClass);
+    const engineWords = /\b[\w-]+\.[\w.-]+|index|HTTP \d/i.test(message) || /\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b/.test(message);
+    const plain = unreachable ? 'The app could not reach the engine.' : engineWords || !message ? 'The engine did not confirm it.'
+      : /[.!?]$/.test(message) ? message : `${message}.`;
+    return this.developer && plain !== message && message ? `${plain} (${message})` : plain;
+  }
+
   private async runLibraryAction(operation: 'core.reindex' | 'core.trigger-offline-processing'): Promise<void> {
     if (this.menuBusy) return;
     this.shadowRoot?.querySelector<HTMLElement>('.more-trigger')?.focus();
@@ -2216,7 +2238,7 @@ export class LibrarySurface extends JfElement {
       else this.actionMessage = `${result.message || 'Reading pass accepted.'} ${typeof result.structuredData?.remaining === 'number' && result.structuredData.remaining > 0
         ? 'Some files are still waiting; another pass may be needed.' : 'Completion of all waiting work has not been confirmed. Check Activity; another pass may be needed.'}`;
     } catch (error) {
-      if (serial === this.surfaceSerial) this.error = `Reading was not confirmed. ${error instanceof Error ? error.message : String(error)} Check Activity before retrying.`;
+      if (serial === this.surfaceSerial) this.error = `Reading was not confirmed. ${this.actionFailure(error)} Check Activity before retrying.`;
     } finally { if (serial === this.surfaceSerial) this.menuBusy = false; }
   }
 
@@ -2234,7 +2256,7 @@ export class LibrarySurface extends JfElement {
           @menu-close=${() => { this.menuOpen = false; }} .content=${html`
           <button type="button" role="menuitem" tabindex="-1" ?disabled=${noFolders || this.menuBusy}
             @click=${() => void this.runLibraryAction('core.reindex')}>${icon({ name: 'refresh-cw', size: 16 })}
-            <span class="item-label">Read everything again${noFolders || totalKnown ? html`<span class="item-detail item-secondary">${noFolders ? 'No folders yet' : `All ${total.toLocaleString()} files`}</span>` : nothing}</span></button>
+            <span class="item-label">Read everything again${noFolders || totalKnown ? html`<span class="item-detail item-secondary">${noFolders ? 'No folders yet' : `All ${formatFileCount(total, false)}`}</span>` : nothing}</span></button>
           <button type="button" role="menuitem" tabindex="-1" ?disabled=${this.waitingWork === 'none' || this.menuBusy}
             @click=${() => void this.runLibraryAction('core.trigger-offline-processing')}>${icon({ name: 'zap', size: 16 })}
             <span class="item-label">Read waiting files now${this.waitingWork === 'none' ? html`<span class="item-detail item-secondary">Nothing is waiting</span>` : nothing}</span></button>
@@ -2287,7 +2309,8 @@ export class LibrarySurface extends JfElement {
         ${this.reindexOutcome}
         ${this.reindexOutcomeKey ? html`<jf-button label="Check reading outcome" .disabled=${this.reindexOutcomeBusy}
           .onActivate=${() => this.checkReindexOutcome()}>Check reading outcome</jf-button>` : nothing}
-        ${this.retryWaiting ? nothing : html`<p>${this.indexingActivity.summary}${this.indexingActivity.detail ? ` — ${this.indexingActivity.detail}` : ''}</p>`}
+        ${this.retryWaiting ? nothing : this.indexProgress.phase === 'blocked' ? html`<p>Up to date</p>`
+          : html`<p>${this.indexingActivity.summary}${this.indexingActivity.detail ? ` — ${this.indexingActivity.detail}` : ''}</p>`}
       </div>` : nothing}
 
 
@@ -2431,7 +2454,7 @@ export class LibrarySurface extends JfElement {
       ${this.developer && !(this.unfinishedForgets?.items.length ?? 0) && this.forgetReadStatus !== 'unavailable' && !this.forgetMessage ? html`<details class="removal-history"><summary>Removal history</summary>${this.renderUnfinishedForgets()}</details>` : nothing}
       <div class="bottom-links">
         ${this.otherSources.sources.length || this.otherSources.truncated ? html`<details><summary>
-          ${this.otherSources.sources.reduce((sum, source) => sum + source.docCount, 0).toLocaleString()} documents from other apps${this.otherSources.truncated ? ' · incomplete list' : ''}
+          ${formatCount(this.otherSources.sources.reduce((sum, source) => sum + source.docCount, 0))} documents from other apps${this.otherSources.truncated ? ' · incomplete list' : ''}
         </summary>${this.renderOtherSources()}</details>` : nothing}
         <jf-button variant="ghost" label="Activity" .onActivate=${() => { this.activityOpen = !this.activityOpen; }}>Activity</jf-button>
         ${this.activeTab === 'folders' && (this.developer || this.activityOpen) ? html`<jf-ingestion-summary compact .host_=${this.host_}></jf-ingestion-summary>` : nothing}

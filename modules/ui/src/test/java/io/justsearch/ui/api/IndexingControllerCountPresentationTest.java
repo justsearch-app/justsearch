@@ -29,6 +29,21 @@ final class IndexingControllerCountPresentationTest {
     assertRootCount(50_000L, true);
   }
 
+  @Test void anUnreadableSubfolderKeepsTheReadableCountAsALowerBound() throws Exception {
+    Files.createFile(root.resolve("one.txt"));
+    Files.createFile(root.resolve("two.txt"));
+    Path locked = Files.createDirectory(root.resolve("locked"));
+    Files.createFile(locked.resolve("hidden.txt"));
+    org.junit.jupiter.api.Assumptions.assumeTrue(
+        locked.toFile().setReadable(false, false) && !Files.isReadable(locked),
+        "needs a file system that can deny reading a folder (not root, not Windows)");
+    try {
+      assertRootCount(2L, true);
+    } finally {
+      locked.toFile().setReadable(true, false);
+    }
+  }
+
   @Test void missingDiskObservationIsUnknownRatherThanAnEmptyFolder() throws Exception {
     Files.delete(root);
     assertRootCount(-1L, false);

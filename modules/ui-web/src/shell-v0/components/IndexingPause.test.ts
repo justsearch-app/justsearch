@@ -515,11 +515,17 @@ describe('WP3.7 verifier layout and focus repairs', () => {
       rootsObserved: true });
     await settle(library);
     const card = () => library.shadowRoot!.querySelector('.card')!;
-    expect(card().textContent).toContain('semantic search waiting for AI install');
+    // V1: the row's status says the word-search state; the meaning caveat is said once, by its name,
+    // in the open row's Search by meaning line.
+    const meaning = () => card().querySelector('.folder-details')?.textContent ?? '';
+    card().querySelector<HTMLButtonElement>('.folder-toggle')!.click(); await settle(library);
+    expect(card().querySelector('.card-meta')?.textContent).toBe('Up to date');
+    expect(meaning()).toMatch(/Search by meaning\s*Needs AI/);
     expect(card().querySelector('.status-icon.pending')).not.toBeNull();
     observe('PAUSED'); await settle(library);
-    expect(card().textContent).toContain('semantic search waiting for AI install');
-    expect(card().textContent).toContain('keyword search ready');
+    expect(card().querySelector('.card-meta')?.textContent).toBe('Up to date');
+    expect(meaning()).toMatch(/Search by meaning\s*Needs AI/);
+    expect(card().textContent).not.toMatch(/semantic search/i);
     expect(card().querySelector('.status-icon.pending')).not.toBeNull();
     expect(card().querySelector('.status-icon.indexed')).toBeNull();
   });

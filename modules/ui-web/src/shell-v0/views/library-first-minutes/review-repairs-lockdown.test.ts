@@ -22,15 +22,33 @@ el.host_ = { data: { fetch: async (url, init) => {
   return Response.json({ files: parent === '/Documents' ? [] : fixture.entries.map(name => ({ docId: parent + '/' + name, fields: { path: parent + '/' + name, filename: name } })) });
 } }, platform: { capabilities: new Set() } };
 document.body.append(el);
-window.settle = async () => { for (let i = 0; i < 35; i++) { await Promise.resolve(); await el.updateComplete; } };
+// A real browser resolves Response.json() on a task, not a microtask: settle lets tasks run too.
+window.settle = async () => { for (let i = 0; i < 35; i++) { await new Promise(resolve => setTimeout(resolve)); await el.updateComplete; } };
+</script></body></html>`;
+const menuHarness = `<!doctype html><html lang="en"><body><button id="trigger">Open</button><span id="anchor"></span><button id="after">After</button>
+<script type="module">
+import '/src/shell-v0/components/Menu.ts';
+window.closes = 0;
+window.openMenu = async label => {
+  const menu = document.createElement('jf-menu');
+  const content = document.createDocumentFragment();
+  for (const name of ['One', 'Two']) {
+    const item = document.createElement('button');
+    item.setAttribute('role', 'menuitem'); item.tabIndex = -1; item.textContent = label + ' ' + name; content.append(item);
+  }
+  menu.label = label; menu.trigger = document.getElementById('trigger'); menu.content = content;
+  menu.addEventListener('menu-close', () => { window.closes++; menu.remove(); });
+  document.getElementById('anchor').append(menu);
+  await menu.updateComplete; await new Promise(resolve => setTimeout(resolve));
+};
 </script></body></html>`;
 beforeAll(async () => {
   scratch = await mkdtemp(path.join(tmpdir(), 'review-repairs-browser-'));
   server = await createServer({ configFile: false, root: process.cwd(), cacheDir: scratch,
     server: { host: '127.0.0.1', port: 0 }, plugins: [{ name: 'review-repairs-fixture', configureServer(vite) {
       vite.middlewares.use((req, res, next) => {
-        if (!req.url?.startsWith('/review-repairs.html')) return next();
-        res.setHeader('Content-Type', 'text/html'); res.end(harness);
+        if (!req.url?.startsWith('/review-repairs.html') && !req.url?.startsWith('/review-repairs-menu.html')) return next();
+        res.setHeader('Content-Type', 'text/html'); res.end(req.url.startsWith('/review-repairs-menu.html') ? menuHarness : harness);
       });
     } }],
   });
@@ -92,5 +110,45 @@ it('a background child reload retains cached rows and real focus, then recovers 
     await settle(page);
     expect(await folder.evaluate(el => el === (el.getRootNode() as ShadowRoot).activeElement)).toBe(true);
     expect(await page.locator('[role="treeitem"][tabindex="0"]').count()).toBe(1);
+  } finally { await page.close(); }
+});
+it('V4: an open folder with nothing to say adds no band above the tree', async () => {
+  const page = await open();
+  try {
+    const folder = page.locator('[data-path="/Documents/Nested"]');
+    expect(await folder.count()).toBe(1);
+    await folder.click(); await settle(page);
+    expect(await page.locator('[data-path="/Documents/Nested/keep.md"]').count()).toBe(1);
+    const notices = page.locator('.notice');
+    expect(await notices.count()).toBe(1);
+    expect((await notices.first().textContent())?.trim()).toBe('');
+    expect(await notices.first().evaluate(el => el.getBoundingClientRect().height)).toBe(0);
+  } finally { await page.close(); }
+});
+type MenuWindow = Window & { openMenu(label: string): Promise<void>; closes: number };
+it('V8: moving focus out of an open menu closes it, by Shift+Tab or otherwise; one menu is open at a time', async () => {
+  const page = await browser.newPage();
+  page.setDefaultTimeout(3000);
+  try {
+    await page.goto(origin + 'review-repairs-menu.html');
+    await page.waitForFunction(() => typeof Reflect.get(window, 'openMenu') === 'function');
+    const open = (label: string) => page.evaluate(name => (window as unknown as MenuWindow).openMenu(name), label);
+    const menus = page.locator('jf-menu');
+    await open('First');
+    expect(await menus.count()).toBe(1);
+    expect(await page.evaluate(() => document.activeElement?.textContent)).toBe('First One');
+    await page.keyboard.press('Shift+Tab');
+    expect(await menus.count()).toBe(0);
+    await open('First');
+    expect(await menus.count()).toBe(1);
+    await page.evaluate(() => document.getElementById('after')!.focus());
+    expect(await menus.count()).toBe(0);
+    await open('First'); await open('Second');
+    expect(await menus.count()).toBe(1);
+    expect(await page.evaluate(() => document.activeElement?.textContent)).toBe('Second One');
+    // A press on the trigger moves focus there too, but its own click toggles (this harness has no
+    // toggle): focus moving by pointer must not close it first and let that click reopen it.
+    await page.locator('#trigger').click();
+    expect(await menus.count()).toBe(1);
   } finally { await page.close(); }
 });

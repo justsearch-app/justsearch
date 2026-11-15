@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import '../LibrarySurface.js';
 import '../BrowseSurface.js';
 import type { LibrarySurface } from '../LibrarySurface.js';
@@ -25,10 +27,19 @@ function observe() {
   __feedForTest({ status: { worker: { core: { indexedDocuments: 8, ownSearchableDocuments: 8,
     indexState: 'IDLE', indexHealthy: true }, migration: { migrationState: 'IDLE' } } } as unknown as StatusSnapshot });
 }
+/** Word search works; no AI is installed, so meaning work waits (the captured no-model enrichment block). */
+function observeNoAi() {
+  __feedForTest({ status: { worker: { core: { indexedDocuments: 8, ownSearchableDocuments: 8, indexState: 'IDLE', indexHealthy: true },
+    migration: { migrationState: 'IDLE' }, enrichment: { embeddingEnabled: false, spladeEnabled: false, nerEnabled: false,
+      embeddingDocCount: 8, embeddingPendingCount: 8, embeddingCoveragePercent: 0, spladeDocCount: 8, spladePendingCount: 8,
+      spladeCoveragePercent: 0, pendingNerCount: 8, completedNerCount: 0,
+      chunk: { chunkDocCount: 2, chunkEmbeddingPendingCount: 2, chunkVectorsReady: false } } },
+  readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] } } } } as unknown as StatusSnapshot });
+}
 const root: IndexedRootView = { pathHash: 'a', status: 'indexed', fileCount: 8, failedCount: 0,
   inFlightCount: 0, walkCompleted: true };
-async function library(row: IndexedRootView = root) {
-  observe();
+async function library(row: IndexedRootView = root, feed: () => void = observe) {
+  feed();
   const host = createMockHostApi();
   host.data.fetch = vi.fn(async path => path.startsWith('/api/indexing-roots/substrate')
     ? Response.json({ items: [row] }) : new Response('{}', { status: 503 }));
@@ -185,4 +196,141 @@ it('remaining source and rebuild messages use reading/search-data wording and pr
   expect(must(el.shadowRoot, '.gap-decision h3').textContent).toBe('Reading everything again');
   expect(must(el.shadowRoot, '.gap-decision').textContent).toContain('current search data stays available');
   expect(el.shadowRoot!.textContent).not.toMatch(/\bindex(?:es|ed|ing)?\b|re-index/i);
+});
+
+it('V1: with no AI installed the Library says each fact once and names meaning only as Search by meaning', async () => {
+  const { el } = await library(root, observeNoAi);
+  expect(el.enrichmentBlocked).toBe(true);
+  expect(must(el.shadowRoot, 'h2').textContent).toBe('Your files are searchable');
+  expect(must(el.shadowRoot, '.card-meta').textContent).toBe('Up to date');
+  must<HTMLButtonElement>(el.shadowRoot, '.folder-toggle').click(); await settle(el);
+  const meaning = [...el.shadowRoot!.querySelectorAll('.folder-details dl > div')].find(row => row.querySelector('dt')?.textContent === 'Search by meaning');
+  expect(meaning).toBeDefined(); expect(must(meaning!, 'dd').textContent).toContain('Needs AI');
+  const text = el.shadowRoot!.textContent ?? '';
+  expect(text).not.toMatch(/semantic search/i);
+  expect(text.match(/Needs AI/g) ?? []).toHaveLength(1);
+});
+
+it('V2: a provisional state that is not an observed rebuild is not called "Rebuilding"', async () => {
+  const { el } = await library();
+  Object.assign(el, { provisional: true, rebuilding: false }); await settle(el);
+  expect(must(el.shadowRoot, '.card-meta').textContent).not.toBe('');
+  expect(el.shadowRoot!.textContent).not.toMatch(/Rebuilding/);
+  Object.assign(el, { rebuilding: true }); el.requestUpdate(); await settle(el);
+  expect(must(el.shadowRoot, '.card-meta').textContent).toContain('Rebuilding');
+});
+
+it('V2: walk codes are plain words, with codes only behind developer tools', async () => {
+  const missing = { ...root, status: 'unavailable', walkError: 'ROOT_NOT_DIRECTORY' };
+  const { el } = await library(missing);
+  Object.assign(el, { provisional: true, rebuilding: false }); await settle(el);
+  expect(el.shadowRoot!.querySelector('.attention-item')).not.toBeNull();
+  let text = el.shadowRoot!.textContent ?? '';
+  expect(text).not.toContain('ROOT_NOT_DIRECTORY');
+  expect(text).toContain('This folder is missing or is not a folder');
+  setShowDeveloperTools(true); await settle(el);
+  must<HTMLButtonElement>(el.shadowRoot, '.folder-toggle').click(); await settle(el);
+  expect(el.shadowRoot!.textContent).toContain('ROOT_NOT_DIRECTORY');
+  setShowDeveloperTools(false);
+  Object.assign(el, { provisional: false, rebuilding: false, roots: [{ ...root, status: 'error', walkError: 'INCOMPLETE_COVERAGE' }] }); await settle(el);
+  expect(must(el.shadowRoot, '.card-meta').textContent).toBe("Some subfolders couldn't be read");
+  text = el.shadowRoot!.textContent ?? '';
+  expect(text).not.toContain('INCOMPLETE_COVERAGE');
+});
+
+it('V4: Browse lists folders and then files by name', async () => {
+  const { el, setEntries } = await browse();
+  setEntries(['b.md', 'A.md', 'c.md']);
+  must<HTMLElement>(el.shadowRoot, '[data-path="/Documents"]').click(); await settle(el);
+  expect(el.shadowRoot!.querySelector('[data-path="/Documents/c.md"]')).not.toBeNull();
+  expect([...el.shadowRoot!.querySelectorAll<HTMLElement>('[role="treeitem"][aria-level="2"]')].map(row => row.dataset.path))
+    .toEqual(['/Documents/Nested', '/Documents/A.md', '/Documents/b.md', '/Documents/c.md']);
+});
+
+it('V4: a total of one file reads "1 file"', async () => {
+  const { el: lib } = await library({ ...root, fileCount: 1, fileCountCapped: false });
+  must<HTMLButtonElement>(lib.shadowRoot, '.more-trigger').click(); await settle(lib);
+  const reread = [...lib.shadowRoot!.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.includes('Read everything again'));
+  expect(reread).toBeDefined();
+  expect(must(reread!, '.item-detail').textContent).toBe('All 1 file');
+});
+
+it('V5: the shared formatter groups digits even where the runtime does not', async () => {
+  const Native = Intl.NumberFormat;
+  vi.spyOn(Intl, 'NumberFormat').mockImplementation(function (locale?: string | string[], options?: Intl.NumberFormatOptions) {
+    return new Native(locale ?? 'en-US', locale === undefined ? { ...options, useGrouping: false } : options);
+  } as unknown as typeof Intl.NumberFormat);
+  expect(new Intl.NumberFormat().format(50000)).toBe('50000');
+  vi.resetModules();
+  const format = await import('../../display/format.js');
+  expect(format.formatFileCount(50_000, true)).toBe('50,000+ files');
+  expect(format.formatCount(1234)).toBe('1,234');
+});
+
+it('V5: Library and Browse show one count per folder, the newest either of them read', async () => {
+  const { el } = await library({ ...root, fileCount: -1 });
+  expect(must(el.shadowRoot, '.files-found').textContent).toBe('');
+  const { el: tree } = await browse([{ path: '/Documents', fileCount: 8, fileCountCapped: false }]);
+  expect(must(tree.shadowRoot, '.row .meta').textContent).toBe('8 files');
+  await settle(el);
+  expect(must(el.shadowRoot, '.files-found').textContent).toBe('8 files');
+});
+
+it('V5: a counted folder read that finishes after a newer counts-free read still delivers its count', async () => {
+  observe();
+  const row = { ...root, pathHash: 'overtaken-count' };
+  let release!: () => void;
+  const held = new Promise<void>(done => { release = done; });
+  const counted = readIndexedRoots(async () => { await held; return Response.json({ items: [{ ...row, fileCount: 8 }] }); }, true);
+  await readIndexedRoots(async () => Response.json({ items: [{ ...row, fileCount: -1 }] }), false);
+  expect(getIndexedRoots().roots.find(item => item.pathHash === row.pathHash)?.fileCount).toBe(-1);
+  release(); await counted;
+  expect(getIndexedRoots().roots.find(item => item.pathHash === row.pathHash)?.fileCount).toBe(8);
+});
+
+const rereadItem = (el: LibrarySurface) => [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+  .find(item => item.textContent?.includes('Read everything again'));
+
+it('V6: when Read everything again completes, the folders are read again so Read shows the new time', async () => {
+  const { el, host } = await library({ ...root, lastIndexedIsoTime: '2026-01-01T00:00:00Z' });
+  host.utilities.formatRelativeTime = (iso: string) => iso ? `at ${iso}` : '';
+  let invoked = 0;
+  vi.stubGlobal('fetch', vi.fn(async () => { invoked++; return Response.json({ success: true, structuredData: { operationKey: '0194f72c-0000-7000-8000-000000000002' } }); }));
+  host.data.fetch = vi.fn(async (path: string) => path.startsWith('/api/operation-history/') ? Response.json({ state: 'complete', historySince: 0 })
+    : path.startsWith('/api/indexing-roots/substrate') ? Response.json({ items: [{ ...root, lastIndexedIsoTime: '2026-02-02T00:00:00Z' }] })
+    : new Response('{}', { status: 503 }));
+  must<HTMLButtonElement>(el.shadowRoot, '.more-trigger').click(); await settle(el);
+  const reread = () => rereadItem(el);
+  expect(reread()).toBeDefined(); reread()!.click(); await settle(el);
+  expect(invoked).toBe(1);
+  expect(el.shadowRoot!.textContent).toContain('Read again completed');
+  must<HTMLButtonElement>(el.shadowRoot, '.folder-toggle').click(); await settle(el);
+  const read = [...el.shadowRoot!.querySelectorAll('.folder-details dl > div')].find(row => row.querySelector('dt')?.textContent === 'Read');
+  expect(read).toBeDefined(); expect(must(read!, 'dd').textContent).toBe('at 2026-02-02T00:00:00Z');
+  vi.unstubAllGlobals();
+});
+
+it('V7: when the Engine cannot be reached, Read everything again says so in plain words; developer tools add the Engine message', async () => {
+  const { el } = await library();
+  const reread = () => rereadItem(el);
+  vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+  must<HTMLButtonElement>(el.shadowRoot, '.more-trigger').click(); await settle(el);
+  expect(reread()).toBeDefined(); reread()!.click(); await settle(el);
+  const banner = must(el.shadowRoot, '.error-banner');
+  expect(banner.textContent).toContain('could not reach the engine');
+  expect(banner.textContent).not.toMatch(/index|core\./i);
+  setShowDeveloperTools(true); await settle(el);
+  must<HTMLButtonElement>(el.shadowRoot, '.more-trigger').click(); await settle(el);
+  expect(reread()).toBeDefined(); reread()!.click(); await settle(el);
+  expect(must(el.shadowRoot, '.error-banner').textContent).toContain('core.reindex');
+  vi.unstubAllGlobals();
+});
+
+it('V7: maintenance actions the command palette shows without developer tools do not say index', () => {
+  const catalog = readFileSync(resolve(process.cwd(), '../app-api/src/main/resources/messages/registry-operation.en.properties'), 'utf8');
+  const labels = Object.fromEntries(catalog.split('\n').filter(line => /^[^#].*=/.test(line)).map(line => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
+  for (const key of ['ops.index-gc.label', 'ops.settle-index.label']) {
+    expect(labels[key], key).toBeDefined();
+    expect(labels[key]).not.toMatch(/index/i);
+  }
 });

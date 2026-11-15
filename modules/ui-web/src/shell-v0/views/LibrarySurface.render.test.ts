@@ -365,7 +365,9 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
     try {
       expect(el.enrichmentBlocked).toBe(true);
       const text = el.shadowRoot?.textContent ?? '';
-      expect(text).toContain('semantic search waiting for AI install');
+      // V1: the qualification is said once, in the open row's Search by meaning line, by that name.
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Search by meaning\s*Needs AI/);
+      expect(text).not.toMatch(/semantic search/i);
       expect(text).not.toContain('fully searchable');
     } finally {
       el.remove();

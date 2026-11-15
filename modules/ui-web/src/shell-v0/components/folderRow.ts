@@ -126,6 +126,7 @@ export function renderFolderRow(f: FolderRow, actions: RowActions): TemplateResu
           title=${failed.title || nothing} data-last-known=${f.failedLastKnown ? 'true' : 'false'}
           .disabled=${disabled} .onActivate=${() => { if (!disabled) actions.invoke('show-failed'); }}>${failed.text}</jf-button>` : 'None reported'}</dd></div>
         ${f.developer ? html`<div><dt>Collection</dt><dd>${f.collection ?? 'default'}</dd></div>
+          ${f.walkError ? html`<div><dt>Reason code</dt><dd><code>${f.walkError}</code></dd></div>` : nothing}
           <div><dt>Searchable by words</dt><dd>${f.wordsVerdict ?? 'Unconfirmed'}</dd></div>
           <div><dt>Meaning processing progress</dt><dd>${f.processingPercent != null ? `${f.processingPercent}%` : 'Unconfirmed'}</dd></div>` : nothing}</dl>
       <dl><div><dt>Read</dt><dd>${f.reading ? 'Reading now' : f.indexedAgo || 'Not yet confirmed'}</dd></div>

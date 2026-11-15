@@ -38,6 +38,7 @@ export const menuStyles = css`
   }
 `;
 let sequence = 0;
+const PRESS_EVENTS = ['pointerdown', 'pointerup', 'click', 'pointercancel'] as const;
 
 /** Light DOM keeps caller-owned rows, selectors and focus in the same shadow boundary. */
 export class Menu extends JfElement {
@@ -60,19 +61,37 @@ export class Menu extends JfElement {
     super(); this.content = nothing; this.label = 'Menu'; this.align = 'end'; this.anchor = null; this.trigger = null;
   }
   protected override createRenderRoot(): HTMLElement { return this; }
+  /** A pointer press in progress; its own click decides (outside dismiss, or the trigger's toggle). */
+  private pressing = false;
+  private readonly onPress = (event: Event): void => {
+    if (event.type === 'pointerdown') this.pressing = true;
+    else setTimeout(() => { this.pressing = false; });
+  };
+  override connectedCallback(): void {
+    super.connectedCallback();
+    for (const type of PRESS_EVENTS) document.addEventListener(type, this.onPress, true);
+  }
+  /** Focus moved out of the menu by keyboard or by code (Tab, Shift+Tab, a shortcut): the menu closes. */
+  private onFocusOut(event: FocusEvent): void {
+    const next = event.relatedTarget;
+    if (this.pressing || next instanceof Node && this.contains(next)) return;
+    this.close(false);
+  }
   protected override firstUpdated(): void {
-    this.transient.open(); this.items()[0]?.focus();
+    this.closed = false; this.transient.open(); this.items()[0]?.focus();
     window.addEventListener('resize', this.place);
   }
   protected override updated(_changed: PropertyValues): void { this.place(); }
   protected override onReveal(): void {
     window.addEventListener('resize', this.place);
     void this.updateComplete.then(() => {
-      if (this.isConnected) { this.transient.open(); this.place(); this.items()[0]?.focus(); }
+      if (this.isConnected) { this.closed = false; this.transient.open(); this.place(); this.items()[0]?.focus(); }
     });
   }
   override disconnectedCallback(): void {
     window.removeEventListener('resize', this.place);
+    for (const type of PRESS_EVENTS) document.removeEventListener(type, this.onPress, true);
+    this.pressing = false;
     if (this.sheetRoot && this.sheet) this.sheetRoot.adoptedStyleSheets = this.sheetRoot.adoptedStyleSheets.filter(sheet => sheet !== this.sheet);
     this.sheet = null; this.sheetRoot = null;
     super.disconnectedCallback();
@@ -94,7 +113,10 @@ export class Menu extends JfElement {
       : `translate:${shiftIntoWindow(box, margin)}px 0;`;
     this.sheet.replaceSync(`[data-menu-id="${this.menuId}"]{${placement}}`);
   };
+  private closed = false;
   close(restoreFocus = true): void {
+    if (this.closed) return;
+    this.closed = true;
     this.transient.close();
     const root = this.getRootNode() as Document | ShadowRoot;
     if (restoreFocus && this.contains(root.activeElement)) this.trigger?.focus();
@@ -117,7 +139,7 @@ export class Menu extends JfElement {
   }
   override render() {
     return html`<div class="menu ${this.anchor ? 'fixed' : `align-${this.align}`}" data-menu-id=${this.menuId}
-      role="menu" aria-label=${this.label} @keydown=${this.onKey}>${this.content}</div>`;
+      role="menu" aria-label=${this.label} @keydown=${this.onKey} @focusout=${this.onFocusOut}>${this.content}</div>`;
   }
 }
 if (!customElements.get('jf-menu')) customElements.define('jf-menu', Menu);

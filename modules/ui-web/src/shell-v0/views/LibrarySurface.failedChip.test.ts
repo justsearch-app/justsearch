@@ -50,7 +50,8 @@ async function mount(
   await el.updateComplete;
   (el as unknown as { roots: IndexedRootView[] }).roots = rows;
   (el as unknown as { lastKnownFailed: Record<string, number> }).lastKnownFailed = lastKnownFailed;
-  (el as unknown as { provisional: boolean }).provisional = provisional;
+  // A provisional fixture here is an observed rebuild: the row may say "Rebuilding" only then (V2).
+  Object.assign(el as unknown as { provisional: boolean; rebuilding: boolean }, { provisional, rebuilding: provisional });
   el.loading = false;
   el.requestUpdate();
   await el.updateComplete;

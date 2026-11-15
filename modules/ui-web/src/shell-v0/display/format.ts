@@ -9,7 +9,12 @@
  * that still format contextual values (e.g. Brain's download/VRAM byte values, which are NOT facts).
  */
 
-const NUM = new Intl.NumberFormat();
+/**
+ * Some webviews (WebKitGTK under a POSIX locale) format numbers without digit groups, so 50000
+ * would read "50000". Group explicitly when the runtime's default locale does not.
+ */
+const LOCAL_NUM = new Intl.NumberFormat();
+const NUM = /\D/.test(LOCAL_NUM.format(10_000)) ? LOCAL_NUM : new Intl.NumberFormat('en-US');
 
 /** Human-readable byte size. Zero/absent → `'0 B'` (the chosen single canonical zero-case). */
 export function formatBytes(n: number | undefined | null): string {

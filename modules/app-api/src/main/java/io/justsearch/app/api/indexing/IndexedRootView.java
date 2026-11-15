@@ -27,6 +27,8 @@ import io.justsearch.agent.api.registry.Nullable;
  *   <li>{@link #fileCount}: last-known indexed file count (cached at
  *       indexing time). Zero is a valid value for an empty / not-yet-indexed
  *       root; not nullable.
+ *   <li>{@link #fileCountCapped}: the disk count is a lower bound ("N+"): the bounded walk hit its
+ *       limit or could not read part of the folder (for example one unreadable subfolder).
  *   <li>{@link #lastIndexedIsoTime}: ISO-8601 wall-clock of last successful
  *       indexing pass; empty string if never indexed.
  *   <li>{@link #status}: derived enum string — "indexed" / "indexing" /

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { getShowDeveloperTools, subscribeShowDeveloperTools } from '../state/developerToolsState.js';
 import { JfElement } from '../primitives/JfElement.js';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
+import { recordRootCounts, rootCount, subscribeIndexedRoots } from '../state/indexedRoots.js';
 import { selectIndexingProgress } from '../state/indexingProgress.js';
 import { unavailableBecause } from '../state/availability.js';
 import { buttonBaseStyles } from '../components/Button.js';
@@ -17,7 +18,7 @@ import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { openLocalFile } from '../plugin-api/capabilities/platform.js';
 import { compose } from '../utils/compose.js';
 import { fileKindPresentation } from '../display/fileKind.js';
-import { formatBytes, formatFileCount, formatShortDate } from '../display/format.js';
+import { formatBytes, formatCount, formatFileCount, formatShortDate } from '../display/format.js';
 import { folderBrowseResponseSchema } from '../../api/generated/schema-types/folder-browse-response.js';
 import { folderFilesResponseSchema } from '../../api/generated/schema-types/folder-files-response.js';
 import { parseWireContract } from '../../api/schemas.js';
@@ -27,6 +28,10 @@ interface BrowseFolder { path: string; name: string; fileCount?: number; fileCou
 interface BrowseFile { path: string; name: string; size?: number; fileKind?: string; mimeBase?: string; modifiedAt?: number }
 type TreeRow = { id: string; path: string; parent?: string; level: number; position: number; size: number; folder?: BrowseFolder; file?: BrowseFile };
 const lastSeg = (path: string): string => path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || path;
+/** Folders, then files, each by name, the order the Engine already gives folders (case-insensitive). */
+const NAMES = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
+const byName = <T extends { name: string; path: string }>(rows: T[]): T[] =>
+  [...rows].sort((a, b) => NAMES.compare(a.name, b.name) || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 
 export class BrowseSurface extends JfElement {
   static properties = {
@@ -54,6 +59,7 @@ export class BrowseSurface extends JfElement {
   declare partial: Record<string, boolean>;
   declare activeRowId: string;
   private aiUnsub: (() => void) | null = null;
+  private countsUnsub: (() => void) | null = null;
   private generation = 0;
   private recoveryParent: Record<string, string | undefined> = {};
   private recoverFocus = false;
@@ -95,6 +101,7 @@ export class BrowseSurface extends JfElement {
     .level-7 .row-name { padding-inline-start: 12.25rem; }
     .level-8 .row-name { padding-inline-start: 14rem; }
     .notice, .empty-state { padding: .5rem; }
+    .notice:empty { padding: 0; }
     .browse-error { margin: .5rem 1.5rem; }
     @media (max-width: 640px) {
       .row, .column-heads { grid-template-columns: minmax(0, 1fr) 4.5rem 6rem 3.75rem; }
@@ -109,9 +116,18 @@ export class BrowseSurface extends JfElement {
     this.developerUnsub = subscribeShowDeveloperTools(show => { this.developer = show; });
     void this.loadRoots();
     this.aiUnsub = subscribeAiState(state => { this.provisional = state.stability.kind === 'provisional'; this.aiState = state; });
+    // Library and Browse show one count per folder: the newest disk count either of them read.
+    this.countsUnsub = subscribeIndexedRoots(() => {
+      if (this.roots.some(root => { const count = rootCount(undefined, root.path); return count && (count.fileCount !== root.fileCount || count.fileCountCapped !== root.fileCountCapped); })) {
+        this.roots = this.roots.map(root => ({ ...root, ...rootCount(undefined, root.path) }));
+      }
+    });
   }
   protected override settleTransients(): void { ++this.generation; this.inflight = {}; this.refreshing = false; this.error = null; }
-  override disconnectedCallback(): void { ++this.generation; this.developerUnsub?.(); this.aiUnsub?.(); this.aiUnsub = null; super.disconnectedCallback(); }
+  override disconnectedCallback(): void {
+    ++this.generation; this.developerUnsub?.(); this.aiUnsub?.(); this.aiUnsub = null; this.countsUnsub?.(); this.countsUnsub = null;
+    super.disconnectedCallback();
+  }
   private doFetch(path: string, body?: unknown): Promise<Response> {
     return this.host_.data.fetch(path, body === undefined ? {} : {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
@@ -124,7 +140,9 @@ export class BrowseSurface extends JfElement {
       const res = await this.doFetch('/api/indexing/roots?counts=true');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = parseWireContract(rootsSchema, await res.json(), '/api/indexing/roots');
-      if (generation === this.generation) this.roots = data.roots.map(root => ({ ...root, name: lastSeg(root.path) }));
+      if (generation !== this.generation) return;
+      recordRootCounts(data.roots);
+      this.roots = data.roots.map(root => ({ ...root, ...rootCount(undefined, root.path), name: lastSeg(root.path) }));
     } catch (error) { if (generation === this.generation) this.error = `Could not load folders. ${error instanceof Error ? error.message : String(error)}`;
     } finally { if (generation === this.generation) this.refreshing = false; }
   }
@@ -142,14 +160,14 @@ export class BrowseSurface extends JfElement {
       const folders = parseWireContract(folderBrowseResponseSchema, await foldersRes.json(), '/api/knowledge/folders');
       const files = parseWireContract(folderFilesResponseSchema, await filesRes.json(), '/api/knowledge/folder-files');
       if (generation !== this.generation) return;
-      this.folderChildren = { ...this.folderChildren, [path]: (folders.folders ?? []).filter(f => f.path).map(f => ({
+      this.folderChildren = { ...this.folderChildren, [path]: byName((folders.folders ?? []).filter(f => f.path).map(f => ({
         path: f.path!, name: f.name || lastSeg(f.path!), fileCount: f.fileCount,
-      })) };
+      }))) };
       const numeric = (value: string | undefined): number | undefined => value !== undefined && value.trim() !== '' && Number.isFinite(Number(value)) ? Number(value) : undefined;
-      this.fileChildren = { ...this.fileChildren, [path]: (files.files ?? []).filter(row => row.fields?.path || row.docId).map(row => ({
+      this.fileChildren = { ...this.fileChildren, [path]: byName((files.files ?? []).filter(row => row.fields?.path || row.docId).map(row => ({
         path: row.fields?.path ?? row.docId!, name: row.fields?.filename ?? lastSeg(row.fields?.path ?? row.docId!),
         fileKind: row.fields?.file_kind, mimeBase: row.fields?.mime_base, size: numeric(row.fields?.size_bytes), modifiedAt: numeric(row.fields?.modified_at),
-      })) };
+      }))) };
       this.partial = { ...this.partial, [path]: folders.truncated === true || (files.totalCount ?? 0) > (files.files?.length ?? 0) };
     } catch (error) {
       if (generation === this.generation) this.folderErrors = { ...this.folderErrors, [path]: `Could not load ${lastSeg(path)}. ${error instanceof Error ? error.message : String(error)}` };
@@ -270,23 +288,27 @@ export class BrowseSurface extends JfElement {
       </span>
     </div>`;
   }
+  /** One status line per open folder; an open folder with nothing to say adds no band above the tree. */
   private renderNotices(): TemplateResult {
     return html`${this.rows().filter(row => row.folder && this.expanded[row.id]).map(({ path }) => {
       const folders = this.folderChildren[path], files = this.fileChildren[path];
       const count = (folders?.length ?? 0) + (files?.length ?? 0);
+      const empty = folders !== undefined && files !== undefined && (this.filter && ![...folders, ...files].some(item => this.matchesFilter(item.name))
+        ? `${lastSeg(path)}: No matching files in the loaded entries.` : count === 0 ? `${lastSeg(path)}: No searchable files in this folder.` : '');
+      const partial = folders !== undefined && files !== undefined && this.partial[path] ? `${lastSeg(path)}: Showing first ${formatCount(count)} entries.` : '';
+      // The live region stays so a later message is announced; with nothing to say it takes no room.
       return html`<div class="notice" role="status">${this.inflight[path] ? `Loading ${lastSeg(path)}…`
         : this.folderErrors[path] ? html`${this.folderErrors[path]} <jf-button variant="ghost" label=${`Retry ${lastSeg(path)}`}
           .onActivate=${() => void this.loadFolder(path)}>Retry</jf-button>`
-        : folders === undefined || files === undefined ? ''
-        : html`${this.partial[path] ? `${lastSeg(path)}: Showing first ${count.toLocaleString()} entries.` : ''}
-          ${this.filter && ![...folders, ...files].some(item => this.matchesFilter(item.name)) ? `${lastSeg(path)}: No matching files in the loaded entries.`
-            : count === 0 ? `${lastSeg(path)}: No searchable files in this folder.` : ''}`}</div>`;
+        : [partial, empty].filter(Boolean).join(' ') || nothing}</div>`;
     })}`;
   }
   override render(): TemplateResult {
     const rows = this.rows();
     const state = this.aiState;
     const activity = selectIndexingProgress(state?.status ?? null, state?.indexingStatusLive ?? false, state?.episodeMaxPendingJobs ?? 0, state?.enrichSettleSamples ?? []).activity;
+    // Only an observed rebuild is called one; another transition (an outage, a restart) is not.
+    const rebuilding = state?.stability.kind === 'provisional' && (state.stability.cause === 'rebuilding' || state.stability.cause === 'generation-switch');
     return html`${this.developer ? html`<div class="header"><jf-button variant="ghost" size="icon" label="Refresh"
       .availability=${this.refreshing ? unavailableBecause('Refreshing…', true) : undefined} .onActivate=${() => void this.refresh()}>
       ${icon({ name: 'refresh-cw', size: 14, spin: this.refreshing })}</jf-button></div>
@@ -299,7 +321,8 @@ export class BrowseSurface extends JfElement {
         ${rows.length ? html`<div role="tree" aria-label="Browse searchable files">${repeat(rows, row => row.id, row => this.renderRow(row))}</div>`
           : html`<div class="empty-state" tabindex="-1" role="status">${this.refreshing ? 'Loading folders…' : this.error ? ''
             : state && !activity.confirmed ? `${activity.summary}. Waiting for a fresh observation of folders.`
-            : this.provisional ? 'Reading your files again… your watched folders will reappear when it finishes.'
+            : this.provisional && rebuilding ? 'Reading your files again… your watched folders will reappear when it finishes.'
+            : this.provisional ? 'Waiting for a fresh observation of folders.'
             : this.filter ? 'No matching folders in the loaded entries.' : 'No folders yet. Add a folder in Library.'}</div>`}
       </div>`;
   }
