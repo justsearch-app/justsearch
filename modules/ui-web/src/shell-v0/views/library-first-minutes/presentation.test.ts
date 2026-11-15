@@ -212,12 +212,14 @@ it('K4: a hidden Library closes its transient menu before it is shown again', as
   expect(el.shadowRoot!.querySelector('jf-menu')).toBeNull();
 });
 
-it('M4: paused meaning work keeps the last read time and never claims Reading now', async () => {
+it('M4: paused meaning work never claims Reading now and shows no read time', async () => {
   const el = await library();
   Object.assign(el, { enrichmentStages: { embedding: true, splade: false, ner: false },
     indexProgress: { ...(el as unknown as { indexProgress: object }).indexProgress, pause: { state: 'paused', reason: 'user_paused', reasons: ['user_paused'] } },
     roots: [{ ...el.roots[0]!, lastIndexedIsoTime: '2026-01-01T00:00:00Z', parentDocsTotalEmbedding: 8, parentDocsSettledEmbedding: 4 }] });
   await settle(el); must<HTMLButtonElement>(el.shadowRoot, '.folder-toggle').click(); await settle(el);
-  const read = [...el.shadowRoot!.querySelectorAll('.folder-details dl > div')].find(row => row.querySelector('dt')?.textContent === 'Read');
-  expect(read).toBeDefined(); expect(must(read!, 'dd').textContent).not.toBe('Reading now');
+  const details = must(el.shadowRoot, '.folder-details').textContent ?? '';
+  expect(details).toContain('Search by meaning');
+  expect(details).not.toContain('Reading now');
+  expect([...el.shadowRoot!.querySelectorAll('.folder-details dt')].map(term => term.textContent)).not.toContain('Read');
 });

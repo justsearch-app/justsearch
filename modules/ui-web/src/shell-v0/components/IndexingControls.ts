@@ -76,7 +76,8 @@ class IndexingControls extends SignalWatcher(JfElement) {
     :host([compact]) button, :host([compact]) select { border: 0; background: transparent; }
     .pause-menu { position: relative; }
     .pause-menu > button { display: inline-flex; align-items: center; gap: .4rem; }
-    .pause-options { position: absolute; top: 100%; right: 0; z-index: 1; min-width: 11rem;
+    /* A transient overlay like the shared menu: above the page's own layers, such as Browse's sticky column heads. */
+    .pause-options { position: absolute; top: 100%; right: 0; z-index: var(--z-overlay-transient); min-width: 11rem;
       padding: .35rem; background: var(--surface-1); border: 1px solid var(--border-subtle); }
     .pause-options button { display: block; width: 100%; text-align: start; }
     .pause-options button:hover { background: var(--surface-2); }

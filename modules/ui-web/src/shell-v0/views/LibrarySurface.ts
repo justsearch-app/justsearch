@@ -1186,7 +1186,6 @@ export class LibrarySurface extends JfElement {
         ? `${confirmed ? 'Now' : 'Last known'}${fs.state === 'unverified' ? ' · deletions unverified' : ''}`
         : 'Not yet confirmed; see status',
       processingPercent: progress?.percent,
-      indexedAgo: root.lastIndexedIsoTime ? this.host_.utilities.formatRelativeTime(root.lastIndexedIsoTime) : '',
       verifiedAgo: root.lastVerifiedIsoTime ? this.host_.utilities.formatRelativeTime(root.lastVerifiedIsoTime) : '',
       canReveal: this.isTauri,
       revealUnavailable: !fullPath ? 'The folder path could not be resolved.'
@@ -1948,8 +1947,8 @@ export class LibrarySurface extends JfElement {
       const outcome = parseWireContract(operationOutcomeViewSchema, await response.json(), 'read again outcome');
       if (serial !== this.reindexReadSerial) return;
       this.reindexOutcomeError = outcome.state === 'failed';
-      // The pass changed what each folder last read: read the folders again, counts included, so the
-      // rows' Read times and file counts are the ones after this pass rather than before it.
+      // The pass changed what each folder holds: read the folders again, counts included, so the rows'
+      // file counts are the ones after this pass rather than before it (live refreshes carry no counts).
       if (outcome.state === 'complete' || outcome.state === 'failed') void readIndexedRoots(path => this.doFetch(path), true, this.apiBase);
       if (outcome.state === 'complete') {
         this.reindexOutcome = 'Read again completed for the recorded request. Current reading activity is shown below.';

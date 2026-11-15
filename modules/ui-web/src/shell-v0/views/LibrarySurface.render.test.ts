@@ -338,7 +338,9 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
     try {
       const text = el.shadowRoot?.textContent ?? '';
       expect(el.shadowRoot?.querySelector('.folder-state')?.textContent).toContain('Up to date');
-      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Read\s*just now/);
+      // A settled folder claims no reading in progress; its open row has no read time (scans, not writes, set it).
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toContain('Search by meaning');
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).not.toMatch(/Reading now|Read\s*just now/);
       expect(text).not.toContain('semantic search still catching up');
     } finally {
       el.remove();
@@ -398,7 +400,9 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
       expect(el.enrichmentBlocked).toBe(false);
       const text = el.shadowRoot?.textContent ?? '';
       expect(el.shadowRoot?.querySelector('.folder-state')?.textContent).toContain('Up to date');
-      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Read\s*just now/);
+      // A settled folder claims no reading in progress; its open row has no read time (scans, not writes, set it).
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toContain('Search by meaning');
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).not.toMatch(/Reading now|Read\s*just now/);
       expect(text).not.toContain('semantic search waiting for AI install');
     } finally {
       el.remove();

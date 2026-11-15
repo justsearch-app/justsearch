@@ -81,6 +81,9 @@ export class BrowseSurface extends JfElement {
       align-items: center; box-sizing: border-box; min-height: 2.125rem; padding: 0 .5rem; gap: .25rem;
       border-bottom: 1px solid var(--border-subtle); font-size: var(--font-size-sm); color: var(--text-primary); }
     .column-heads { position: sticky; top: 0; z-index: 1; background: var(--surface-0); min-height: 1.875rem; font-size: var(--font-size-xs); font-weight: 500; color: var(--text-secondary); }
+    /* The stuck heads stop at the body's top padding; this band, the padding's height, covers it so no
+       row scrolls into view above them. */
+    .column-heads::before { content: ''; position: absolute; inset-inline: 0; bottom: 100%; height: .875rem; background: inherit; }
     .row { cursor: pointer; user-select: none; }
     .row:hover, .row:focus-within { background: var(--surface-2); border-radius: 8px; border-bottom-color: transparent; }
     .row:focus-visible, .filter-input:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: -2px; }
@@ -109,7 +112,7 @@ export class BrowseSurface extends JfElement {
       .body, .header, .search-bar { padding-inline: .75rem; }
       .row-name { gap: .25rem; }
     }
-    @media (max-height: 30rem) { .column-heads { position: static; } }
+    @media (max-height: 30rem) { .column-heads { position: static; } .column-heads::before { content: none; } }
     @media (forced-colors: active) { .row, .column-heads { border-color: CanvasText; } }
   `];
   override connectedCallback(): void {

@@ -293,22 +293,23 @@ it('V5: a counted folder read that finishes after a newer counts-free read still
 const rereadItem = (el: LibrarySurface) => [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
   .find(item => item.textContent?.includes('Read everything again'));
 
-it('V6: when Read everything again completes, the folders are read again so Read shows the new time', async () => {
-  const { el, host } = await library({ ...root, lastIndexedIsoTime: '2026-01-01T00:00:00Z' });
-  host.utilities.formatRelativeTime = (iso: string) => iso ? `at ${iso}` : '';
+it('V6: when Read everything again completes, the folders are read again so the rows show the new file counts', async () => {
+  const { el, host } = await library({ ...root, pathHash: 'reread-count' });
+  el.resolvedPaths = { 'reread-count': '/Documents' };
+  expect(must(el.shadowRoot, '.files-found').textContent).toBe('8 files');
   let invoked = 0;
+  const reads: string[] = [];
   vi.stubGlobal('fetch', vi.fn(async () => { invoked++; return Response.json({ success: true, structuredData: { operationKey: '0194f72c-0000-7000-8000-000000000002' } }); }));
   host.data.fetch = vi.fn(async (path: string) => path.startsWith('/api/operation-history/') ? Response.json({ state: 'complete', historySince: 0 })
-    : path.startsWith('/api/indexing-roots/substrate') ? Response.json({ items: [{ ...root, lastIndexedIsoTime: '2026-02-02T00:00:00Z' }] })
+    : path.startsWith('/api/indexing-roots/substrate') ? (reads.push(path), Response.json({ items: [{ ...root, pathHash: 'reread-count', fileCount: 12 }] }))
     : new Response('{}', { status: 503 }));
   must<HTMLButtonElement>(el.shadowRoot, '.more-trigger').click(); await settle(el);
   const reread = () => rereadItem(el);
   expect(reread()).toBeDefined(); reread()!.click(); await settle(el);
   expect(invoked).toBe(1);
   expect(el.shadowRoot!.textContent).toContain('Read again completed');
-  must<HTMLButtonElement>(el.shadowRoot, '.folder-toggle').click(); await settle(el);
-  const read = [...el.shadowRoot!.querySelectorAll('.folder-details dl > div')].find(row => row.querySelector('dt')?.textContent === 'Read');
-  expect(read).toBeDefined(); expect(must(read!, 'dd').textContent).toBe('at 2026-02-02T00:00:00Z');
+  expect(reads.some(path => path.includes('counts=true')), JSON.stringify(reads)).toBe(true);
+  expect(must(el.shadowRoot, '.files-found').textContent).toBe('12 files');
   vi.unstubAllGlobals();
 });
 
@@ -423,4 +424,23 @@ it('R7: top-level Browse folders are listed by name like their children', async 
   const { el } = await browse([{ path: '/b/Zeta' }, { path: '/a/alpha' }, { path: '/c/Beta' }]);
   expect([...el.shadowRoot!.querySelectorAll<HTMLElement>('[role="treeitem"][aria-level="1"]')].map(row => row.dataset.path))
     .toEqual(['/a/alpha', '/c/Beta', '/b/Zeta']);
+});
+
+it('P1: the open row has no Read time; it says Reading now only while reading and keeps Checked for changes', async () => {
+  const { el, host } = await library({ ...root, lastIndexedIsoTime: '2026-01-01T00:00:00Z', lastVerifiedIsoTime: '2026-01-02T00:00:00Z' });
+  host.utilities.formatRelativeTime = (iso: string) => iso ? `at ${iso}` : '';
+  el.requestUpdate(); await settle(el);
+  must<HTMLButtonElement>(el.shadowRoot, '.folder-toggle').click(); await settle(el);
+  const facts = () => [...el.shadowRoot!.querySelectorAll('.folder-details dl > div')]
+    .map(row => [row.querySelector('dt')?.textContent ?? '', row.querySelector('dd')?.textContent ?? '']);
+  const details = () => must(el.shadowRoot, '.folder-details').textContent ?? '';
+  expect(facts().find(([term]) => term === 'Checked for changes')).toEqual(['Checked for changes', 'at 2026-01-02T00:00:00Z']);
+  expect(facts().find(([term]) => term === 'Read'), 'no Read line when nothing is being read').toBeUndefined();
+  expect(details()).not.toContain('2026-01-01');
+  expect(details()).not.toContain('Not yet confirmed');
+  expect(details()).not.toContain('Reading now');
+  el.roots = [{ ...el.roots[0]!, inFlightCount: 2 }]; await settle(el);
+  expect(details()).toContain('Reading now');
+  expect(details()).not.toContain('2026-01-01');
+  expect(facts().find(([term]) => term === 'Checked for changes')).toEqual(['Checked for changes', 'at 2026-01-02T00:00:00Z']);
 });

@@ -31,7 +31,6 @@ export interface FolderRow {
   readonly collection?: string;
   readonly wordsVerdict?: string;
   readonly processingPercent?: number | null;
-  readonly indexedAgo?: string;
   readonly verifiedAgo?: string;
   readonly canReveal?: boolean;
   readonly revealUnavailable?: string;
@@ -129,8 +128,8 @@ export function renderFolderRow(f: FolderRow, actions: RowActions): TemplateResu
           ${f.walkError ? html`<div><dt>Reason code</dt><dd><code>${f.walkError}</code></dd></div>` : nothing}
           <div><dt>Searchable by words</dt><dd>${f.wordsVerdict ?? 'Unconfirmed'}</dd></div>
           <div><dt>Meaning processing progress</dt><dd>${f.processingPercent != null ? `${f.processingPercent}%` : 'Unconfirmed'}</dd></div>` : nothing}</dl>
-      <dl><div><dt>Read</dt><dd>${f.reading ? 'Reading now' : f.indexedAgo || 'Not yet confirmed'}</dd></div>
-        ${f.verifiedAgo ? html`<div><dt>Checked for changes</dt><dd>${f.verifiedAgo}</dd></div>` : nothing}</dl>
+      ${f.reading || f.verifiedAgo ? html`<dl>${f.reading ? html`<div><dt>Read</dt><dd>Reading now</dd></div>` : nothing}
+        ${f.verifiedAgo ? html`<div><dt>Checked for changes</dt><dd>${f.verifiedAgo}</dd></div>` : nothing}</dl>` : nothing}
       <div class="row-actions">${f.canReveal ? html`<jf-button variant="ghost" label="Open in Files"
         title=${f.revealUnavailable || nothing} .disabled=${disabled}
         .availability=${f.revealUnavailable ? unavailableBecause(f.revealUnavailable) : undefined}

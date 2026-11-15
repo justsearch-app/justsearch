@@ -25,6 +25,40 @@ document.body.append(el);
 // A real browser resolves Response.json() on a task, not a microtask: settle lets tasks run too.
 window.settle = async () => { for (let i = 0; i < 35; i++) { await new Promise(resolve => setTimeout(resolve)); await el.updateComplete; } };
 </script></body></html>`;
+/** The real Shell with Library hosting Browse, over a stubbed backend: many folders, so the tree scrolls. */
+const appHarness = `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<link rel="stylesheet" href="/src/styles/tokens.css"></head><body><script type="module">
+const json = body => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+const names = Array.from({ length: 40 }, (_, i) => 'Folder ' + String(i).padStart(2, '0'));
+window.fetch = async input => {
+  const url = String(input?.url ?? input);
+  if (url.includes('/api/indexing/roots')) return json({ roots: names.map(name => ({ path: '/' + name, fileCount: 3, fileCountCapped: false })) });
+  if (url.includes('/api/indexing-roots/substrate')) return json({ items: [], count: 0 });
+  if (url.endsWith('/folders')) return json({ folders: [], truncated: false });
+  return json({ entries: [], files: [] });
+};
+window.EventSource = class { constructor() { this.readyState = 0; } addEventListener() {} removeEventListener() {} close() {} };
+const { __seedForTest } = await import('/src/api/registry/SurfaceCatalogClient.ts');
+await import('/src/shell-v0/index.ts');
+await import('/src/shell-v0/chrome/Shell.ts');
+const surface = (id, mountTag, extra = {}) => ({ id, mountTag, audience: 'USER', placement: 'RAIL', presentation: { labelKey: id, descriptionKey: id },
+  consumes: { operations: [], resources: [], prompts: [], diagnosticChannels: [] }, provenance: { tier: 'CORE', contributorId: 'core', version: '1.0.0' }, ...extra });
+__seedForTest({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', primitive: 'Surface', entries: [
+  surface('core.search-v3-surface', 'jf-sv3-window'),
+  surface('core.library-surface', 'jf-library-surface', { members: ['core.browse-surface'] }),
+  surface('core.browse-surface', 'jf-browse-surface', { placement: 'DEEPLINK' }),
+  surface('core.settings-surface', 'jf-settings-surface', { placement: 'MODAL' }),
+] });
+const ai = await import('/src/shell-v0/state/aiStateStore.ts');
+const observe = () => {
+  ai.__feedForTest({ status: { worker: { core: { indexState: 'IDLE', indexHealthy: true, indexedDocuments: 120, searchableDocuments: 120, ownSearchableDocuments: 120, pendingJobs: 0 },
+    migration: { migrationState: 'IDLE' } } } });
+  ai.__feedContactForTest();
+};
+document.body.append(document.createElement('jf-shell'));
+observe(); setInterval(observe, 1_000);
+document.body.dataset.ready = 'true';
+</script></body></html>`;
 const menuHarness = `<!doctype html><html lang="en"><body><button id="trigger">Open</button><span id="anchor"></span><button id="after">After</button>
 <script type="module">
 import '/src/shell-v0/components/Menu.ts';
@@ -47,6 +81,7 @@ beforeAll(async () => {
   server = await createServer({ configFile: false, root: process.cwd(), cacheDir: scratch,
     server: { host: '127.0.0.1', port: 0 }, plugins: [{ name: 'review-repairs-fixture', configureServer(vite) {
       vite.middlewares.use((req, res, next) => {
+        if (req.url?.startsWith('/review-repairs-app.html')) { res.setHeader('Content-Type', 'text/html'); res.end(appHarness); return; }
         if (!req.url?.startsWith('/review-repairs.html') && !req.url?.startsWith('/review-repairs-menu.html')) return next();
         res.setHeader('Content-Type', 'text/html'); res.end(req.url.startsWith('/review-repairs-menu.html') ? menuHarness : harness);
       });
@@ -152,3 +187,106 @@ it('V8: moving focus out of an open menu closes it, by Shift+Tab or otherwise; o
     expect(await menus.count()).toBe(1);
   } finally { await page.close(); }
 });
+
+/** The innermost element at a viewport point, through open shadow roots; the page's own hit test. */
+function hitPath(x: number, y: number): Element[] {
+  const path: Element[] = [];
+  let top = document.elementFromPoint(x, y);
+  while (top) {
+    path.push(top);
+    const inner = top.shadowRoot?.elementFromPoint(x, y);
+    if (!inner || inner === top) break;
+    top = inner;
+  }
+  return path;
+}
+async function browseInLibrary(theme: string): Promise<Page> {
+  const page = await browser.newPage({ viewport: { width: 1100, height: 560 } });
+  page.setDefaultTimeout(5000);
+  page.on('pageerror', error => console.info('pageerror', error.message));
+  await page.goto(origin + 'review-repairs-app.html#justsearch://surface/core.library-surface', { timeout: 45_000 });
+  await page.locator('body[data-ready="true"]').waitFor({ timeout: 45_000 });
+  await page.evaluate(value => { document.documentElement.dataset.theme = value; }, theme);
+  await page.locator('jf-surface-tabs [role="tab"][data-tab-id="core.browse-surface"]').click();
+  await expect.poll(() => page.locator('jf-browse-surface [role="treeitem"]').count(), { timeout: 10_000 }).toBe(40);
+  await expect.poll(() => page.locator('jf-indexing-controls #pause-toggle').getAttribute('aria-disabled'), { timeout: 10_000 }).toBe('false');
+  return page;
+}
+it.each(['light', 'dark'])('P2: on Browse, the Pause dropdown and the More menu open above the column heads (%s)', async theme => {
+  const page = await browseInLibrary(theme);
+  try {
+    await page.locator('jf-indexing-controls #pause-toggle').click();
+    const options = page.locator('jf-indexing-controls #pause-options');
+    expect(await options.count()).toBe(1);
+    const heads = page.locator('jf-browse-surface .column-heads');
+    expect(await heads.count()).toBe(1);
+    const [box, head] = [await options.boundingBox(), await heads.boundingBox()];
+    expect(box, 'dropdown box').not.toBeNull(); expect(head, 'column heads box').not.toBeNull();
+    expect(box!.y < head!.y + head!.height && box!.y + box!.height > head!.y, 'the dropdown reaches over the column heads').toBe(true);
+    // Every point of the dropdown that lies over the heads, and its centre, hit-tests to the dropdown.
+    const over = await page.evaluate(({ hitPathSource, box, head }) => {
+      const hit = new Function(`return (${hitPathSource})`)() as (x: number, y: number) => Element[];
+      const options = document.querySelector('jf-shell')!.shadowRoot!.querySelector('jf-stage')!.shadowRoot!
+        .querySelector('jf-library-surface')!.shadowRoot!.querySelector('jf-indexing-controls')!.shadowRoot!.querySelector('#pause-options')!;
+      const points: [number, number][] = [[box.x + box.width / 2, box.y + box.height / 2]];
+      for (let y = Math.max(box.y, head.y) + 1; y < Math.min(box.y + box.height, head.y + head.height) - 1; y += 3) points.push([box.x + box.width / 2, y]);
+      return points.map(([x, y]) => { const path = hit(x, y); const last = path[path.length - 1]; return { y, owner: last && options.contains(last) ? 'dropdown' : (last?.className || last?.localName) ?? 'none' }; });
+    }, { hitPathSource: hitPath.toString(), box: box!, head: head! });
+    expect(over.filter(point => point.owner !== 'dropdown'), JSON.stringify(over)).toEqual([]);
+    await page.keyboard.press('Escape');
+    await page.locator('jf-library-surface .more-trigger').click();
+    const menu = page.locator('jf-library-surface jf-menu [role="menu"]');
+    expect(await menu.count()).toBe(1);
+    const menuBox = await menu.boundingBox();
+    expect(menuBox, 'menu box').not.toBeNull();
+    const menuHit = await page.evaluate(({ hitPathSource, x, y }) => {
+      const hit = new Function(`return (${hitPathSource})`)() as (x: number, y: number) => Element[];
+      // The menu's items are its light-DOM children: walk the composed ancestors of the innermost hit.
+      const path = hit(x, y);
+      for (let node: Node | null = path[path.length - 1] ?? null; node; node = node.parentNode ?? (node as ShadowRoot).host ?? null) {
+        if ((node as Element).localName === 'jf-menu') return 'menu';
+      }
+      return path.map(el => `${el.localName}.${el.className}`).join(' > ');
+    }, { hitPathSource: hitPath.toString(), x: menuBox!.x + menuBox!.width / 2, y: menuBox!.y + menuBox!.height / 2 });
+    expect(menuHit, 'the More menu is above the Browse tree').toBe('menu');
+  } finally { await page.close(); }
+}, 120_000);
+it.each(['light', 'dark'])('P2: a scrolled Browse tree shows no row above the bottom of its column heads (%s)', async theme => {
+  const page = await browseInLibrary(theme);
+  try {
+    const result = await page.evaluate(async hitPathSource => {
+      const hit = new Function(`return (${hitPathSource})`)() as (x: number, y: number) => Element[];
+      const browse = document.querySelector('jf-shell')!.shadowRoot!.querySelector('jf-stage')!.shadowRoot!
+        .querySelector('jf-library-surface')!.shadowRoot!.querySelector('jf-surface-tabs')!.shadowRoot!.querySelector('jf-browse-surface')!;
+      const body = browse.shadowRoot!.querySelector<HTMLElement>('.body')!;
+      const heads = browse.shadowRoot!.querySelector<HTMLElement>('.column-heads')!;
+      const scrollable = body.scrollHeight > body.clientHeight + 100;
+      body.scrollTop = 300;
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const top = body.getBoundingClientRect().top, bottom = heads.getBoundingClientRect().bottom;
+      const left = heads.getBoundingClientRect().left, right = heads.getBoundingClientRect().right;
+      const rows: string[] = [];
+      for (let y = top + 0.5; y < bottom - 0.5; y += 1) {
+        for (const x of [left + 4, (left + right) / 2, right - 4]) {
+          const row = hit(x, y).find(el => el.getAttribute('role') === 'treeitem' || el.classList.contains('row'));
+          if (row) rows.push(`${Math.round(y - top)}px: ${row.getAttribute('data-path') ?? row.className}`);
+        }
+      }
+      // The heads and the band above them paint the colour behind the tree, so they hide rows and nothing else.
+      const painted = (node: Element | null): string => {
+        for (; node; node = node.parentElement ?? ((node.getRootNode() as ShadowRoot).host ?? null)) {
+          const colour = getComputedStyle(node).backgroundColor;
+          if (colour !== 'rgba(0, 0, 0, 0)' && colour !== 'transparent') return colour;
+        }
+        return 'none';
+      };
+      const colours = { behind: painted(body), heads: getComputedStyle(heads).backgroundColor, band: getComputedStyle(heads, '::before').backgroundColor };
+      return { colours, scrollable, scrolled: body.scrollTop, headsTop: Math.round(heads.getBoundingClientRect().top - top), headsHeight: Math.round(bottom - heads.getBoundingClientRect().top), rows };
+    }, hitPath.toString());
+    expect(result.scrollable, JSON.stringify(result)).toBe(true);
+    expect(result.scrolled).toBeGreaterThan(0);
+    expect(result.rows, JSON.stringify(result)).toEqual([]);
+    expect(result.colours.heads, JSON.stringify(result.colours)).toBe(result.colours.behind);
+    expect(result.colours.band, JSON.stringify(result.colours)).toBe(result.colours.behind);
+  } finally { await page.close(); }
+}, 120_000);

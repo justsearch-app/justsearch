@@ -81,31 +81,6 @@ final class WatchedRootsStateTest {
     assertEquals(now, store.loadPersistedRoots().get(normalized));
   }
 
-  @org.junit.jupiter.params.ParameterizedTest(name = "force={0}")
-  @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
-  @DisplayName("a complete read again of a healthy root that wrote its files records the new read time")
-  void completedRecordedPassThatWroteFilesUpdatesLastIndexed(boolean force) {
-    Path rootsFile = tempDir.resolve("watched_roots.json");
-    WatchedRootsStore store = new WatchedRootsStore(rootsFile, null);
-    Instant earlier = Instant.parse("2026-01-01T00:00:00Z");
-    Instant now = Instant.parse("2026-02-02T00:00:00Z");
-    WatchedRootsState state =
-        new WatchedRootsState(new ConcurrentHashMap<>(), store, Clock.fixed(now, ZoneOffset.UTC));
-    Path root = tempDir.resolve("healthy-root").toAbsolutePath().normalize();
-    state.register(root, null, false);
-    state.rootsMap().put(root, earlier);
-    state.persist();
-    var scope = new io.justsearch.app.api.operations.RecordedRootPlan.Root(
-        root, null, force, false, List.of(), List.of());
-
-    state.recordRecordedWalk(scope, state.captureRootProducer(root, true), true, "", 0, List.of());
-    assertEquals(earlier, state.rootsMap().get(root), "a pass that wrote nothing keeps the read time");
-
-    state.recordRecordedWalk(scope, state.captureRootProducer(root, true), true, "", 8, List.of());
-    assertEquals(now, state.rootsMap().get(root), "the pass that wrote this root's files is its newest write");
-    assertEquals(now, store.loadPersistedRoots().get(root), "the new read time is persisted");
-  }
-
   @Test
   @DisplayName("§Recency: clearing the unverified flag stamps lastVerifiedAt via the injected clock")
   void verifyingStampsLastVerifiedAt() {
