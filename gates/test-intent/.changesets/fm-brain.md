@@ -2964,3 +2964,14 @@ expected value is computed by production code: the locked-Memory words are today
   "note": "Reject: repaired install/placement/layout checks fail before on absent data-step markup, not their claimed behavior; moved panel ladder audit rounds font sizes and checks only one corner; locked Memory oracle calls production reasonFor."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "82dda74a-63a1-4df0-9f4e-7d497595aaca",
+  "verdict": "accept",
+  "digest": "sha256:e7b1325f0615eb05176ef5fcd75f28fd27a8662d000ec6cf82e24cc1f297dc60",
+  "note": "Test intent accepted after reviewing all 35 entries and validating committed D4 evidence; fresh local test execution unavailable because npm installation failed (EPERM/EAI_AGAIN)."
+}
+```
