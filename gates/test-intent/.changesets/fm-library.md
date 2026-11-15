@@ -1938,7 +1938,7 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
         "modules/ui-web/src/shell-v0/views/library-first-minutes/review-repairs-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "Review and packaged-run repairs: a failed roots read shows as uncertainty, not 'Up to date'; one count formatter keeps cap and unknown (50,000+ with explicit digit grouping, no number when unknown, at-least when part of a tree was unreadable) in Library, Browse, removal text and status-panel rows, and Library and Browse agree; a path rendered twice keeps one tab stop and navigation follows the focused occurrence; Browse reloads roots when shown and children on expand; completed folder coverage is not reported blocked by another folder's work; no-AI headline and row words per V1, plain words for raw codes and Rebuilding only when observed per V2; Browse rows sorted by name with no blank band and singular '1 file'; file counts refreshed after reading everything again (the read-time line itself was withdrawn by P1); remaining index wording replaced; Shift+Tab out of a menu closes it.",
+      "behaviour": "Review and packaged-run repairs: a failed roots read shows as uncertainty, not 'Up to date'; one count formatter keeps cap and unknown (50,000+ with explicit digit grouping, no number when unknown, at-least when part of a tree was unreadable) in Library, Browse, removal text and status-panel rows, and Library and Browse agree; a path rendered twice keeps one tab stop and navigation follows the focused occurrence; Browse reloads roots when shown and children on expand; completed folder coverage is not reported blocked by another folder's work; no-AI headline and row words per V1, plain words for raw codes and Rebuilding only when observed per V2; Browse rows sorted by name with no blank band and singular '1 file'; file counts refreshed after reading everything again (the read-time line itself was withdrawn by P1); remaining index wording replaced; Shift+Tab out of a menu closes it. 'Reading now' shows only while the folder's files are being read; blocked, deferred or paused meaning work never claims it.",
       "sources": [
         {
           "kind": "owner-words",
@@ -1990,6 +1990,14 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Review repair decisions N1-N6 (N1 roots-observation availability joins visible uncertainty; N2 one cap-preserving count formatter, absent cap with count equal to the 50,000 limit is capped; N3 occurrence identity in Browse; N4 Refresh and filter stay behind developer tools, Browse refreshes roots on show and children on expand; N5 a root's completed coverage wins over a global block; N6 remaining index wording) and packaged-run decisions V1-V8 (V1 and V2 as above; V3 unreadable subfolder never shown as an exact count; V4 Browse sorted by name, no blank band, '1 file'; V5 explicit digit grouping and one shared root count for Library and Browse; V6 read times refreshed when Read everything again completes; V7 remaining index words; V8 moving focus out of a menu closes it).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "P3: 'Reading now' means this folder's files are being read now (indexing/scanning, confirmed, reading not paused); meaning work has its own 'Search by meaning' line and no longer sets it.",
           "label": "agent choice"
         }
       ],
