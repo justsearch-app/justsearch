@@ -379,8 +379,11 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
     const dom = domOf(panel(false).renderSimplePanel());
     expect(dom.textContent).not.toContain('Everything below runs on this computer.');
     // Main's present-tense "Online" status word is gone; its successor is the answers step state,
-    // which must not report the retained "on" observation as current.
-    expect(answersStepState(dom)).toBe('Unknown — checking AI status');
+    // which must not report the retained "on" observation as current: the heading says once that AI
+    // status is being checked (W5), and the step is neither lit nor given a note of its own.
+    expect(dom.querySelector('.brain-headline')?.textContent).toBe('Checking AI status…');
+    expect(dom.querySelector('.path-step[data-feature="chat"]')?.getAttribute('data-lit')).toBe('false');
+    expect(dom.querySelector('.path-step[data-feature="chat"] .step-note')).toBeNull();
     expect(dom.querySelector('.brain-headline')?.textContent).not.toBe('AI is ready');
   });
 

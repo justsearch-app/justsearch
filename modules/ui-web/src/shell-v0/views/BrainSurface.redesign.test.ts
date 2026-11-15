@@ -111,7 +111,10 @@ describe('AI Brain redesign behaviour', () => {
     emit({ runtimeStatus: { ...store.current.runtimeStatus, active: { mmprojActive: false } } }); await el.updateComplete;
     expect(el.shadowRoot!.querySelector('[data-step="pictures"]')!.getAttribute('data-lit')).toBe('false');
     emit({ snapshotLive: false }); await el.updateComplete;
-    expect(el.shadowRoot!.querySelector('[data-feature="pictures"]')!.textContent).toContain('Unknown');
+    // W5: the heading says once that AI status is being checked; the step is unlit and does not repeat it.
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Checking AI status…');
+    expect(el.shadowRoot!.querySelector('[data-feature="pictures"]')!.textContent).not.toContain('Unknown — checking AI status');
+    expect(el.shadowRoot!.querySelector('[data-step="pictures"]')!.getAttribute('data-lit')).toBe('false');
     expect(switches(el, 'Best match first')).toHaveLength(1);
     expect(switches(el, 'Best match first')[0]!.getAttribute('aria-disabled')).toBe('true');
     expect(switches(el, 'Text in scans and images')).toHaveLength(1);

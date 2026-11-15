@@ -1639,6 +1639,11 @@ export class BrainSurface extends JfElement {
     return this._unifiedAiState?.installObservationLive === true;
   }
 
+  /** The page's own facts are live; otherwise its heading says once that AI status is being checked. */
+  private pageKnown(): boolean {
+    return (this.installKnown() && this.installStatus?.state === 'running') || this.aiKnown();
+  }
+
   private hasInstalledAi(): boolean {
     // A first install that runs has files still to come, not an installed AI missing a file (AM4).
     const firstInstallRunning = this.installStatus?.state === 'running' && this.installStatus.installedFully !== true;
@@ -1737,6 +1742,8 @@ export class BrainSurface extends JfElement {
     const live = this.aiKnown();
     const installed = this.hasInstalledAi();
     const settingsKnown = this.settingsRead && !!this.rerankerSettings?.witness;
+    // Each fact stands once (fm-10): while the heading says AI status is being checked, no step repeats it.
+    const checkingSaid = !this.pageKnown();
     const features = {} as Record<BrainFeatureId, BrainFeature>;
     for (const [id, packageId, label] of [
       ['meaning', 'embedding', 'Understand meaning'],
@@ -1785,7 +1792,7 @@ export class BrainSurface extends JfElement {
       const note = uncertain ? 'Checking after an interrupted change'
         : running && packageProgress?.state === 'pending' ? 'Waiting to download'
         : running && packageProgress?.state === 'downloading' ? `Downloading${percent === null ? '' : ` ${percent}%`}`
-        : !live ? 'Unknown — checking AI status'
+        : !live ? checkingSaid ? null : 'Unknown — checking AI status'
         : stopped && packageProgress != null && !present && (packageProgress.bytesDownloaded ?? 0) > 0 ? `Cancelled · ${formatBytes(packageProgress.bytesDownloaded ?? 0)} kept`
         : unavailable ? null
         : !component && !present ? 'Unknown — package status unavailable'
@@ -1831,7 +1838,7 @@ export class BrainSurface extends JfElement {
       id: 'pictures', label: 'Text in scans and images', selected: pictureKnown && pictureChoice,
       installed: features.chat.installed, active: live ? this.pictureApplied ?? mmproj : null,
       availability: features.chat.availability,
-      note: !live ? 'Unknown — checking AI status'
+      note: !live ? checkingSaid ? null : 'Unknown — checking AI status'
         : !reachable ? 'Simple scans are read already'
         : this.pictureUncertain ? 'Checking after an interrupted change'
         : !pictureKnown ? null
@@ -1994,6 +2001,8 @@ export class BrainSurface extends JfElement {
   private renderFeaturePath(): TemplateResult {
     const features = this.brainFeatures();
     const live = this.aiKnown();
+    // Each fact stands once (fm-10): while the heading says AI status is being checked, no step repeats it.
+    const unknown = this.pageKnown() ? html`<span class="step-meta">Unknown — checking AI status</span>` : nothing;
     // The person's own files (Help excluded), as the composer and Library count them.
     const count = this._unifiedAiState?.index?.ownDocumentCount;
     const glyphs = { meaning: 'zap', reranker: 'list', chat: 'message-square', pictures: 'image' } as const;
@@ -2015,11 +2024,11 @@ export class BrainSurface extends JfElement {
     return html`<section class="brain-path" aria-label="How AI uses your files">
       <div class="path-step files-step" data-step="files" data-lit=${live ? 'true' : 'false'} data-reach="ok">
         <span class="step-symbol" aria-hidden="true">${icon({ name: 'copy', size: 20 })}</span>
-        <div class="step-text"><div class="step-words"><span class="step-name">Your files</span><span class="step-meta">${!live ? 'Unknown — checking AI status' : !count?.known ? 'File count unknown' : count.value === 0 ? 'None yet' : `${NUM.format(count.value)} ${count.value === 1 ? 'file' : 'files'}`}</span></div></div>
+        <div class="step-text"><div class="step-words"><span class="step-name">Your files</span>${!live ? unknown : html`<span class="step-meta">${!count?.known ? 'File count unknown' : count.value === 0 ? 'None yet' : `${NUM.format(count.value)} ${count.value === 1 ? 'file' : 'files'}`}</span>`}</div></div>
       </div>
       <div class="path-step read-step" data-step="read" data-lit=${live ? 'true' : 'false'} data-reach="ok">
         <span class="step-symbol" aria-hidden="true">${icon({ name: 'file-text', size: 20 })}</span>
-        <div class="step-text"><div class="step-words"><span class="step-name">Read the text</span><span class="step-meta">${live ? 'Built in' : 'Unknown — checking AI status'}</span></div></div>
+        <div class="step-text"><div class="step-words"><span class="step-name">Read the text</span>${live ? html`<span class="step-meta">Built in</span>` : unknown}</div></div>
       </div>
       <div class="picture-branch">${renderStep(features.pictures)}</div>
       ${renderStep(features.meaning)}
@@ -2805,7 +2814,7 @@ export class BrainSurface extends JfElement {
     // from before; only its SOURCE changed (the one `computeAiEngineVerdict` derivation, not the
     // old 5-source ladder).
     // A live install observation needs no runtime observation to show download progress.
-    const known = (this.installKnown() && this.installStatus?.state === 'running') || this.aiKnown();
+    const known = this.pageKnown();
     const aiVerdict: AiEngineVerdict = known ? this.deriveAiEngineVerdict() : { kind: 'connecting', stability: { kind: 'provisional', cause: 'checking' }, installFailure: null };
     const aiState = aiVerdict.kind;
     const activationRequired = known && aiState !== 'installing' && this.installStatus?.phase === 'activation_required';
@@ -3049,7 +3058,10 @@ export class BrainSurface extends JfElement {
     // D3/AM3 — the heading says what works. Failure, repair, activation and policy headings stay; a
     // positive heading needs live evidence of meaning search; an unknown says nothing either way.
     const [headline, sentence] = ((): [string, string | null] => {
-      if (!known) return ['Checking AI status…', 'Waiting for live install and AI observations.'];
+      // W5 — the last-known truth stays, said once: a picture-reading pass seen before the observation was lost.
+      if (!known) return ['Checking AI status…', (this.systemStatus ?? this._unifiedAiState?.status)?.inference?.procedure === 'VDU_BATCH'
+        ? 'Pictures were being read when last observed; current answer availability is unconfirmed.'
+        : 'Waiting for live install and AI observations.'];
       if (aiState === 'installing' || failed || aiState === 'paused') return [sc.label, sc.sub];
       if (activationRequired) return ['Downloaded — activation required', sc.sub];
       if (reindexRequired) return ['Read your files again to use these models', 'Search still finds files by their words until then.'];

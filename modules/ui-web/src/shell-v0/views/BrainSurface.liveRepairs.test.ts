@@ -82,8 +82,12 @@ describe('Brain live redesign repairs', () => {
     const el = await mount(); const root = el.shadowRoot!;
     expect(root.querySelector('.brain-headline')!.textContent).toContain('Checking AI');
     expect(root.querySelector('.brain-sentence')!.textContent).not.toMatch(/Installing AI|Answers are off|understands what/);
-    expect([...root.querySelectorAll('.brain-path .path-step')].map(step => step.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('Unknown')]));
-    for (const step of root.querySelectorAll('.brain-path .path-step')) expect(step.textContent).toContain('Unknown');
+    // W5: the heading says once that AI status is being checked; no step repeats it, and none is lit.
+    expect(root.querySelectorAll('.brain-path .path-step').length).toBeGreaterThan(0);
+    for (const step of root.querySelectorAll('.brain-path .path-step')) {
+      expect(step.textContent).not.toContain('Unknown — checking AI status');
+      expect(step.getAttribute('data-lit')).toBe('false');
+    }
     expect(root.querySelectorAll('[role="switch"]').length).toBeGreaterThan(0);
     expect([...root.querySelectorAll<HTMLButtonElement>('[role="switch"]')].every(button => button.getAttribute('aria-disabled') === 'true')).toBe(true);
     expect(root.querySelector('[label^="Install AI"], [label^="Install additions"]')).toBeNull();

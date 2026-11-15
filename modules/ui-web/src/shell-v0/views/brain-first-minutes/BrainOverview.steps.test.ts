@@ -226,6 +226,20 @@ describe('S7a-2 installed, meaning works, answers unavailable (fm-13)', () => {
     expect(el.shadowRoot!.querySelector('.graphics-card')).toBeNull();
     expect([...panel(el)!.querySelectorAll('jf-button')].filter(b => b.getAttribute('variant') === 'primary')).toHaveLength(0);
   });
+
+  it('a lost observation is said once by the heading, not again under every step; an unknown choice stays Not known', async () => {
+    settings = { ...settings, witness: undefined };
+    const el = await mount();
+    store.current = { ...store.current, snapshotLive: false };
+    for (const listener of store.listeners) listener(store.current);
+    await settle(el);
+    expect(headline(el)).toBe('Checking AI status…');
+    expect(words(el.shadowRoot!)).not.toContain('Unknown — checking AI status');
+    for (const id of ['files', 'read', 'pictures', 'meaning', 'reranker', 'chat']) {
+      expect(words(step(el, id)), `${id} step`).not.toMatch(/checking AI status/i);
+    }
+    expect(words(step(el, 'reranker')!.querySelector('.switch-state'))).toBe('Not known');
+  });
 });
 
 describe('S7a-3 meaning not working keeps its remedy and claims nothing', () => {

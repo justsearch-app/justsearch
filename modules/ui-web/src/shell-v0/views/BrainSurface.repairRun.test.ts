@@ -254,7 +254,9 @@ describe('Brain running repair controls (B2/B8)', () => {
     expect(el.shadowRoot!.querySelector('[data-testid="install-staged-progress"]')).toBeNull();
     expect(el.shadowRoot!.querySelector('[label="Pause download"]')).toBeNull();
     expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).toBeNull();
-    expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Unknown — checking AI status');
+    // W5: the heading says once that AI status is being checked; the step does not repeat it and is not lit.
+    expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).not.toContain('Unknown — checking AI status');
+    expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.getAttribute('data-lit')).toBe('false');
     expect(el.shadowRoot!.textContent).not.toMatch(/Downloading|Preparing download|Download stalled/);
     notify({ installObservationLive: true, snapshotLive: true }); await settle(el);
     expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();

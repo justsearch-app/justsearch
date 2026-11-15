@@ -109,8 +109,10 @@ function expectReading(el: Brain) {
   expect(view(el)).toMatchObject({ word: 'On', note: undefined, switches: ['true'], lit: 'true' });
 }
 function expectChecking(el: Brain) {
-  expect(view(el).note).toBe('Unknown — checking AI status');
+  // W5: the heading says once that AI status is being checked; the step does not repeat it.
   expect(el.shadowRoot!.querySelector('.brain-headline')?.textContent).toBe('Checking AI status…');
+  expect(view(el)).toMatchObject({ note: undefined, lit: 'false' });
+  expect(el.shadowRoot!.textContent).not.toContain('Unknown — checking AI status');
   expect(el.shadowRoot!.textContent).not.toContain(NOT_AVAILABLE);
 }
 
