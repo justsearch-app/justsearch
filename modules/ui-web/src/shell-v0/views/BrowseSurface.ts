@@ -106,7 +106,6 @@ export class BrowseSurface extends JfElement {
     .level-8 .row-name { padding-inline-start: 14rem; }
     .notice, .empty-state { padding: .5rem; }
     .notice:empty { padding: 0; }
-    .browse-error { margin: .5rem 1.5rem; }
     @media (max-width: 640px) {
       .row, .column-heads { grid-template-columns: minmax(0, 1fr) 4.5rem 6rem 3.75rem; }
       .body, .header, .search-bar { padding-inline: .75rem; }
@@ -149,7 +148,7 @@ export class BrowseSurface extends JfElement {
       if (generation !== this.generation) return;
       recordRootCounts(data.roots);
       this.roots = byName(data.roots.map(root => ({ ...root, ...rootCount(undefined, root.path), name: lastSeg(root.path) })));
-    } catch (error) { if (generation === this.generation) this.error = `Could not load folders. ${error instanceof Error ? error.message : String(error)}`;
+    } catch { if (generation === this.generation) this.error = "Couldn't load folders";
     } finally { if (generation === this.generation) this.refreshing = false; }
   }
   private async loadFolder(path: string): Promise<void> {
@@ -175,8 +174,8 @@ export class BrowseSurface extends JfElement {
         fileKind: row.fields?.file_kind, mimeBase: row.fields?.mime_base, size: numeric(row.fields?.size_bytes), modifiedAt: numeric(row.fields?.modified_at),
       }))) };
       this.partial = { ...this.partial, [path]: folders.truncated === true || (files.totalCount ?? 0) > (files.files?.length ?? 0) };
-    } catch (error) {
-      if (generation === this.generation) this.folderErrors = { ...this.folderErrors, [path]: `Could not load ${lastSeg(path)}. ${error instanceof Error ? error.message : String(error)}` };
+    } catch {
+      if (generation === this.generation) this.folderErrors = { ...this.folderErrors, [path]: "Couldn't load this folder" };
     } finally { if (generation === this.generation) { const next = { ...this.inflight }; delete next[path]; this.inflight = next; } }
   }
   private async toggle(row: TreeRow): Promise<void> {
@@ -311,8 +310,8 @@ export class BrowseSurface extends JfElement {
       const partial = folders !== undefined && files !== undefined && this.partial[path] ? `${lastSeg(path)}: Showing first ${formatCount(count)} entries.` : '';
       // The live region stays so a later message is announced; with nothing to say it takes no room.
       return html`<div class="notice" role="status">${this.inflight[path] ? `Loading ${lastSeg(path)}…`
-        : this.folderErrors[path] ? html`${this.folderErrors[path]} <jf-button variant="ghost" label=${`Retry ${lastSeg(path)}`}
-          .onActivate=${() => void this.loadFolder(path)}>Retry</jf-button>`
+        : this.folderErrors[path] ? html`${this.folderErrors[path]} <jf-button variant="ghost" label="Try again"
+          .onActivate=${() => void this.loadFolder(path)}>Try again</jf-button>`
         : [partial, empty].filter(Boolean).join(' ') || nothing}</div>`;
     })}`;
   }
@@ -327,9 +326,9 @@ export class BrowseSurface extends JfElement {
       ${icon({ name: 'refresh-cw', size: 14, spin: this.refreshing })}</jf-button></div>
       <div class="search-bar"><input class="filter-input" type="search" aria-label="Filter files" placeholder="Filter files…"
         .value=${this.filter} @input=${(event: Event) => { this.filter = (event.target as HTMLInputElement).value; }}></div>` : nothing}
-      ${this.error ? html`<jf-error-alert class="browse-error">${this.error}<jf-button label="Retry loading folders" .onActivate=${() => void this.refresh()}>Retry</jf-button></jf-error-alert>` : nothing}
       <div class="body">
         <div class="column-heads" aria-hidden="true"><span>Name</span><span>Size</span><span>Changed</span><span></span></div>
+        ${this.error ? html`<jf-error-alert class="browse-error">${this.error}<jf-button label="Try again" .onActivate=${() => void this.refresh()}>Try again</jf-button></jf-error-alert>` : nothing}
         ${this.renderNotices()}
         ${rows.length ? html`<div role="tree" aria-label="Browse searchable files">${repeat(rows, row => row.id, row => this.renderRow(row))}</div>`
           : html`<div class="empty-state" tabindex="-1" role="status">${this.refreshing ? 'Loading folders…' : this.error ? ''

@@ -1,0 +1,202 @@
+// @vitest-environment happy-dom
+// SPDX-License-Identifier: Apache-2.0
+import { afterEach, expect, it, vi } from 'vitest';
+import '../LibrarySurface.js';
+import '../BrowseSurface.js';
+import '../../components/IndexingControls.js';
+import '../../chrome/TopBar.js';
+import type { LibrarySurface } from '../LibrarySurface.js';
+import type { BrowseSurface } from '../BrowseSurface.js';
+import { createMockHostApi } from '../../plugin-api/testHostApi.js';
+import { getOperationClient } from '../../operations/OperationClient.js';
+import { __feedForTest, __resetAiStateForTest, type StatusSnapshot } from '../../state/aiStateStore.js';
+import { selectIndexingProgress } from '../../state/indexingProgress.js';
+import type { StatusResponse } from '../../../api/generated/schema-types/index.js';
+import { setShowDeveloperTools } from '../../state/developerToolsState.js';
+
+function must<T extends Element = HTMLElement>(root: ParentNode | null, selector: string): T {
+  expect(root, `root for ${selector}`).not.toBeNull();
+  const found = root!.querySelector<T>(selector);
+  expect(found, selector).not.toBeNull(); return found!;
+}
+async function settle(el: { updateComplete: Promise<unknown> }) {
+  for (let i = 0; i < 40; i++) { await Promise.resolve(); await el.updateComplete; }
+}
+function button(root: ParentNode, words: string): HTMLButtonElement {
+  const found = [...root.querySelectorAll<HTMLButtonElement>('button')].find(el => el.textContent?.trim() === words);
+  expect(found, words).toBeDefined(); return found!;
+}
+const row = { pathHash: 'slice6b1', status: 'indexed', fileCount: 8, fileCountCapped: false,
+  failedCount: 0, inFlightCount: 0, walkCompleted: true };
+async function library() {
+  __feedForTest({ status: { worker: { core: { indexedDocuments: 8, ownSearchableDocuments: 8,
+    indexState: 'IDLE', indexHealthy: true }, migration: { migrationState: 'IDLE' },
+    enrichment: { embeddingEnabled: false, spladeEnabled: false, nerEnabled: false,
+      embeddingDocCount: 8, embeddingPendingCount: 8, embeddingCoveragePercent: 0,
+      spladeDocCount: 8, spladePendingCount: 8, spladeCoveragePercent: 0, pendingNerCount: 8,
+      completedNerCount: 0, chunk: { chunkDocCount: 2, chunkEmbeddingPendingCount: 2, chunkVectorsReady: false } } },
+    readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] } } } } as unknown as StatusSnapshot });
+  const host = createMockHostApi();
+  host.data.fetch = vi.fn(async path => path.startsWith('/api/indexing-roots/substrate') ? Response.json({ items: [row] })
+    : path.startsWith('/api/operation-history/') ? Response.json({ state: 'complete', historySince: 0 }) : new Response('{}', { status: 503 }));
+  const el = document.createElement('jf-library-surface') as LibrarySurface;
+  el.host_ = host; el.resolvedPaths = { slice6b1: '/Documents' };
+  document.body.append(el); await settle(el); return el;
+}
+afterEach(() => { document.body.replaceChildren(); __resetAiStateForTest(); setShowDeveloperTools(false); vi.restoreAllMocks(); });
+
+it('6b1-1: Library removes its more button and menu', async () => {
+  const el = await library();
+  expect(el.shadowRoot).not.toBeNull();
+  expect(el.shadowRoot!.querySelector('[aria-label="More Library actions"]')).toBeNull();
+  expect(el.shadowRoot!.querySelector('jf-menu')).toBeNull();
+});
+it('6b1-7: Library has no misleading waiting-work action', async () => {
+  const el = await library();
+  const more = el.shadowRoot?.querySelector<HTMLButtonElement>('[aria-label="More Library actions"]');
+  if (more) { more.click(); await settle(el); }
+  expect(el.shadowRoot).not.toBeNull();
+  expect(el.shadowRoot!.textContent).not.toContain('Read waiting files now');
+});
+it('6b1-2: the quiet foot action asks in place, and Cancel runs nothing and restores focus', async () => {
+  const invoke = vi.spyOn(getOperationClient(''), 'invokeWithConsent');
+  const el = await library();
+  const foot = must(el.shadowRoot, '.bottom-links');
+  const action = button(foot, 'Read everything again');
+  expect(must(foot, '[label="Activity"]').textContent).toBe('Activity');
+  expect(action.getAttribute('tabindex')).not.toBe('-1');
+  expect(action.disabled).toBe(false);
+  expect(action.getAttribute('aria-expanded')).toBe('false');
+  action.focus(); expect(el.shadowRoot!.activeElement).toBe(action);
+  action.click(); await settle(el);
+  const ask = must(el.shadowRoot, '[role="region"][aria-label="Read every watched folder again?"]');
+  expect(action.getAttribute('aria-expanded')).toBe('true');
+  expect(ask.closest('.bottom-links')).toBe(foot);
+  expect(ask.textContent).toContain('Read every watched folder again?');
+  expect(el.shadowRoot!.querySelector('[role="dialog"], dialog')).toBeNull();
+  expect(ask.parentElement?.getAttribute('aria-live')).toBe('polite');
+  const cancel = button(ask, 'Cancel');
+  button(ask, 'Read again'); cancel.focus(); cancel.click(); await settle(el);
+  expect(el.shadowRoot!.querySelector('[role="region"][aria-label="Read every watched folder again?"]')).toBeNull();
+  expect(el.shadowRoot!.activeElement).toBe(action);
+  expect(action.getAttribute('aria-expanded')).toBe('false');
+  expect(invoke).not.toHaveBeenCalled();
+  expect(el.shadowRoot!.querySelector('[style]')).toBeNull();
+});
+it('6b1-2: confirmation uses consent and recorded outcome', async () => {
+  const invoke = vi.spyOn(getOperationClient(''), 'invokeWithConsent').mockResolvedValue({ success: true, message: 'Reading accepted',
+    structuredData: { operationKey: '0194f72c-0000-7000-8000-000000000062' } });
+  const el = await library();
+  button(must(el.shadowRoot, '.bottom-links'), 'Read everything again').click(); await settle(el);
+  expect(invoke).not.toHaveBeenCalled();
+  const ask = must(el.shadowRoot, '[role="region"][aria-label="Read every watched folder again?"]');
+  button(ask, 'Read again').click(); await settle(el);
+  expect(invoke).toHaveBeenCalledTimes(1);
+  expect(invoke).toHaveBeenCalledWith('core.reindex', { args: { force: true } }, { requestConsent: expect.any(Function) });
+  expect(el.shadowRoot!.textContent).toContain('Read again completed');
+});
+it('6b1-4: after no-AI completion Up to date occurs once on the page', async () => {
+  vi.spyOn(getOperationClient(''), 'invokeWithConsent').mockResolvedValue({ success: true, message: 'Reading accepted',
+    structuredData: { operationKey: '0194f72c-0000-7000-8000-000000000064' } });
+  const el = await library();
+  const more = el.shadowRoot?.querySelector<HTMLButtonElement>('[aria-label="More Library actions"]');
+  if (more) { // The before tree reaches the same operation through its old menu.
+    more.click(); await settle(el);
+    const item = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+      .find(el => el.textContent?.includes('Read everything again'));
+    expect(item).toBeDefined(); item!.click();
+  } else {
+    button(must(el.shadowRoot, '.bottom-links'), 'Read everything again').click(); await settle(el);
+    button(must(el.shadowRoot, '[role="region"][aria-label="Read every watched folder again?"]'), 'Read again').click();
+  }
+  await settle(el);
+  expect(el.shadowRoot!.textContent).toContain('Read again completed');
+  expect(el.shadowRoot!.textContent!.match(/Up to date/g)).toHaveLength(1);
+});
+it.each([[1, '1 document from other apps'], [0, '0 documents from other apps'], [12, '12 documents from other apps']] as const)(
+  '6b1-3: other-app total %s has literal singular/plural words', async (count, words) => {
+    const el = await library();
+    el.otherSources = { sources: [{ collection: 'app', docCount: count }], truncated: false };
+    await settle(el); expect(must(el.shadowRoot, '.bottom-links details summary').textContent?.trim()).toBe(words);
+  });
+
+async function browse(fetch: (path: string) => Promise<Response>) {
+  const host = createMockHostApi(); host.data.fetch = fetch;
+  const el = document.createElement('jf-browse-surface') as BrowseSurface;
+  el.host_ = host; document.body.append(el); await settle(el); return el;
+}
+function inList(el: BrowseSurface, selector: string) {
+  const heads = must(el.shadowRoot, '.column-heads');
+  const notice = must(el.shadowRoot, selector);
+  expect(notice.closest('.body')).toBe(heads.parentElement);
+  expect(heads.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); return notice;
+}
+it.each(['outside click', 'Escape'])('6b1-1 preservation: top bar and Browse context menus still close on %s', async dismiss => {
+  const close = () => dismiss === 'Escape'
+    ? document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    : document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true }));
+  const bar = document.createElement('jf-top-bar') as HTMLElement & { updateComplete: Promise<unknown> };
+  document.body.append(bar); await settle(bar);
+  must<HTMLButtonElement>(bar.shadowRoot, '.more-trigger').click(); await settle(bar);
+  must(bar.shadowRoot, '[role="menu"]'); close(); await settle(bar);
+  expect(bar.shadowRoot!.querySelector('[role="menu"]')).toBeNull();
+
+  const el = await browse(vi.fn(async (path: string) => Response.json(path.includes('/api/indexing/roots')
+    ? { roots: [{ path: '/Documents' }] } : path.endsWith('/folders') ? { folders: [] }
+      : { files: [{ docId: '/Documents/one.txt', fields: { path: '/Documents/one.txt', filename: 'one.txt' } }], totalCount: 1 })));
+  must<HTMLElement>(el.shadowRoot, '[role="treeitem"]').click(); await settle(el);
+  must(el.shadowRoot, '.row.file').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, composed: true }));
+  await settle(el);
+  const context = must<HTMLElement & { updateComplete: Promise<unknown> }>(document.body, 'jf-context-menu');
+  await settle(context);
+  const shared = must<HTMLElement & { updateComplete: Promise<unknown> }>(context.shadowRoot, 'jf-menu');
+  await settle(shared); expect(must(context.shadowRoot, '[role="menu"]').getAttribute('aria-label')).toBe('File actions');
+  close(); await settle(el); expect(document.querySelector('jf-context-menu')).toBeNull();
+});
+it('6b1-5: root loading and failure occupy the list area, hide browser errors, and Try again reloads', async () => {
+  let reject!: (error: Error) => void;
+  const fetch = vi.fn(() => new Promise<Response>((_resolve, fail) => { reject = fail; }));
+  const el = await browse(fetch);
+  expect(inList(el, '[role="status"]').textContent).toContain('Loading folders…');
+  reject(new TypeError('Load failed')); await settle(el);
+  const failure = inList(el, '.browse-error');
+  expect(failure.textContent).toContain("Couldn't load folders");
+  expect(el.shadowRoot!.textContent).not.toContain('Load failed');
+  const retry = must<HTMLElement & { onActivate(): void }>(failure, 'jf-button[label="Try again"]');
+  fetch.mockResolvedValue(Response.json({ roots: [{ path: '/Documents' }] }));
+  retry.onActivate(); await settle(el);
+  expect(must(el.shadowRoot, '[role="treeitem"]').textContent).toContain('Documents');
+});
+it('6b1-5: folder loading/failure sit after heads, with plain failure and a working Try again', async () => {
+  let reject!: (error: Error) => void;
+  const fetch = vi.fn((path: string) => path.includes('/api/indexing/roots') ? Promise.resolve(Response.json({ roots: [{ path: '/Documents' }] }))
+    : path.endsWith('/folders') ? Promise.resolve(Response.json({ folders: [] }))
+      : new Promise<Response>((_resolve, fail) => { reject = fail; }));
+  const el = await browse(fetch);
+  must<HTMLElement>(el.shadowRoot, '[role="treeitem"]').click(); await settle(el);
+  expect(inList(el, '.notice').textContent).toContain('Loading Documents…');
+  reject(new TypeError('Load failed')); await settle(el);
+  const failure = inList(el, '.notice');
+  expect(failure.textContent).toContain("Couldn't load this folder");
+  expect(el.shadowRoot!.textContent).not.toContain('Load failed');
+  const retry = must<HTMLElement & { onActivate(): void }>(failure, 'jf-button[label="Try again"]');
+  fetch.mockImplementation(async (path: string) => Response.json(path.endsWith('/folders') ? { folders: [] } : { files: [], totalCount: 0 }));
+  retry.onActivate(); await settle(el);
+  expect(inList(el, '.notice').textContent).toContain('No searchable files in this folder');
+});
+it('6b1-6: focused Resume becomes enabled Pause when observation confirms reading runs', async () => {
+  vi.spyOn(getOperationClient(''), 'invokeWithConsent').mockResolvedValue({ success: true, message: 'Resume accepted' });
+  const progress = (paused: boolean) => selectIndexingProgress({ worker: { core: { indexState: 'IDLE', indexedDocuments: 1 } },
+    operating: { indexing: { state: paused ? 'PAUSED' : 'RUNNING', reasons: paused ? ['user_paused'] : [] } } } as unknown as StatusResponse, true, 0, []);
+  const el = document.createElement('jf-indexing-controls') as HTMLElement & { progress: ReturnType<typeof progress>; updateComplete: Promise<unknown> };
+  Object.assign(el, { toolbar: true, compact: true, allowPause: true, progress: progress(true) });
+  document.body.append(el); await settle(el);
+  const toggle = button(must(el.shadowRoot, '.pause-menu'), 'Resume reading');
+  toggle.focus(); expect(el.shadowRoot!.activeElement).toBe(toggle);
+  toggle.click(); await settle(el); expect(el.shadowRoot!.activeElement).toBe(toggle);
+  el.progress = progress(false); await settle(el);
+  expect(el.shadowRoot!.activeElement).toBe(toggle);
+  expect(toggle.textContent?.trim()).toBe('Pause reading');
+  expect(toggle.getAttribute('aria-disabled')).toBe('false');
+  toggle.click(); await settle(el); button(must(el.shadowRoot, '.pause-options'), 'Until I resume');
+});

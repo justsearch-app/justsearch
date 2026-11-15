@@ -291,14 +291,11 @@ it.each(['cancel', 'accept-gaps'] as const)('Library %s keeps an immediate decis
   expect([...el.shadowRoot!.querySelectorAll('[role="alert"] small')].map(e => e.textContent).join(' ')).toContain(`Code: ${expectedCode}`);
 });
 
-it('Library shows the picture-off refusal from Process pending work in plain words', async () => {
-  invokeRefusal = { code: 'PICTURE_READING_OFF', message: 'Picture reading is off. Turn it on to process pending work.' };
+it('Library omits the picture-only waiting-work action', async () => {
   const el = document.createElement('jf-library-surface') as LibrarySurface;
   el.apiBase = base; el.host_ = host(); document.body.append(el); await pump(el);
-  el.shadowRoot!.querySelector<HTMLButtonElement>('.more-trigger')!.click(); await pump(el);
-  const waiting = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(item => item.textContent?.includes('Read waiting files now'))!;
-  expect(waiting).not.toBeNull(); waiting.click();
-  await vi.waitFor(() => expect(el.shadowRoot!.textContent).toContain(invokeRefusal.message));
-  expect(invocations).toBe(1);
-  expect(el.shadowRoot!.textContent).not.toContain('Enrichment pass started');
+  expect(el.shadowRoot).not.toBeNull();
+  expect(el.shadowRoot!.textContent).not.toContain('Read waiting files now');
+  expect(el.shadowRoot!.querySelector('.more-trigger')).toBeNull();
+  expect(invocations).toBe(0);
 });

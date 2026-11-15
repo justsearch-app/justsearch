@@ -26,7 +26,6 @@ import { decideForget, forgetObservationText, parseForgetPage, publishForgetComp
 import { deepActiveElement } from '../utils/keyboardHandler.js';
 import type { ForgetPage, ForgetOutcome } from '../../api/generated/schema-types/index.js';
 import { confirmForget } from '../components/searchResults/forgetConsent.js';
-import { menuStyles } from '../components/Menu.js';
 import { getShowDeveloperTools, subscribeShowDeveloperTools } from '../state/developerToolsState.js';
 import { JfElement } from '../primitives/JfElement.js';
 import '../components/OpButton.js';
@@ -217,7 +216,7 @@ export class LibrarySurface extends JfElement {
   private provisionalHeadline = 'Reading status unconfirmed';
   private indexProgress = selectIndexingProgress(null, false, 0, []);
   static properties = {
-    developer: { state: true }, menuOpen: { state: true }, menuBusy: { state: true }, activityOpen: { state: true },
+    developer: { state: true }, rereadConfirmOpen: { state: true }, rereadBusy: { state: true }, activityOpen: { state: true },
     apiBase: { attribute: 'api-base', type: String },
     host_: { attribute: false },
     roots: { state: true },
@@ -275,10 +274,9 @@ export class LibrarySurface extends JfElement {
 
   private developerUnsub: (() => void) | undefined;
   declare developer: boolean;
-  declare menuOpen: boolean;
-  declare menuBusy: boolean;
+  declare rereadConfirmOpen: boolean;
+  declare rereadBusy: boolean;
   declare activityOpen: boolean;
-  private waitingWork: 'unknown' | 'waiting' | 'none' = 'unknown';
   declare apiBase: string;
   declare host_: PluginHostApi;
   declare roots: IndexedRootView[];
@@ -434,6 +432,8 @@ export class LibrarySurface extends JfElement {
     // L21 — focus stays on its control across row updates; when its row leaves, a neighbour (else Add folder) takes it.
     new FocusKeeper(this, () => this.renderRoot.querySelector<HTMLElement>('[data-add-folder]'));
     this.apiBase = '';
+    this.rereadConfirmOpen = false;
+    this.rereadBusy = false;
     this.host_ = undefined as unknown as PluginHostApi;
     this.roots = [];
     this.resolvedPaths = {};
@@ -683,7 +683,6 @@ export class LibrarySurface extends JfElement {
     // two render sites cannot drift; see failedChipPresentation.ts.
     failedChipStyles,
     folderRowStyles,
-    menuStyles,
     css`
       .folders-scroll { padding: 1.8rem 2.5rem; min-width: 0; }
       .header-left h2 { font-size: var(--font-size-headline); font-variation-settings: "opsz" 32; font-weight: 400; }
@@ -696,13 +695,15 @@ export class LibrarySurface extends JfElement {
       .removal-history summary { cursor: pointer; }
       .window-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
       @media (max-width: 45rem) { .window-actions { gap: .25rem; } }
-      .more-actions { position: relative; }
-      /* The trigger is its fixed-size icon plus a text-sized margin: 30px at default text, and at 200%
-         small enough that Library's three actions still share one row beside a 600px window's tabs. */
-      .more-trigger { display: inline-grid; place-items: center; width: calc(18px + .75rem); height: calc(18px + .75rem); padding: 0;
-        border: 0; border-radius: 8px; color: var(--text-primary); background: transparent; cursor: pointer; }
-      .more-trigger:hover, .more-trigger[aria-expanded=true] { background: var(--surface-2); }
-      .more-trigger:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+      .text-action { align-self: center; padding: .25rem 0; border: 0; background: transparent;
+        color: var(--text-secondary); font: inherit; cursor: pointer; }
+      .text-action:hover { color: var(--text-primary); text-decoration: underline; }
+      .text-action:disabled { cursor: default; opacity: .65; }
+      .text-action:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
+      .reread-confirmation { flex-basis: 100%; }
+      .reread-confirmation:empty { display: none; }
+      .reread-confirmation p { margin: 0 0 .5rem; }
+      .reread-confirmation button + button { margin-inline-start: .75rem; }
       .browser-banner { padding: 0; border: 0; background: transparent; color: var(--text-secondary); font-size: var(--font-size-xs); }
       .excludes-section, .gap-decision { background: transparent; border: 0; border-radius: 0;
         border-top: 1px solid var(--border-subtle); padding: 1rem 0; }
@@ -849,11 +850,6 @@ export class LibrarySurface extends JfElement {
       this.contactUnconfirmed = s.stability.kind === 'provisional' &&
         ['initial-load', 'updating', 'channel-stale'].includes(s.stability.cause);
       this.observeGapDecision(s.status?.worker?.migration);
-      const core = s.status?.worker?.core, enrichment = s.status?.worker?.enrichment;
-      const pending = [core?.pendingVduCount, enrichment?.embeddingPendingCount,
-        enrichment?.spladePendingCount, enrichment?.pendingNerCount, enrichment?.chunk?.chunkEmbeddingPendingCount, enrichment?.chunk?.chunkSpladePendingCount];
-      this.waitingWork = !s.indexingStatusLive || this.provisional || s.status?.meta?.workerRpcStale === true || s.status?.operating?.freshness?.staleSources?.includes('indexing') ? 'unknown' : pending.some(value => typeof value === 'number' && value > 0)
-        ? 'waiting' : pending.every(value => typeof value === 'number' && value === 0) ? 'none' : 'unknown';
       // Tempdoc 813 §4 — the per-root second tier needs to know which stages apply; take it from the
       // ONE index-wide progress derivation rather than re-reading the enrichment wire flags here.
       const progress = selectIndexingProgress(
@@ -899,8 +895,8 @@ export class LibrarySurface extends JfElement {
    *  spinner / error would otherwise survive navigation). Folder/excludes drafts, the active tab, and the
    *  fetched roots are recoverable and KEPT. */
   protected override settleTransients(): void {
-    this.menuOpen = false;
-    this.menuBusy = false;
+    this.rereadConfirmOpen = false;
+    this.rereadBusy = false;
     this.excludesError = null;
     this.excludesNotice = '';
     this.excludesResult = null;
@@ -2234,44 +2230,26 @@ export class LibrarySurface extends JfElement {
     return this.developer && plain !== message && message ? `${plain} (${message})` : plain;
   }
 
-  private async runLibraryAction(operation: 'core.reindex' | 'core.trigger-offline-processing'): Promise<void> {
-    if (this.menuBusy) return;
-    this.shadowRoot?.querySelector<HTMLElement>('.more-trigger')?.focus();
-    this.menuOpen = false;
-    this.menuBusy = true;
+  private async runLibraryAction(operation: 'core.reindex'): Promise<void> {
+    if (this.rereadBusy) return;
+    this.shadowRoot?.querySelector<HTMLElement>('[data-reread]')?.focus();
+    this.rereadConfirmOpen = false;
+    this.rereadBusy = true;
     const serial = this.surfaceSerial;
     try {
       const result = await getOperationClient(this.apiBase).invokeWithConsent(operation,
-        { args: operation === 'core.reindex' ? { force: true } : {} }, { requestConsent: requestAuthorization });
+        { args: { force: true } }, { requestConsent: requestAuthorization });
       if (serial !== this.surfaceSerial) return;
-      if (operation === 'core.reindex') await this.reindexAccepted(result);
-      else this.actionMessage = `${result.message || 'Reading pass accepted.'} ${typeof result.structuredData?.remaining === 'number' && result.structuredData.remaining > 0
-        ? 'Some files are still waiting; another pass may be needed.' : 'Completion of all waiting work has not been confirmed. Check Activity; another pass may be needed.'}`;
+      await this.reindexAccepted(result);
     } catch (error) {
       if (serial === this.surfaceSerial) this.error = `Reading was not confirmed. ${this.actionFailure(error)} Check Activity before retrying.`;
-    } finally { if (serial === this.surfaceSerial) this.menuBusy = false; }
+    } finally { if (serial === this.surfaceSerial) this.rereadBusy = false; }
   }
 
   private renderWindowActions(): TemplateResult {
-    const noFolders = this.rootsObserved && this.roots.length === 0 && !this.provisional;
-    const totalKnown = this.rootsObserved && getIndexedRoots().confirmed && this.roots.length > 0 && !this.provisional && this.indexingActivity.confirmed
-      && this.roots.every(root => (root.fileCount ?? -1) >= 0 && root.fileCountCapped === false && root.walkCompleted === true && !root.walkError && root.status !== 'unavailable');
-    const total = this.roots.reduce((sum, root) => sum + (root.fileCount ?? 0), 0);
     return html`<div slot="actions" class="window-actions">
       <jf-indexing-controls data-testid="library-indexing-pause" compact toolbar allow-pause .progress=${this.indexProgress} api-base=${this.apiBase}
         .saveWithSettings=${this.saveSettingsOperation}></jf-indexing-controls>
-      <span class="more-actions"><button class="more-trigger" type="button" aria-label="More Library actions" title="More Library actions"
-        aria-haspopup="menu" aria-expanded=${String(this.menuOpen)} @click=${() => { this.menuOpen = !this.menuOpen; }}>${icon({ name: 'more-horizontal', size: 18 })}</button>
-        ${this.menuOpen ? html`<jf-menu label="More Library actions" .trigger=${this.shadowRoot?.querySelector<HTMLElement>('.more-trigger') ?? null}
-          @menu-close=${() => { this.menuOpen = false; }} .content=${html`
-          <button type="button" role="menuitem" tabindex="-1" ?disabled=${noFolders || this.menuBusy}
-            @click=${() => void this.runLibraryAction('core.reindex')}>${icon({ name: 'refresh-cw', size: 16 })}
-            <span class="item-label">Read everything again${noFolders || totalKnown ? html`<span class="item-detail item-secondary">${noFolders ? 'No folders yet' : `All ${formatFileCount(total, false)}`}</span>` : nothing}</span></button>
-          <button type="button" role="menuitem" tabindex="-1" ?disabled=${this.waitingWork === 'none' || this.menuBusy}
-            @click=${() => void this.runLibraryAction('core.trigger-offline-processing')}>${icon({ name: 'zap', size: 16 })}
-            <span class="item-label">Read waiting files now${this.waitingWork === 'none' ? html`<span class="item-detail item-secondary">Nothing is waiting</span>` : nothing}</span></button>
-        `}></jf-menu>` : nothing}
-      </span>
       <jf-button variant="primary" data-add-folder label="Add a folder" .disabled=${this.addBusy}
         .onActivate=${() => this.handleAddFolderClick()}>${icon({ name: 'folder-plus', size: 14 })} Add a folder</jf-button>
     </div>`;
@@ -2310,6 +2288,7 @@ export class LibrarySurface extends JfElement {
   }
 
   private renderFolders(): TemplateResult {
+    const otherDocumentCount = this.otherSources.sources.reduce((sum, source) => sum + source.docCount, 0);
     return html`
       ${this.renderHeader()}
       ${this.activeTab === 'folders' ? html`<jf-interrupted-imports api-base=${this.apiBase} .host_=${this.host_}></jf-interrupted-imports>` : nothing}
@@ -2319,7 +2298,7 @@ export class LibrarySurface extends JfElement {
         ${this.reindexOutcome}
         ${this.reindexOutcomeKey ? html`<jf-button label="Check reading outcome" .disabled=${this.reindexOutcomeBusy}
           .onActivate=${() => this.checkReindexOutcome()}>Check reading outcome</jf-button>` : nothing}
-        ${this.retryWaiting ? nothing : this.indexProgress.phase === 'blocked' ? html`<p>Up to date</p>`
+        ${this.retryWaiting || this.indexProgress.phase === 'blocked' ? nothing
           : html`<p>${this.indexingActivity.summary}${this.indexingActivity.detail ? ` — ${this.indexingActivity.detail}` : ''}</p>`}
       </div>` : nothing}
 
@@ -2465,9 +2444,23 @@ export class LibrarySurface extends JfElement {
       ${this.developer && !(this.unfinishedForgets?.items.length ?? 0) && this.forgetReadStatus !== 'unavailable' && !this.forgetMessage ? html`<details class="removal-history"><summary>Removal history</summary>${this.renderUnfinishedForgets()}</details>` : nothing}
       <div class="bottom-links">
         ${this.otherSources.sources.length || this.otherSources.truncated ? html`<details><summary>
-          ${formatCount(this.otherSources.sources.reduce((sum, source) => sum + source.docCount, 0))} documents from other apps${this.otherSources.truncated ? ' · incomplete list' : ''}
+          ${formatCount(otherDocumentCount)} ${otherDocumentCount === 1 ? 'document' : 'documents'} from other apps${this.otherSources.truncated ? ' · incomplete list' : ''}
         </summary>${this.renderOtherSources()}</details>` : nothing}
         <jf-button variant="ghost" label="Activity" .onActivate=${() => { this.activityOpen = !this.activityOpen; }}>Activity</jf-button>
+        <button type="button" class="text-action" data-reread
+          ?disabled=${this.rereadBusy || this.rootsObserved && this.roots.length === 0 && !this.provisional}
+          title=${this.rootsObserved && this.roots.length === 0 && !this.provisional ? 'No folders yet' : nothing}
+          aria-expanded=${String(this.rereadConfirmOpen)} aria-controls="reread-confirmation"
+          @click=${() => { this.rereadConfirmOpen = true; }}>Read everything again</button>
+        <div id="reread-confirmation" class="reread-confirmation" aria-live="polite">${this.rereadConfirmOpen ? html`
+          <section role="region" aria-label="Read every watched folder again?">
+            <p>Read every watched folder again?</p>
+            <button type="button" class="text-action" @click=${() => void this.runLibraryAction('core.reindex')}>Read again</button>
+            <button type="button" class="text-action" @click=${() => {
+              this.rereadConfirmOpen = false;
+              this.shadowRoot?.querySelector<HTMLButtonElement>('[data-reread]')?.focus();
+            }}>Cancel</button>
+          </section>` : nothing}</div>
         ${this.activeTab === 'folders' && (this.developer || this.activityOpen) ? html`<jf-ingestion-summary compact .host_=${this.host_}></jf-ingestion-summary>` : nothing}
       </div>
     `;

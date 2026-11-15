@@ -152,10 +152,10 @@ Note: `GET /api/debug/effective-config` exists for "effective config" debugging.
 
 ### Reading files again
 
-In **Library → More Library actions**, choose **Read everything again** to read all watched
-folders again, including unchanged files. **Read again to verify** on an unverified row also
+At the foot of **Library → Folders**, beside **Activity**, choose **Read everything again**.
+Confirm **Read every watched folder again?** with **Read again** to read all watched folders,
+including unchanged files, or choose **Cancel** to leave them as they are. **Read again to verify** on an unverified row also
 checks all watched folders. Neither action is limited to that row's folder.
-**Read waiting files now** starts one pass through waiting AI work; another pass may be needed.
 Acceptance is reported separately from completion. A rebuild for an incompatible search format
 is a separate recovery: existing search data stays available until the replacement is ready,
 and any files it could not include require a decision before activation.

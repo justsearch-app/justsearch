@@ -161,18 +161,18 @@ it('ordinary Browse reloads roots on show and replaces cached children on each e
   expect(fetch.mock.calls.filter(([path]) => path.includes('/api/indexing/roots'))).toHaveLength(2);
 });
 
-it('a failed child reload preserves cached rows and exposes Retry, which replaces them on success', async () => {
+it('a failed child reload preserves cached rows and exposes Try again, which replaces them on success', async () => {
   const { el, setEntries, fail } = await browse();
   const folder = must<HTMLElement>(el.shadowRoot, '[data-path="/Documents"]');
   folder.click(); await settle(el); folder.click(); await settle(el); fail(true);
   folder.click(); await settle(el);
-  const retry = must<HTMLElement & { onActivate(): void }>(el.shadowRoot, '[label="Retry Documents"]');
-  expect(el.shadowRoot!.textContent).toContain('Could not load Documents');
+  const retry = must<HTMLElement & { onActivate(): void }>(el.shadowRoot, '[label="Try again"]');
+  expect(el.shadowRoot!.textContent).toContain("Couldn't load this folder");
   expect(el.shadowRoot!.querySelector('[data-path="/Documents/old.md"]')).not.toBeNull();
   fail(false); setEntries(['replacement.md']); retry.onActivate(); await settle(el);
   expect(el.shadowRoot!.querySelector('[data-path="/Documents/replacement.md"]')).not.toBeNull();
   expect(el.shadowRoot!.querySelector('[data-path="/Documents/old.md"]')).toBeNull();
-  expect(el.shadowRoot!.textContent).not.toContain('Could not load Documents');
+  expect(el.shadowRoot!.textContent).not.toContain("Couldn't load this folder");
 });
 
 it('complete root coverage wins over a global meaning-work block affecting other folders', async () => {
@@ -250,10 +250,7 @@ it('V4: Browse lists folders and then files by name', async () => {
 
 it('V4: a total of one file reads "1 file"', async () => {
   const { el: lib } = await library({ ...root, fileCount: 1, fileCountCapped: false });
-  must<HTMLButtonElement>(lib.shadowRoot, '.more-trigger').click(); await settle(lib);
-  const reread = [...lib.shadowRoot!.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.includes('Read everything again'));
-  expect(reread).toBeDefined();
-  expect(must(reread!, '.item-detail').textContent).toBe('All 1 file');
+  expect(must(lib.shadowRoot, '.files-found').textContent).toBe('1 file');
 });
 
 it('V5: the shared formatter groups digits even where the runtime does not', async () => {
@@ -290,8 +287,12 @@ it('V5: a counted folder read that finishes after a newer counts-free read still
   expect(getIndexedRoots().roots.find(item => item.pathHash === row.pathHash)?.fileCount).toBe(8);
 });
 
-const rereadItem = (el: LibrarySurface) => [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
-  .find(item => item.textContent?.includes('Read everything again'));
+async function reread(el: LibrarySurface) {
+  must<HTMLButtonElement>(el.shadowRoot, '[data-reread]').click(); await settle(el);
+  const ask = must(el.shadowRoot, '[aria-label="Read every watched folder again?"]');
+  const confirm = [...ask.querySelectorAll<HTMLButtonElement>('button')].find(item => item.textContent === 'Read again');
+  expect(confirm).toBeDefined(); confirm!.click(); await settle(el);
+}
 
 it('V6: when Read everything again completes, the folders are read again so the rows show the new file counts', async () => {
   const { el, host } = await library({ ...root, pathHash: 'reread-count' });
@@ -303,9 +304,7 @@ it('V6: when Read everything again completes, the folders are read again so the 
   host.data.fetch = vi.fn(async (path: string) => path.startsWith('/api/operation-history/') ? Response.json({ state: 'complete', historySince: 0 })
     : path.startsWith('/api/indexing-roots/substrate') ? (reads.push(path), Response.json({ items: [{ ...root, pathHash: 'reread-count', fileCount: 12 }] }))
     : new Response('{}', { status: 503 }));
-  must<HTMLButtonElement>(el.shadowRoot, '.more-trigger').click(); await settle(el);
-  const reread = () => rereadItem(el);
-  expect(reread()).toBeDefined(); reread()!.click(); await settle(el);
+  await reread(el);
   expect(invoked).toBe(1);
   expect(el.shadowRoot!.textContent).toContain('Read again completed');
   expect(reads.some(path => path.includes('counts=true')), JSON.stringify(reads)).toBe(true);
@@ -315,16 +314,13 @@ it('V6: when Read everything again completes, the folders are read again so the 
 
 it('V7: when the Engine cannot be reached, Read everything again says so in plain words; developer tools add the Engine message', async () => {
   const { el } = await library();
-  const reread = () => rereadItem(el);
   vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
-  must<HTMLButtonElement>(el.shadowRoot, '.more-trigger').click(); await settle(el);
-  expect(reread()).toBeDefined(); reread()!.click(); await settle(el);
+  await reread(el);
   const banner = must(el.shadowRoot, '.error-banner');
   expect(banner.textContent).toContain('could not reach the engine');
   expect(banner.textContent).not.toMatch(/index|core\./i);
   setShowDeveloperTools(true); await settle(el);
-  must<HTMLButtonElement>(el.shadowRoot, '.more-trigger').click(); await settle(el);
-  expect(reread()).toBeDefined(); reread()!.click(); await settle(el);
+  await reread(el);
   expect(must(el.shadowRoot, '.error-banner').textContent).toContain('core.reindex');
   vi.unstubAllGlobals();
 });
