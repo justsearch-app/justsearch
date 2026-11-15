@@ -2125,3 +2125,13 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
   "note": "Entry 57: review-repairs-lockdown.test.ts:289-290 requires the column-head and ::before band background colors to equal the body background. P2 requires menus above the heads and no scrolled rows above them; it does not require exact color equality or a pseudo-element. Keep behavior assertions or cite an agreed source for these extra expectations. Other entries have no intent objection; local runtime reruns are unverified due sandbox restrictions."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-go4808z5",
+  "verdict": "accept",
+  "digest": "sha256:dea84a5c306129df3a976b5d67e4efb2157677703892559744703eeecd715fb2"
+}
+```
