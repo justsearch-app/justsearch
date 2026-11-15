@@ -3196,3 +3196,14 @@ expected value is computed by production code: the locked-Memory words are today
   "note": "Accept: all 37 entries re-judged on digest 6ec09fae. Prior rejection resolved: R1/R3/R5 and R2/R4 checks (switch-repairs, step-repairs) fail on 2f670abba7 by assertion on their defects via aria-checked/visible text/consent dialog, reproduced per case; entry 12 asserts 'Not confirmed yet'; entry 17 asserts the reasons. All 35 flagged files pass on the candidate; every new file fails on 777b598043 by behavioural assertion (preservation file passes)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "g392pl0f",
+  "verdict": "accept",
+  "digest": "sha256:6f14a3e75839475b3a46c20fe40a2003d8327f76ec6a7e81803f81de722f0799",
+  "note": "Accept: digest 6f14a3e7 re-judged. Since accepted 6ec09fae only the unused settingsGets counter left switch-repairs.test.ts (no assertion read it) and fm-brain-repairs.json was regenerated; its digests match the files. switch-repairs still fails on 2f670abba7 by the same three assertions (aria-checked, files-are-missing text, consent dialog), identical to the pre-lint file. All 35 flagged files pass on the candidate."
+}
+```
