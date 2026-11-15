@@ -1,0 +1,2107 @@
+---
+schema: test-intent.v1
+task: t-20261113-fmimpl
+author-role: builder
+author-session: builder-fm-s7-testintent-20261115
+---
+
+# Slice 7a test intent: AI Brain's Overview
+
+AI Brain's Overview follows the agreed pictures fm-10 (not installed), fm-13 (installed, no NVIDIA
+card) and fm-14 (answers working): the heading says what works, the sentence says only what the
+picture cannot, each switch sits once under its step with its state in words, only working steps
+are lit, the tab row "Overview | Memory" appears only once answers work, and what the pictures do
+not show sits behind Settings › Advanced › Show developer tools. The sources are the owner's adopted
+rules and picture notes, the pictures' words (quoted in each entry, because tmp/design is not in
+git), and the slice 7a decisions D1-D6 and AM1-AM10 under the implementation delegation.
+
+There is one entry per flagged file. The six new files under brain-first-minutes/ are not isolated:
+the same diff deletes brainPage.test.ts, and repository-wide scanners read them. Each has a New
+entry with its evidence. The evidence is gates/test-intent/evidence/fm-brain.json, written by
+run-evidence with --before origin/main (8a312d1484). Every case that fails on the before-state
+fails by assertion; none by exception or timeout. The style= source guard passes on the
+before-state too. Modified files have Obsolete entries naming the source of each changed
+expectation. installCause has an Adaptation entry, because only its locator moved.
+
+Expected values without a quoted source are kept where the implementation chose them. They are
+listed in the builder report and named in the entries, not given invented sources. They include
+the exact wording of notes and some headlines, "Not included", "Changing…", "Read everything
+again", the type-ladder sizes and radii, Space/Enter, and byte sizes formatted with formatBytes.
+This builder wrote no acceptance record.
+
+```json
+{
+  "entries": [
+    {
+      "items": [
+        "modules/ui-web/src/boot/type-ladder-lockdown.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "No tab row until answers work, then \"Overview | Memory\". The sentence has no switches; each switch sits under its step with its state in words.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Installed on a computer with an NVIDIA card. Only now is there a second tab (Memory), so only now a tab row; its first tab is \"Overview\", not the area's name again.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D1 Tab row hidden until answers work (same readiness as slice 4's Search / Ask); then \"Overview | Memory\". Explicit Memory navigation (justsearch://surface/core.memory-surface, ?tab=core.memory-surface, palette \"Open AI Brain › Memory\", Back/Forward, reload) still opens Memory and then shows the tab row so Overview is reachable; Memory facts stay readable/forgettable whatever the answer state.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "The production type-ladder audit still requires zero violations across every reached view; the number of views it reaches is 140 because AI Brain (fixture state without working answers) now contributes 5 views per theme instead of 14.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "summary.surfaces is 158.",
+          "newAssertion": "summary.surfaces is 140; violations stay 0.",
+          "reason": "Observed with modules/ui-web/e2e/type-ladder-chromium.mjs on both trees (2026-11-15, headless, private Vite): before (origin/main 8a312d1484) 158 views, 0 violations; candidate 140 views, 0 violations. The 18 views that left, per theme (dark, light): ai-brain-tab-1 (the click on the Brain tab row, which D1/handover \"No tab row until answers work\" removes for this fixture) and ai-brain-tab-1-expanded-1..8 (each 37 text elements: the eight aria-expanded feature openers of the old page, the sentence phrases (.feature-phrase) and step openers that open the \"You get / It costs\" panel, which D5/AM5 put behind Settings › Advanced › Show developer tools). The four remaining Brain expansions (Advanced settings, Other options, Use another, Change: 83-87 text elements before, 72-76 now) are still audited as ai-brain-expanded-1..4 because type-ladder-chromium.mjs now expands sub-views of a surface without a tab row. Where the removed text is now checked: the \"You get / It costs\" panel with developer tools on in dark and light in BrainOverview.layout-lockdown.test.ts (\"developer tools: the %s \"You get / It costs\" panel stays on the ladders\", one panel per theme, the panel template is shared by the four steps); the Overview without tab row at 1024/600 px and 200% zoom in BrainOverview.layout-lockdown.test.ts; the tab row itself (fm-14 state) in the same file's fm-14 cases. No source still requires a Brain tab row or default-visible feature panels in a state where answers do not work."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/indexingSurfaceSweep.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Every fact has one home on a screen. ... The same thing has one name everywhere: the app reads files (not \"indexes\")",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "AI Brain on a computer without an NVIDIA card (most computers). The sentence says only what the picture cannot; each fact stands once (the card under its step, sizes under theirs). A switch exists only under its step, with its state in words. What can't work here is said once, in ordinary words, and drawn as not reachable. Only the steps that work now are lit; the Install button is the one filled action.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D4 One fact once: card under its step, sizes under theirs; no \"registry footprint\", no leading separators, one kept-files wording; the CUDA reason once.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM9 Brain wording in 7a: \"indexing\", \"Resume Chat AI\", \"Rebuild the index\" and similar on Brain's default and exceptional states move to read/answers words; page/status coherence for Brain states (S7-25 subset); verdict ids unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "AI Brain's simple panel no longer repeats the reading-work hold reason (it lives in the status panel, Health and Brain's enrichment card) and still never infers indexing activity from runtime mode; the compatibility callout without reasons offers reading everything again in read words.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "S33.1/S33.4/S33.6 Brain simple panel: panel text contains expectedReason(which) (the hold reason or \"Indexing status unconfirmed\") for every case, job count and awaitingChatEnable; never \"Indexing embeddings\".",
+          "newAssertion": "Panel text does not contain expectedReason(which); never \"Indexing embeddings\" (kept).",
+          "reason": "Owner words \"Every fact has one home on a screen\" and D4 (\"One fact once\") / AM9 (page/status coherence) give the reading-work fact one home, outside AI Brain's Overview; fm-10 \"The sentence says only what the picture cannot\". The hold reasons are still asserted for every case in this file: Health Index state row (S33.1 S33.4 S33.6 Health index-state row), Health work row (S33.4 SH8), Brain enrichment card (S33.1 S33.2 S33.3 S33.4 S33.6 Brain cards; D5 keeps enrichment progress words), and the availability reasons of the status/answers availability checks further down. No source requires the Overview to repeat them."
+        },
+        {
+          "oldAssertion": "Compatibility callout without reasons contains \"Rebuild the index\".",
+          "newAssertion": "It contains \"Read everything again\" (the built-before-semantic-search branch and the UNCONFIRMED check are unchanged).",
+          "reason": "AM9 moves \"Rebuild the index\" on Brain's exceptional states to read words; owner words \"the app reads files (not \\\"indexes\\\")\". The exact phrase \"Read everything again\" is the Library action's name; no quoted source in this changeset spells it (listed as an exact word without its own source in the builder report). The callout's remedy and its unconfirmed treatment stay required (D5) and are kept."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/aiStateStore.restartInference.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "A restarted head that confirms nothing cannot inherit the previous head's Online; the oracle is unchanged. The test now turns developer tools on so the Start/Stop answers action it observes is rendered.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Start/Stop answers action observed on the default page.",
+          "newAssertion": "Same assertions, with developer tools on (devTools = true) before rendering.",
+          "reason": "D5 puts Start/Stop answers behind Settings › Advanced › Show developer tools; owner words \"What a picture does not show is not on that screen by default\". The restart/inheritance assertions are kept; only the precondition that makes the observed control exist changed."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.answer-pause.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Every fact has one home on a screen. ... The same thing has one name everywhere: the app reads files (not \"indexes\")",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM9 Brain wording in 7a: \"indexing\", \"Resume Chat AI\", \"Rebuild the index\" and similar on Brain's default and exceptional states move to read/answers words; page/status coherence for Brain states (S7-25 subset); verdict ids unchanged.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM3 (D3) Positive \"Search understands meaning\" heading only with live meaning evidence; embedding absent/inactive/unknown, activation required, incompatible embeddings, answers-working-but-meaning-not keep their remedy headline; unknown -> neutral headline.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "An Engine pause observation drives the answers-paused wording in a second window; the switch converges; the answer model stays loaded. Words are read/answers words.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Heading is \"Answers paused while indexing\"; sentence contains \"Answers resume automatically when bulk file indexing ends.\"",
+          "newAssertion": "Heading is \"Answers paused while files are read\"; sentence contains \"Answers resume when JustSearch finishes reading the files.\"; \"answer model stays loaded\", convergence and the switch write are unchanged.",
+          "reason": "AM9 moves \"indexing\" words on Brain's states to read/answers words; owner words \"the app reads files (not \\\"indexes\\\")\". The exact new sentences are the implementation's wording: no quoted source spells them (named in the builder report)."
+        },
+        {
+          "oldAssertion": "Fixture without runtime meaning evidence.",
+          "newAssertion": "Fixture adds runtimeStatus onnxFeatures embed active.",
+          "reason": "AM3: the positive \"AI is ready\" heading needs live meaning evidence; the fixture supplies the evidence the scenario (installed, online) implies. Oracle unchanged."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.answers-completion.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "Answers with a removed answer model: every route that turns answers on asks first, Cancel saves nothing, Accept starts the download without switching answers on. The Start answers route is a developer tool.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "the Start answers action observed with developer tools off (the default).",
+          "newAssertion": "Developer tools are turned on (setShowDeveloperTools(true)) before the Start answers action is observed; afterEach turns them off again.",
+          "reason": "Owner words \"What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.\" with D5/AM5. The control and every assertion about what it does are kept; only the precondition that makes it visible changed. No source requires it on the default page."
+        },
+        {
+          "oldAssertion": "Action located by data-testid=\"brain-simple-action\".",
+          "newAssertion": "Same action located by data-testid=\"brain-answers-action\"; its label \"Start answers\" and every consent/save assertion are unchanged.",
+          "reason": "The Start/Stop answers action is no longer the panel's primary action (D2/D5: the answer switch under its step is the default route), so it has its own test id; locator rename only."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.automatic-vdu.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Installed on a computer with an NVIDIA card. Only now is there a second tab (Memory), so only now a tab row; its first tab is \"Overview\", not the area's name again.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Overview | Memory / AI is ready / Everything below runs on this computer. / Text in scans and images: 2.1 GB, switch off, Off / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, On / Answer questions: 5.7 GB, switch on, On / Graphics card: 5.8 of 12 GB in use · RTX 4070 / Advanced settings / Engine history in Health. All five path steps lit.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-14-ai-ready (tmp/design/fm-14-ai-ready.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM9 Brain wording in 7a: \"indexing\", \"Resume Chat AI\", \"Rebuild the index\" and similar on Brain's default and exceptional states move to read/answers words; page/status coherence for Brain states (S7-25 subset); verdict ids unchanged.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D2 Sentence has no switches; each switch sits under its step with its state in words; existing handlers and meanings only (pre-install Included = package decline; Best match first = rerankerEnabled/intent; Answer questions = nullable chatEnabled, unset stays unset; Text in scans and images = pictureReadingEnabled). Switch shows stored selection; the step's lit/unlit and state words show what works now (selection never presented as activity).",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "While loaded answers lend their server to an automatic picture-reading pass, the page says pictures are being read and that answers resume after the current document; after the hold closes, or on stale observations, it never claims picture reading; explicit and chat-off passes keep the normal sentence.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Panel text contains \"Reading pictures. Chat resumes after the current document.\" and not \"Chat and summaries ready.\"; the Start/Stop action exists.",
+          "newAssertion": "Heading is \"Reading text in scans and images\"; sentence is \"Answers resume after the current document.\"; the fm-14 sentence \"Everything below runs on this computer.\" is absent; the Answer questions step exists.",
+          "reason": "AM9 (answers words, not \"Chat\"), fm-14 sentence words; the step name \"Text in scans and images\" is the pictures' name. D2: the answer switch sits under its step, so the step replaces the old action as the control that must remain. The exact headline and sentence are implementation wording (named in the builder report)."
+        },
+        {
+          "oldAssertion": "After the hold closes the text contains \"Chat and summaries ready.\"; stale VDU does not contain \"Reading pictures.\"",
+          "newAssertion": "After the hold closes the sentence is exactly \"Everything below runs on this computer.\" (fm-14); stale VDU never contains \"Reading text in scans and images\".",
+          "reason": "fm-14 picture words replace the old status sentence; the never-claim-stale-picture-reading half is kept."
+        },
+        {
+          "oldAssertion": "Explicit and chat-off automatic passes keep \"Chat and summaries ready.\" and never \"Chat resumes after the current document.\"",
+          "newAssertion": "For those passes the heading is \"Reading text in scans and images\" and the sentence equals the normal sentence; never \"Answers resume after the current document.\"",
+          "reason": "Same oracle (no resume promise when answers are not lent) in answers words (AM9). The heading reports the observed live VDU pass, which is true in these fixtures."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.chat-intent.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "AI Brain on a computer without an NVIDIA card (most computers). The sentence says only what the picture cannot; each fact stands once (the card under its step, sizes under theirs). A switch exists only under its step, with its state in words. What can't work here is said once, in ordinary words, and drawn as not reachable. Only the steps that work now are lit; the Install button is the one filled action.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "No tab row until answers work, then \"Overview | Memory\". The sentence has no switches; each switch sits under its step with its state in words.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D2 Sentence has no switches; each switch sits under its step with its state in words; existing handlers and meanings only (pre-install Included = package decline; Best match first = rerankerEnabled/intent; Answer questions = nullable chatEnabled, unset stays unset; Text in scans and images = pictureReadingEnabled). Switch shows stored selection; the step's lit/unlit and state words show what works now (selection never presented as activity).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM10 Reachability legs separate: (a) Linux platform exclusion of answers (reachable here), (b) hardware no-card (sandbox proof or unverified), (c) fm-14 only with real answers, picture-reader and GPU observations.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "In every chat-lifecycle state the answer escape action exists and writes core.set-chat-enabled with the expected value; it never posts core.switch-inference-mode. Where answers cannot work the step is drawn not reachable, with its reason once in ordinary words and no switch.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "The primary action is data-testid=\"brain-simple-action\" with a non-empty label; activating it writes the intent.",
+          "newAssertion": "The control is the Answer questions switch under its step ([data-step=\"chat\"] [role=\"switch\"]) with aria-label \"Use Answer questions\"; activating it writes the same intent with the same enabled value.",
+          "reason": "Handover/D2: \"The sentence has no switches; each switch sits under its step with its state in words\", with existing handlers and meanings only (Answer questions = chatEnabled). D5 moves Start/Stop answers behind developer tools. The intent table and the never-switch-inference-mode assertion are unchanged. \"Answer questions\" is the pictures' step name; the \"Use \" prefix is the existing switch naming at the base."
+        },
+        {
+          "oldAssertion": "Chat unavailable: the action is disabled with availability unavailableBecause(planner reason) and the planner reason \"Chat runtime is not supplied for linux-x86_64.\" is shown.",
+          "newAssertion": "Chat unavailable: no switch; the step has data-reach=\"na\" and a non-empty .step-reason; the planner reason text is not shown on the page.",
+          "reason": "fm-10: \"A switch exists only under its step ... What can't work here is said once, in ordinary words, and drawn as not reachable.\" D5: technical detail behind a disclosure. AM10(a): the Linux exclusion is said in ordinary words. No source still requires the planner's technical text on the default page."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.componentList.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "AI isn't installed yet / Search already works with exact words. Installing AI adds the steps that are not lit yet. / Install AI · 2.6 GB / You see each licence before anything downloads. Everything runs on this computer. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, Included / Answer questions: Needs an NVIDIA graphics card (drawn not reachable). Lit: Your files, Read the text; no tab row; no links row.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-10-ai-not-installed (tmp/design/fm-10-ai-not-installed.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "The component list (download choices per part, declines) works as before; before install it is reached with developer tools on, because fm-10 shows no Advanced settings.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Advanced settings (the component list) before install observed with developer tools off (the default).",
+          "newAssertion": "Developer tools are turned on (setShowDeveloperTools(true)) before Advanced settings (the component list) before install is observed; afterEach turns them off again.",
+          "reason": "Owner words \"What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.\" with D5/AM5. The control and every assertion about what it does are kept; only the precondition that makes it visible changed. No source requires it on the default page."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.installCause.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Adaptation",
+      "moved": [
+        "rename"
+      ],
+      "whatMoved": "The install-failure detail under the heading is read from [data-testid=\"brain-simple-panel\"] > .brain-sentence instead of > .brain-status-detail: the Overview has one line under the heading (the sentence), and the failure detail now renders there. Inputs (install statuses and error codes), the heading, and every expectation on the detail (names the cause, says to install again, guesses no cause the code does not name, equals the status panel's detail words) are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "AI Brain on a computer without an NVIDIA card (most computers). The sentence says only what the picture cannot; each fact stands once (the card under its step, sizes under theirs). A switch exists only under its step, with its state in words. What can't work here is said once, in ordinary words, and drawn as not reachable. Only the steps that work now are lit; the Install button is the one filled action.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D2 Sentence has no switches; each switch sits under its step with its state in words; existing handlers and meanings only (pre-install Included = package decline; Best match first = rerankerEnabled/intent; Answer questions = nullable chatEnabled, unset stays unset; Text in scans and images = pictureReadingEnabled). Switch shows stored selection; the step's lit/unlit and state words show what works now (selection never presented as activity).",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Installed, no NVIDIA card. The headline says what now works, never \"AI Offline\" or \"Installed with limitations\". An off switch reads \"Off\" and is drawn off.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Installed on a computer with an NVIDIA card. Only now is there a second tab (Memory), so only now a tab row; its first tab is \"Overview\", not the area's name again.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Search understands meaning / It finds files by what they are about, not only by their words. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch off, Off / Answer questions: Needs an NVIDIA graphics card (drawn not reachable) / Advanced settings / Remove AI models. Lit: Your files, Read the text, Understand meaning; no tab row; no graphics card.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-13-ai-installed-no-card (tmp/design/fm-13-ai-installed-no-card.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Overview | Memory / AI is ready / Everything below runs on this computer. / Text in scans and images: 2.1 GB, switch off, Off / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, On / Answer questions: 5.7 GB, switch on, On / Graphics card: 5.8 of 12 GB in use · RTX 4070 / Advanced settings / Engine history in Health. All five path steps lit.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-14-ai-ready (tmp/design/fm-14-ai-ready.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "No tab row until answers work, then \"Overview | Memory\". The sentence has no switches; each switch sits under its step with its state in words.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D2 Sentence has no switches; each switch sits under its step with its state in words; existing handlers and meanings only (pre-install Included = package decline; Best match first = rerankerEnabled/intent; Answer questions = nullable chatEnabled, unset stays unset; Text in scans and images = pictureReadingEnabled). Switch shows stored selection; the step's lit/unlit and state words show what works now (selection never presented as activity).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D4 One fact once: card under its step, sizes under theirs; no \"registry footprint\", no leading separators, one kept-files wording; the CUDA reason once.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM2 (D2) Switch projection from stored selection only (never runtime): saved Off/runtime On shows Off; saved On/runtime Off shows On with the step's words saying it is not working; unknown settings show \"Not known\" (not an unchecked switch) with the existing refresh route; unset answers show automatic without writing a default; operator overrides explained. Existing picture tests encoding the old drawing change (listed).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM8 (D4) Sizes keep what they measure: package download size labelled as download, never as measured disk use; omitted for compact/custom models unless a matching trustworthy value exists (omission named). Graphics meter only with a current reading; never infer \"no card\" from a missing meter; installing/unsupported/insufficient-memory/unknown settled explicitly.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "Live redesign repairs keep their oracles (whole page waits for live observations, repair stays primary, previews cannot overwrite saved choices, no step claims Downloading for a stopped run, a required-component message stands once, picture branch layout), with one switch per feature under its step, the plain fm-14 sentence, and the graphics meter shown only with a current reading.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Repair-available page: sentence contains \"Answers are off; background work can continue\"; two answer switches both aria-checked false.",
+          "newAssertion": "The Answer questions step's state word is \"Off\"; one switch, aria-checked false; Repair primary and no Install AI unchanged.",
+          "reason": "fm-13: \"An off switch reads \\\"Off\\\" and is drawn off\"; handover/D2: one switch under its step, no switches in the sentence."
+        },
+        {
+          "oldAssertion": "Switch arrays of two (sentence copy and path copy): [\"false\",\"false\"], [\"true\",\"true\"]; second copy clicked.",
+          "newAssertion": "Arrays of one; the single switch is clicked; operations, declines and preview-race expectations unchanged.",
+          "reason": "D2 / handover: \"each switch sits under its step\"; AM2 lists the picture tests encoding the old double drawing as changing."
+        },
+        {
+          "oldAssertion": "G5: card text contains \"9.00 GB of 12.00 GB in use · all apps · one of 2 graphics devices\"; when the snapshot is not live or used memory is absent, the card says \"Memory use unknown\" and has no aria-valuenow.",
+          "newAssertion": "Card contains \"9.00 GB of 12.00 GB in use · one of 2 graphics devices\" with the meter value; without a current reading there is no card at all and no \"Memory use unknown\".",
+          "reason": "fm-14 picture words \"5.8 of 12 GB in use · RTX 4070\" (no \"all apps\"); AM8: \"Graphics meter only with a current reading; never infer \\\"no card\\\" from a missing meter\"; owner words \"Anything a picture shows that the app has no data for: build the screen without it\". \"one of 2 graphics devices\" is base wording for multi-device machines, kept; device-zero figures unchanged."
+        },
+        {
+          "oldAssertion": "D1: sentence keeps whitespace outside phrase buttons (\"puts the best match first and answers\"), no \"firstand\", no leading-punctuation phrase text, no text node starting \". \".",
+          "newAssertion": "D1: the sentence is exactly \"Everything below runs on this computer.\" and contains no button or switch.",
+          "reason": "fm-14 sentence words and fm-10 \"The sentence says only what the picture cannot\"; handover \"The sentence has no switches\". The phrase buttons the old checks guarded no longer exist; no source requires them."
+        },
+        {
+          "oldAssertion": "the step openers (\"You get / It costs\") in D3 observed with developer tools off (the default).",
+          "newAssertion": "Developer tools are turned on (setShowDeveloperTools(true)) before the step openers (\"You get / It costs\") in D3 is observed; afterEach turns them off again.",
+          "reason": "Owner words \"What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.\" with D5/AM5. The control and every assertion about what it does are kept; only the precondition that makes it visible changed. No source requires it on the default page."
+        },
+        {
+          "oldAssertion": "D4 cancelled run: meaning contains \"Not downloaded\"; reranker contains \"On\" (files present, runtime active).",
+          "newAssertion": "Neither says Downloading or Cancelled; meaning is unlit (data-lit false), reranker is lit (data-lit true).",
+          "reason": "fm-10: sizes under their steps and \"Only the steps that work now are lit\" (the not-installed picture has no \"Not downloaded\" words); AM2/D2: the light shows what works now. The no-Downloading/no-Cancelled oracle is kept."
+        },
+        {
+          "oldAssertion": "D6: the status detail (.brain-status-detail) does not contain \"A required component is missing\".",
+          "newAssertion": "The sentence (.brain-sentence, if present) does not contain it; the page still contains it exactly once.",
+          "reason": "Locator follows the one line under the heading (D2/D4 one fact once); the once-only oracle is unchanged."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.pausedInstall.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "AI isn't installed yet / Search already works with exact words. Installing AI adds the steps that are not lit yet. / Install AI · 2.6 GB / You see each licence before anything downloads. Everything runs on this computer. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, Included / Answer questions: Needs an NVIDIA graphics card (drawn not reachable). Lit: Your files, Read the text; no tab row; no links row.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-10-ai-not-installed (tmp/design/fm-10-ai-not-installed.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "AI Brain on a computer without an NVIDIA card (most computers). The sentence says only what the picture cannot; each fact stands once (the card under its step, sizes under theirs). A switch exists only under its step, with its state in words. What can't work here is said once, in ordinary words, and drawn as not reachable. Only the steps that work now are lit; the Install button is the one filled action.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        }
+      ],
+      "behaviour": "A genuinely fresh install is untouched by the paused-download handling: \"AI isn't installed yet\", the fm-10 sentence, no \"Download Paused\".",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Text contains \"Install AI models to get started\".",
+          "newAssertion": "Text contains \"Search already works with exact words. Installing AI adds the steps that are not lit yet.\"",
+          "reason": "fm-10 picture words for the sentence under \"AI isn't installed yet\"; the other two assertions are unchanged."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-availability.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "No tab row until answers work, then \"Overview | Memory\". The sentence has no switches; each switch sits under its step with its state in words.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Installed, no NVIDIA card. The headline says what now works, never \"AI Offline\" or \"Installed with limitations\". An off switch reads \"Off\" and is drawn off.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D2 Sentence has no switches; each switch sits under its step with its state in words; existing handlers and meanings only (pre-install Included = package decline; Best match first = rerankerEnabled/intent; Answer questions = nullable chatEnabled, unset stays unset; Text in scans and images = pictureReadingEnabled). Switch shows stored selection; the step's lit/unlit and state words show what works now (selection never presented as activity).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM2 (D2) Switch projection from stored selection only (never runtime): saved Off/runtime On shows Off; saved On/runtime Off shows On with the step's words saying it is not working; unknown settings show \"Not known\" (not an unchecked switch) with the existing refresh route; unset answers show automatic without writing a default; operator overrides explained. Existing picture tests encoding the old drawing change (listed).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision: two test fixture operation keys are replaced with '01993ba0-0000-7000-8000-000000000002' (secret-scanner false positive; fixture value only).",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "Saved picture reading with an answer model that cannot read pictures: delayed reads cannot overturn newer receipts, interrupted changes reconcile, refusals keep the prior choice, unconfirmed projector reports never read as text-only. The one switch under the step shows the stored choice; the step's light and note show what works now; the sentence carries no per-feature part.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "view() reads the path copy's last .step-meta (\"path\") and the sentence's pictures phrase (\"sentence\"); two switches.",
+          "newAssertion": "view() reads the step's state word (.switch-state, \"word\"), its note (.step-note, \"note\"), one switch, and the step's data-lit.",
+          "reason": "D2/handover: one switch under its step with its state in words; the sentence no longer has per-feature parts (fm-14 sentence \"Everything below runs on this computer.\")."
+        },
+        {
+          "oldAssertion": "Not available: path \"On — not available with this answer model\", sentence \"Text in scans and images: On — not available with this answer model.\", lit false.",
+          "newAssertion": "Not available: word \"On\", note \"Not available with this answer model\", one switch checked, lit false.",
+          "reason": "AM2: \"saved On/runtime Off shows On with the step's words saying it is not working\". Same fact, split into the switch word and the note; the exact note wording is the implementation's (named in the builder report)."
+        },
+        {
+          "oldAssertion": "Reading: path \"On\", sentence \"It reads text in scans and images.\"; checking: path \"Unknown — checking AI status\" and the sentence says AI status and feature availability are still being checked.",
+          "newAssertion": "Reading: word \"On\", no note, lit true. Checking: note \"Unknown — checking AI status\" and heading \"Checking AI status…\"; never the not-available words.",
+          "reason": "The unknown state keeps its base words, now once under the step and in the base heading (\"Checking AI status…\" exists at the base); D2 removes the sentence copy."
+        },
+        {
+          "oldAssertion": "P5: Off reads \"Off - files and read text kept\"; never \"On — the saved Off choice is not applied\".",
+          "newAssertion": "P5: word \"Off\", no note; never \"Off is not applied yet\".",
+          "reason": "fm-13 \"An off switch reads \\\"Off\\\"\"; D4 \"one kept-files wording\" (the per-step kept-files tail is gone). The receipt-ordering oracle is unchanged."
+        },
+        {
+          "oldAssertion": "P5 interrupted: path \"Unknown — checking picture reading after an interrupted change\".",
+          "newAssertion": "Word \"Not known\", note \"Checking after an interrupted change\", no switch; after reconciliation the word is \"On\".",
+          "reason": "AM2: unknown shows \"Not known\" (not an unchecked switch). The note wording is the implementation's (named in the builder report)."
+        },
+        {
+          "oldAssertion": "P3 null projector: path \"On\", sentence \"Reading text in scans and images is unconfirmed.\"; offline engine: sentence unconfirmed.",
+          "newAssertion": "P3 null projector: word \"On\", note \"Not confirmed yet\", lit false; offline engine: lit false and never the not-available words.",
+          "reason": "AM2: the switch keeps the stored On; the step's light and note show the unconfirmed runtime. The \"never text-only\" oracle is kept; \"Not confirmed yet\" is implementation wording (named)."
+        },
+        {
+          "oldAssertion": "P4 table (path, sentence, both switches): explicit Off -> \"Off - files and read text kept\", unchecked; operator Off -> \"Off — operator controlled\", unchecked; operator On with inactive reader -> \"Unavailable — operator picture reader is not active\", unchecked; missing files -> \"Unavailable — picture reading files are missing\", checked; unknown settings -> \"Saved picture reading choice is not known. Refresh settings before changing it.\", unchecked; no saved choice -> \"Off - files and read text kept\", unchecked; saved Off with runtime On -> \"On — the saved Off choice is not applied\", checked. Never the not-available words; no posts.",
+          "newAssertion": "P4 table (word, note, switch, lit): explicit Off -> Off, none, unchecked, unlit; operator Off -> Off, \"Set by an operator override\", unchecked, unlit; operator On -> On, \"Set by an operator override\", checked, unlit; missing files -> On, \"Not working — its files are missing\", checked, unlit; unknown settings -> \"Not known\", none, no switch, unlit; no saved choice -> On, \"Not available with this answer model\", checked, unlit; saved Off with runtime On -> Off, \"Off is not applied yet\", unchecked, lit. Never the not-available words except for the no-saved-choice row; no posts.",
+          "reason": "AM2: \"Switch projection from stored selection only (never runtime): saved Off/runtime On shows Off; ... unknown settings show \\\"Not known\\\" (not an unchecked switch) ...; operator overrides explained.\" The old operator-On and saved-Off/runtime-On rows drew the runtime, and the old no-saved-choice row derived Off from the runtime projector report (base: unset -> runtime mmproj ?? files present); AM2 retires both. With no saved choice the switch now shows the effective stored default (the Engine treats unset picture reading as on: InferenceConfig.pictureReadingEnabled returns true for an unset projector choice; the page follows the installed answer model's files), and the note says it does not work with this model. Nothing is written in any row (posts [] kept). The exact notes are implementation wording (named in the builder report)."
+        },
+        {
+          "oldAssertion": "Fixture witness lastCommittedOperationKey \"other-window\".",
+          "newAssertion": "lastCommittedOperationKey \"01993ba0-0000-7000-8000-000000000002\".",
+          "reason": "Orchestrator decision (fixture value only; a secret-scanner false positive). The value is only compared for difference from this window's key."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "No tab row until answers work, then \"Overview | Memory\". The sentence has no switches; each switch sits under its step with its state in words.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "AI Brain on a computer without an NVIDIA card (most computers). The sentence says only what the picture cannot; each fact stands once (the card under its step, sizes under theirs). A switch exists only under its step, with its state in words. What can't work here is said once, in ordinary words, and drawn as not reachable. Only the steps that work now are lit; the Install button is the one filled action.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Installed, no NVIDIA card. The headline says what now works, never \"AI Offline\" or \"Installed with limitations\". An off switch reads \"Off\" and is drawn off.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "AI isn't installed yet / Search already works with exact words. Installing AI adds the steps that are not lit yet. / Install AI · 2.6 GB / You see each licence before anything downloads. Everything runs on this computer. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, Included / Answer questions: Needs an NVIDIA graphics card (drawn not reachable). Lit: Your files, Read the text; no tab row; no links row.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-10-ai-not-installed (tmp/design/fm-10-ai-not-installed.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Search understands meaning / It finds files by what they are about, not only by their words. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch off, Off / Answer questions: Needs an NVIDIA graphics card (drawn not reachable) / Advanced settings / Remove AI models. Lit: Your files, Read the text, Understand meaning; no tab row; no graphics card.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-13-ai-installed-no-card (tmp/design/fm-13-ai-installed-no-card.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D2 Sentence has no switches; each switch sits under its step with its state in words; existing handlers and meanings only (pre-install Included = package decline; Best match first = rerankerEnabled/intent; Answer questions = nullable chatEnabled, unset stays unset; Text in scans and images = pictureReadingEnabled). Switch shows stored selection; the step's lit/unlit and state words show what works now (selection never presented as activity).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM2 (D2) Switch projection from stored selection only (never runtime): saved Off/runtime On shows Off; saved On/runtime Off shows On with the step's words saying it is not working; unknown settings show \"Not known\" (not an unchecked switch) with the existing refresh route; unset answers show automatic without writing a default; operator overrides explained. Existing picture tests encoding the old drawing change (listed).",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "The picture reading switch: unknown saved choices read \"Not known\" without a switch and post nothing; Off reads Off and is drawn off; interrupted deliveries reconcile; refusals keep the prior choice and show the refusal; a pending change locks the one switch; stale second windows refresh and converge; operator overrides lock it; consent before downloading the answer model; where answers cannot work, no switch and no download, and the step says simple scans are read already.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Unknown saved choice: two disabled unchecked switches; the sentence and path both show \"Saved picture reading choice is not known. Refresh settings before changing it.\" as their describedby text and contain no On/Off; clicking posts nothing.",
+          "newAssertion": "No switch; the step's word is \"Not known\" exactly once; the step says neither On nor Off; the sentence does not mention pictures; nothing posted.",
+          "reason": "AM2: \"unknown settings show \\\"Not known\\\" (not an unchecked switch) with the existing refresh route\"; the refresh route is checked in BrainOverview.switches.test.ts (\"unknown saved choices read Not known ... with a refresh reachable\"). D2: the sentence carries no switch."
+        },
+        {
+          "oldAssertion": "\"ends the unknown picture choice sentence with one period\": the sentence phrase is exactly the not-known sentence.",
+          "newAssertion": "Removed.",
+          "reason": "D2/handover: the sentence has no per-feature phrase, so the punctuation of that phrase has nothing to guard. No source still requires it."
+        },
+        {
+          "oldAssertion": "Saved Off: the sentence phrase is \"It doesn't read text in scans and images.\" (no \"yet\"); both switches unchecked.",
+          "newAssertion": "Saved Off: word \"Off\", step unlit, one unchecked switch.",
+          "reason": "fm-13: \"An off switch reads \\\"Off\\\" and is drawn off.\""
+        },
+        {
+          "oldAssertion": "Answer files not downloaded: phrase \"It doesn't read text in scans and images yet.\"",
+          "newAssertion": "Word \"Off\" and step unlit.",
+          "reason": "D2: the stored choice is shown as the switch word, the step's light shows that it does not work; no sentence phrase exists."
+        },
+        {
+          "oldAssertion": "Interrupted change text \"Unknown — checking picture reading after an interrupted change\"; reconciled text \"Off - files and read text kept\".",
+          "newAssertion": "Interrupted text \"Checking after an interrupted change\"; reconciled word \"Off\"; replay/witness assertions unchanged.",
+          "reason": "AM2 (Not known / note) and fm-13 (\"Off\"); D4 one kept-files wording. Note wording is the implementation's (named in the builder report)."
+        },
+        {
+          "oldAssertion": "Pending Off: the step contains \"Stopping picture reading…\" and the switches are disabled and still checked; after receipt \"Off - files and read text kept\" and step symbol data-active false.",
+          "newAssertion": "Pending Off: the word is \"Changing…\" (also after settleTransients), the one switch disabled and still checked; after receipt word \"Off\" and the step unlit.",
+          "reason": "D2: the state in words under the step; the switch shows the stored selection until the applied receipt (kept). \"Changing…\" is the base's pending word for Best match first, now shared; no quoted source spells it (named in the builder report)."
+        },
+        {
+          "oldAssertion": "Switch arrays of two (sentence copy and path copy), e.g. [\"true\",\"true\"]; the second copy ([1]) clicked.",
+          "newAssertion": "Arrays of one; the single switch ([0]) clicked; every write, receipt, refusal and convergence expectation unchanged.",
+          "reason": "Handover / D2: \"The sentence has no switches; each switch sits under its step with its state in words.\" AM2 lists these picture tests as changing."
+        },
+        {
+          "oldAssertion": "Unavailable picture reader: two disabled switches; clicking posts nothing; text \"Text in scans and images is unavailable on this computer\".",
+          "newAssertion": "No switch; nothing posted, no operation; the step contains \"Simple scans are read already\".",
+          "reason": "fm-10/fm-13 picture words for the pictures step on a computer where answers cannot work (\"Text in scans and images: Simple scans are read already\", no switch); fm-10 \"A switch exists only under its step\". The no-download/no-post oracle is kept."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "No tab row until answers work, then \"Overview | Memory\". The sentence has no switches; each switch sits under its step with its state in words.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Installed, no NVIDIA card. The headline says what now works, never \"AI Offline\" or \"Installed with limitations\". An off switch reads \"Off\" and is drawn off.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Overview | Memory / AI is ready / Everything below runs on this computer. / Text in scans and images: 2.1 GB, switch off, Off / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, On / Answer questions: 5.7 GB, switch on, On / Graphics card: 5.8 of 12 GB in use · RTX 4070 / Advanced settings / Engine history in Health. All five path steps lit.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-14-ai-ready (tmp/design/fm-14-ai-ready.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D2 Sentence has no switches; each switch sits under its step with its state in words; existing handlers and meanings only (pre-install Included = package decline; Best match first = rerankerEnabled/intent; Answer questions = nullable chatEnabled, unset stays unset; Text in scans and images = pictureReadingEnabled). Switch shows stored selection; the step's lit/unlit and state words show what works now (selection never presented as activity).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM2 (D2) Switch projection from stored selection only (never runtime): saved Off/runtime On shows Off; saved On/runtime Off shows On with the step's words saying it is not working; unknown settings show \"Not known\" (not an unchecked switch) with the existing refresh route; unset answers show automatic without writing a default; operator overrides explained. Existing picture tests encoding the old drawing change (listed).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM3 (D3) Positive \"Search understands meaning\" heading only with live meaning evidence; embedding absent/inactive/unknown, activation required, incompatible embeddings, answers-working-but-meaning-not keep their remedy headline; unknown -> neutral headline.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM8 (D4) Sizes keep what they measure: package download size labelled as download, never as measured disk use; omitted for compact/custom models unless a matching trustworthy value exists (omission named). Graphics meter only with a current reading; never infer \"no card\" from a missing meter; installing/unsupported/insufficient-memory/unknown settled explicitly.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "AI Brain redesign behaviour: one saved answer switch with one busy state; stopping keeps files and background work; runtime evidence shows in the step light and unknown observations disable switches; unset answers stay automatic without a write; feature panels (developer tools) keep focus behaviour; acquisitions and consent unchanged; the graphics meter only with a current reading.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Two answer switches with distinct ids, both checked; both disabled while busy; after stop both unchecked and the text contains \"Answers are off; background work can continue\".",
+          "newAssertion": "One answer switch, checked; disabled while busy; after stop unchecked and the step's word is \"Off\"; the answer model files stay installed; turning on writes enabled:true.",
+          "reason": "Handover/D2 one switch under its step; fm-13 \"An off switch reads \\\"Off\\\"\". The keep-files and write oracles are unchanged."
+        },
+        {
+          "oldAssertion": "After mmprojActive false the page text contains \"It doesn't read text in scans and images yet\".",
+          "newAssertion": "After mmprojActive false the pictures step is unlit (data-lit false); the unknown-observation and disabled-switch checks are unchanged.",
+          "reason": "AM2: the light shows what works now; the sentence has no per-feature part (D2)."
+        },
+        {
+          "oldAssertion": "Null answer intent: the chat path contains \"automatic (no saved answer choice)\".",
+          "newAssertion": "Null answer intent: the step's word is \"Automatic\"; the switch is checked; nothing written.",
+          "reason": "AM2 \"unset answers show automatic without writing a default\"; D2 \"Answer questions = nullable chatEnabled, unset stays unset\"."
+        },
+        {
+          "oldAssertion": "Information opener located by aria-label \"About Answer questions\", developer tools off.",
+          "newAssertion": "Opener located as [data-step=\"chat\"] button.step-info with developer tools on; panel, focus and Escape/outside-click assertions unchanged.",
+          "reason": "D5: the \"You get / It costs\" disclosure is a developer tool; owner words \"What a picture does not show ... goes behind Settings › Advanced › Show developer tools\"."
+        },
+        {
+          "oldAssertion": "Graphics memory: card contains \"4.0 KB of 8.0 KB in use · all apps · Test adapter\"; stale values say \"Memory use unknown\" with no aria-valuenow.",
+          "newAssertion": "Card contains \"4.0 KB of 8.0 KB in use · Test adapter\"; stale values draw no card and never \"Memory use unknown\".",
+          "reason": "fm-14 picture words \"5.8 of 12 GB in use · RTX 4070\"; AM8 meter only with a current reading. The all-app device data source is unchanged."
+        },
+        {
+          "oldAssertion": "Fixture onnxFeatures without status.",
+          "newAssertion": "Fixture onnxFeatures embed/reranker with status \"active\".",
+          "reason": "AM3: positive headings need live meaning evidence; the fixture states the observation its scenario (AI ready) implies."
+        },
+        {
+          "oldAssertion": "Switch arrays of two (sentence copy and path copy), e.g. [\"true\",\"true\"]; the second copy ([1]) clicked.",
+          "newAssertion": "Arrays of one; the single switch ([0]) clicked; every write, receipt, refusal and convergence expectation unchanged.",
+          "reason": "Handover / D2: \"The sentence has no switches; each switch sits under its step with its state in words.\" AM2 lists these picture tests as changing."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.reindex-coherence.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Every fact has one home on a screen. ... The same thing has one name everywhere: the app reads files (not \"indexes\")",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM9 Brain wording in 7a: \"indexing\", \"Resume Chat AI\", \"Rebuild the index\" and similar on Brain's default and exceptional states move to read/answers words; page/status coherence for Brain states (S7-25 subset); verdict ids unchanged.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "The compatibility callout without a reindex code falls back to one generic remedy line (no per-cause fork), in read words.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Text contains \"Rebuild the index to restore full search.\"",
+          "newAssertion": "Text contains \"Read everything again to restore full search.\"",
+          "reason": "AM9 names \"Rebuild the index\" among the words that move to read words; owner words \"the app reads files (not \\\"indexes\\\")\"; D5 keeps the compatibility warning's actionable words. \"Read everything again\" is the Library action's name; no quoted source in this changeset spells the exact phrase (named in the builder report)."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.removalBand-lockdown.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM6 Recovery routes stay reachable without developer tools: pack import when downloads are disabled, settings refresh for unknown choices, manual repair URLs/destinations, removal refusals/interrupted outcomes, Settings \"Reading memory\" link opens and focuses its control.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "The removal band in real Chromium (confirm, refuse, Escape handling, outcomes) is unchanged; its fixture observes no AI state, so Advanced settings is opened with developer tools on.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Advanced settings (the removal band) in a fixture without AI observations observed with developer tools off (the default).",
+          "newAssertion": "Developer tools are turned on (setShowDeveloperTools(true)) before Advanced settings (the removal band) in a fixture without AI observations is observed; they are turned off again after the test.",
+          "reason": "Owner words \"What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.\" with D5/AM5 (Brain's Advanced shows only where fm-13/fm-14 show it, plus the AM6 recovery routes). Every assertion about the control itself is kept; only the precondition that makes it visible changed."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "AI Brain on a computer without an NVIDIA card (most computers). The sentence says only what the picture cannot; each fact stands once (the card under its step, sizes under theirs). A switch exists only under its step, with its state in words. What can't work here is said once, in ordinary words, and drawn as not reachable. Only the steps that work now are lit; the Install button is the one filled action.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Installed, no NVIDIA card. The headline says what now works, never \"AI Offline\" or \"Installed with limitations\". An off switch reads \"Off\" and is drawn off.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Search understands meaning / It finds files by what they are about, not only by their words. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch off, Off / Answer questions: Needs an NVIDIA graphics card (drawn not reachable) / Advanced settings / Remove AI models. Lit: Your files, Read the text, Understand meaning; no tab row; no graphics card.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-13-ai-installed-no-card (tmp/design/fm-13-ai-installed-no-card.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D3 Heading says what works: installed with working meaning search and answers unavailable -> a \"Search understands meaning\" style heading (as fm-13), never \"AI Offline\"/\"Installed with limitations\"; answers unavailable said once under its step in ordinary words. Genuine failure/repair/policy headlines stay.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D4 One fact once: card under its step, sizes under theirs; no \"registry footprint\", no leading separators, one kept-files wording; the CUDA reason once.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM3 (D3) Positive \"Search understands meaning\" heading only with live meaning evidence; embedding absent/inactive/unknown, activation required, incompatible embeddings, answers-working-but-meaning-not keep their remedy headline; unknown -> neutral headline.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "Running repair controls: Cancel says the download paused or shows the completed state; planning never shows Downloading for declined or unavailable parts; heading after completion says what works.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "After the install completes, the heading is \"AI is ready\".",
+          "newAssertion": "The heading is \"Search understands meaning\" (answers are saved Off in this fixture; meaning is observed active).",
+          "reason": "D3 and fm-13 \"The headline says what now works\": with live meaning evidence (AM3) and answers not working, the heading is fm-13's \"Search understands meaning\", not \"AI is ready\"."
+        },
+        {
+          "oldAssertion": "Planning with an unavailable reranker or answer part: the step contains \"Unavailable on this computer\".",
+          "newAssertion": "The step is drawn not reachable (data-reach=\"na\"); never \"Not available here.\"; declined still \"Not downloaded\"; never Downloading/Waiting/Preparing (kept).",
+          "reason": "fm-10: \"What can't work here is said once, in ordinary words, and drawn as not reachable\"; D4 one fact once."
+        },
+        {
+          "oldAssertion": "Unavailable answer runtime with complete files: the step contains \"Off — background work can continue\".",
+          "newAssertion": "The step's switch word is \"Off\".",
+          "reason": "fm-13 \"An off switch reads \\\"Off\\\"\"; D4 one fact once (the background-work tail is gone)."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.reranker-switch.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "No tab row until answers work, then \"Overview | Memory\". The sentence has no switches; each switch sits under its step with its state in words.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Installed, no NVIDIA card. The headline says what now works, never \"AI Offline\" or \"Installed with limitations\". An off switch reads \"Off\" and is drawn off.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D2 Sentence has no switches; each switch sits under its step with its state in words; existing handlers and meanings only (pre-install Included = package decline; Best match first = rerankerEnabled/intent; Answer questions = nullable chatEnabled, unset stays unset; Text in scans and images = pictureReadingEnabled). Switch shows stored selection; the step's lit/unlit and state words show what works now (selection never presented as activity).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM2 (D2) Switch projection from stored selection only (never runtime): saved Off/runtime On shows Off; saved On/runtime Off shows On with the step's words saying it is not working; unknown settings show \"Not known\" (not an unchecked switch) with the existing refresh route; unset answers show automatic without writing a default; operator overrides explained. Existing picture tests encoding the old drawing change (listed).",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "The Best match first switch: waits for completion, refuses operator-controlled changes, reconciles invalid receipts, converges second windows, completes consented enables, keeps a saved On that does not run as On with a not-working note, cancels consent without a transfer.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Switch arrays of two (sentence copy and path copy), e.g. [\"true\",\"true\"]; the second copy ([1]) clicked.",
+          "newAssertion": "Arrays of one; the single switch ([0]) clicked; every write, receipt, refusal and convergence expectation unchanged.",
+          "reason": "Handover / D2: \"The sentence has no switches; each switch sits under its step with its state in words.\" AM2 lists these picture tests as changing."
+        },
+        {
+          "oldAssertion": "After Off: the step contains \"Off — files kept\"; after On: the second .step-meta is \"On\".",
+          "newAssertion": "Word \"Off\"; after On word \"On\" and no note.",
+          "reason": "fm-13 \"An off switch reads \\\"Off\\\"\"; D4 one kept-files wording."
+        },
+        {
+          "oldAssertion": "Invalid receipt: \"Unknown — checking Best match first after an interrupted change\".",
+          "newAssertion": "Word \"Not known\", note \"Checking after an interrupted change\"; then \"Off\" after convergence.",
+          "reason": "AM2 unknown -> \"Not known\"; note wording is the implementation's (named in the builder report)."
+        },
+        {
+          "oldAssertion": "Saved On without a serving observation: \"Unavailable — Best match first is enabled\"; then \"On\".",
+          "newAssertion": "Word \"On\", note \"Not working now\"; then \"On\" with no note.",
+          "reason": "AM2: \"saved On/runtime Off shows On with the step's words saying it is not working\". \"Not working now\" is implementation wording (named in the builder report)."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "AI Brain on a computer without an NVIDIA card (most computers). The sentence says only what the picture cannot; each fact stands once (the card under its step, sizes under theirs). A switch exists only under its step, with its state in words. What can't work here is said once, in ordinary words, and drawn as not reachable. Only the steps that work now are lit; the Install button is the one filled action.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Installed, no NVIDIA card. The headline says what now works, never \"AI Offline\" or \"Installed with limitations\". An off switch reads \"Off\" and is drawn off.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "AI isn't installed yet / Search already works with exact words. Installing AI adds the steps that are not lit yet. / Install AI · 2.6 GB / You see each licence before anything downloads. Everything runs on this computer. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, Included / Answer questions: Needs an NVIDIA graphics card (drawn not reachable). Lit: Your files, Read the text; no tab row; no links row.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-10-ai-not-installed (tmp/design/fm-10-ai-not-installed.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "No tab row until answers work, then \"Overview | Memory\". The sentence has no switches; each switch sits under its step with its state in words.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D2 Sentence has no switches; each switch sits under its step with its state in words; existing handlers and meanings only (pre-install Included = package decline; Best match first = rerankerEnabled/intent; Answer questions = nullable chatEnabled, unset stays unset; Text in scans and images = pictureReadingEnabled). Switch shows stored selection; the step's lit/unlit and state words show what works now (selection never presented as activity).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D4 One fact once: card under its step, sizes under theirs; no \"registry footprint\", no leading separators, one kept-files wording; the CUDA reason once.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM2 (D2) Switch projection from stored selection only (never runtime): saved Off/runtime On shows Off; saved On/runtime Off shows On with the step's words saying it is not working; unknown settings show \"Not known\" (not an unchecked switch) with the existing refresh route; unset answers show automatic without writing a default; operator overrides explained. Existing picture tests encoding the old drawing change (listed).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM3 (D3) Positive \"Search understands meaning\" heading only with live meaning evidence; embedding absent/inactive/unknown, activation required, incompatible embeddings, answers-working-but-meaning-not keep their remedy headline; unknown -> neutral headline.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM10 Reachability legs separate: (a) Linux platform exclusion of answers (reachable here), (b) hardware no-card (sandbox proof or unverified), (c) fm-14 only with real answers, picture-reader and GPU observations.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "Slice A/B review repairs keep their oracles: chosen answers are switched on once and persist; unavailable or not-in-mode answers are never promised and are drawn not reachable; unknown runtime observations stay unconfirmed; saved LLM values are not reverted; inactive loaded features are not shown as working; unknown saved answer intent blocks changes until settings are read; picture-reading holds use last-observed uncertainty; step openers (developer tools) share expanded state.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "R1: the second mount has two answer switches, both checked.",
+          "newAssertion": "One answer switch, checked.",
+          "reason": "Handover/D2 one switch under its step."
+        },
+        {
+          "oldAssertion": "R2 unavailable/not-in-mode: the sentence does not contain \"and answer your questions with sources\" but contains \"answers unavailable on this computer\"; the pictures step contains \"unavailable on this computer\"; no answer switch.",
+          "newAssertion": "The sentence mentions no answers at all; the answer step is drawn not reachable (data-reach=\"na\") with a reason (\"Not part of this install\" for not-in-mode, non-empty otherwise); the planner reason \"No supported graphics card\" is not shown; the pictures step contains \"Simple scans are read already\"; no answer switch.",
+          "reason": "fm-10: \"What can't work here is said once, in ordinary words, and drawn as not reachable\" and pictures \"Simple scans are read already\"; D4 the reason once. The never-promise oracle is kept and strengthened. \"Not part of this install\" is implementation wording (named in the builder report)."
+        },
+        {
+          "oldAssertion": "R4 unknown runtime: the sentence contains \"Understanding meaning is unconfirmed\" and \"best match first unconfirmed\"; the steps contain \"Unknown\".",
+          "newAssertion": "The heading claims neither ready nor understands; the meaning and best-match notes are \"Not confirmed yet\"; meaning unlit.",
+          "reason": "AM3: unknown -> neutral headline; AM2 the note shows what works now; D2 no per-feature sentence. \"Not confirmed yet\" is implementation wording (named)."
+        },
+        {
+          "oldAssertion": "S2 inactive loaded sessions: reranker and meaning steps contain \"Off\"; the sentence contains \"without best match first\"; Advanced reranker step contains \"Off\".",
+          "newAssertion": "Reranker and meaning steps are unlit with the note \"Not working now\"; unknown -> note \"Not confirmed yet\"; Advanced: reranker step unlit (component-row and 1/2 active assertions unchanged).",
+          "reason": "AM2: \"Switch projection from stored selection only (never runtime) ... saved On/runtime Off shows On with the step's words saying it is not working\". The old checks drew the runtime as Off, which AM2 retires; \"never promised\" is kept by the unlit step."
+        },
+        {
+          "oldAssertion": "S3 unknown saved answer intent (pending or failed settings): the path contains \"Saved answer choice is not known\" and not \"automatic\"; every answer switch is disabled with that describedby text and clicking writes nothing; after settings arrive the switch is enabled and pending shows \"automatic (no saved answer choice)\".",
+          "newAssertion": "The step's word is \"Not known\"; no answer switch; nothing written; after settings arrive the switch is enabled and pending shows \"Automatic\".",
+          "reason": "AM2: unknown -> \"Not known\" (not an unchecked switch); unset answers show automatic without writing."
+        },
+        {
+          "oldAssertion": "S5 VDU hold: the sentence contains \"while pictures are being read\"; when the snapshot goes stale it contains \"Pictures were being read when last observed\"; after a live completion it contains \"answers your questions\" and not \"last observed\".",
+          "newAssertion": "The heading is \"Reading text in scans and images\" during the hold; stale -> the heading is \"Checking AI status…\" (no current picture-reading claim); after a live completion it is neither.",
+          "reason": "D2 removes the per-feature sentence that carried the last-observed phrase; AM1 \"Stale/unknown observation keeps the last shown state\" applies to the tab row, and the page heading falls back to the base neutral heading \"Checking AI status…\". The never-claim-stale-reading oracle is kept. Not kept: the words \"when last observed\" for this hold on the Overview; no other test now checks them (risk named in the builder report). The new headline is implementation wording."
+        },
+        {
+          "oldAssertion": "S7: more than 8 openers (sentence phrases, step openers, About), all collapsed; 4 for answers.",
+          "newAssertion": "With developer tools on: exactly 4 step openers (one per feature step), all collapsed; 1 for answers; shared expanded state and panel association unchanged.",
+          "reason": "D2 (no phrases in the sentence) and D5 (the \"You get / It costs\" disclosure is a developer tool). The count 4 is the four switchable steps of the pictures (meaning, best match, answers, pictures)."
+        },
+        {
+          "oldAssertion": "the step openers (S7) observed with developer tools off (the default).",
+          "newAssertion": "Developer tools are turned on (setShowDeveloperTools(true)) before the step openers (S7) is observed; they are turned off again after the test.",
+          "reason": "Owner words \"What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.\" with D5/AM5 (Brain's Advanced shows only where fm-13/fm-14 show it, plus the AM6 recovery routes). Every assertion about the control itself is kept; only the precondition that makes it visible changed."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.snapshotLiveness.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Installed on a computer with an NVIDIA card. Only now is there a second tab (Memory), so only now a tab row; its first tab is \"Overview\", not the area's name again.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Overview | Memory / AI is ready / Everything below runs on this computer. / Text in scans and images: 2.1 GB, switch off, Off / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, On / Answer questions: 5.7 GB, switch on, On / Graphics card: 5.8 of 12 GB in use · RTX 4070 / Advanced settings / Engine history in Health. All five path steps lit.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-14-ai-ready (tmp/design/fm-14-ai-ready.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM3 (D3) Positive \"Search understands meaning\" heading only with live meaning evidence; embedding absent/inactive/unknown, activation required, incompatible embeddings, answers-working-but-meaning-not keep their remedy headline; unknown -> neutral headline.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "With the backend gone the card no longer reads as working, and the answer step reports the unknown observation; a live observation still renders \"AI is ready\", the fm-14 sentence, the On answer step and an available Stop answers (developer tool).",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Round-13: text does not contain \"Chat and summaries ready.\"; anti-regression: text contains \"Chat and summaries ready.\".",
+          "newAssertion": "Round-13: text does not contain \"Everything below runs on this computer.\"; anti-regression: it does.",
+          "reason": "fm-14 picture words replace the old status sentence; the oracles (no ready claim when gone, ready claim when live) are unchanged."
+        },
+        {
+          "oldAssertion": "Answer state read from the last .step-meta of the chat path; action located by data-testid=\"brain-simple-action\".",
+          "newAssertion": "Answer state read from the step note, else its switch word; action located by data-testid=\"brain-answers-action\". Expected values (\"Unknown — checking AI status\", \"On\", \"Stop answers\", available) unchanged.",
+          "reason": "D2 state in words under the step; D5 Start/Stop answers has its own id as a developer tool."
+        },
+        {
+          "oldAssertion": "Fixture without meaning evidence, developer tools off.",
+          "newAssertion": "runtimeStatus embed active (AM3 live meaning evidence for the positive heading) and devTools = true (D5 Start/Stop answers).",
+          "reason": "Preconditions only; the asserted outcomes are unchanged."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.telemetry-mode.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Overview | Memory / AI is ready / Everything below runs on this computer. / Text in scans and images: 2.1 GB, switch off, Off / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, On / Answer questions: 5.7 GB, switch on, On / Graphics card: 5.8 of 12 GB in use · RTX 4070 / Advanced settings / Engine history in Health. All five path steps lit.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-14-ai-ready (tmp/design/fm-14-ai-ready.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "Developer telemetry belongs to Health; Brain never polls telemetry with Advanced closed or open; the Engine history link focuses Health's AI Engine section whether Health is mounted already or later.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Advanced settings and the Engine history link (fixture without AI observations) observed with developer tools off (the default).",
+          "newAssertion": "Developer tools are turned on (setShowDeveloperTools(true)) before Advanced settings and the Engine history link (fixture without AI observations) is observed; they are turned off again after the test.",
+          "reason": "Owner words \"What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.\" with D5/AM5 (Brain's Advanced shows only where fm-13/fm-14 show it, plus the AM6 recovery routes). Every assertion about the control itself is kept; only the precondition that makes it visible changed."
+        },
+        {
+          "oldAssertion": "The engine-history link is the first .brain-links anchor.",
+          "newAssertion": "Additionally asserts the link text contains \"Engine history in Health\".",
+          "reason": "fm-14 picture words \"Engine history in Health\"; added to make sure the clicked link is that one."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.ui-mode.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "Opening Brain's Advanced never writes ui.mode, under either global detail level.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Advanced settings (fixture without AI observations) observed with developer tools off (the default).",
+          "newAssertion": "Developer tools are turned on (setShowDeveloperTools(true)) before Advanced settings (fixture without AI observations) is observed; they are turned off again after the test.",
+          "reason": "Owner words \"What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.\" with D5/AM5 (Brain's Advanced shows only where fm-13/fm-14 show it, plus the AM6 recovery routes). Every assertion about the control itself is kept; only the precondition that makes it visible changed."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ContextWindow.home-lockdown.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "No tab row until answers work, then \"Overview | Memory\". The sentence has no switches; each switch sits under its step with its state in words.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Installed on a computer with an NVIDIA card. Only now is there a second tab (Memory), so only now a tab row; its first tab is \"Overview\", not the area's name again.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D1 Tab row hidden until answers work (same readiness as slice 4's Search / Ask); then \"Overview | Memory\". Explicit Memory navigation (justsearch://surface/core.memory-surface, ?tab=core.memory-surface, palette \"Open AI Brain › Memory\", Back/Forward, reload) still opens Memory and then shows the tab row so Overview is reachable; Memory facts stay readable/forgettable whatever the answer state.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM6 Recovery routes stay reachable without developer tools: pack import when downloads are disabled, settings refresh for unknown choices, manual repair URLs/destinations, removal refusals/interrupted outcomes, Settings \"Reading memory\" link opens and focuses its control.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "Settings arrives at Reading memory with focus, from cold and from the Memory tab; queued keyboard changes return to the saved Reading memory after a refused save.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "The \"Memory tab\" case clicks button[data-tab-id=\"core.memory-surface\"] on the Brain tab row.",
+          "newAssertion": "It opens Memory with requestSurfaceNavigation('core.memory-surface') and still waits for ?tab=core.memory-surface in the address; the Settings › Reading memory arrival and focus assertions are unchanged.",
+          "reason": "D1 / handover \"No tab row until answers work\": this fixture has no working answers, so no tab to click; D1 keeps explicit Memory navigation working, which is what the case now uses."
+        },
+        {
+          "oldAssertion": "Advanced settings (fixture without AI observations) in the queued-keyboard case observed with developer tools off (the default).",
+          "newAssertion": "Developer tools are turned on (setShowDeveloperTools(true)) before Advanced settings (fixture without AI observations) in the queued-keyboard case is observed; they are turned off again after the test.",
+          "reason": "Owner words \"What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.\" with D5/AM5 (Brain's Advanced shows only where fm-13/fm-14 show it, plus the AM6 recovery routes). Every assertion about the control itself is kept; only the precondition that makes it visible changed."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/ContextWindow.home.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "Reading memory has one home (AI Brain Advanced); save ownership, refusals and conflicts unchanged.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "AI Brain's Advanced settings (fixture without AI observations) observed with developer tools off (the default).",
+          "newAssertion": "Developer tools are turned on (setShowDeveloperTools(true)) before AI Brain's Advanced settings (fixture without AI observations) is observed; they are turned off again after the test.",
+          "reason": "Owner words \"What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.\" with D5/AM5 (Brain's Advanced shows only where fm-13/fm-14 show it, plus the AM6 recovery routes). Every assertion about the control itself is kept; only the precondition that makes it visible changed."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/brainPage.test.ts"
+      ],
+      "change": "deleted",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "removal",
+          "removed": [
+            "modules/ui-web/src/shell-v0/state/brainPage.ts#composeBrainSentence",
+            "modules/ui-web/src/shell-v0/state/brainPage.ts#BrainSentencePart"
+          ]
+        },
+        {
+          "kind": "owner-words",
+          "quote": "No tab row until answers work, then \"Overview | Memory\". The sentence has no switches; each switch sits under its step with its state in words.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "AI Brain on a computer without an NVIDIA card (most computers). The sentence says only what the picture cannot; each fact stands once (the card under its step, sizes under theirs). A switch exists only under its step, with its state in words. What can't work here is said once, in ordinary words, and drawn as not reachable. Only the steps that work now are lit; the Install button is the one filled action.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Installed on a computer with an NVIDIA card. Only now is there a second tab (Memory), so only now a tab row; its first tab is \"Overview\", not the area's name again.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "AI isn't installed yet / Search already works with exact words. Installing AI adds the steps that are not lit yet. / Install AI · 2.6 GB / You see each licence before anything downloads. Everything runs on this computer. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, Included / Answer questions: Needs an NVIDIA graphics card (drawn not reachable). Lit: Your files, Read the text; no tab row; no links row.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-10-ai-not-installed (tmp/design/fm-10-ai-not-installed.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Search understands meaning / It finds files by what they are about, not only by their words. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch off, Off / Answer questions: Needs an NVIDIA graphics card (drawn not reachable) / Advanced settings / Remove AI models. Lit: Your files, Read the text, Understand meaning; no tab row; no graphics card.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-13-ai-installed-no-card (tmp/design/fm-13-ai-installed-no-card.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Overview | Memory / AI is ready / Everything below runs on this computer. / Text in scans and images: 2.1 GB, switch off, Off / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, On / Answer questions: 5.7 GB, switch on, On / Graphics card: 5.8 of 12 GB in use · RTX 4070 / Advanced settings / Engine history in Health. All five path steps lit.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-14-ai-ready (tmp/design/fm-14-ai-ready.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D2 Sentence has no switches; each switch sits under its step with its state in words; existing handlers and meanings only (pre-install Included = package decline; Best match first = rerankerEnabled/intent; Answer questions = nullable chatEnabled, unset stays unset; Text in scans and images = pictureReadingEnabled). Switch shows stored selection; the step's lit/unlit and state words show what works now (selection never presented as activity).",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "composeBrainSentence (one sentence carrying a phrase per feature) is removed from brainPage.ts with its test: the pictures' sentence says only what the picture cannot, and each feature's state sits once under its step.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "Installed, 27 combinations: meaning phrase \"It understands what your files are about\"; reranker/answers/pictures phrases for true/false/null; ending \". Everything runs on this computer.\"",
+          "newAssertion": "Removed. Now: the installed sentence is the pictures' (fm-14 \"Everything below runs on this computer.\" in BrainOverview.tabs.test.ts S7a-5 and BrainSurface.snapshotLiveness.test.ts; fm-13 \"It finds files by what they are about, not only by their words.\" in BrainOverview.steps.test.ts S7a-2); each feature's state is its step word and light (BrainOverview.switches.test.ts, BrainSurface.reranker-switch/picture-switch/picture-availability tests).",
+          "reason": "Handover/D2 \"The sentence has no switches\"; fm-10 \"The sentence says only what the picture cannot; each fact stands once\". The removal source deletes the function."
+        },
+        {
+          "oldAssertion": "Before install: first part contains \"Installing AI lets it understand\"; reranker/answers phrases follow the download choice; pictures phrase comes with the answer model's files.",
+          "newAssertion": "Removed. Now: fm-10 sentence \"Search already works with exact words. Installing AI adds the steps that are not lit yet.\" (BrainOverview.steps.test.ts S7a-1, BrainSurface.pausedInstall.test.ts); download choice as the Included switch under its step (steps S7a-1 \"Included changes only the decline ...\"); pictures step \"Simple scans are read already\" where answers cannot work (steps S7a-1).",
+          "reason": "fm-10 picture words and handover \"Included\" note."
+        },
+        {
+          "oldAssertion": "Before install never promises excluded answers: unavailable/not-in-mode -> \", with answers unavailable on this computer\"; declined -> \", without answers to questions\"; selected -> answers promised.",
+          "newAssertion": "Removed. Now: unavailable/not-in-mode answers are drawn not reachable with their reason once and the sentence mentions no answers (BrainOverview.steps.test.ts S7a-1 no-card and Linux cases; BrainSurface.sliceB.test.ts R2; BrainSurface.chat-intent.test.ts). The fm-10 sentence never promises answers in any case, declined or selected.",
+          "reason": "fm-10 \"What can't work here is said once ... drawn as not reachable\"; the sentence is fixed picture words."
+        },
+        {
+          "oldAssertion": "Unknown status: exactly \"AI status and feature availability are still being checked. Everything runs on this computer.\"",
+          "newAssertion": "Removed. Now: heading \"Checking AI status…\" and step notes \"Unknown — checking AI status\" (BrainSurface.picture-availability.test.ts expectChecking; BrainSurface.snapshotLiveness.test.ts round-13); neither claims availability.",
+          "reason": "D2 no per-feature sentence; the never-claim oracle continues in those files."
+        },
+        {
+          "oldAssertion": "Pictures on but not available with this answer model: \". Text in scans and images: On — not available with this answer model\"",
+          "newAssertion": "Removed. Now: word \"On\", note \"Not available with this answer model\", unlit (BrainSurface.picture-availability.test.ts expectNotAvailable).",
+          "reason": "AM2."
+        },
+        {
+          "oldAssertion": "Answers-off takes precedence over a picture-reading hold: \". Answers are off; background work can continue\".",
+          "newAssertion": "Removed. Now: a chat-off automatic picture pass never says answers resume (BrainSurface.automatic-vdu.test.ts \"keeps the original panel sentence ...\"); the answer step word is \"Off\" (BrainSurface.redesign.test.ts).",
+          "reason": "fm-13 \"An off switch reads \\\"Off\\\"\"; D4."
+        },
+        {
+          "oldAssertion": "Answers resume after picture reading (\"resume after the current document\"); missing answer model -> \". Answers are not downloaded yet\" and never claims to answer.",
+          "newAssertion": "Removed. Now: \"Answers resume after the current document.\" (BrainSurface.automatic-vdu.test.ts). Not kept as a direct check: an installed page whose answer model is not downloaded leaving Answer questions unlit (the nearest remaining checks are BrainSurface.answers-completion.test.ts for the removed answer model and BrainOverview.tabs.test.ts no tab row when answers do not work).",
+          "reason": "D2 removes the sentence part; the gap is named in the builder report rather than covered by a new expectation without a request."
+        }
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "A first install that runs is not an installed AI with a missing file; a genuine idle missing file still offers Repair; Install opens the licences then installs, Pause and Cancel act on the run; Ask in Search keeps its own readiness while Brain counts processor answers as working. Expectations and their sources: (1) running first install: the panel starts with \"Installing\", contains no repair/\"already installed\"/installed words, no Repair button or install-repair-needed notice, no enabled step switch, and offers Pause download and Cancel - AM4 (\"idle missing-file Repair and \\\"already installed\\\" wording are suppressed and a first running install is not projected as installed\"); \"Pause download\" and \"Cancel\" are the base's existing labels for the run. (2) idle missing file: heading \"Installed — repair available\" and Repair runs core.repair-ai-install after one confirmation - AM4 \"genuine idle Repair stays\" and D3 \"Genuine failure/repair/policy headlines stay\" (base heading words). (3) Install: the Install AI button opens the consent dialog, Accept and download runs core.start-ai-install, then pause posts /install/pause and Cancel runs core.cancel-ai-install - fm-10 \"the Install button is the one filled action\", existing handlers (D2 \"existing handlers and meanings only\"). (4) processor answers ready with two files: Brain shows the tab row with first tab \"Overview\" while the Search composer shows no tier controls (data-tier list empty) - AM1 \"CPU operation counts ... NOT the composer's document/GPU gate; Ask behaviour itself unchanged\"; fm-14 \"its first tab is \\\"Overview\\\"\". Fail-before (origin/main): all four cases fail by assertion; cases 2 and 3 fail first on the data-step guard (the base page has no step markup), not on the Repair/Install behaviour, which the base already had. Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM4 Minimal A2 presentation guard moves into 7a: while an install runs, idle missing-file Repair and \"already installed\" wording are suppressed and a first running install is not projected as installed; genuine idle Repair stays. Transport/install repairs stay 7b.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM1 (D1) Tab row condition is \"answers work\", defined explicitly from the answer runtime (installed answer model, answers not explicitly off, runtime observed ready or startable/unloaded-but-startable, CPU operation counts), NOT the composer's document/GPU gate; Ask behaviour itself unchanged. Stale/unknown observation keeps the last shown state (no flicker). Tests: ready with zero files, unloaded-but-startable, CPU, stale.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D3 Heading says what works: installed with working meaning search and answers unavailable -> a \"Search understands meaning\" style heading (as fm-13), never \"AI Offline\"/\"Installed with limitations\"; answers unavailable said once under its step in ordinary words. Genuine failure/repair/policy headlines stay.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "AI isn't installed yet / Search already works with exact words. Installing AI adds the steps that are not lit yet. / Install AI · 2.6 GB / You see each licence before anything downloads. Everything runs on this computer. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, Included / Answer questions: Needs an NVIDIA graphics card (drawn not reachable). Lit: Your files, Read the text; no tab row; no links row.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-10-ai-not-installed (tmp/design/fm-10-ai-not-installed.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "AI Brain on a computer without an NVIDIA card (most computers). The sentence says only what the picture cannot; each fact stands once (the card under its step, sizes under theirs). A switch exists only under its step, with its state in words. What can't work here is said once, in ordinary words, and drawn as not reachable. Only the steps that work now are lit; the Install button is the one filled action.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/fm-brain.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.layout-lockdown.test.ts"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "AI Brain's Overview in real headless Chromium with isolated fixture responses (private Vite on port 0, no Engine, no shared stack, CUDA hidden) for the fm-10, fm-13 and fm-14 states, light and dark, at 1024x700, 600 px and 200% zoom; the developer-tools feature panel; keyboard operation of a step switch; and the Brain template source free of style= attributes. Expectations and their sources: (1) per picture, theme and size: more than 10 text elements, no horizontal scroll of .brain-scroll, no clipped text, every text size on the ladder {11, 12, 13, 15, 20, 28} px and every corner radius in {4, 8, 14} px (or pill/circle) - the ladder values repeat the existing repository-wide type-ladder rule (modules/ui-web/e2e/type-ladder-chromium.mjs sizes and radii at the base); no owner note quoted here states them (named as unsourced in the builder report); the three states are the three pictures. (2) developer tools on: the reranker step opener opens one feature panel whose text and corners stay on the same ladders, dark and light - D5/AM5 (the panel exists only with developer tools); this replaces the type-ladder audit's eight default panel views (see the type-ladder-lockdown entry). (3) the reranker switch in fm-14 toggles off with Space and on with Enter and is not left disabled - D2 \"each switch sits under its step\" with keyboard operation as an accessibility baseline (no quoted owner note spells Space/Enter; named in the builder report). (4) BrainSurface.ts contains no style= template attribute - owner words \"In the app, never set style= on an element: the desktop window drops it.\" (the check passes on the base too; it is a preservation guard; it does not cover .style= property bindings). Fail-before: every rendered case fails by assertion on the before-state (expect.poll guard: no [data-step=\"chat\"] on the base page); case 4 passes on the base. Needs headless Chromium (PLAYWRIGHT_BROWSERS_PATH from tmp/ui-checks); it ran in this sandbox. Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "AI isn't installed yet / Search already works with exact words. Installing AI adds the steps that are not lit yet. / Install AI · 2.6 GB / You see each licence before anything downloads. Everything runs on this computer. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, Included / Answer questions: Needs an NVIDIA graphics card (drawn not reachable). Lit: Your files, Read the text; no tab row; no links row.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-10-ai-not-installed (tmp/design/fm-10-ai-not-installed.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Search understands meaning / It finds files by what they are about, not only by their words. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch off, Off / Answer questions: Needs an NVIDIA graphics card (drawn not reachable) / Advanced settings / Remove AI models. Lit: Your files, Read the text, Understand meaning; no tab row; no graphics card.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-13-ai-installed-no-card (tmp/design/fm-13-ai-installed-no-card.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Overview | Memory / AI is ready / Everything below runs on this computer. / Text in scans and images: 2.1 GB, switch off, Off / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, On / Answer questions: 5.7 GB, switch on, On / Graphics card: 5.8 of 12 GB in use · RTX 4070 / Advanced settings / Engine history in Health. All five path steps lit.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-14-ai-ready (tmp/design/fm-14-ai-ready.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "In the app, never set style= on an element: the desktop window drops it.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/fm-brain.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.layout-lockdown.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "What the pictures do not show sits behind Settings › Advanced › Show developer tools, live; the links row has only the pictured links; recovery routes stay reachable without developer tools. Expectations and their sources: (1) Start/Stop answers, Refresh status and the step \"You get / It costs\" openers are absent with developer tools off, appear when they are turned on (live, no reload), the panel shows \"You get\" then \"It costs\", and they leave again when turned off - owner words on developer tools, D5 (names exactly these three), AM5 \"live preference change\". (2) links row is exactly [\"Advanced settings\", \"Engine history in Health\"] in the answers-working state - fm-14 picture words; D5 \"Advanced settings and Engine history stay as in fm-14\". (3) downloads disabled before install: Advanced settings is reachable and contains \"Import an offline package\" - AM6 \"pack import when downloads are disabled\" (\"Import an offline package\" is the base's label for that route). (4) not installed otherwise: no Advanced settings link - fm-10 picture (no links row). (5) manual repair URL and target path stay on the page - AM6 \"manual repair URLs/destinations\". (6) an interrupted removal outcome reads \"The removal was interrupted\" under Advanced settings - AM6 \"removal refusals/interrupted outcomes\" (base wording). (7) the Settings › Reading memory request focuses #brain-contextWindow on a not-installed page - AM6 \"Settings \\\"Reading memory\\\" link opens and focuses its control\". Fail-before: all seven fail by assertion (cases 3, 5, 6, 7 first on the data-step guard; their routes existed at the base and are preservation checks). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "AI isn't installed yet / Search already works with exact words. Installing AI adds the steps that are not lit yet. / Install AI · 2.6 GB / You see each licence before anything downloads. Everything runs on this computer. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, Included / Answer questions: Needs an NVIDIA graphics card (drawn not reachable). Lit: Your files, Read the text; no tab row; no links row.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-10-ai-not-installed (tmp/design/fm-10-ai-not-installed.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Search understands meaning / It finds files by what they are about, not only by their words. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch off, Off / Answer questions: Needs an NVIDIA graphics card (drawn not reachable) / Advanced settings / Remove AI models. Lit: Your files, Read the text, Understand meaning; no tab row; no graphics card.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-13-ai-installed-no-card (tmp/design/fm-13-ai-installed-no-card.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Overview | Memory / AI is ready / Everything below runs on this computer. / Text in scans and images: 2.1 GB, switch off, Off / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, On / Answer questions: 5.7 GB, switch on, On / Graphics card: 5.8 of 12 GB in use · RTX 4070 / Advanced settings / Engine history in Health. All five path steps lit.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-14-ai-ready (tmp/design/fm-14-ai-ready.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D5 Not in the pictures -> behind Settings > Advanced > Show developer tools (or Advanced): feature disclosure \"You get / It costs\", Start/Stop answers, Refresh status icon. Graphics card meter only where pictured (card present). Advanced settings and Engine history stay as in fm-14. Exceptional states (policy errors, compatibility/rebuild warnings, enrichment progress, genuine Repair) keep their actionable words; technical detail behind a disclosure.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM6 Recovery routes stay reachable without developer tools: pack import when downloads are disabled, settings refresh for unknown choices, manual repair URLs/destinations, removal refusals/interrupted outcomes, Settings \"Reading memory\" link opens and focuses its control.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/fm-brain.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.steps.test.ts"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "AI Brain's Overview as drawn in fm-10 (not installed) and fm-13 (installed, no NVIDIA card): the heading says what works, each fact stands once, only working steps are lit; meaning not working keeps its remedy and claims nothing; sizes are downloads; read words; heading and status panel agree. Expectations and their sources: fm-10: heading \"AI isn't installed yet\", sentence \"Search already works with exact words. Installing AI adds the steps that are not lit yet.\" with no control in it, one filled action \"Install AI · <plan total>\", \"You see each licence before anything downloads. Everything runs on this computer.\", lit = files and read only, \"8 files\", \"Built in\", pictures \"Simple scans are read already\" without switch, meaning without switch and with its size, reranker size and one \"Included\" switch checked - all fm-10 picture words/drawing and the fm-10 note; the Install label and sizes are formatted with the app's formatBytes because byte units are D6/7b (the picture shows \"2.6 GB\"; named in the builder report as an expected value computed by production code). Answers no card: drawn not reachable, no switch, \"Needs an NVIDIA graphics card\" exactly once on the page, no answer size, no CUDA or \"answers unavailable on this computer\", no tab row - fm-10 note and picture, D4 \"the CUDA reason once\" (here: not on the default page), handover tab rule. Linux: a non-empty reason without planner/technical words, not the NVIDIA words, once - AM10(a). Included: toggling posts/deletes only the decline (no settings write, no operation), the word becomes \"Not included\", the Install total drops by the part size, and the choice survives remount and a new mount - handover \"Included\" note and D2 \"pre-install Included = package decline\" (\"Not included\" is implementation wording; named in the builder report). fm-13: heading \"Search understands meaning\", sentence \"It finds files by what they are about, not only by their words.\", never \"AI Offline\"/\"Installed with limitations\", lit = files, read, meaning, Best match first one switch unchecked reading \"Off\", answers not reachable with the NVIDIA words once, pictures \"Simple scans are read already\", no tab row, no graphics card, no filled action - fm-13 picture words and note, D3, AM8. Meaning not working (inactive, unknown, absent+missing file, activation required, incompatible embeddings, answers working while meaning not): meaning unlit, no positive heading, never \"AI Offline\"; repair heading \"Installed — repair available\", activation heading \"Downloaded — activation required\" (base headings, D3 \"Genuine ... headlines stay\"); incompatible: no index/rebuild words in the heading, the core.rebuild-index operation still offered, no \"Rebuild the index\" - AM3, AM9. Sizes: each step's size line contains its download size and the word download, never on disk/registry/footprint; no step line starts with a separator; compact or custom answer model shows no answer size - AM8, D4. At most one \"kept\" on the page and no CUDA on the default no-card page - D4. Read/answers words: four answer/read-again states never show indexing, \"Resume Chat AI\", \"Rebuild the index\" or \"Chat AI\" - AM9. Status coherence: the fm-13 heading stands with no search-limited/search-reduced/indexing status rows, and an install failure heading equals the status panel row title - AM9 \"page/status coherence\". Fail-before: all 20 cases fail by assertion on the before-state. Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "AI isn't installed yet / Search already works with exact words. Installing AI adds the steps that are not lit yet. / Install AI · 2.6 GB / You see each licence before anything downloads. Everything runs on this computer. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, Included / Answer questions: Needs an NVIDIA graphics card (drawn not reachable). Lit: Your files, Read the text; no tab row; no links row.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-10-ai-not-installed (tmp/design/fm-10-ai-not-installed.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Search understands meaning / It finds files by what they are about, not only by their words. / Text in scans and images: Simple scans are read already / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch off, Off / Answer questions: Needs an NVIDIA graphics card (drawn not reachable) / Advanced settings / Remove AI models. Lit: Your files, Read the text, Understand meaning; no tab row; no graphics card.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-13-ai-installed-no-card (tmp/design/fm-13-ai-installed-no-card.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "AI Brain on a computer without an NVIDIA card (most computers). The sentence says only what the picture cannot; each fact stands once (the card under its step, sizes under theirs). A switch exists only under its step, with its state in words. What can't work here is said once, in ordinary words, and drawn as not reachable. Only the steps that work now are lit; the Install button is the one filled action.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Installed, no NVIDIA card. The headline says what now works, never \"AI Offline\" or \"Installed with limitations\". An off switch reads \"Off\" and is drawn off.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "No tab row until answers work, then \"Overview | Memory\". The sentence has no switches; each switch sits under its step with its state in words.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "The \"Included\" switch for the optional part before installing: a per-part decline exists on main (BrainSurface.ts: declined, 'user-declined'), so the switch can sit on what is already saved.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Every fact has one home on a screen. ... The same thing has one name everywhere: the app reads files (not \"indexes\")",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Anything a picture shows that the app has no data for: build the screen without it and name it in the delivery. Never fill it with a made-up value.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D2 Sentence has no switches; each switch sits under its step with its state in words; existing handlers and meanings only (pre-install Included = package decline; Best match first = rerankerEnabled/intent; Answer questions = nullable chatEnabled, unset stays unset; Text in scans and images = pictureReadingEnabled). Switch shows stored selection; the step's lit/unlit and state words show what works now (selection never presented as activity).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D3 Heading says what works: installed with working meaning search and answers unavailable -> a \"Search understands meaning\" style heading (as fm-13), never \"AI Offline\"/\"Installed with limitations\"; answers unavailable said once under its step in ordinary words. Genuine failure/repair/policy headlines stay.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D4 One fact once: card under its step, sizes under theirs; no \"registry footprint\", no leading separators, one kept-files wording; the CUDA reason once.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM2 (D2) Switch projection from stored selection only (never runtime): saved Off/runtime On shows Off; saved On/runtime Off shows On with the step's words saying it is not working; unknown settings show \"Not known\" (not an unchecked switch) with the existing refresh route; unset answers show automatic without writing a default; operator overrides explained. Existing picture tests encoding the old drawing change (listed).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM3 (D3) Positive \"Search understands meaning\" heading only with live meaning evidence; embedding absent/inactive/unknown, activation required, incompatible embeddings, answers-working-but-meaning-not keep their remedy headline; unknown -> neutral headline.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM8 (D4) Sizes keep what they measure: package download size labelled as download, never as measured disk use; omitted for compact/custom models unless a matching trustworthy value exists (omission named). Graphics meter only with a current reading; never infer \"no card\" from a missing meter; installing/unsupported/insufficient-memory/unknown settled explicitly.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM9 Brain wording in 7a: \"indexing\", \"Resume Chat AI\", \"Rebuild the index\" and similar on Brain's default and exceptional states move to read/answers words; page/status coherence for Brain states (S7-25 subset); verdict ids unchanged.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM10 Reachability legs separate: (a) Linux platform exclusion of answers (reachable here), (b) hardware no-card (sandbox proof or unverified), (c) fm-14 only with real answers, picture-reader and GPU observations.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/fm-brain.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.steps.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.switches.test.ts"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "Each switch sits under its step and shows the stored choice only; the step's light and words show what works now; unknown choices read \"Not known\"; unset answers stay unset; overrides are explained; pending and interrupted changes are said in words; other windows' choices arrive and stale reads do not undo them. Expectations and their sources: Exactly one switch each for Best match first, Answer questions and Text in scans and images, under its step, word \"On\", none in the sentence - handover/D2, fm-14 picture (\"On\" switches). Saved Off while the runtime runs it: unchecked, word \"Off\", step lit - AM2 \"saved Off/runtime On shows Off\". Saved On while the runtime does not run it: checked, word \"On\", unlit, note matching /not working/i - AM2. Settings unreadable: the three words are \"Not known\" with no switch, a \"Refresh status\" button is reachable without developer tools and refreshing reads settings again and shows \"On\" - AM2 \"with the existing refresh route\", AM6 \"settings refresh for unknown choices\" (\"Refresh status\" is the base label). Unset answers: word \"Automatic\", switch present, no write - AM2/D2. Operator override Off with saved On: switch unchecked, disabled, described by operator/administrator words, word \"Off\" - AM2 \"operator overrides explained\". Invalid receipt after a click: word \"Not known\", no switch - AM2. Pending change: word \"Changing…\", switch disabled across remount, a second click posts nothing, then \"Off\" - D2 state in words (\"Changing…\" is the base's pending word for Best match first; no quoted source spells it; named in the builder report). Another window: a newer witness shows \"Off\"; an older delayed read does not undo it - D2/AM2 stored selection. Fail-before: all nine cases fail by assertion. Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "No tab row until answers work, then \"Overview | Memory\". The sentence has no switches; each switch sits under its step with its state in words.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Installed, no NVIDIA card. The headline says what now works, never \"AI Offline\" or \"Installed with limitations\". An off switch reads \"Off\" and is drawn off.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Overview | Memory / AI is ready / Everything below runs on this computer. / Text in scans and images: 2.1 GB, switch off, Off / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, On / Answer questions: 5.7 GB, switch on, On / Graphics card: 5.8 of 12 GB in use · RTX 4070 / Advanced settings / Engine history in Health. All five path steps lit.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-14-ai-ready (tmp/design/fm-14-ai-ready.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D2 Sentence has no switches; each switch sits under its step with its state in words; existing handlers and meanings only (pre-install Included = package decline; Best match first = rerankerEnabled/intent; Answer questions = nullable chatEnabled, unset stays unset; Text in scans and images = pictureReadingEnabled). Switch shows stored selection; the step's lit/unlit and state words show what works now (selection never presented as activity).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM2 (D2) Switch projection from stored selection only (never runtime): saved Off/runtime On shows Off; saved On/runtime Off shows On with the step's words saying it is not working; unknown settings show \"Not known\" (not an unchecked switch) with the existing refresh route; unset answers show automatic without writing a default; operator overrides explained. Existing picture tests encoding the old drawing change (listed).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM6 Recovery routes stay reachable without developer tools: pack import when downloads are disabled, settings refresh for unknown choices, manual repair URLs/destinations, removal refusals/interrupted outcomes, Settings \"Reading memory\" link opens and focuses its control.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision: two test fixture operation keys are replaced with '01993ba0-0000-7000-8000-000000000002' (secret-scanner false positive; fixture value only).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/fm-brain.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.switches.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.tabs.test.ts"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "AI Brain has a tab row only once answers work here, and then \"Overview | Memory\"; Memory stays reachable by its routes in every answer state; Memory transitions keep state; the graphics meter shows only with a current reading. Expectations and their sources: Answers working (GPU fm-14 state): tabs exactly [\"Overview\", \"Memory\"], graphics card text \"<used> of <total> in use · RTX 4070\", links contain \"Advanced settings\" and \"Engine history in Health\", heading \"AI is ready\", sentence \"Everything below runs on this computer.\" - fm-14 picture words and note; the meter figures use formatBytes (byte units are D6/7b; the picture shows \"5.8 of 12 GB\"; named in the builder report). Ready with zero files, unloaded-but-startable, processor, starting: the row shows - AM1 (its listed test states; \"starting\" read as startable). Answers off, unavailable, failed: tab host present, no tabs, heading present - D1/handover. Stale or unknown observation keeps the row as last shown (absent when first seen stale; present stays present) - AM1 \"no flicker\". Meter: none on the processor and never \"Needs an NVIDIA graphics card\" or \"Memory use unknown\" there; none for a stale reading; none while installing - AM8, owner rule on no made-up values. Memory routes for ready/off/unavailable/starting: a member-tab request opens Memory with tabs [\"Overview\", \"Memory\"] and Memory selected; back to Overview unmounts it; forward mounts it again; reload opens it - D1. Losing readiness with Memory open keeps the same Memory element, its draft, an open Forget question, then a pending Forget completes with \"Forgotten.\" - AM7 (\"Forgotten.\" is Memory's base wording). Returning to Overview emits tab-change {id: runtime, previous: memory}, removes the row and focuses the heading - AM7. Locked Memory shows the memory.locked reason wording, never \"No learned memory yet.\" - AM7 (base wordings). Another SurfaceTabs host keeps its row [\"First\", \"Second\"] - AM7 \"other SurfaceTabs hosts unchanged\". Fail-before: all 18 cases fail by assertion (the base shows the row [\"AI Brain\", \"Memory\"] in every state). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Installed on a computer with an NVIDIA card. Only now is there a second tab (Memory), so only now a tab row; its first tab is \"Overview\", not the area's name again.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Overview | Memory / AI is ready / Everything below runs on this computer. / Text in scans and images: 2.1 GB, switch off, Off / Your files: 8 files / Read the text: Built in / Understand meaning: 1.2 GB / Best match first: 341 MB, switch on, On / Answer questions: 5.7 GB, switch on, On / Graphics card: 5.8 of 12 GB in use · RTX 4070 / Advanced settings / Engine history in Health. All five path steps lit.",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-14-ai-ready (tmp/design/fm-14-ai-ready.html; the pictures are not in git, the words are quoted here)",
+          "label": "owner-adopted picture words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "No tab row until answers work, then \"Overview | Memory\". The sentence has no switches; each switch sits under its step with its state in words.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Anything a picture shows that the app has no data for: build the screen without it and name it in the delivery. Never fill it with a made-up value.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D1 Tab row hidden until answers work (same readiness as slice 4's Search / Ask); then \"Overview | Memory\". Explicit Memory navigation (justsearch://surface/core.memory-surface, ?tab=core.memory-surface, palette \"Open AI Brain › Memory\", Back/Forward, reload) still opens Memory and then shows the tab row so Overview is reachable; Memory facts stay readable/forgettable whatever the answer state.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM1 (D1) Tab row condition is \"answers work\", defined explicitly from the answer runtime (installed answer model, answers not explicitly off, runtime observed ready or startable/unloaded-but-startable, CPU operation counts), NOT the composer's document/GPU gate; Ask behaviour itself unchanged. Stale/unknown observation keeps the last shown state (no flicker). Tests: ready with zero files, unloaded-but-startable, CPU, stale.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM7 Memory transitions: losing readiness while Memory is open keeps it mounted with a draft, a Forget confirmation and an unresolved Forget response; address and focus sync when returning to Overview and the row disappears; locked/unreadable Memory distinct from empty; other SurfaceTabs hosts unchanged.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM8 (D4) Sizes keep what they measure: package download size labelled as download, never as measured disk use; omitted for compact/custom models unless a matching trustworthy value exists (omission named). Graphics meter only with a current reading; never infer \"no card\" from a missing meter; installing/unsupported/insufficient-memory/unknown settled explicitly.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/fm-brain.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.tabs.test.ts"
+      ],
+      "repaired": true
+    }
+  ]
+}
+```
+
+## Acceptance records
