@@ -42,7 +42,7 @@ async function mount() {
   return el;
 }
 function toggle(el: Brain) {
-  const button = el.shadowRoot!.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Pause answers while indexing"]');
+  const button = el.shadowRoot!.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Pause answers while files are read"]');
   expect(button).not.toBeNull(); return button!;
 }
 beforeEach(() => {
@@ -77,7 +77,7 @@ it('defaults off, saves only the pause policy, and waits for the witnessed save'
   const el = await mount();
   expect(toggle(el).getAttribute('aria-checked')).toBe('false');
   expect(toggle(el).parentElement!.textContent).toContain('Off');
-  expect(toggle(el).closest('.advanced-row')!.textContent).toContain('indexing files (bulk import, reindex)');
+  expect(toggle(el).closest('.advanced-row')!.textContent).toContain('Wait while many files are being read (a large import, reading everything again)');
   let release!: () => void;
   holdSave = new Promise(resolve => { release = resolve; });
   toggle(el).click(); await settle(el);

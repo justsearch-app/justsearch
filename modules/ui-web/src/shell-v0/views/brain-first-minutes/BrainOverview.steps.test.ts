@@ -350,6 +350,34 @@ describe('S7a-9 sizes and words', () => {
     expect(step(el, 'chat'), 'Answer questions step').not.toBeNull();
     expect(words(step(el, 'meaning'))).toContain('1.20 GB download');
   });
+  // R2/X5 — answers run on the compact model. models/status drops dev-only packages, so the standard
+  // answer package reads incomplete; the manifest (the model registry) names chat-compact with one
+  // model file and its projector: 2740937888 + 672423616 bytes. The standard package is 6.34 GB.
+  it('shows the compact answer model’s own package size, never the standard one', async () => {
+    preview = plan(true, 'available'); settings = { ...settings, ui: { chatEnabled: true } };
+    preview = { ...preview, components: preview.components!.map(c => c.id === 'chat' ? { ...c, state: 'to-download', totalBytes: 6807977504, downloadBytes: 6807977504 } : c) };
+    presence = { packages: [...['embedding', 'reranker'].map(id => ({ id, complete: true })),
+      { id: 'chat', complete: false, presentVariantFiles: [], missingSupportingFiles: ['mmproj-F16.gguf'] } as { id: string; complete: boolean }] };
+    const registry = { schemaVersion: 2, packages: [
+      { id: 'chat', label: 'Chat model', targetDir: '', license: 'Apache-2.0', termsUrl: 'https://example.invalid/terms',
+        variants: [{ filename: 'Qwen_Qwen3.5-9B-Q4_K_M.gguf', precision: 'GGUF', targetEP: 'LLAMA_SERVER', sha256: 'A', sizeBytes: 5889811552, downloadUrl: 'https://example.invalid/a' }],
+        supportingFiles: [{ filename: 'mmproj-F16.gguf', sha256: 'B', sizeBytes: 918165952, downloadUrl: 'https://example.invalid/b', extract: false, required: true }] },
+      { id: 'chat-compact', label: 'Chat model (compact)', targetDir: 'compact', license: 'Apache-2.0', termsUrl: 'https://example.invalid/terms', devOnly: true,
+        variants: [{ filename: 'Qwen3.5-4B-Q4_K_M.gguf', precision: 'GGUF', targetEP: 'LLAMA_SERVER', sha256: 'C', sizeBytes: 2740937888, downloadUrl: 'https://example.invalid/c' }],
+        supportingFiles: [{ filename: 'mmproj-F16.gguf', sha256: 'D', sizeBytes: 672423616, downloadUrl: 'https://example.invalid/d', extract: false, required: true }] }] };
+    const base = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => String(input).endsWith('/manifest') ? json(registry) : base(input, init));
+    store.current = { ...installedNoCard(), aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
+      runtime: { mode: 'online', modelLabel: 'Answer model', installed: { known: true, value: true }, gpu: { available: false, description: 'CPU' } },
+      capabilities: { chat: true, rag: true, extract: true, embedding: true },
+      runtimeStatus: { active: { chatProfile: 'compact', modelPath: '/models/compact/Qwen3.5-4B-Q4_K_M.gguf', mmprojActive: true },
+        onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] } } as unknown as AiState;
+    const el = await mount();
+    expect(step(el, 'chat'), 'Answer questions step').not.toBeNull();
+    expect(words(el.shadowRoot!)).not.toContain('6.34 GB download');
+    expect(words(step(el, 'chat'))).toContain('3.18 GB download');
+    expect(words(step(el, 'chat'))).not.toMatch(/not working|not applied/i);
+  });
   it('keeps one kept-files wording at most and no CUDA reason on the default page', async () => {
     preview = plan(true, 'no-card'); settings = { ...settings, rerankerEnabled: false };
     presence = { packages: ['embedding', 'reranker'].map(id => ({ id, complete: true })) };
@@ -371,6 +399,26 @@ describe('S7a-9 sizes and words', () => {
     const el = await mount();
     expect(words(el.shadowRoot!)).not.toMatch(/indexing|Resume Chat AI|Rebuild the index|Chat AI/i);
     expect(step(el, 'chat'), 'Answer questions step').not.toBeNull();
+  });
+  // R4 — Advanced settings › Answers names the pause setting in the read words the page already uses
+  // for it ("Paused while files are read"); its meaning is unchanged.
+  it('Advanced names the answer pause in read words, never indexing ones', async () => {
+    preview = plan(true, 'available');
+    presence = { packages: ['embedding', 'reranker', 'chat'].map(id => ({ id, complete: true })) };
+    store.current = { ...installedNoCard(), aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
+      capabilities: { chat: true, rag: true, extract: true, embedding: true } } as unknown as AiState;
+    const el = await mount();
+    const advanced = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.includes('Advanced settings'));
+    expect(advanced, 'Advanced settings opener').toBeTruthy();
+    advanced!.click(); await settle(el);
+    const answers = el.shadowRoot!.querySelector('[aria-label="Answer settings"]');
+    expect(answers, 'Answer settings').not.toBeNull();
+    const pause = [...answers!.querySelectorAll<HTMLElement>('.advanced-row')].find(row => /Pause answers/.test(words(row)));
+    expect(pause, 'answer pause row').toBeTruthy();
+    expect(words(answers)).not.toMatch(/index/i);
+    expect(pause!.querySelector('[role="switch"]')!.getAttribute('aria-label')).toBe('Pause answers while files are read');
+    expect(words(pause)).toContain('Pause answers while files are read');
+    expect(words(pause)).toContain('Wait while many files are being read (a large import, reading everything again); keep the answer model loaded');
   });
 });
 

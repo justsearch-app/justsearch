@@ -1714,6 +1714,22 @@ export class BrainSurface extends JfElement {
   }
 
   /**
+   * Whether the files of the answer model the Engine runs answers with are all on disk (X5, R5): the
+   * package of the observed profile (`chat-<profile>`), the standard `chat` package otherwise. The
+   * Engine's file reports leave a dev-only package out; then the model the Engine loaded under that
+   * profile is what shows its files are there.
+   */
+  private answerFilesComplete(): boolean {
+    const profile = this.runtimeStatus?.active?.chatProfile;
+    const id = profile != null && profile !== 'standard' ? `chat-${profile}` : 'chat';
+    const listed = this.modelPresence?.packages?.find(p => p.id === id)?.complete
+      ?? this.planPreview?.components?.find(c => c.id === id)?.state;
+    if (typeof listed === 'boolean') return listed;
+    if (listed !== undefined || id === 'chat') return listed === 'installed';
+    return (this.runtimeStatus?.active?.modelPath ?? '').trim() !== '';
+  }
+
+  /**
    * Whether answers work on this computer now (AM1), from the answer runtime alone: the answer model is
    * installed, answers are not switched off, and the runtime is ready, starting, or unloaded but
    * started again by a question (processor operation counts). An unloaded model the runtime will not
@@ -1749,18 +1765,28 @@ export class BrainSurface extends JfElement {
   }
 
   /**
-   * The answer package's download size, only while it measures the model answers run with (AM8).
-   * Before the files are downloaded it is the download Install would make. Once they are, only the
-   * running engine's profile names a matching package: a saved model path, or no profile at all (an
-   * operator's model, or no engine observed; null is not "standard"), has no trustworthy size here.
+   * The answer package's download size, only while it measures the model answers run with (AM8, X5).
+   * Answers running on another profile's model show that profile's own package size (`chat-<profile>`,
+   * which the plan leaves out when it is dev-only) where the registry measures it unambiguously, else
+   * none. Otherwise, before the files are downloaded it is the download Install would make; once they
+   * are, a saved model path or no profile at all (an operator's model, or no engine observed; null is
+   * not "standard") has no trustworthy size here.
    */
   private answerSize(component: { totalBytes?: number } | undefined): number | null {
     if ((this.llm.modelPath ?? '').trim() !== '') return null;
-    if (!this.packagePresent('chat')) return component?.totalBytes ?? null;
     const profile = this.runtimeStatus?.active?.chatProfile;
+    if (profile != null && profile !== 'standard') {
+      const planned = this.planPreview?.components?.find(c => c.id === `chat-${profile}`)?.totalBytes;
+      if (planned != null) return planned;
+      // One model file and its supporting files: the footprint the planner states for a package.
+      const pkg = this.manifest?.packages?.find(p => p.id === `chat-${profile}`);
+      const files = pkg?.variants?.length === 1 ? [pkg.variants[0]!, ...(pkg.supportingFiles ?? [])] : [];
+      return files.length > 0 && files.every(f => Number.isSafeInteger(f.sizeBytes) && f.sizeBytes > 0)
+        ? files.reduce((sum, f) => sum + f.sizeBytes, 0) : null;
+    }
+    if (!this.packagePresent('chat')) return component?.totalBytes ?? null;
     if (profile == null) return null;
-    if (profile === 'standard') return component?.totalBytes ?? null;
-    return this.planPreview?.components?.find(c => c.id === `chat-${profile}`)?.totalBytes ?? null;
+    return component?.totalBytes ?? null;
   }
 
   /** The installer replaces the previous run's package records only after planning. */
@@ -1791,12 +1817,15 @@ export class BrainSurface extends JfElement {
       const wanted = component != null && component.declined !== true && component.state !== 'declined';
       const runtimeControl = installed && (id === 'reranker' || id === 'chat' && (present || wanted));
       const acquisitionControl = !runtimeControl && component?.declinable === true && (!installed || !present);
-      // AM2 — the switch shows the stored choice, never the runtime: Best match first unset keeps the
-      // installed files in use (not false); unset answers follow the configured default.
+      // AM2 — the switch shows the stored choice, never the runtime: unset answers follow the configured
+      // default. Unset Best match first shows the Engine's effective default for this computer: off where
+      // it keeps reranking off (on the processor, or disabled), on otherwise; unobserved, it is not known.
       const storedAnswers = this.settings.chatEnabled ?? (this.systemStatus?.inference?.chatEnabledSpec
         ?? this._unifiedAiState?.status?.inference?.chatEnabledSpec ?? false);
+      const rerankerChoice = id !== 'reranker' ? null : this.rerankerSettings?.rerankerEnabled
+        ?? (onnx?.status == null || onnx.status === 'unknown' ? null : onnx.reason !== 'cpu_default_off' && onnx.reason !== 'disabled');
       const selected = runtimeControl
-        ? id === 'reranker' ? this.rerankerSettings?.rerankerEnabled !== false : storedAnswers
+        ? id === 'reranker' ? rerankerChoice === true : storedAnswers
         : !unavailable && wanted;
       // Meaning search does not work while the files' meaning must be read again (or is being read
       // again) or new models wait for activation, whatever the encoder reports (AM3). It works only
@@ -1815,7 +1844,7 @@ export class BrainSurface extends JfElement {
       const pending = id === 'reranker' ? this.pendingActions.has('reranker-switch')
         : id === 'chat' ? this.pendingActions.has('inference-switch') : false;
       const uncertain = id === 'reranker' && this.rerankerUncertain;
-      const choiceKnown = runtimeControl ? id === 'reranker' ? settingsKnown : this.settingsRead : component != null;
+      const choiceKnown = runtimeControl ? id === 'reranker' ? settingsKnown && rerankerChoice !== null : this.settingsRead : component != null;
       const switchWord = !runtimeControl && !acquisitionControl ? null
         : pending || this.pendingActions.has(`component:${packageId}`) ? 'Changing…'
         : uncertain || !choiceKnown ? 'Not known'
@@ -1833,6 +1862,7 @@ export class BrainSurface extends JfElement {
         : !installed || !runtimeControl && id !== 'meaning' ? null
         : !present ? 'Not downloaded'
         : id === 'meaning' && active === false ? 'Not working now'
+        : id === 'reranker' && rerankerChoice === null ? 'Not confirmed yet'
         : !selected ? active === true ? 'Off is not applied yet' : null
         : active === null ? 'Not confirmed yet'
         : active === true ? null
@@ -1862,8 +1892,10 @@ export class BrainSurface extends JfElement {
     // Unset is drawn as the Engine's effective default, On, and nothing is written (W2); the note says
     // when it cannot work, e.g. while the answer model's files are missing.
     const pictureChoice = pictureOverride ?? this.rerankerSettings?.pictureReadingEnabled ?? true;
-    const pictureFiles = this.modelPresence?.packages?.find(p => p.id === 'chat')?.complete
-      ?? this.planPreview?.components?.find(c => c.id === 'chat')?.state === 'installed';
+    const pictureActive = live ? this.pictureApplied ?? mmproj : null;
+    // This part's files are the observed answer model's; they are missing only while the Engine does
+    // not report the picture reader active (a lit step never carries a note the Engine contradicts).
+    const pictureFilesMissing = !this.answerFilesComplete() && pictureActive !== true;
     const pictureMismatch = mmproj === true && pictureChoice === false && this.pictureApplied === null;
     const pictureModelCannotRead = mmproj === false && this.pictureApplied === null && this.runtimeReadFollowsPictureChange();
     // Picture reading runs in the answer model: where answers cannot work, the built-in reader is what reads scans.
@@ -1871,7 +1903,7 @@ export class BrainSurface extends JfElement {
     const pictureKnown = this.settingsRead && !!this.rerankerSettings?.witness && !this.pictureUncertain;
     features.pictures = {
       id: 'pictures', label: 'Text in scans and images', selected: pictureKnown && pictureChoice,
-      installed: features.chat.installed, active: live ? this.pictureApplied ?? mmproj : null,
+      installed: features.chat.installed, active: pictureActive,
       availability: features.chat.availability,
       note: !live ? checkingSaid ? null : 'Unknown — checking AI status'
         : !reachable ? 'Simple scans are read already'
@@ -1880,7 +1912,7 @@ export class BrainSurface extends JfElement {
         : pictureOverride != null ? 'Set by an operator override'
         : pictureMismatch ? 'Off is not applied yet'
         : !pictureChoice ? null
-        : !pictureFiles ? 'Not working — its files are missing'
+        : pictureFilesMissing ? 'Not working — its files are missing'
         : pictureModelCannotRead ? PICTURES_NOT_AVAILABLE_WITH_MODEL
         : (this.pictureApplied ?? mmproj) === null ? 'Not confirmed yet'
         : null,
@@ -1933,9 +1965,7 @@ export class BrainSurface extends JfElement {
   private async changeFeature(feature: BrainFeature): Promise<void> {
     if (feature.blockedReason || this.planLockReason()) return;
     if (feature.id === 'pictures' && this.hasInstalledAi()) {
-      const complete = this.modelPresence?.packages?.find(p => p.id === 'chat')?.complete
-        ?? this.planPreview?.components?.find(c => c.id === 'chat')?.state === 'installed';
-      if (!feature.selected && !complete) {
+      if (!feature.selected && !this.answerFilesComplete()) {
         // The saved decline is withdrawn only by the accepted install (design D4): a cancelled
         // consent leaves it, so Repair cannot restore files the user removed.
         await this.startInstall('pictures', this.declinedIds(['chat']));
@@ -3979,8 +4009,8 @@ export class BrainSurface extends JfElement {
           <button type="button" aria-expanded=${!!this.expanded.model} @click=${() => this.toggleSection('model')}>${icon({ name: 'folder', size: 14 })} Change</button>
           ${this.expanded.model ? this.settingInput('modelPath', 'Model path') : nothing}
         </div></div>
-        <div class="advanced-row"><div>Pause answers while indexing<p>Wait while indexing files (bulk import, reindex); keep the answer model loaded</p></div><div>
-          <button type="button" class="component-toggle" role="switch" aria-label="Pause answers while indexing"
+        <div class="advanced-row"><div>Pause answers while files are read<p>Wait while many files are being read (a large import, reading everything again); keep the answer model loaded</p></div><div>
+          <button type="button" class="component-toggle" role="switch" aria-label="Pause answers while files are read"
             aria-checked=${this.rerankerSettings?.pauseAnswersWhileIndexing === true}
             ?disabled=${!this.settingsRead || !this.rerankerSettings?.witness || !!this.busy['answer-pause-switch']}
             @click=${() => this.setPauseAnswersWhileIndexing(this.rerankerSettings?.pauseAnswersWhileIndexing !== true)}><span></span></button>

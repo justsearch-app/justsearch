@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-15T19:18:35.323Z",
-  "revision": "692573b042839efa5cdf324e0649d808ff451f4d",
-  "tree": "78ef01746706da95e26c3465929bc8d7681ec85e",
+  "createdAt": "2026-11-15T22:08:57.174Z",
+  "revision": "2f670abba7ec43cbff601ec35f18509b81540b4e",
+  "tree": "c21709c183b08d369f5cb9733cf7003fee655a56",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.steps.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.switches.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.tabs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/f_p66ben/tmp/test-intent-vitest-28022-1794770274577.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.steps.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.switches.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.tabs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3a51k790/tmp/test-intent-vitest-3224-1794780510533.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4311
+      "durationMs": 2628
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-first-minutes/BrainOverview.layout-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/f_p66ben/tmp/test-intent-vitest-28022-1794770278889.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-first-minutes/BrainOverview.layout-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/3a51k790/tmp/test-intent-vitest-3224-1794780513162.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 13475
+      "durationMs": 9623
     }
   ],
   "checks": [
@@ -184,7 +184,7 @@
       "id": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.steps.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.steps.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:19848dc186f6895a8bcd4a0eed56727b9c99b563761f35e8feb82f17f1db6f73",
+      "contentDigest": "sha256:02718a85eb56ca324d07ec0bae3cda9c18ab67b5aaa0ded125d7c71e95dab21d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -258,6 +258,10 @@
           "status": "passed"
         },
         {
+          "name": "S7a-9 sizes and words shows the compact answer model’s own package size, never the standard one",
+          "status": "passed"
+        },
+        {
           "name": "S7a-9 sizes and words keeps one kept-files wording at most and no CUDA reason on the default page",
           "status": "passed"
         },
@@ -275,6 +279,10 @@
         },
         {
           "name": "S7a-9 sizes and words search must read files again: read and answers words, never indexing ones",
+          "status": "passed"
+        },
+        {
+          "name": "S7a-9 sizes and words Advanced names the answer pause in read words, never indexing ones",
           "status": "passed"
         },
         {
@@ -311,7 +319,7 @@
       "id": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.switches.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.switches.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5635ec963a546e563a92334694b2730d9b0dab2f9f2197faded629d4d7dd2efa",
+      "contentDigest": "sha256:6dbf049a5b0fdbfe0c3777881beacd68e9611a5c6f47360492c891d6291ef6a5",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -338,6 +346,18 @@
         },
         {
           "name": "S7a-4 one switch per feature, under its step an unset picture choice with the answer files missing is drawn On, says its files are missing, and writes nothing",
+          "status": "passed"
+        },
+        {
+          "name": "S7a-4 one switch per feature, under its step an unset Best match first that the Engine keeps off on the processor reads Off, and a click saves On",
+          "status": "passed"
+        },
+        {
+          "name": "S7a-4 one switch per feature, under its step a lit picture step with the vision files active carries no files-missing note",
+          "status": "passed"
+        },
+        {
+          "name": "S7a-4 one switch per feature, under its step with answers on the compact model, a click on picture reading Off saves On and installs nothing",
           "status": "passed"
         },
         {
@@ -439,46 +459,46 @@
     }
   ],
   "failBefore": {
-    "ref": "origin/main",
-    "revision": "8a312d1484182e6dc5ca3f34f76599440c16bd73",
+    "ref": "777b598043",
+    "revision": "777b5980430615f3405de3a90f44bd3d726de18b",
     "overlays": [],
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.steps.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.switches.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.tabs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/f_p66ben/tmp/test-intent-vitest-28022-1794770297161.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.steps.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.switches.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.tabs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/3a51k790/tmp/test-intent-vitest-3224-1794780524175.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 3568,
-        "output": "JSON report written to /home/elias/.cache/am/f_p66ben/tmp/test-intent-vitest-28022-1794770297161.json\n\n"
+        "durationMs": 2280,
+        "output": "JSON report written to /home/elias/.cache/am/3a51k790/tmp/test-intent-vitest-3224-1794780524175.json\n\n"
       },
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-first-minutes/BrainOverview.layout-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/f_p66ben/tmp/test-intent-vitest-28022-1794770300730.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-first-minutes/BrainOverview.layout-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/3a51k790/tmp/test-intent-vitest-3224-1794780526456.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 14187,
-        "output": "JSON report written to /home/elias/.cache/am/f_p66ben/tmp/test-intent-vitest-28022-1794770300730.json\n\n"
+        "durationMs": 10477,
+        "output": "JSON report written to /home/elias/.cache/am/3a51k790/tmp/test-intent-vitest-3224-1794780526456.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts",
         "classification": "assertion",
-        "detail": "S7a-7 a first install that runs shows no Repair and no installed wording, and is not projected as installed:  AssertionError: expected 'Installing… 33% Understanding meaning…' not to match /repair|already installed|\\binstalled…/i\n    at /home/elias/.cache/am/f_p66ben/tmp/test-intent-before-gLNyvT/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts:87:22\n    at file:///home/el | S7a-11 Ask in Search Ask in Search keeps its own readiness while Brain counts processor"
+        "detail": "S7a-7 a first install that runs shows no Repair and no installed wording, and is not projected as installed:  AssertionError: expected 'Installing… 33% Understanding meaning…' not to match /repair|already installed|\\binstalled…/i\n    at /home/elias/.cache/am/3a51k790/tmp/test-intent-before-pCJTw7/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts:87:22\n    at file:///home/el | S7a-11 Ask in Search Ask in Search keeps its own readiness while Brain counts processor"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.layout-lockdown.test.ts",
         "classification": "assertion",
-        "detail": "'fm-13' 'dark' at 1024 px, zoom 1: nothing clipped, ladder sizes and corners:  AssertionError: expected [ …(2) ] to deeply equal []\n    at /home/elias/.cache/am/f_p66ben/tmp/test-intent-before-gLNyvT/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.layout-lockdown.test.ts:178:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7/modules/ui-web/ | 'fm-13' 'dark' at 600 px, zoom 1: nothing clipped, ladder sizes and corners:  AssertionError: expected [ …(2) ] to dee"
+        "detail": "'fm-13' 'dark' at 1024 px, zoom 1: nothing clipped, ladder sizes and corners:  AssertionError: expected [ …(2) ] to deeply equal []\n    at /home/elias/.cache/am/3a51k790/tmp/test-intent-before-pCJTw7/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.layout-lockdown.test.ts:178:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7/modules/ui-web/ | 'fm-13' 'dark' at 600 px, zoom 1: nothing clipped, ladder sizes and corners:  AssertionError: expected [ …(2) ] to dee"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts",
         "classification": "assertion",
-        "detail": "S7a-8 unpictured controls are developer tools, live Start/Stop answers, Refresh status and the You get / It costs panels appear only with developer tools:  AssertionError: expected [ 'Stop answers', …(4) ] to not deeply equal ArrayContaining [\"Stop answers\"]\n    at /home/elias/.cache/am/f_p66ben/tmp/test-intent-before-gLNyvT/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts:79:28\n    at file:///home/elias/dev/justsea | S7a-8 unpictured controls are developer t"
+        "detail": "S7a-8 unpictured controls are developer tools, live Start/Stop answers, Refresh status and the You get / It costs panels appear only with developer tools:  AssertionError: expected [ 'Stop answers', …(4) ] to not deeply equal ArrayContaining [\"Stop answers\"]\n    at /home/elias/.cache/am/3a51k790/tmp/test-intent-before-pCJTw7/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts:79:28\n    at file:///home/elias/dev/justsea | S7a-8 unpictured controls are developer t"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.steps.test.ts",
         "classification": "assertion",
-        "detail": "S7a-1 not installed (fm-10) says the picture’s words, lights only the steps that work, and has one filled action:  AssertionError: expected 'Search already works with exact words…' to be 'Search already works with exact words…' // Object.is equality\n    at /home/elias/.cache/am/f_p66ben/tmp/test-intent-before-gLNyvT/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.steps.test.ts:146:33\n    at f | S7a-1 not installed (fm-10) draws answers as not reachable here and says why once,"
+        "detail": "S7a-1 not installed (fm-10) says the picture’s words, lights only the steps that work, and has one filled action:  AssertionError: expected 'Search already works with exact words…' to be 'Search already works with exact words…' // Object.is equality\n    at /home/elias/.cache/am/3a51k790/tmp/test-intent-before-pCJTw7/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.steps.test.ts:146:33\n    at f | S7a-1 not installed (fm-10) draws answers as not reachable here and says why once,"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.switches.test.ts",
@@ -488,9 +508,9 @@
       {
         "id": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.tabs.test.ts",
         "classification": "assertion",
-        "detail": "S7a-5 answers work: Overview | Memory shows the tab row, the graphics card reading and the two pictured links:  AssertionError: expected [ 'AI Brain', 'Memory' ] to deeply equal [ 'Overview', 'Memory' ]\n    at /home/elias/.cache/am/f_p66ben/tmp/test-intent-before-gLNyvT/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.tabs.test.ts:120:26\n    at file:///home/elias/dev/justsearch/.claude/work | S7a-5 answers work: Overview | Memory ready with zero files counts as answers work:  "
+        "detail": "S7a-5 answers work: Overview | Memory shows the tab row, the graphics card reading and the two pictured links:  AssertionError: expected [ 'AI Brain', 'Memory' ] to deeply equal [ 'Overview', 'Memory' ]\n    at /home/elias/.cache/am/3a51k790/tmp/test-intent-before-pCJTw7/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.tabs.test.ts:120:26\n    at file:///home/elias/dev/justsearch/.claude/work | S7a-5 answers work: Overview | Memory ready with zero files counts as answers work:  "
       }
     ]
   },
-  "digest": "sha256:631d537fde4cfdc1a809fe8df44598809f9c4b917a35d14aa5b6fa22ba0e6a55"
+  "digest": "sha256:1853108ec0e1f4fe2d571f3d11bb4f6366ba35c924db2c05e036ef2f3e174896"
 }

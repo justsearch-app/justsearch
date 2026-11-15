@@ -30,6 +30,8 @@ let heldPost: Promise<void> | null;
 let invalidReceipt: boolean;
 let heldGets: Array<(r: Response) => void> | null;
 let answerFiles: boolean;
+let presence: unknown;
+let planned: InstallPlanPreview | null;
 const preview: InstallPlanPreview = { totalDownloadBytes: 0, components: ['embedding', 'reranker', 'chat'].map(id => ({
   id, label: id, state: 'installed', declinable: id !== 'embedding', totalBytes: 1024 ** 3, downloadBytes: 0 })) };
 function ready(reranker = true): AiState {
@@ -66,7 +68,7 @@ beforeEach(() => {
   setShowDeveloperTools(false);
   saved = { rerankerEnabled: true, pictureReadingEnabled: true, chatEnabled: true };
   witness = { acceptedRevision: 0, lastCommittedOperationKey: null };
-  posts = []; operations = []; answerFiles = true; settingsFails = false; settingsGets = 0; heldPost = null; invalidReceipt = false; heldGets = null;
+  posts = []; operations = []; answerFiles = true; presence = null; planned = null; settingsFails = false; settingsGets = 0; heldPost = null; invalidReceipt = false; heldGets = null;
   store.current = ready();
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input);
@@ -86,9 +88,9 @@ beforeEach(() => {
       if (heldGets) return new Promise<Response>(resolve => heldGets!.push(() => resolve(body)));
       return body;
     }
-    if (path.endsWith('/plan-preview')) return json(preview);
+    if (path.endsWith('/plan-preview')) return json(planned ?? preview);
     if (path.endsWith('/manifest')) return json({ schemaVersion: 2, packages: [] });
-    if (path.endsWith('/api/ai/models/status')) return json({ packages: ['embedding', 'reranker', 'chat'].map(id => ({ id, complete: id !== 'chat' || answerFiles })) });
+    if (path.endsWith('/api/ai/models/status')) return json(presence ?? { packages: ['embedding', 'reranker', 'chat'].map(id => ({ id, complete: id !== 'chat' || answerFiles })) });
     if (path.endsWith('/api/ai/install/downloaded-files')) return json({ parts: [] });
     return json({});
   }));
@@ -164,6 +166,65 @@ describe('S7a-4 one switch per feature, under its step', () => {
     expect(allSwitches(el, 'Text in scans and images'), 'one picture switch').toHaveLength(1);
     expect(stateWord(el, 'pictures')).toBe('On');
     expect(posts).toEqual([]); expect(operations).toEqual([]);
+  });
+
+  // R1 — a fresh install with nothing saved on a computer without a usable card: the Engine keeps Best
+  // match first off on the processor (its observation: inactive, reason cpu_default_off, session
+  // loaded). The unset switch shows that effective state, and a click saves the opposite of it.
+  it('an unset Best match first that the Engine keeps off on the processor reads Off, and a click saves On', async () => {
+    saved.rerankerEnabled = null;
+    store.current = { ...ready(), runtime: { mode: 'online', modelLabel: 'Answer model', installed: { known: true, value: true }, gpu: { available: false, description: 'CPU' } },
+      runtimeStatus: { active: { mmprojActive: true }, onnxFeatures: [
+        { id: 'embed', label: 'Semantic embedding', status: 'active', reason: 'auto_discovered', modelPath: '/models/embedding/model.onnx', modelActive: true, executionProvider: 'cpu', gpuFallback: false, fallbackReason: null },
+        { id: 'reranker', label: 'Search reranking', status: 'inactive', reason: 'cpu_default_off', modelPath: '/models/reranker/model.onnx', modelActive: true, executionProvider: 'cpu', gpuFallback: false, fallbackReason: null }] } } as unknown as AiState;
+    const el = await mount();
+    expect(stepSwitch(el, 'reranker'), 'Best match first switch').not.toBeNull();
+    expect(stateWord(el, 'reranker')).toBe('Off');
+    expect(stepSwitch(el, 'reranker')!.getAttribute('aria-checked')).toBe('false');
+    expect(words(step(el, 'reranker'))).not.toMatch(/not working/i);
+    expect(litOf(step(el, 'reranker'))).toBe('false');
+    expect(posts).toEqual([]);
+    stepSwitch(el, 'reranker')!.click(); await settle(el);
+    expect(posts.map(p => p.rerankerEnabled)).toEqual([true]);
+  });
+
+  // R3 — answers run on the compact model with its vision files active: models/status covers only the
+  // standard answer package, whose files are absent, but the Engine reports this part's files active.
+  it('a lit picture step with the vision files active carries no files-missing note', async () => {
+    store.current = { ...ready(), runtimeStatus: { ...ready().runtimeStatus,
+      active: { chatProfile: 'compact', modelPath: '/models/compact/Qwen3.5-4B-Q4_K_M.gguf', mmprojActive: true } } } as unknown as AiState;
+    presence = { runtimeInstalled: true, canActivateDefault: false, packages: [
+      { id: 'embedding', label: 'Embedding model', complete: true, blockingIncomplete: false, presentVariantFiles: ['model.onnx'], missingSupportingFiles: [] },
+      { id: 'reranker', label: 'Reranker', complete: true, blockingIncomplete: false, presentVariantFiles: ['model.onnx'], missingSupportingFiles: [] },
+      { id: 'chat', label: 'Chat model', complete: false, blockingIncomplete: false, presentVariantFiles: [], missingSupportingFiles: ['mmproj-F16.gguf'] }] };
+    const el = await mount();
+    expect(step(el, 'pictures'), 'Text in scans and images step').not.toBeNull();
+    expect(litOf(step(el, 'pictures'))).toBe('true');
+    expect(words(step(el, 'pictures'))).not.toContain('Not working — its files are missing');
+    expect(words(step(el, 'pictures'))).not.toMatch(/not working/i);
+    expect(stateWord(el, 'pictures')).toBe('On');
+  });
+
+  // R5 — answers run on the compact model with picture reading saved Off, so the Engine drops the
+  // projector (mmprojActive false). models/status and the plan leave the dev-only compact package out
+  // and say only that the standard answer package is absent. The files of the model answers run with
+  // are on disk: a click saves On and opens no install of the standard model.
+  it('with answers on the compact model, a click on picture reading Off saves On and installs nothing', async () => {
+    saved.pictureReadingEnabled = false;
+    store.current = { ...ready(), runtimeStatus: { ...ready().runtimeStatus,
+      active: { chatProfile: 'compact', modelPath: '/models/compact/Qwen3.5-4B-Q4_K_M.gguf', mmprojActive: false } } } as unknown as AiState;
+    presence = { runtimeInstalled: true, canActivateDefault: false, packages: [
+      { id: 'embedding', label: 'Embedding model', complete: true, blockingIncomplete: false, presentVariantFiles: ['model.onnx'], missingSupportingFiles: [] },
+      { id: 'reranker', label: 'Reranker', complete: true, blockingIncomplete: false, presentVariantFiles: ['model.onnx'], missingSupportingFiles: [] },
+      { id: 'chat', label: 'Chat model', complete: false, blockingIncomplete: false, presentVariantFiles: [], missingSupportingFiles: ['mmproj-F16.gguf'] }] };
+    planned = { ...preview, totalDownloadBytes: 6807977504, components: preview.components!.map(c => c.id === 'chat'
+      ? { ...c, state: 'to-download', totalBytes: 6807977504, downloadBytes: 6807977504 } : c) };
+    const el = await mount();
+    expect(stepSwitch(el, 'pictures'), 'picture switch').not.toBeNull();
+    expect(stepSwitch(el, 'pictures')!.getAttribute('aria-checked')).toBe('false');
+    stepSwitch(el, 'pictures')!.click(); await settle(el);
+    expect(el.shadowRoot!.querySelector('[data-testid="install-consent-dialog"][open]'), 'no install of the standard answer model').toBeNull();
+    expect(posts.map(p => p.pictureReadingEnabled)).toEqual([true]);
   });
 
   it('an operator override is explained and locks the switch at the override', async () => {
