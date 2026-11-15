@@ -2384,3 +2384,14 @@ This builder wrote no acceptance record.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1e074-6439-71c1-b65f-1796c1e9cd8d",
+  "verdict": "reject",
+  "digest": "sha256:5de89b147f075a74bac5bd3f5a6411a71a406897cb3ff1bb389881e3ae00b8bb",
+  "note": "Reject: repaired install/placement/layout checks fail before on absent data-step markup, not their claimed behavior; moved panel ladder audit rounds font sizes and checks only one corner; locked Memory oracle calls production reasonFor."
+}
+```
