@@ -13,6 +13,13 @@ import { projectResultView } from '../searchResultViewModel.js';
 import { renderFolderRow } from '../../components/folderRow.js';
 import { render } from 'lit';
 
+function must<T extends Element = Element>(root: ParentNode | null, selector: string): T {
+  expect(root, `root for ${selector}`).not.toBeNull();
+  const found = root!.querySelector<T>(selector);
+  expect(found, selector).not.toBeNull();
+  return found!;
+}
+
 async function settle(el: { updateComplete: Promise<unknown> }) {
   for (let i = 0; i < 30; i++) { await Promise.resolve(); await el.updateComplete; }
 }
@@ -28,7 +35,7 @@ async function library() {
   el.host_ = host; document.body.append(el); await settle(el);
   Object.assign(el, { loading: false, rootsObserved: true, forgetReadStatus: 'ready', roots: [{ pathHash: 'a',
     status: 'indexed', fileCount: 8, failedCount: 0, inFlightCount: 0, walkCompleted: true }], resolvedPaths: { a: '/Documents' } });
-  await settle(el); return el;
+  await settle(el); expect(el.shadowRoot).not.toBeNull(); return el;
 }
 async function browse(failure = false) {
   const host = createMockHostApi();
@@ -40,7 +47,7 @@ async function browse(failure = false) {
     : Response.json({ folders: [{ path: '/Documents/Nested' }] }));
   const el = document.createElement('jf-browse-surface') as BrowseSurface;
   el.host_ = host; document.body.append(el); await settle(el);
-  return { el, host };
+  expect(el.shadowRoot).not.toBeNull(); return { el, host };
 }
 function key(el: Element, value: string, shiftKey = false) {
   el.dispatchEvent(new KeyboardEvent('keydown', { key: value, shiftKey, bubbles: true, composed: true }));
@@ -49,16 +56,16 @@ afterEach(() => { document.body.replaceChildren(); __resetAiStateForTest(); setS
 
 it('K2/K3: one state headline, no count subtitle, Add a folder, healthy rows have one scoped count', async () => {
   const el = await library();
-  expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Your files are searchable');
+  expect(must(el.shadowRoot, 'h2').textContent).toBe('Your files are searchable');
   expect(el.shadowRoot!.querySelector('.header .subtitle')).toBeNull();
-  expect(el.shadowRoot!.querySelector('[data-add-folder]')!.getAttribute('label')).toBe('Add a folder');
-  expect(el.shadowRoot!.querySelector('.files-found')!.textContent).toBe('8 files');
+  expect(must(el.shadowRoot, '[data-add-folder]').getAttribute('label')).toBe('Add a folder');
+  expect(must(el.shadowRoot, '.files-found').textContent).toBe('8 files');
 });
 it('K2/M3/M4: expanded facts retain uncertainty, active reading and deletion recovery without expert facts', async () => {
   const el = await library();
   el.roots = [{ ...el.roots[0]!, inFlightCount: 2, deleteDetectionUnverified: true, lastIndexedIsoTime: '2026-01-01T00:00:00Z' }];
-  await settle(el); el.shadowRoot!.querySelector<HTMLButtonElement>('.folder-toggle')!.click(); await settle(el);
-  const text = el.shadowRoot!.querySelector('.folder-details')!.textContent!;
+  await settle(el); must<HTMLButtonElement>(el.shadowRoot, '.folder-toggle').click(); await settle(el);
+  const text = must(el.shadowRoot, '.folder-details').textContent!;
   expect(text).toContain('Search by meaning'); expect(text).toContain("Couldn't be read");
   expect(text).toContain('Reading now'); expect(text).not.toContain('Collection'); expect(text).not.toContain('Searchable by words');
   expect(text).not.toContain('Checked for changes');
@@ -67,23 +74,27 @@ it('K2/M3/M4: expanded facts retain uncertainty, active reading and deletion rec
 it('M5: capped and unknown Library counts keep their scope', async () => {
   const el = await library();
   el.roots = [{ ...el.roots[0]!, fileCount: 50000, ...{ fileCountCapped: true } }]; await settle(el);
-  expect(el.shadowRoot!.querySelector('.files-found')!.textContent).toBe('50,000+ files');
+  expect(must(el.shadowRoot, '.files-found').textContent).toBe('50,000+ files');
   el.roots = [{ ...el.roots[0]!, fileCount: -1 }]; await settle(el);
-  expect(el.shadowRoot!.querySelector('.files-found')!.textContent).toBe('');
+  expect(must(el.shadowRoot, '.files-found').textContent).toBe('');
 });
 it('M3: no current observation of zero failures says none reported', () => {
   const container = document.createElement('div');
   render(renderFolderRow({ failed: 0 }, { expanded: true, enabled: true, toggle() {}, invoke() {} }), container);
-  expect(container.querySelector('.folder-details')!.textContent).toContain('None reported');
+  expect(must(container, '.folder-details').textContent).toContain('None reported');
 });
 it('K4/M2: shared Library menu says what runs; empty and uncertain waiting differ', async () => {
   const el = await library();
-  const trigger = el.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="More Library actions"]')!;
+  const trigger = must<HTMLButtonElement>(el.shadowRoot, '[aria-label="More Library actions"]');
   trigger.click(); await settle(el);
-  const menu = el.shadowRoot!.querySelector('jf-menu'); expect(menu).not.toBeNull();
+  const menu = must(el.shadowRoot, 'jf-menu');
   if (menu) await settle(menu as unknown as { updateComplete: Promise<unknown> });
   expect(menu!.textContent).toContain('Read everything again'); expect(menu!.textContent).toContain('Read waiting files now');
-  const waiting = () => [...menu!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(item => item.textContent?.includes('Read waiting files now'))!;
+  const waiting = () => {
+    const item = [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(item => item.textContent?.includes('Read waiting files now'));
+    expect(item, 'Read waiting files now menu item').toBeDefined();
+    return item!;
+  };
   expect(waiting().disabled).toBe(false); expect(menu!.textContent).not.toContain('Nothing is waiting');
   expect(menu!.textContent).not.toContain('All 8 files');
   const snapshot = { worker: { core: { pendingVduCount: 0, indexedDocuments: 8, ownSearchableDocuments: 8, indexState: 'IDLE', indexHealthy: true },
@@ -106,22 +117,22 @@ it('K5/M1/M7/M11: expert history and activity are opt-in, unavailable removals a
   await settle(el);
   expect(el.shadowRoot!.querySelector('[data-testid="unfinished-forgets"]')).not.toBeNull();
   expect(el.shadowRoot!.textContent).toContain('3 documents from other apps');
-  expect(el.shadowRoot!.querySelector('h2')!.textContent).not.toContain('Add a folder');
+  expect(must(el.shadowRoot, 'h2').textContent).not.toContain('Add a folder');
 });
 it('K6/M5: Browse column heads, stable root count, byte and shared date presentation, no inline styles', async () => {
-  const { el } = await browse(); el.shadowRoot!.querySelector<HTMLElement>('[role="treeitem"]')!.click(); await settle(el);
-  expect(el.shadowRoot!.querySelector('.column-heads')?.textContent).toMatch(/Name\s*Size\s*Changed/);
+  const { el } = await browse(); must<HTMLElement>(el.shadowRoot, '[role="treeitem"]').click(); await settle(el);
+  expect(must(el.shadowRoot, '.column-heads').textContent).toMatch(/Name\s*Size\s*Changed/);
   expect(el.shadowRoot!.textContent).toContain('50,000+ files'); expect(el.shadowRoot!.textContent).toContain('90 bytes');
   expect(el.shadowRoot!.textContent).toContain('2000'); expect(el.shadowRoot!.querySelector('[style]')).toBeNull();
   expect(el.shadowRoot!.querySelector('[aria-label="Open file"]')).not.toBeNull();
 });
 it('M8: failed Browse children provide Retry and never say empty', async () => {
-  const { el } = await browse(true); el.shadowRoot!.querySelector<HTMLElement>('[role="treeitem"]')!.click(); await settle(el);
+  const { el } = await browse(true); must<HTMLElement>(el.shadowRoot, '[role="treeitem"]').click(); await settle(el);
   expect(el.shadowRoot!.textContent).toContain('Could not load'); expect(el.shadowRoot!.textContent).toContain('Retry');
   expect(el.shadowRoot!.textContent).not.toContain('Folder is empty');
 });
 it('M8: truncated, filtered-empty and confirmed-empty are distinct', async () => {
-  const { el } = await browse(); el.shadowRoot!.querySelector<HTMLElement>('[role="treeitem"]')!.click(); await settle(el);
+  const { el } = await browse(); must<HTMLElement>(el.shadowRoot, '[role="treeitem"]').click(); await settle(el);
   expect(el.shadowRoot!.textContent).toContain('Showing first');
   el.filter = 'no-such-file'; await settle(el); expect(el.shadowRoot!.textContent).toContain('No matching');
   el.filter = ''; el.folderChildren = { '/Documents': [] }; el.fileChildren = { '/Documents': [] };
@@ -130,10 +141,10 @@ it('M8: truncated, filtered-empty and confirmed-empty are distinct', async () =>
   expect(el.shadowRoot!.textContent).not.toContain('Showing first');
 });
 it('M9: one tree tab stop, full hierarchy, Right to child, Left to parent, focus after collapse', async () => {
-  const { el } = await browse(); const root = el.shadowRoot!.querySelector<HTMLElement>('[role="treeitem"]')!;
+  const { el } = await browse(); const root = must<HTMLElement>(el.shadowRoot, '[role="treeitem"]');
   root.focus(); key(root, 'ArrowRight'); await settle(el); key(root, 'ArrowRight'); await settle(el);
   const child = el.shadowRoot!.activeElement as HTMLElement;
-  expect(child).not.toBe(root); expect(child.getAttribute('aria-level')).toBe('2');
+  expect(child).not.toBeNull(); expect(child).not.toBe(root); expect(child.getAttribute('aria-level')).toBe('2');
   expect(child.getAttribute('aria-posinset')).toBe('1'); expect(child.getAttribute('aria-setsize')).toBe('2');
   key(child, 'ArrowLeft'); await settle(el); expect(el.shadowRoot!.activeElement).toBe(root);
   key(root, 'ArrowLeft'); await settle(el);
@@ -147,16 +158,16 @@ it('M10: eight file kind glyphs are distinct and shared with search results', ()
 
 it('M6/M12: hidden weekday restrictions stay effective across developer visibility changes', async () => {
   const el = await library();
-  const editor = el.shadowRoot!.querySelector('jf-indexing-rules-editor')! as HTMLElement & {
+  const editor = must(el.shadowRoot, 'jf-indexing-rules-editor') as HTMLElement & {
     indexingRules: { enabled: boolean; days: number[]; start: string; end: string; pauseOnBattery: boolean };
     updateComplete: Promise<unknown>;
   };
   editor.indexingRules = { enabled: true, days: [1, 3], start: '22:00', end: '07:00', pauseOnBattery: false };
   await settle(editor);
-  expect(editor.shadowRoot!.querySelector<HTMLElement>('.indexing-days')!.hidden).toBe(true);
-  expect(editor.shadowRoot!.querySelector('.effective-days')!.textContent).toBe('Mon, Wed');
+  expect(must<HTMLElement>(editor.shadowRoot, '.indexing-days').hidden).toBe(true);
+  expect(must(editor.shadowRoot, '.effective-days').textContent).toBe('Mon, Wed');
   setShowDeveloperTools(true); await settle(el); await settle(editor);
-  expect(editor.shadowRoot!.querySelector<HTMLElement>('.indexing-days')!.hidden).toBe(false);
+  expect(must<HTMLElement>(editor.shadowRoot, '.indexing-days').hidden).toBe(false);
   setShowDeveloperTools(false); await settle(el); await settle(editor);
   expect(editor.indexingRules.days).toEqual([1, 3]);
   expect(editor.indexingRules.start).toBe('22:00'); expect(editor.indexingRules.end).toBe('07:00');
@@ -166,22 +177,22 @@ it('K4/M10: opening the Library menu closes the bar menu, and outside clicks ins
   const el = await library();
   const bar = document.createElement('jf-top-bar') as HTMLElement & { updateComplete: Promise<unknown> };
   document.body.append(bar); await settle(bar);
-  bar.shadowRoot!.querySelector<HTMLButtonElement>('.more-trigger')!.click(); await settle(bar);
+  must<HTMLButtonElement>(bar.shadowRoot, '.more-trigger').click(); await settle(bar);
   expect(bar.shadowRoot!.querySelector('[role="menu"]')).not.toBeNull();
-  el.shadowRoot!.querySelector<HTMLButtonElement>('.more-trigger')!.click(); await settle(el); await settle(bar);
+  must<HTMLButtonElement>(el.shadowRoot, '.more-trigger').click(); await settle(el); await settle(bar);
   expect(bar.shadowRoot!.querySelector('[role="menu"]')).toBeNull();
-  el.shadowRoot!.querySelector('.header')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true }));
+  must(el.shadowRoot, '.header').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true }));
   await settle(el); expect(el.shadowRoot!.querySelector('[role="menu"]')).toBeNull();
 });
 
 it('M9: file action Enter cannot open the row, and disappearing focused descendants recover to their parent', async () => {
   const { el } = await browse();
-  const root = el.shadowRoot!.querySelector<HTMLElement>('[role="treeitem"]')!;
+  const root = must<HTMLElement>(el.shadowRoot, '[role="treeitem"]');
   root.click(); await settle(el);
-  const file = el.shadowRoot!.querySelector<HTMLElement>('.row.file')!;
+  const file = must<HTMLElement>(el.shadowRoot, '.row.file');
   file.focus(); await settle(el);
   const open = vi.spyOn(el as unknown as { openFile(path: string): Promise<void> }, 'openFile').mockResolvedValue(undefined);
-  const action = file.querySelector<HTMLButtonElement>('[aria-label="Open file"]')!;
+  const action = must<HTMLButtonElement>(file, '[aria-label="Open file"]');
   key(action, 'Enter'); expect(open).not.toHaveBeenCalled();
   action.click(); expect(open).toHaveBeenCalledTimes(1);
   file.focus(); el.expanded = {}; await settle(el);
@@ -191,7 +202,7 @@ it('M9: file action Enter cannot open the row, and disappearing focused descenda
 
 it('K4: a hidden Library closes its transient menu before it is shown again', async () => {
   const el = await library();
-  el.shadowRoot!.querySelector<HTMLButtonElement>('.more-trigger')!.click(); await settle(el);
+  must<HTMLButtonElement>(el.shadowRoot, '.more-trigger').click(); await settle(el);
   expect(el.shadowRoot!.querySelector('jf-menu')).not.toBeNull();
   el.remove(); document.body.append(el); await settle(el);
   expect(el.shadowRoot!.querySelector('jf-menu')).toBeNull();
@@ -202,7 +213,7 @@ it('M4: paused meaning work keeps the last read time and never claims Reading no
   Object.assign(el, { enrichmentStages: { embedding: true, splade: false, ner: false },
     indexProgress: { ...(el as unknown as { indexProgress: object }).indexProgress, pause: { state: 'paused', reason: 'user_paused', reasons: ['user_paused'] } },
     roots: [{ ...el.roots[0]!, lastIndexedIsoTime: '2026-01-01T00:00:00Z', parentDocsTotalEmbedding: 8, parentDocsSettledEmbedding: 4 }] });
-  await settle(el); el.shadowRoot!.querySelector<HTMLButtonElement>('.folder-toggle')!.click(); await settle(el);
+  await settle(el); must<HTMLButtonElement>(el.shadowRoot, '.folder-toggle').click(); await settle(el);
   const read = [...el.shadowRoot!.querySelectorAll('.folder-details dl > div')].find(row => row.querySelector('dt')?.textContent === 'Read');
-  expect(read).toBeDefined(); expect(read!.querySelector('dd')!.textContent).not.toBe('Reading now');
+  expect(read).toBeDefined(); expect(must(read!, 'dd').textContent).not.toBe('Reading now');
 });

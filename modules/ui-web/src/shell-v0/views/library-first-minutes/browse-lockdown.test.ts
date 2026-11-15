@@ -27,7 +27,9 @@ beforeAll(async () => {
       });
     } }],
   });
-  await server.listen(); origin = server.resolvedUrls!.local[0]!;
+  await server.listen();
+  expect(server.resolvedUrls).not.toBeNull();
+  expect(server.resolvedUrls!.local[0]).toBeDefined(); origin = server.resolvedUrls!.local[0]!;
   browser = await chromium.launch({ headless: true, args: ['--disable-gpu'] });
 }, 30_000);
 afterAll(async () => { await browser?.close(); await server?.close(); if (scratch) await rm(scratch, { recursive: true, force: true }); });
@@ -45,13 +47,15 @@ async function open(failed = false): Promise<Page> {
     ] } });
   });
   page.on('pageerror', error => { throw error; });
-  await page.goto(origin + 'browse.html'); await page.getByRole('treeitem').first().waitFor(); return page;
+  await page.goto(origin + 'browse.html');
+  await expect.poll(() => page.getByRole('treeitem').first().isVisible(), { timeout: 3000 }).toBe(true); return page;
 }
 it('the browser tree has real roving focus, stable row geometry, reachable actions and a shared keyboard menu', async () => {
   const page = await open();
   try {
     const root = page.getByRole('treeitem').first(); await root.focus(); await page.keyboard.press('ArrowRight');
-    const file = page.locator('.row.file').first(); await file.waitFor();
+    const file = page.locator('.row.file').first();
+    await expect.poll(() => file.isVisible(), { timeout: 3000 }).toBe(true);
     expect(await root.innerText()).toContain('50,000+ files');
     expect(await file.innerText()).toContain('0 bytes'); expect(await file.innerText()).toContain('2000');
     expect(await page.locator('jf-browse-surface [style]').count()).toBe(0);
@@ -59,11 +63,16 @@ it('the browser tree has real roving focus, stable row geometry, reachable actio
     expect(await file.evaluate(el => el === (el.getRootNode() as ShadowRoot).activeElement)).toBe(true);
     expect(await file.getAttribute('aria-level')).toBe('2'); expect(await file.getAttribute('aria-posinset')).toBe('1');
     expect(await file.getAttribute('aria-setsize')).toBe('2');
-    const height = (await file.boundingBox())!.height;
-    await file.hover(); expect((await file.boundingBox())!.height).toBe(height); expect(height).toBe(34);
-    await page.keyboard.press('Tab'); expect(await page.getByRole('button', { name: 'Open file', exact: true }).first().evaluate(el => el === (el.getRootNode() as ShadowRoot).activeElement)).toBe(true);
+    const bounds = await file.boundingBox(); expect(bounds).not.toBeNull(); const height = bounds!.height;
+    await file.hover(); const hoveredBounds = await file.boundingBox(); expect(hoveredBounds).not.toBeNull();
+    expect(hoveredBounds!.height).toBe(height); expect(height).toBe(34);
+    await page.keyboard.press('Tab');
+    const action = page.getByRole('button', { name: 'Open file', exact: true }).first();
+    expect(await action.count()).toBeGreaterThan(0);
+    expect(await action.evaluate(el => el === (el.getRootNode() as ShadowRoot).activeElement)).toBe(true);
     await page.keyboard.press('Enter'); expect(await page.evaluate(() => (window as unknown as { opened: number }).opened)).toBe(1);
-    await file.focus(); await page.keyboard.press('Shift+F10'); await page.getByRole('menu', { name: 'File actions' }).waitFor();
+    await file.focus(); await page.keyboard.press('Shift+F10');
+    await expect.poll(() => page.getByRole('menu', { name: 'File actions' }).isVisible(), { timeout: 3000 }).toBe(true);
     expect(await page.getByRole('menuitem').allTextContents()).toEqual(expect.arrayContaining([expect.stringContaining('Open file'), expect.stringContaining('Show in folder')]));
     await page.keyboard.press('Escape'); expect(await page.getByRole('menu').count()).toBe(0);
     expect(await file.evaluate(el => el === (el.getRootNode() as ShadowRoot).activeElement)).toBe(true);
@@ -75,7 +84,8 @@ it('the browser tree has real roving focus, stable row geometry, reachable actio
 it('a failed browser load is a recoverable failure rather than an empty folder', async () => {
   const page = await open(true);
   try {
-    await page.getByRole('treeitem').first().click(); await page.getByRole('button', { name: 'Retry Documents', exact: true }).waitFor();
+    await page.getByRole('treeitem').first().click();
+    await expect.poll(() => page.getByRole('button', { name: 'Retry Documents', exact: true }).isVisible(), { timeout: 3000 }).toBe(true);
     expect(await page.locator('body').innerText()).not.toContain('No searchable files in this folder');
   } finally { await page.close(); }
 }, 15_000);

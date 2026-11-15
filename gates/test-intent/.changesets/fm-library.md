@@ -10,7 +10,8 @@ author-session: codex-builder-fm-s6-20261115
 This is the intermediate presentation slice. Save-on-change is deferred to 6b.
 The independent verifier must inspect the per-file diffs and accept this changeset;
 no acceptance records were written by this builder. New isolated presentation and
-count tests exercise the supplied decisions against baseline 94fdd08cc1.
+count tests exercise the supplied decisions. Fail-before evidence for the five new files is
+gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a312d1484; each fails by assertion).
 
 ```json
 {
