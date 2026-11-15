@@ -25,7 +25,7 @@ hours, skip rules, settings persistence and operation implementations are outsid
         {
           "kind": "owner-words",
           "quote": "the Library \"more\" button is removed together with the Library menu; \"Read everything again\" becomes a quiet text action at the page foot beside \"Activity\" and asks in place before starting. The shared menu component stays for the top bar and Browse's context menu.",
-          "location": "task t-20261113-fmimpl, owner decision Q2 of 2026-11-15 via session justsearch-fd"
+          "location": "task t-20261113-fmimpl agreement, owner decision Q2 of 2026-11-15 (delegated answer via session justsearch-fd)"
         },
         {
           "kind": "delegated-choice",
@@ -50,7 +50,7 @@ hours, skip rules, settings persistence and operation implementations are outsid
         {
           "kind": "owner-words",
           "quote": "the Library \"more\" button is removed together with the Library menu; \"Read everything again\" becomes a quiet text action at the page foot beside \"Activity\" and asks in place before starting. The shared menu component stays for the top bar and Browse's context menu.",
-          "location": "task t-20261113-fmimpl, owner decision Q2 of 2026-11-15 via session justsearch-fd"
+          "location": "task t-20261113-fmimpl agreement, owner decision Q2 of 2026-11-15 (delegated answer via session justsearch-fd)"
         },
         {
           "kind": "delegated-choice",
@@ -75,7 +75,7 @@ hours, skip rules, settings persistence and operation implementations are outsid
         {
           "kind": "owner-words",
           "quote": "the Library \"more\" button is removed together with the Library menu; \"Read everything again\" becomes a quiet text action at the page foot beside \"Activity\" and asks in place before starting. The shared menu component stays for the top bar and Browse's context menu.",
-          "location": "task t-20261113-fmimpl, owner decision Q2 of 2026-11-15 via session justsearch-fd"
+          "location": "task t-20261113-fmimpl agreement, owner decision Q2 of 2026-11-15 (delegated answer via session justsearch-fd)"
         },
         {
           "kind": "delegated-choice",
@@ -100,7 +100,7 @@ hours, skip rules, settings persistence and operation implementations are outsid
         {
           "kind": "owner-words",
           "quote": "the Library \"more\" button is removed together with the Library menu; \"Read everything again\" becomes a quiet text action at the page foot beside \"Activity\" and asks in place before starting. The shared menu component stays for the top bar and Browse's context menu.",
-          "location": "task t-20261113-fmimpl, owner decision Q2 of 2026-11-15 via session justsearch-fd"
+          "location": "task t-20261113-fmimpl agreement, owner decision Q2 of 2026-11-15 (delegated answer via session justsearch-fd)"
         },
         {
           "kind": "delegated-choice",
@@ -125,7 +125,7 @@ hours, skip rules, settings persistence and operation implementations are outsid
         {
           "kind": "owner-words",
           "quote": "the Library \"more\" button is removed together with the Library menu; \"Read everything again\" becomes a quiet text action at the page foot beside \"Activity\" and asks in place before starting. The shared menu component stays for the top bar and Browse's context menu.",
-          "location": "task t-20261113-fmimpl, owner decision Q2 of 2026-11-15 via session justsearch-fd"
+          "location": "task t-20261113-fmimpl agreement, owner decision Q2 of 2026-11-15 (delegated answer via session justsearch-fd)"
         },
         {
           "kind": "delegated-choice",
@@ -150,7 +150,7 @@ hours, skip rules, settings persistence and operation implementations are outsid
         {
           "kind": "owner-words",
           "quote": "the Library \"more\" button is removed together with the Library menu; \"Read everything again\" becomes a quiet text action at the page foot beside \"Activity\" and asks in place before starting. The shared menu component stays for the top bar and Browse's context menu.",
-          "location": "task t-20261113-fmimpl, owner decision Q2 of 2026-11-15 via session justsearch-fd"
+          "location": "task t-20261113-fmimpl agreement, owner decision Q2 of 2026-11-15 (delegated answer via session justsearch-fd)"
         },
         {
           "kind": "delegated-choice",
@@ -175,7 +175,7 @@ hours, skip rules, settings persistence and operation implementations are outsid
         {
           "kind": "owner-words",
           "quote": "the Library \"more\" button is removed together with the Library menu; \"Read everything again\" becomes a quiet text action at the page foot beside \"Activity\" and asks in place before starting. The shared menu component stays for the top bar and Browse's context menu.",
-          "location": "task t-20261113-fmimpl, owner decision Q2 of 2026-11-15 via session justsearch-fd"
+          "location": "task t-20261113-fmimpl agreement, owner decision Q2 of 2026-11-15 (delegated answer via session justsearch-fd)"
         },
         {
           "kind": "delegated-choice",
@@ -207,7 +207,7 @@ hours, skip rules, settings persistence and operation implementations are outsid
         {
           "kind": "owner-words",
           "quote": "the Library \"more\" button is removed together with the Library menu; \"Read everything again\" becomes a quiet text action at the page foot beside \"Activity\" and asks in place before starting. The shared menu component stays for the top bar and Browse's context menu.",
-          "location": "task t-20261113-fmimpl, owner decision Q2 of 2026-11-15 via session justsearch-fd"
+          "location": "task t-20261113-fmimpl agreement, owner decision Q2 of 2026-11-15 (delegated answer via session justsearch-fd)"
         },
         {
           "kind": "delegated-choice",
@@ -239,7 +239,7 @@ hours, skip rules, settings persistence and operation implementations are outsid
         {
           "kind": "owner-words",
           "quote": "the Library \"more\" button is removed together with the Library menu; \"Read everything again\" becomes a quiet text action at the page foot beside \"Activity\" and asks in place before starting. The shared menu component stays for the top bar and Browse's context menu.",
-          "location": "task t-20261113-fmimpl, owner decision Q2 of 2026-11-15 via session justsearch-fd"
+          "location": "task t-20261113-fmimpl agreement, owner decision Q2 of 2026-11-15 (delegated answer via session justsearch-fd)"
         },
         {
           "kind": "delegated-choice",
