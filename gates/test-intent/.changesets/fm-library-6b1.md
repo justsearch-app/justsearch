@@ -406,3 +406,14 @@ Pending independent verification and acceptance on the committed candidate.
   "digest": "sha256:00f174bfefac89111f3c770f1a7fe77f0604a23a422fc0832a62a646cd99175c"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "y5s7jhvz",
+  "verdict": "reject",
+  "digest": "sha256:27d501509d6f81420dbd45aa2a42104c43ae5883529dc5ced1395d54cd3ac5ea",
+  "note": "Browse retry: three Obsolete entries (presentation.test.ts M8, review-repairs.test.ts retry case, browse-lockdown.test.ts) replace the pinned folder-naming control 'Retry Documents' with 'Try again'. No quoted source contradicts the old expectation: the owner quote covers only the Library menu, S6b1-4 says 'with Retry', and the base contract docs/reference/secondary-views-behavior.md:89 says 'failed-with-Retry'. The only support is the agent's own choice under an implement-the-design delegation, which cannot change an established contract. The new name also drops the folder from the control's accessible name (Button.ts: label sets aria-label), so several failed folders give several identical 'Try again' controls. Repair: keep a folder-naming accessible name on each folder retry (e.g. 'Retry Documents') with the tests asserting it, or cite an owner or design source for the 'Try again' wording. All other entries, both new files, the evidence and the Escape repair check out."
+}
+```
