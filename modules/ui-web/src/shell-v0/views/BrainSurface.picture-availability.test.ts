@@ -7,8 +7,9 @@ import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import './BrainSurface.js';
 
 // Real poller and store: only a delayed response through them can start before a receipt and land after it.
-const NOT_AVAILABLE = 'On — not available with this answer model';
-const NOT_AVAILABLE_SENTENCE = `Text in scans and images: ${NOT_AVAILABLE}`;
+// Slice 7a (D2, AM2): one switch under the step shows the saved choice; the step's light and note say
+// what works now. The sentence no longer carries per-feature parts.
+const NOT_AVAILABLE = 'Not available with this answer model';
 const POLL = 5000;
 interface Brain extends HTMLElement { apiBase: string; host_: unknown; updateComplete: Promise<boolean> }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
@@ -87,10 +88,10 @@ function switches(el: Brain) { return [...el.shadowRoot!.querySelectorAll<HTMLBu
 function view(el: Brain) {
   const root = el.shadowRoot!;
   return {
-    path: [...root.querySelectorAll('[data-feature="pictures"] .step-meta')].at(-1)?.textContent,
-    sentence: root.querySelector('.brain-sentence .feature-phrase[aria-controls="brain-feature-panel-pictures"]')?.textContent,
+    word: root.querySelector('[data-step="pictures"] .switch-state')?.textContent,
+    note: root.querySelector('[data-step="pictures"] .step-note')?.textContent,
     switches: switches(el).map(b => b.getAttribute('aria-checked')),
-    lit: root.querySelector('[data-feature="pictures"] .step-symbol')?.getAttribute('data-active'),
+    lit: root.querySelector('[data-step="pictures"]')?.getAttribute('data-lit'),
   };
 }
 /** Starts a runtime read that stays unanswered, as a slow response would. */
@@ -102,14 +103,14 @@ async function startDelayedRead(el: Brain) {
 async function deliverDelayedRead(el: Brain) { heldRuntime.splice(0).forEach(release => release()); await settle(el); }
 async function toggle(el: Brain) { switches(el)[0]!.click(); await settle(el); }
 function expectNotAvailable(el: Brain) {
-  expect(view(el)).toMatchObject({ path: NOT_AVAILABLE, sentence: `${NOT_AVAILABLE_SENTENCE}.`, switches: ['true', 'true'], lit: 'false' });
+  expect(view(el)).toMatchObject({ word: 'On', note: NOT_AVAILABLE, switches: ['true'], lit: 'false' });
 }
 function expectReading(el: Brain) {
-  expect(view(el)).toMatchObject({ path: 'On', sentence: 'It reads text in scans and images.', switches: ['true', 'true'], lit: 'true' });
+  expect(view(el)).toMatchObject({ word: 'On', note: undefined, switches: ['true'], lit: 'true' });
 }
 function expectChecking(el: Brain) {
-  expect(view(el).path).toBe('Unknown — checking AI status');
-  expect(el.shadowRoot!.querySelector('.brain-sentence')?.textContent).toContain('AI status and feature availability are still being checked');
+  expect(view(el).note).toBe('Unknown — checking AI status');
+  expect(el.shadowRoot!.querySelector('.brain-headline')?.textContent).toBe('Checking AI status…');
   expect(el.shadowRoot!.textContent).not.toContain(NOT_AVAILABLE);
 }
 
@@ -154,7 +155,7 @@ describe('saved picture reading with an answer model that cannot read pictures',
     it('P5 a read started before an On receipt cannot show not available or clear the transition', async () => {
       saved = false;
       const el = await start();
-      expect(view(el).path).toBe('Off - files and read text kept');
+      expect(view(el)).toMatchObject({ word: 'Off', note: undefined });
       await startDelayedRead(el);
       await toggle(el);
       expectReading(el);
@@ -178,10 +179,10 @@ describe('saved picture reading with an answer model that cannot read pictures',
       expectReading(el);
       await startDelayedRead(el);
       await toggle(el);
-      expect(view(el)).toMatchObject({ path: 'Off - files and read text kept', switches: ['false', 'false'] });
+      expect(view(el)).toMatchObject({ word: 'Off', note: undefined, switches: ['false'] });
       await deliverDelayedRead(el);
-      expect(view(el)).toMatchObject({ path: 'Off - files and read text kept', switches: ['false', 'false'] });
-      expect(el.shadowRoot!.textContent).not.toContain('On — the saved Off choice is not applied');
+      expect(view(el)).toMatchObject({ word: 'Off', note: undefined, switches: ['false'] });
+      expect(el.shadowRoot!.textContent).not.toContain('Off is not applied yet');
     });
 
     it('P5 repeated switching judges a delayed read against the latest receipt', async () => {
@@ -214,11 +215,11 @@ describe('saved picture reading with an answer model that cannot read pictures',
       saved = false;
       const el = await start();
       await startDelayedRead(el);
-      saved = true; witness = { acceptedRevision: 1, lastCommittedOperationKey: 'other-window' };
+      saved = true; witness = { acceptedRevision: 1, lastCommittedOperationKey: '01993ba0-0000-7000-8000-000000000002' };
       window.dispatchEvent(new Event('focus')); await settle(el);
       await deliverDelayedRead(el);
       expect(el.shadowRoot!.textContent).not.toContain(NOT_AVAILABLE);
-      expect(view(el).switches).toEqual(['true', 'true']);
+      expect(view(el).switches).toEqual(['true']);
       await poll(el);
       expectNotAvailable(el);
     });
@@ -254,7 +255,7 @@ describe('saved picture reading with an answer model that cannot read pictures',
       await startDelayedRead(el);
       await toggle(el);
       expect(el.shadowRoot!.textContent).toContain('Picture reading could not start');
-      expect(view(el).path).toBe('Off - files and read text kept');
+      expect(view(el)).toMatchObject({ word: 'Off', note: undefined });
       refusal = null;
       window.dispatchEvent(new Event('focus')); await settle(el);
       await deliverDelayedRead(el);
@@ -279,9 +280,9 @@ describe('saved picture reading with an answer model that cannot read pictures',
       const el = await start();
       interruptPost = true;
       await toggle(el);
-      expect(view(el).path).toBe('Unknown — checking picture reading after an interrupted change');
+      expect(view(el)).toMatchObject({ word: 'Not known', note: 'Checking after an interrupted change', switches: [] });
       window.dispatchEvent(new Event('focus')); await settle(el);
-      expect(view(el).path).toBe('On');
+      expect(view(el).word).toBe('On');
       await poll(el);
       expectNotAvailable(el);
     });
@@ -297,7 +298,7 @@ describe('saved picture reading with an answer model that cannot read pictures',
       window.dispatchEvent(new Event('focus')); await settle(el);
       await deliverDelayedRead(el);
       expect(el.shadowRoot!.textContent).not.toContain(NOT_AVAILABLE);
-      expect(view(el)).toMatchObject({ path: 'On', switches: ['true', 'true'] });
+      expect(view(el)).toMatchObject({ word: 'On', switches: ['true'] });
       settingsReadFails = false;
       window.dispatchEvent(new Event('focus')); await settle(el);
       await poll(el);
@@ -315,29 +316,31 @@ describe('saved picture reading with an answer model that cannot read pictures',
     it('P3 a null projector report stays unconfirmed, never text-only', async () => {
       mmproj = null;
       const el = await start();
-      expect(view(el)).toMatchObject({ path: 'On', sentence: 'Reading text in scans and images is unconfirmed.', switches: ['true', 'true'] });
+      expect(view(el)).toMatchObject({ word: 'On', note: 'Not confirmed yet', switches: ['true'], lit: 'false' });
     });
 
     it('P3 an offline engine keeps a retained text-only report from reading as confirmed', async () => {
       const el = await start();
       engineOnline = false; await poll(el); await poll(el);
       expect(el.shadowRoot!.textContent).not.toContain(NOT_AVAILABLE);
-      expect(view(el).sentence).toBe('Reading text in scans and images is unconfirmed.');
+      expect(view(el).lit).toBe('false');
     });
 
+    // AM2: the switch shows the saved choice (an operator override is the saved choice that wins);
+    // the note says what works now. Unset follows the installed answer model's files (UiSettings).
     it.each([
-      { name: 'explicit Off', arrange: () => { saved = false; }, path: 'Off - files and read text kept', sentence: "It doesn't read text in scans and images.", checked: 'false' },
-      { name: 'operator override Off', arrange: () => { override = false; }, path: 'Off — operator controlled', sentence: "It doesn't read text in scans and images yet.", checked: 'false' },
-      { name: 'operator override On', arrange: () => { override = true; }, path: 'Unavailable — operator picture reader is not active', sentence: "It doesn't read text in scans and images yet.", checked: 'false' },
-      { name: 'missing files', arrange: () => { filesComplete = false; }, path: 'Unavailable — picture reading files are missing', sentence: "It doesn't read text in scans and images yet.", checked: 'true' },
-      { name: 'unknown settings', arrange: () => { quarantined = true; }, path: 'Saved picture reading choice is not known. Refresh settings before changing it.', sentence: 'Saved picture reading choice is not known. Refresh settings before changing it.', checked: 'false' },
-      { name: 'no saved choice', arrange: () => { saved = null; }, path: 'Off - files and read text kept', sentence: "It doesn't read text in scans and images yet.", checked: 'false' },
-      { name: 'saved Off with runtime On', arrange: () => { saved = false; mmproj = true; }, path: 'On — the saved Off choice is not applied', sentence: 'It reads text in scans and images.', checked: 'true' },
-    ])('P4 $name keeps its wording and the saved preference', async ({ arrange, path, sentence, checked }) => {
+      { name: 'explicit Off', arrange: () => { saved = false; }, word: 'Off', note: undefined, checked: ['false'], lit: 'false' },
+      { name: 'operator override Off', arrange: () => { override = false; }, word: 'Off', note: 'Set by an operator override', checked: ['false'], lit: 'false' },
+      { name: 'operator override On', arrange: () => { override = true; }, word: 'On', note: 'Set by an operator override', checked: ['true'], lit: 'false' },
+      { name: 'missing files', arrange: () => { filesComplete = false; }, word: 'On', note: 'Not working — its files are missing', checked: ['true'], lit: 'false' },
+      { name: 'unknown settings', arrange: () => { quarantined = true; }, word: 'Not known', note: undefined, checked: [], lit: 'false' },
+      { name: 'no saved choice', arrange: () => { saved = null; }, word: 'On', note: NOT_AVAILABLE, checked: ['true'], lit: 'false' },
+      { name: 'saved Off with runtime On', arrange: () => { saved = false; mmproj = true; }, word: 'Off', note: 'Off is not applied yet', checked: ['false'], lit: 'true' },
+    ])('P4 $name keeps its wording and the saved preference', async ({ name, arrange, word, note, checked, lit }) => {
       arrange();
       const el = await start();
-      expect(view(el)).toMatchObject({ path, sentence, switches: [checked, checked] });
-      expect(el.shadowRoot!.textContent).not.toContain(NOT_AVAILABLE);
+      expect(view(el)).toMatchObject({ word, note, switches: checked, lit });
+      if (name !== 'no saved choice') expect(el.shadowRoot!.textContent).not.toContain(NOT_AVAILABLE);
       expect(posts).toEqual([]);
     });
   });

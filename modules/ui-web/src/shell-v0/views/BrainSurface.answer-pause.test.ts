@@ -52,6 +52,8 @@ beforeEach(() => {
     aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
     runtime: { mode: 'online', installed: { known: true, value: true } },
     installStatus: { state: 'completed', installedFully: true }, capabilities: { chat: true },
+    // Slice 7a (AM3): "AI is ready" needs live meaning evidence.
+    runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] },
   } as AiState;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input);
@@ -96,8 +98,9 @@ it('uses the Engine pause observation for wording and converges a second window'
   toggle(first).click(); await settle(first);
   emit(true); await settle(first); await settle(second);
   expect(toggle(second).getAttribute('aria-checked')).toBe('true');
-  expect(first.shadowRoot!.querySelector('h1')!.textContent).toBe('Answers paused while indexing');
-  expect(first.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('Answers resume automatically when bulk file indexing ends.');
+  // Slice 7a (AM9): read words, not indexing ones.
+  expect(first.shadowRoot!.querySelector('h1')!.textContent).toBe('Answers paused while files are read');
+  expect(first.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('Answers resume when JustSearch finishes reading the files.');
   expect(first.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('answer model stays loaded');
   toggle(second).click(); await settle(second);
   expect(enabled).toBe(false);

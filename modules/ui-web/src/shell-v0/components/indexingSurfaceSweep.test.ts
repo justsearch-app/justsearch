@@ -146,12 +146,14 @@ describe('WP3.3 complete surface sweep', () => {
       if (unconfirmed(which)) expect(card.textContent).toContain('pending when last observed');
     }
   });
-  it('S33.1 S33.4 S33.6 Brain simple panel describes observed work rather than inferring activity from runtime mode', () => {
+  // Slice 7a (D4, AM9): the reading work has one home, the status in the bar; AI Brain does not repeat
+  // it and never infers activity from runtime mode.
+  it('S33.1 S33.4 S33.6 Brain simple panel leaves reading work to the status and never infers it from runtime mode', () => {
     for (const which of CASES) for (const jobs of [4, 0]) for (const awaitingChatEnable of [false, true]) {
       const el = harness('jf-brain-surface', observe(which, jobs));
       Object.assign(el._unifiedAiState.aiEngine, { awaitingChatEnable });
       const panel = dom(el.renderSimplePanel());
-      expect(panel.textContent, `${which}, ${jobs} files`).toContain(expectedReason(which));
+      expect(panel.textContent, `${which}, ${jobs} files`).not.toContain(expectedReason(which));
       expect(panel.textContent).not.toContain('Indexing embeddings');
     }
   });
@@ -334,7 +336,7 @@ describe('WP3.3 complete surface sweep', () => {
       state.verdict = { kind: 'degraded', severity: 'warn', reasons };
       const el = harness('jf-brain-surface', state);
       const callout = dom(el.renderCompatibilityCallouts());
-      expect(callout.textContent).toContain(reasons.length ? 'built before semantic search' : 'Rebuild the index');
+      expect(callout.textContent).toContain(reasons.length ? 'built before semantic search' : 'Read everything again'); // Slice 7a (AM9)
       if (unconfirmed(which)) expect(callout.textContent, which).toContain(UNCONFIRMED);
     }
   });

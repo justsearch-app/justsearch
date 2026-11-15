@@ -9,6 +9,7 @@ function panel(procedure: string | undefined, live = true, engineReason = 'autom
     busy: Record<string, boolean>;
     policy: unknown;
     installStatus: unknown;
+    runtimeStatus: unknown;
     inference: unknown;
     _unifiedAiState: unknown;
     renderSimplePanel(): TemplateResult;
@@ -17,8 +18,9 @@ function panel(procedure: string | undefined, live = true, engineReason = 'autom
   element.policy = { downloadsEnabled: true, onlineAiEnabled: true };
   element.installStatus = { state: 'completed', installedFully: true };
   element.inference = null;
+  element.runtimeStatus = { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] };
   element._unifiedAiState = {
-    aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
+    aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null }, capabilities: { chat: true },
     installObservationLive: live, runtimeObservationLive: live, snapshotLive: live,
     status: { inference: {
       procedure, engineReason, chatEnabledSpec: engineReason !== 'inference.up_for_background',
@@ -29,22 +31,26 @@ function panel(procedure: string | undefined, live = true, engineReason = 'autom
   return container;
 }
 
+// Slice 7a (AM9): picture reading and answers in answers words; the answer switch stays under its step.
 it('names picture reading while loaded chat lends its server to a VDU pass', () => {
   const view = panel('VDU_BATCH');
-  expect(view.textContent).toContain('Reading pictures. Chat resumes after the current document.');
-  expect(view.textContent).not.toContain('Chat and summaries ready.');
-  expect(view.querySelector('[data-testid="brain-simple-action"]')).not.toBeNull();
+  expect(view.querySelector('.brain-headline')?.textContent).toBe('Reading text in scans and images');
+  expect(view.querySelector('.brain-sentence')?.textContent).toBe('Answers resume after the current document.');
+  expect(view.textContent).not.toContain('Everything below runs on this computer.');
+  expect(view.querySelector('[data-step="chat"]')).not.toBeNull();
 });
 
-it('keeps normal chat wording after the hold closes and never claims stale picture reading', () => {
-  expect(panel(undefined).textContent).toContain('Chat and summaries ready.');
-  expect(panel('VDU_BATCH', false).textContent).not.toContain('Reading pictures.');
+it('keeps normal answer wording after the hold closes and never claims stale picture reading', () => {
+  expect(panel(undefined).querySelector('.brain-sentence')?.textContent).toBe('Everything below runs on this computer.');
+  expect(panel('VDU_BATCH', false).textContent).not.toContain('Reading text in scans and images');
 });
 
 it('keeps the original panel sentence for explicit and chat-off automatic passes', () => {
+  const normal = panel(undefined).querySelector('.brain-sentence')?.textContent;
   for (const engineReason of ['healthy', 'inference.up_for_background']) {
     const view = panel('VDU_BATCH', true, engineReason);
-    expect(view.textContent).toContain('Chat and summaries ready.');
-    expect(view.textContent).not.toContain('Chat resumes after the current document.');
+    expect(view.querySelector('.brain-headline')?.textContent).toBe('Reading text in scans and images');
+    expect(view.querySelector('.brain-sentence')?.textContent).toBe(normal);
+    expect(view.textContent).not.toContain('Answers resume after the current document.');
   }
 });

@@ -14,6 +14,7 @@ vi.mock('../state/aiStateStore.js', async original => ({
 import './BrainSurface.js';
 
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
+import { setShowDeveloperTools } from '../state/developerToolsState.js';
 import type { AiInstallManifest } from '../../api/domains/packs.js';
 
 interface Brain extends HTMLElement { installConsentOpen: boolean; apiBase: string; host_: unknown; llm: {contextWindow?: number; gpuLayers?: number | null; maxTokens?: number | null; modelPath?: string | null}; patchLlm(updates: {contextWindow: number}): Promise<void>; refreshSettings(): Promise<void>; updateComplete: Promise<boolean> }
@@ -89,7 +90,7 @@ beforeEach(() => {
     return json({});
   }));
 });
-afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); setShowDeveloperTools(false); });
 
 
 function notInstalled() {
@@ -115,16 +116,22 @@ describe('Brain slice A independent review repairs', () => {
     expect(calls).toEqual([{ id: 'core.set-chat-enabled', args: { enabled: true } }]);
     expect(declines).toEqual([]); first.remove();
     const second = await mount();
-    expect(switches(second, 'Answer questions').map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
+    expect(switches(second, 'Answer questions').map(b => b.getAttribute('aria-checked'))).toEqual(['true']);
     expect(second.shadowRoot!.querySelector('[data-feature="chat"]')!.textContent).not.toContain('Not downloaded');
   });
   it.each(['unavailable', 'not-in-mode'])('R2 %s answers are not promised, and pictures use explicit availability', async state => {
     notInstalled();
     preview.components = preview.components!.map(c => ({ ...c, state: c.id === 'chat' ? state : 'to-download', unavailableReason: c.id === 'chat' ? 'No supported graphics card' : '' }));
     const el = await mount();
-    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).not.toContain('and answer your questions with sources');
-    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('answers unavailable on this computer');
-    expect(el.shadowRoot!.querySelector('[data-feature="pictures"]')!.textContent).toContain('unavailable on this computer');
+    // Slice 7a (fm-10, D4): the answer step is drawn not reachable with its reason once; the sentence
+    // promises nothing; pictures say what reads scans here.
+    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).not.toMatch(/answer/i);
+    expect(el.shadowRoot!.querySelector('[data-step="chat"]')!.getAttribute('data-reach')).toBe('na');
+    const reason = el.shadowRoot!.querySelector('[data-step="chat"] .step-reason')!.textContent!;
+    if (state === 'not-in-mode') expect(reason).toBe('Not part of this install');
+    else expect(reason).toMatch(/\S/);
+    expect(el.shadowRoot!.textContent).not.toContain('No supported graphics card');
+    expect(el.shadowRoot!.querySelector('[data-step="pictures"]')!.textContent).toContain('Simple scans are read already');
     expect(switches(el, 'Answer questions')).toHaveLength(0);
   });
   it('R3 live installed packages replace stale not-downloaded paths before the staged run ends', async () => {
@@ -136,13 +143,13 @@ describe('Brain slice A independent review repairs', () => {
     expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).not.toContain('Not downloaded');
     expect(el.shadowRoot!.querySelector('[data-feature="chat"]')!.textContent).toContain('Downloading 50%');
   });
-  it('R4 an unknown runtime observation stays unconfirmed in both sentence and path', async () => {
+  it('R4 an unknown runtime observation stays unconfirmed in the heading and the steps', async () => {
     emit({ runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'unknown', modelActive: false }, { id: 'reranker', status: 'unknown', modelActive: false }] } });
     const el = await mount();
-    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('Understanding meaning is unconfirmed');
-    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('best match first unconfirmed');
-    expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Unknown');
-    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('Unknown');
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).not.toMatch(/ready|understands/i);
+    expect(el.shadowRoot!.querySelector('[data-step="meaning"] .step-note')!.textContent).toBe('Not confirmed yet');
+    expect(el.shadowRoot!.querySelector('[data-step="reranker"] .step-note')!.textContent).toBe('Not confirmed yet');
+    expect(el.shadowRoot!.querySelector('[data-step="meaning"]')!.getAttribute('data-lit')).toBe('false');
   });
   it('R5 a settings GET begun before a witnessed LLM save cannot revert the saved value', async () => {
     const el = await mount();
@@ -281,12 +288,14 @@ describe('Brain step 1 review repairs', () => {
   });
   it('S2 inactive loaded sessions are off and never promised, while unknown remains unknown', async () => {
     emit({ runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: false }, { id: 'reranker', status: 'inactive', modelActive: true }] } });
+    // Slice 7a (AM2): the switch keeps the saved choice; the step's light and note say it is not working.
     const el = await mount();
-    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('Off');
-    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('without best match first');
-    expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Off');
+    expect(el.shadowRoot!.querySelector('[data-step="reranker"]')!.getAttribute('data-lit')).toBe('false');
+    expect(el.shadowRoot!.querySelector('[data-step="reranker"] .step-note')!.textContent).toBe('Not working now');
+    expect(el.shadowRoot!.querySelector('[data-step="meaning"]')!.getAttribute('data-lit')).toBe('false');
+    expect(el.shadowRoot!.querySelector('[data-step="meaning"] .step-note')!.textContent).toBe('Not working now');
     emit({ runtimeStatus: { onnxFeatures: [{ id: 'reranker', status: 'unknown', modelActive: true }] } }); await el.updateComplete;
-    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('Unknown');
+    expect(el.shadowRoot!.querySelector('[data-step="reranker"] .step-note')!.textContent).toBe('Not confirmed yet');
   });
   it('S2 Advanced applies the same rule: a loaded but inactive feature is not in use or counted active', async () => {
     emit({ runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }, { id: 'reranker', status: 'inactive', modelActive: true }] } });
@@ -295,25 +304,21 @@ describe('Brain step 1 review repairs', () => {
     expect(el.shadowRoot!.querySelector('[data-testid="component-row-reranker"]')!.textContent).toContain('Downloaded');
     expect(el.shadowRoot!.querySelector('[data-testid="component-row-reranker"]')!.textContent).not.toContain('in use');
     expect(el.shadowRoot!.querySelector('[data-testid="brain-observed-features"] h4')!.textContent).toContain('1/2 active');
-    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('Off');
+    expect(el.shadowRoot!.querySelector('[data-step="reranker"]')!.getAttribute('data-lit')).toBe('false');
   });
   it.each(['pending', 'failed'])('S3 saved answer intent is unknown and blocked while initial settings are %s', async outcome => {
     let release!: (value: Response) => void;
     settingsGet = outcome === 'pending' ? () => new Promise(resolve => { release = resolve; }) : async () => json({}, 503);
+    // Slice 7a (AM2): an unknown saved choice reads "Not known", never as an unchecked switch.
     const el = await mount();
-    const path = el.shadowRoot!.querySelector('[data-feature="chat"]')!;
-    expect(path.textContent).toContain('Saved answer choice is not known');
-    expect(path.textContent).not.toContain('automatic (no saved answer choice)');
-    for (const toggle of switches(el, 'Answer questions')) {
-      expect(toggle.getAttribute('aria-disabled')).toBe('true');
-      expect(el.shadowRoot!.getElementById(toggle.getAttribute('aria-describedby')!)!.textContent).toContain('Saved answer choice is not known');
-      toggle.click();
-    }
+    const word = () => el.shadowRoot!.querySelector('[data-step="chat"] .switch-state')?.textContent;
+    expect(word()).toBe('Not known');
+    expect(switches(el, 'Answer questions')).toHaveLength(0);
     await settle(el); expect(calls).toEqual([]);
     if (outcome === 'pending') { release(json({ ui: { chatEnabled: null } })); await settle(el); }
     else { settingsGet = null; await el.refreshSettings(); await settle(el); }
     expect(switches(el, 'Answer questions')[0]!.getAttribute('aria-disabled')).toBe('false');
-    if (outcome === 'pending') expect(path.textContent).toContain('automatic (no saved answer choice)');
+    if (outcome === 'pending') expect(word()).toBe('Automatic');
   });
   it('S4 installed systems retain an additions Install action with selected size and exact consent', async () => {
     preview = { totalDownloadBytes: 1024, components: [component('embedding'), component('chat'), component('reranker', 'to-download'), component('splade', 'declined', true)] };
@@ -331,21 +336,23 @@ describe('Brain step 1 review repairs', () => {
   it('S5 disconnect during picture reading uses last-observed wording until a live completion', async () => {
     emit({ status: { inference: { chatEnabledSpec: true, procedure: 'VDU_BATCH' } } as AiState['status'] });
     const el = await mount();
-    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('while pictures are being read');
+    const headline = () => el.shadowRoot!.querySelector('.brain-headline')!.textContent;
+    expect(headline()).toBe('Reading text in scans and images');
     emit({ snapshotLive: false }); await el.updateComplete;
-    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).not.toContain('while pictures are being read');
-    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('Pictures were being read when last observed');
+    expect(headline()).toBe('Checking AI status…');
     emit({ installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, status: { inference: { chatEnabledSpec: true, procedure: 'NONE' } } as AiState['status'] }); await el.updateComplete;
-    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('answers your questions');
-    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).not.toContain('last observed');
+    expect(headline()).not.toBe('Reading text in scans and images');
+    expect(headline()).not.toBe('Checking AI status…');
   });
-  it('S7 every phrase, step and About opener shares expanded state and panel association', async () => {
+  // Slice 7a (D2, D5): one opener per step, its name, and only with developer tools.
+  it('S7 every step opener shares expanded state and panel association (developer tools)', async () => {
+    setShowDeveloperTools(true);
     const el = await mount();
     const openers = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('.feature-phrase, .step-info')];
-    expect(openers.length).toBeGreaterThan(8);
+    expect(openers).toHaveLength(4);
     for (const opener of openers) expect(opener.getAttribute('aria-expanded')).toBe('false');
     const chat = openers.filter(b => b.getAttribute('aria-controls') === 'brain-feature-panel-chat');
-    expect(chat).toHaveLength(4);
+    expect(chat).toHaveLength(1);
     for (const opener of chat) {
       opener.click(); await el.updateComplete;
       const panel = el.shadowRoot!.getElementById('brain-feature-panel-chat')!;

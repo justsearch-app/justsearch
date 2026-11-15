@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AiState } from '../state/aiStateStore.js';
 import type { InstallPlanPreview } from '../utils/aiInstallPoll.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
+import { setShowDeveloperTools } from '../state/developerToolsState.js';
 const store = vi.hoisted(() => ({ listeners: new Set<(state: AiState) => void>(), current: {} as AiState }));
 vi.mock('../state/aiStateStore.js', async original => ({
   ...await original<typeof import('../state/aiStateStore.js')>(),
@@ -71,7 +72,7 @@ beforeEach(() => {
     return json({});
   }));
 });
-afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); setShowDeveloperTools(false); });
 
 describe('Brain live redesign repairs', () => {
   it.each(['no observation', 'retained negative', 'unconfirmed verdict'] as const)('D2 the whole page waits for live install and verdict: %s', async state => {
@@ -98,8 +99,8 @@ describe('Brain live redesign repairs', () => {
     emit({ installStatus: { state: 'idle', installedFully: false, repairNeeded: true }, capabilities: { chat: false } as AiState['capabilities'], runtime: { mode: 'offline', installed: { known: true, value: false } } as AiState['runtime'], aiEngine: { kind: 'not_installed', stability: { kind: 'settled' }, installFailure: null } });
     const el = await mount();
     expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installed — repair available');
-    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('Answers are off; background work can continue');
-    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'false']);
+    expect(el.shadowRoot!.querySelector('[data-step="chat"] .switch-state')!.textContent).toBe('Off');
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false']);
     expect(el.shadowRoot!.querySelector('[role="alert"] [label="Repair"]')!.getAttribute('variant')).toBe('primary');
     expect(el.shadowRoot!.querySelector('[label^="Install AI"]')).toBeNull();
   });
@@ -107,11 +108,11 @@ describe('Brain live redesign repairs', () => {
     const el = await mount(); let release!: (response: Response) => void;
     previewGet = () => new Promise(resolve => { release = resolve; });
     window.dispatchEvent(new Event('focus')); await settle(el);
-    expect(switches(el).map(b => b.getAttribute('aria-disabled'))).toEqual(['false', 'false']);
+    expect(switches(el).map(b => b.getAttribute('aria-disabled'))).toEqual(['false']);
     switches(el)[0]!.click(); await settle(el);
     expect(operations).toEqual(['core.set-chat-enabled']);
     release(json({ components: [] })); await settle(el);
-    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'false']);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false']);
     expect(el.shadowRoot!.querySelector('[data-feature="chat"]')!.textContent).toContain('1.0 KB');
   });
   it('D8 a preview begun before an acquisition save cannot overwrite its new choices', async () => {
@@ -160,22 +161,23 @@ describe('Brain live redesign repairs', () => {
   });
   it('G5 Linux memory uses device zero status GPU figures and labels one of several devices', async () => {
     emit({ status: { gpu: { totalVramBytes: 12 * 1024 ** 3, usedVramBytes: 9 * 1024 ** 3, deviceCount: 2 } } as AiState['status'] });
-    const el = await mount(); const card = () => el.shadowRoot!.querySelector('.graphics-card')!;
-    expect(card().textContent).toContain('9.00 GB of 12.00 GB in use · all apps · one of 2 graphics devices');
-    expect(card().querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe(String(9 * 1024 ** 3));
+    // Slice 7a (AM8): fm-14's words; without a current reading there is no meter and nothing is inferred.
+    const el = await mount(); const card = () => el.shadowRoot!.querySelector('.graphics-card');
+    expect(card()?.textContent).toContain('9.00 GB of 12.00 GB in use · one of 2 graphics devices');
+    expect(card()?.querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe(String(9 * 1024 ** 3));
     emit({ snapshotLive: false }); await el.updateComplete;
-    expect(card().textContent).toContain('Memory use unknown'); expect(card().querySelector('[aria-valuenow]')).toBeNull();
+    expect(card()).toBeNull();
     emit({ installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, status: { gpu: { totalVramBytes: 12 * 1024 ** 3 } } as AiState['status'] }); await el.updateComplete;
-    expect(card().textContent).toContain('Memory use unknown');
+    expect(card()).toBeNull(); expect(el.shadowRoot!.textContent).not.toContain('Memory use unknown');
   });
-  it('D1 sentence boundaries keep whitespace outside phrase buttons and punctuation attached to preceding prose', async () => {
+  // Slice 7a (D2): the sentence is plain prose that says only what the picture cannot; no phrases or switches.
+  it('D1 the sentence is one plain sentence with no phrase buttons or switches', async () => {
     const el = await mount(); const sentence = el.shadowRoot!.querySelector('.brain-sentence')!;
-    expect(sentence.textContent).toContain('puts the best match first and answers');
-    expect(sentence.textContent).not.toContain('firstand');
-    for (const button of sentence.querySelectorAll('.feature-phrase:not([aria-label])')) expect(button.textContent).not.toMatch(/^\s|^[.,]/);
-    expect([...sentence.childNodes].some(node => node.nodeType === Node.TEXT_NODE && node.textContent?.startsWith('. '))).toBe(false);
+    expect(sentence.textContent).toBe('Everything below runs on this computer.');
+    expect(sentence.querySelectorAll('button, [role="switch"]')).toHaveLength(0);
   });
   it('D3 a pointer gesture on another step opens it in one click without restoring the previous opener or scrolling focus', async () => {
+    setShowDeveloperTools(true); // Slice 7a (D5): "You get / It costs" is a developer tool.
     const el = await mount(); const root = el.shadowRoot!;
     const first = root.querySelector<HTMLButtonElement>('[data-feature="chat"] .step-info')!;
     const next = root.querySelector<HTMLButtonElement>('[data-feature="reranker"] .step-info')!;
@@ -207,10 +209,13 @@ describe('Brain live redesign repairs', () => {
     emit({ installStatus: { state: 'cancelled', installedFully: false, resumableBytes: 0, packages: [{ packageId: 'embedding', state: 'downloading', bytesDownloaded: 0, bytesTotal: 1024 }, { packageId: 'reranker', state: 'downloading', bytesDownloaded: 512, bytesTotal: 1024 }] }, aiEngine: { kind: 'paused', stability: { kind: 'settled' }, installFailure: null }, runtime: { mode: 'offline', installed: { known: true, value: false } } as AiState['runtime'], runtimeStatus: { onnxFeatures: [{ id: 'reranker', status: 'active', modelActive: true }] } });
     preview.components = preview.components!.map(c => c.id === 'embedding' ? { ...c, state: 'to-download' } : c);
     const el = await mount();
-    const meaning = el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent!;
-    expect(meaning).not.toContain('Downloading'); expect(meaning).toContain('Not downloaded');
-    const reranker = el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent!;
-    expect(reranker).not.toContain('Downloading'); expect(reranker).not.toContain('Cancelled'); expect(reranker).toContain('On');
+    // Slice 7a: before install the size says what is still to download; files present keep their light.
+    const meaning = el.shadowRoot!.querySelector('[data-feature="meaning"]')!;
+    expect(meaning.textContent).not.toContain('Downloading'); expect(meaning.textContent).not.toContain('Cancelled');
+    expect(meaning.getAttribute('data-lit')).toBe('false');
+    const reranker = el.shadowRoot!.querySelector('[data-feature="reranker"]')!;
+    expect(reranker.textContent).not.toContain('Downloading'); expect(reranker.textContent).not.toContain('Cancelled');
+    expect(reranker.getAttribute('data-lit')).toBe('true');
   });
   it.each(['failed', 'completed'])('D4 a %s run with a package record left downloading shows no step as Downloading', async (runState) => {
     emit({ installStatus: { state: runState, installedFully: false, packages: [{ packageId: 'embedding', state: 'downloading', bytesDownloaded: 512, bytesTotal: 1024 }, { packageId: 'reranker', state: 'downloading', bytesDownloaded: 512, bytesTotal: 1024 }] }, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null }, runtime: { mode: 'offline', installed: { known: true, value: false } } as AiState['runtime'], runtimeStatus: { onnxFeatures: [{ id: 'reranker', status: 'active', modelActive: true }] } });
@@ -225,7 +230,7 @@ describe('Brain live redesign repairs', () => {
     emit({ installStatus: { state: 'completed', installedFully: true, repairNeeded: true }, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null } });
     const el = await mount();
     expect(el.shadowRoot!.textContent!.split('A required component is missing').length - 1).toBe(1);
-    expect(el.shadowRoot!.querySelector('.brain-status-detail')!.textContent).not.toContain('A required component is missing');
+    expect(el.shadowRoot!.querySelector('.brain-sentence')?.textContent ?? '').not.toContain('A required component is missing');
   });
   it('D7 the picture branch participates in path layout instead of escaping into preceding alerts', async () => {
     const el = await mount(); const path = el.shadowRoot!.querySelector('.brain-path')!;
@@ -266,13 +271,13 @@ describe('Brain review repairs', () => {
     emit({ installStatus: { state: 'idle', installedFully: false, repairNeeded: true }, capabilities: { chat: false } as AiState['capabilities'], runtime: { mode: 'offline', installed: { known: true, value: false } } as AiState['runtime'], runtimeStatus: {}, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null } });
     preview.components = preview.components!.map(c => c.id === 'chat' ? { ...c, state: 'to-download', downloadBytes: 1024 } : c);
     const el = await mount();
-    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true']);
     switches(el)[0]!.click(); await settle(el);
     expect(operations).toEqual(['core.set-chat-enabled']); expect(declines).toEqual([]);
-    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'false']);
-    switches(el)[1]!.click(); await settle(el);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false']);
+    switches(el)[0]!.click(); await settle(el);
     expect(operations).toEqual(['core.set-chat-enabled', 'core.set-chat-enabled']); expect(declines).toEqual([]);
-    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true']);
     expect(el.shadowRoot!.querySelector('[role="alert"] [label="Repair"]')).not.toBeNull();
     expect(el.shadowRoot!.querySelector<HTMLDialogElement>('dialog')!.open).toBe(false);
   });

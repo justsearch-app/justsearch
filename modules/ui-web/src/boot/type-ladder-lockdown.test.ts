@@ -21,7 +21,10 @@ it('text, corners and bundled variable Inter follow the type ladder under the de
       });
     const summary = JSON.parse(stdout.slice(stdout.lastIndexOf('\n{') + 1)) as { violations: number; surfaces: number };
     expect(summary.violations).toBe(0);
-    expect(summary.surfaces).toBe(158);
+    // Slice 7a: AI Brain draws no tab row until answers work (D1: −1 view per theme) and its eight
+    // "You get / It costs" openers are developer tools (D5: −8 per theme; audited in
+    // BrainOverview.layout-lockdown), so the fixture's Brain contributes 5 views per theme, not 14.
+    expect(summary.surfaces).toBe(140);
     const inventory = JSON.parse(await readFile(path.join(evidence, 'results.json'), 'utf8')) as {
       checks: { id: string; result: string; textElements?: number }[];
     };

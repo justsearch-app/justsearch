@@ -36,6 +36,8 @@ it('a restarted head that confirms nothing cannot inherit the previous head Onli
     _unifiedAiState: unknown; renderSimplePanel(): TemplateResult;
   };
   brain.apiBase = ''; brain.busy = {}; brain.installStatus = null;
+  // Slice 7a (D5): Start/Stop answers is a developer tool.
+  (brain as unknown as { devTools: boolean }).devTools = true;
   brain.policy = { downloadsEnabled: true, onlineAiEnabled: true };
   // The Brain reads the store exactly as it does when connected.
   const unsubscribe = subscribeAiState(state => { brain._unifiedAiState = state; });

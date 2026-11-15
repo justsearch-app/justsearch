@@ -14,6 +14,7 @@ vi.mock('../state/aiStateStore.js', async original => ({
 import './BrainSurface.js';
 import { composeInstallConsent } from './BrainSurface.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
+import { setShowDeveloperTools } from '../state/developerToolsState.js';
 import type { AiInstallManifest } from '../../api/domains/packs.js';
 
 interface Brain extends HTMLElement { apiBase: string; host_: unknown; updateComplete: Promise<boolean> }
@@ -61,7 +62,7 @@ beforeEach(() => {
     runtime: { mode: 'online', modelId: 'answer-model', modelLabel: 'Answer model', installed: { known: true, value: true } },
     capabilities: { chat: true }, status: { gpu: { totalVramBytes: 8192, usedVramBytes: 4096 }, inference: { chatEnabledSpec: true }, operating: { gpu: { stale: false, adapter: 'Test adapter', adapterTotalBytes: 8192, adapterFreeBytes: 4096 } } },
     installStatus: { state: 'completed', phase: 'done', installedFully: true },
-    runtimeStatus: { active: { mmprojActive: true }, onnxFeatures: [{ id: 'embed', modelActive: true }, { id: 'reranker', modelActive: true }] },
+    runtimeStatus: { active: { mmprojActive: true }, onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }, { id: 'reranker', status: 'active', modelActive: true }] },
     index: { documentCount: { known: true, value: 24 } },
   } as unknown as AiState;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -83,31 +84,32 @@ beforeEach(() => {
     return json({});
   }));
 });
-afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); setShowDeveloperTools(false); });
 
 describe('AI Brain redesign behaviour', () => {
-  it('duplicates the saved answer switch with distinct ids and one busy state; stopping keeps files and background work', async () => {
+  // Slice 7a (D2): one answer switch, under its step, with its state in words.
+  it('has one saved answer switch with one busy state; stopping keeps files and background work', async () => {
     const el = await mount(); const controls = switches(el, 'Answer questions');
-    expect(controls).toHaveLength(2); expect(new Set(controls.map(button => button.id)).size).toBe(2);
-    expect(controls.map(button => button.getAttribute('aria-checked'))).toEqual(['true', 'true']);
+    expect(controls).toHaveLength(1);
+    expect(controls.map(button => button.getAttribute('aria-checked'))).toEqual(['true']);
     let release!: () => void; operationWait = new Promise(resolve => { release = resolve; });
     controls[0]!.click(); await el.updateComplete;
-    expect(switches(el, 'Answer questions').map(button => button.getAttribute('aria-disabled'))).toEqual(['true', 'true']);
-    controls[1]!.click(); await el.updateComplete;
+    expect(switches(el, 'Answer questions').map(button => button.getAttribute('aria-disabled'))).toEqual(['true']);
+    switches(el, 'Answer questions')[0]!.click(); await el.updateComplete;
     expect(calls).toEqual([{ id: 'core.set-chat-enabled', args: { enabled: false } }]);
     release(); await settle(el);
-    expect(switches(el, 'Answer questions').map(button => button.getAttribute('aria-checked'))).toEqual(['false', 'false']);
-    expect(el.shadowRoot!.textContent).toContain('Answers are off; background work can continue');
+    expect(switches(el, 'Answer questions').map(button => button.getAttribute('aria-checked'))).toEqual(['false']);
+    expect(el.shadowRoot!.querySelector('[data-step="chat"] .switch-state')?.textContent).toBe('Off');
     expect(preview.components!.find(c => c.id === 'chat')?.state).toBe('installed');
-    switches(el, 'Answer questions')[1]!.click(); await settle(el);
+    switches(el, 'Answer questions')[0]!.click(); await settle(el);
     expect(calls.at(-1)).toEqual({ id: 'core.set-chat-enabled', args: { enabled: true } });
   });
-  it('keeps runtime evidence in the sentence and disables feature switches when observations become unknown', async () => {
+  it('keeps runtime evidence in the step light and disables feature switches when observations become unknown', async () => {
     settingsGet = async () => json({ ui: { chatEnabled }, llm: {}, witness: { acceptedRevision: 0, lastCommittedOperationKey: null } });
     const el = await mount();
     expect(el.shadowRoot!.querySelector('[data-feature="pictures"]')!.textContent).toContain('On');
-    emit({ runtimeStatus: { active: { mmprojActive: false } } }); await el.updateComplete;
-    expect(el.shadowRoot!.textContent).toContain("It doesn't read text in scans and images yet");
+    emit({ runtimeStatus: { ...store.current.runtimeStatus, active: { mmprojActive: false } } }); await el.updateComplete;
+    expect(el.shadowRoot!.querySelector('[data-step="pictures"]')!.getAttribute('data-lit')).toBe('false');
     emit({ snapshotLive: false }); await el.updateComplete;
     expect(el.shadowRoot!.querySelector('[data-feature="pictures"]')!.textContent).toContain('Unknown');
     expect(switches(el, 'Best match first')).toHaveLength(1);
@@ -117,13 +119,15 @@ describe('AI Brain redesign behaviour', () => {
   });
   it('preserves null answer intent as automatic rather than saving false', async () => {
     chatEnabled = null; const el = await mount();
-    expect(el.shadowRoot!.querySelector('[data-feature="chat"]')!.textContent).toContain('automatic (no saved answer choice)');
+    expect(el.shadowRoot!.querySelector('[data-step="chat"] .switch-state')!.textContent).toBe('Automatic');
     expect(switches(el, 'Answer questions')[0]!.getAttribute('aria-checked')).toBe('true');
     expect(calls).toEqual([]);
   });
   it('opens information without toggling, keeps one panel through updates, and restores focus on Escape and outside click', async () => {
+    // Slice 7a (D5): "You get / It costs" is a developer tool.
+    setShowDeveloperTools(true);
     const el = await mount();
-    const opener = el.shadowRoot!.querySelector<HTMLButtonElement>('button[aria-label="About Answer questions"]')!;
+    const opener = el.shadowRoot!.querySelector<HTMLButtonElement>('[data-step="chat"] button.step-info')!;
     opener.click(); await vi.waitFor(() => expect(el.shadowRoot!.activeElement?.className).toBe('feature-panel'));
     expect(calls).toEqual([]); expect(el.shadowRoot!.textContent).toContain('You get'); expect(el.shadowRoot!.textContent).toContain('It costs');
     emit({ runtimeStatus: { active: { mmprojActive: false } } }); await el.updateComplete;
@@ -140,12 +144,12 @@ describe('AI Brain redesign behaviour', () => {
     const first = await mount(); const second = await mount();
     let release!: () => void; declineWait = new Promise(resolve => { release = resolve; });
     switches(first, 'Best match first')[0]!.click(); await first.updateComplete;
-    switches(first, 'Answer questions')[1]!.click(); await first.updateComplete;
+    switches(first, 'Answer questions')[0]!.click(); await first.updateComplete;
     expect(declines).toHaveLength(1);
     expect(switches(first, 'Answer questions')[0]!.getAttribute('aria-describedby')).toBeTruthy();
     release(); await settle(first);
     window.dispatchEvent(new Event('focus')); await settle(second);
-    expect(switches(second, 'Best match first').map(button => button.getAttribute('aria-checked'))).toEqual(['false', 'false']);
+    expect(switches(second, 'Best match first').map(button => button.getAttribute('aria-checked'))).toEqual(['false']);
   });
   it('a retained surface cannot start a newer choice while its earlier request is still unanswered', async () => {
     emit({ installStatus: { state: 'idle', installedFully: false }, runtime: { mode: 'offline', modelId: null, installed: { known: true, value: false } } as AiState['runtime'], aiEngine: { kind: 'not_installed', stability: { kind: 'settled' }, installFailure: null } });
@@ -180,7 +184,7 @@ describe('AI Brain redesign behaviour', () => {
     expect(el.shadowRoot!.querySelector('dialog')!.textContent).toContain('1.0 KB');
     expect(el.shadowRoot!.querySelector('dialog')!.textContent).toContain('Apache-2.0');
     expect(calls).toEqual([]);
-    expect(switches(el, 'Answer questions')[1]!.getAttribute('aria-disabled')).toBe('true');
+    expect(switches(el, 'Answer questions')[0]!.getAttribute('aria-disabled')).toBe('true');
     await clickButton(el, 'Accept and download');
     // Answers are switched on by the Engine when the download completes, not at its start.
     expect(calls.map(call => call.id)).toEqual(['core.start-ai-install']);
@@ -215,11 +219,12 @@ describe('AI Brain redesign behaviour', () => {
     emit({ installStatus: { state: 'completed', phase: 'done', installedFully: true }, aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null } }); await settle(reloaded);
     expect(reloaded.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('AI is ready');
   });
-  it('graphics memory uses all-app device data and stale or absent values remain unknown', async () => {
-    const el = await mount(); const card = () => el.shadowRoot!.querySelector('.graphics-card')!;
-    expect(card().textContent).toContain('4.0 KB of 8.0 KB in use · all apps · Test adapter');
+  // Slice 7a (AM8): the meter shows a current reading in fm-14's words, and only then.
+  it('graphics memory uses all-app device data and stale or absent values draw no meter', async () => {
+    const el = await mount(); const card = () => el.shadowRoot!.querySelector('.graphics-card');
+    expect(card()?.textContent).toContain('4.0 KB of 8.0 KB in use · Test adapter');
     emit({ status: { operating: { gpu: { stale: true, adapterTotalBytes: 8192, adapterFreeBytes: 4096 } } } as AiState['status'] }); await el.updateComplete;
-    expect(card().textContent).toContain('Memory use unknown'); expect(card().querySelector('[aria-valuenow]')).toBeNull();
+    expect(card()).toBeNull(); expect(el.shadowRoot!.textContent).not.toContain('Memory use unknown');
   });
   it('consent lists only planned packages, excluding declined siblings and already installed files', () => {
     const content = composeInstallConsent(manifest, { totalDownloadBytes: 1024, components: [component('embedding'), component('chat', 'to-download'), component('reranker', 'declined', true), component('splade', 'unavailable')] });

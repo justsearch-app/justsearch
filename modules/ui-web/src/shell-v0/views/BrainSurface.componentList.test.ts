@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import './BrainSurface';
 import { computeAiEngineVerdict } from '../state/aiVerdict.js';
 import type { InstallStatus } from '../state/aiStateStore.js';
+import { setShowDeveloperTools } from '../state/developerToolsState.js';
 
 interface BrainHost extends HTMLElement {
   apiBase: string;
@@ -111,6 +112,7 @@ describe('BrainSurface — the component list', () => {
     globalThis.fetch = realFetch;
     declineCalls.length = 0;
     document.body.innerHTML = '';
+    setShowDeveloperTools(false);
   });
 
   /** What the backend reports for a machine that has never installed: idle, nothing on disk. */
@@ -142,6 +144,9 @@ describe('BrainSurface — the component list', () => {
     document.body.appendChild(el);
     await settle(el);
     (el as unknown as { _unifiedAiState: unknown })._unifiedAiState = { installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, aiEngine: { kind: 'not_installed', stability: { kind: 'settled' }, installFailure: null } };
+    // Slice 7a (D5, AM5): before install the page shows no Advanced settings (fm-10); the download
+    // choices for parts without a step are a developer tool.
+    setShowDeveloperTools(true);
     el.requestUpdate(); await el.updateComplete;
     el.shadowRoot?.querySelector<HTMLButtonElement>('.brain-links button')?.click();
     await el.updateComplete;

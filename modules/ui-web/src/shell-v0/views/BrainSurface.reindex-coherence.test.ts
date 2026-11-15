@@ -74,7 +74,7 @@ describe('BrainSurface compat callout — tempdoc 613 reindex coherence', () => 
 
   it('falls back to a generic remedy line when the verdict carries no reindex code (no per-cause fork)', () => {
     const text = calloutText(EMB_BLOCKED_LEGACY, []);
-    expect(text).toContain('Rebuild the index to restore full search.');
+    expect(text).toContain('Read everything again to restore full search.'); // Slice 7a (AM9): read words.
   });
 });
 
