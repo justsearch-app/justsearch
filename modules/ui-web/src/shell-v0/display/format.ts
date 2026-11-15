@@ -9,7 +9,12 @@
  * that still format contextual values (e.g. Brain's download/VRAM byte values, which are NOT facts).
  */
 
-const NUM = new Intl.NumberFormat();
+/**
+ * Some webviews (WebKitGTK under a POSIX locale) format numbers without digit groups, so 50000
+ * would read "50000". Group explicitly when the runtime's default locale does not.
+ */
+const LOCAL_NUM = new Intl.NumberFormat();
+const NUM = /\D/.test(LOCAL_NUM.format(10_000)) ? LOCAL_NUM : new Intl.NumberFormat('en-US');
 
 /** Human-readable byte size. Zero/absent → `'0 B'` (the chosen single canonical zero-case). */
 export function formatBytes(n: number | undefined | null): string {
@@ -23,6 +28,13 @@ export function formatBytes(n: number | undefined | null): string {
 /** Locale-grouped integer (e.g. `12,340`). */
 export function formatCount(n: number): string {
   return NUM.format(n);
+}
+
+/** Disk inventory count. Older Engines omit the cap flag at their 50,000-file limit. */
+export function formatFileCount(count: number | null | undefined, capped?: boolean): string {
+  if (count == null || !Number.isFinite(count) || count < 0) return '';
+  const cap = capped === true || capped === undefined && count === 50_000;
+  return `${formatCount(count)}${cap ? '+' : ''} ${count === 1 && !cap ? 'file' : 'files'}`;
 }
 
 /** Local numeric date and time, including seconds (Date#toLocaleString's default fields). */

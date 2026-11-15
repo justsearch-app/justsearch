@@ -131,7 +131,7 @@ describe('FC7 the Tasks tray asks the Engine it reads from', () => {
     trayAt(ENGINE_A);
     await vi.waitFor(() => expect(asked.length).toBeGreaterThan(0));
     expect(asked.every((url) => url.startsWith(`${ENGINE_A}/`)), `every file-name read went to the Engine: ${asked.join(', ')}`).toBe(true);
-    expect(await label()).toBe('Indexing · reports/report.pdf');
+    expect(await label()).toBe('Reading · reports/report.pdf');
   });
 
   it('after the tray moves to another Engine, the earlier Engine\'s late answer names nothing', async () => {
@@ -144,6 +144,6 @@ describe('FC7 the Tasks tray asks the Engine it reads from', () => {
     hold.get(ENGINE_A)!();
     expect(await label(), 'the earlier Engine\'s file is not this Engine\'s').not.toContain('report.pdf');
     hold.get(ENGINE_B)!();
-    expect(await label()).toBe('Indexing · notes/other.txt');
+    expect(await label()).toBe('Reading · notes/other.txt');
   });
 });

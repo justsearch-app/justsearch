@@ -236,7 +236,7 @@ export function isWorkerReportedIndex(status: StatusResponse | null | undefined)
 
 const EMPTY: IndexingProgress = {
   pause: null,
-  activity: { summary: 'Indexing status unconfirmed', detail: null, confirmed: false, enrichmentDeferred: false },
+  activity: { summary: 'Reading status unconfirmed', detail: null, confirmed: false, enrichmentDeferred: false },
   phase: 'unknown',
   jobsPending: 0,
   jobsRunning: 0,
@@ -469,9 +469,9 @@ const AUTOMATIC_REASONS: ReadonlySet<string> = new Set([
 ]);
 const PAUSE_REASON_WORDING: ReadonlyMap<string, string> = new Map([
   ['user_paused', 'Paused by you.'],
-  ['schedule', 'Outside indexing hours.'],
+  ['schedule', 'Outside reading hours.'],
   ['on_battery', 'Paused while this computer is running on battery.'],
-  ['settings_recovery', 'Settings recovery — saved settings were damaged and replaced by defaults. Indexing stays held until the reset is confirmed in Settings. Check exclusions.'],
+  ['settings_recovery', 'Settings recovery — saved settings were damaged and replaced by defaults. Reading stays held until the reset is confirmed in Settings. Check exclusions.'],
 ]);
 
 function policyPause(status: StatusResponse | null | undefined): IndexingProgress['pause'] {
@@ -668,9 +668,9 @@ export function selectIndexingProgress(
     waiting: reportedPause.waiting || jobsPending > 0 || work.rawPending > 0 || count(core.pendingVduCount) > 0 } : null;
   const phase = pause?.state ?? derivePhase(core.indexState, jobsPending, work);
   const activity = pause ? {
-    summary: pause.state === 'pausing' ? 'Pausing — finishing current files' : 'Indexing paused',
+    summary: pause.state === 'pausing' ? 'Pausing — finishing current files' : 'Reading paused',
     detail: [(pause.reasons?.length ? pause.reasons : [pause.reason]).map(reason =>
-      PAUSE_REASON_WORDING.get(reason) ?? 'Indexing is on hold; reason unavailable.').join(' '),
+      PAUSE_REASON_WORDING.get(reason) ?? 'Reading is on hold; reason unavailable.').join(' '),
       work.blockedPending > 0 && (!work.embeddingBlocked || work.applicable.embedding)
         ? work.embeddingBlocked && status.worker?.enrichment?.embeddingAvailable === false
           ? 'Embedding cannot run right now. Keyword search remains available.'
@@ -780,13 +780,13 @@ function indexingActivity(
     details.push('Sparse enrichment between files also waits, including on CPU.');
   }
   if (reasons.has('chat_generating') && !enrichmentDeferred) {
-    details.push('Indexing shares time with chat.');
+    details.push('Reading shares time with chat.');
   }
   if (phase === 'error') {
     const failed = count(status.worker?.failure?.failedJobs);
-    return { summary: 'Indexing error',
-      detail: readEnrichmentWork(status).incomplete ? 'Some enrichment failed or is missing. Keyword search remains available.' : failed > 0 ? `${formatCount(failed)} ${failed === 1 ? 'file could' : 'files could'} not be indexed.`
-        : 'Some files could not be indexed.',
+    return { summary: 'Reading error',
+      detail: readEnrichmentWork(status).incomplete ? 'Some enrichment failed or is missing. Keyword search remains available.' : failed > 0 ? `${formatCount(failed)} ${failed === 1 ? 'file could' : 'files could'} not be read.`
+        : 'Some files could not be read.',
       confirmed: true, enrichmentDeferred };
   }
   if (phase === 'waiting') {
@@ -809,10 +809,10 @@ function indexingActivity(
       confirmed: true, enrichmentDeferred: true };
   }
   const summary = phase === 'indexing'
-    ? energy || gpuCauses.length > 0 ? 'Text indexing continues' : 'Indexing'
+    ? energy || gpuCauses.length > 0 ? 'Text reading continues' : 'Reading'
     : phase === 'enriching'
       ? energy ? 'Meaning processing is waiting to save energy' : gpuCauses.length > 0 ? 'Meaning processing is waiting for the GPU' : 'Search is ready — still improving'
       : phase === 'blocked' ? 'Semantic search waiting for AI install'
-        : status.worker?.core?.indexHealthy === true ? 'Ready — fully searchable' : 'Indexing queue empty';
+        : status.worker?.core?.indexHealthy === true ? 'Ready — fully searchable' : 'Reading queue empty';
   return { summary, detail: details.join(' ') || null, confirmed: true, enrichmentDeferred };
 }

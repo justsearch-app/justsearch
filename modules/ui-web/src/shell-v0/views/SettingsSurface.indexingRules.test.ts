@@ -47,7 +47,7 @@ async function edit(el: Mounted, selector: string, value: string | boolean): Pro
   field.dispatchEvent(new Event(typeof value === 'boolean' ? 'change' : 'input', { bubbles: true })); await settle(el);
 }
 async function save(el: Mounted): Promise<void> {
-  const form = el.shadowRoot!.querySelector('form[aria-label="Indexing rules"]');
+  const form = el.shadowRoot!.querySelector('form[aria-label="Reading rules"]');
   expect(form, 'rules form is mounted').not.toBeNull();
   form!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await settle(el);
 }
@@ -82,7 +82,7 @@ describe('WP3.8b rules editor', () => {
     expect(JSON.parse(String(ruleCalls()[0]![1].body)).args).toEqual({ schedule: { ...saved, enabled: false }, pauseOnBattery: true });
     await edit(el, '#indexing-battery', false); await save(el);
     expect(JSON.parse(String(ruleCalls()[1]![1].body)).args).toEqual({ schedule: { ...saved, enabled: false }, pauseOnBattery: false });
-    expect(el.shadowRoot!.textContent).toContain('Indexing rules saved');
+    expect(el.shadowRoot!.textContent).toContain('Reading rules saved');
   });
   for (const [name, value, error] of [
     ['equal endpoints', '06:00', 'Start and end times must be different.'],
@@ -137,7 +137,7 @@ describe('WP3.8b rules editor', () => {
   it('S38.7 preserves Save focus while pending and sends one unchanged rule pair', async () => {
     const el = await mount(); let release!: (response: Response) => void;
     fetchMock.mockImplementation(() => new Promise<Response>(resolve => { release = resolve; }));
-    const saveButton = action(el, 'Save indexing rules'); saveButton.focus();
+    const saveButton = action(el, 'Save reading rules'); saveButton.focus();
     await save(el);
     expect(el.shadowRoot!.activeElement).toBe(saveButton);
     expect(saveButton.getAttribute('aria-disabled')).toBe('true');
@@ -190,8 +190,8 @@ describe('WP3.8b policy status and actions', () => {
   for (const reason of ['schedule', 'on_battery']) for (const state of ['PAUSING', 'PAUSED']) {
     it(`D5 ${state} ${reason} names the rule with an empty queue and offers its Library action`, async () => {
       observe([reason], state, 0); const el = await mount('jf-settings-surface'); const c = await control(el);
-      expect(el.shadowRoot!.textContent).toContain(reason === 'schedule' ? 'Outside indexing hours.' : 'Paused while this computer is running on battery.');
-      expect(el.shadowRoot!.textContent).not.toContain('Ready'); expect(c.shadowRoot!.textContent).not.toContain('Resume indexing');
+      expect(el.shadowRoot!.textContent).toContain(reason === 'schedule' ? 'Outside reading hours.' : 'Paused while this computer is running on battery.');
+      expect(el.shadowRoot!.textContent).not.toContain('Ready'); expect(c.shadowRoot!.textContent).not.toContain('Resume reading');
       const navigate = vi.fn(); document.addEventListener('jf-navigate-to-surface', navigate);
       try { action(c, reason === 'schedule' ? 'Change hours' : 'Change battery setting').click(); }
       finally { document.removeEventListener('jf-navigate-to-surface', navigate); }
@@ -205,8 +205,8 @@ describe('WP3.8b policy status and actions', () => {
     observe(['on_battery', 'schedule', 'user_paused', 'settings_recovery']); const el = await mount('jf-settings-surface'); const c = await control(el);
     const text = el.shadowRoot!.textContent!;
     expect(text.indexOf('Settings recovery')).toBeLessThan(text.indexOf('Paused by you'));
-    expect(text.indexOf('Paused by you')).toBeLessThan(text.indexOf('Outside indexing hours'));
-    expect(text.indexOf('Outside indexing hours')).toBeLessThan(text.indexOf('Paused while this computer'));
+    expect(text.indexOf('Paused by you')).toBeLessThan(text.indexOf('Outside reading hours'));
+    expect(text.indexOf('Outside reading hours')).toBeLessThan(text.indexOf('Paused while this computer'));
     expect(c.shadowRoot!.textContent).toContain('Open Settings at Reset to defaults'); expect(c.shadowRoot!.textContent).not.toContain('Change hours');
   });
   it('D5 names every folder rule without Waiting for Resume and preserves failure evidence', () => {
@@ -214,22 +214,22 @@ describe('WP3.8b policy status and actions', () => {
       const row = folderStatus({ status: 'indexed', fileCount: 10, inFlightCount: 3, failedCount: 2 } as IndexedRootView,
         { relativeTime: '', verifiedRelativeTime: '', provisional: false, indexingPaused: true, indexingPauseReason: reasons[0], indexingPauseReasons: reasons });
       expect(row.metaText).not.toContain('Waiting for Resume');
-      if (reasons.includes('schedule')) expect(row.metaText).toContain('indexing hours');
+      if (reasons.includes('schedule')) expect(row.metaText).toContain('reading hours');
       if (reasons.includes('on_battery')) expect(row.metaText).toContain('battery rule'); expect(row.failed).toBe(2);
     }
   });
   it('S38.5 Resume clears manual only and announces both remaining rules after confirmed status', async () => {
     observe(['user_paused', 'schedule', 'on_battery']); const el = await mount('jf-settings-surface'); const c = await control(el);
     expect(c.shadowRoot!.textContent).toContain('Change hours'); expect(c.shadowRoot!.textContent).toContain('Change battery setting');
-    action(c, 'Resume indexing').click(); await settle(c);
+    action(c, 'Resume reading').click(); await settle(c);
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith('/core.indexing-resume/invoke'))).toBe(true);
     observe(['schedule', 'on_battery']); await settle(el); await settle(c);
-    expect(c.shadowRoot!.querySelector('[role=status]')?.textContent).toContain('Indexing is still held by indexing hours and battery power');
+    expect(c.shadowRoot!.querySelector('[role=status]')?.textContent).toContain('Reading is still held by reading hours and battery power');
     expect(el.shadowRoot!.textContent).not.toContain('Paused by you'); expect(el.shadowRoot!.textContent).not.toContain('Work is waiting for Resume');
   });
   it('S38.5 waits for manual-pause removal before announcing it cleared', async () => {
     observe(['user_paused', 'schedule']); const el = await mount('jf-settings-surface'); const c = await control(el);
-    action(c, 'Resume indexing').click(); await settle(c);
+    action(c, 'Resume reading').click(); await settle(c);
     observe(['user_paused', 'schedule']); await settle(el); await settle(c);
     expect(c.shadowRoot!.querySelector('[role=status]')?.textContent).toContain('Waiting for status');
     expect(c.shadowRoot!.querySelector('[role=status]')?.textContent).not.toContain('Manual pause cleared');
@@ -238,9 +238,9 @@ describe('WP3.8b policy status and actions', () => {
   });
   it('D5 does not invoke a focused Resume when manual pause clears leaving hours', async () => {
     observe(['user_paused', 'schedule']); const el = await mount('jf-settings-surface'); const c = await control(el);
-    const resume = action(c, 'Resume indexing'); resume.focus(); observe(['schedule']); await settle(el); await settle(c);
+    const resume = action(c, 'Resume reading'); resume.focus(); observe(['schedule']); await settle(el); await settle(c);
     expect(c.shadowRoot!.activeElement).toBe(resume); expect(resume.getAttribute('aria-disabled')).toBe('true');
-    expect(c.shadowRoot!.textContent).toContain('still held by indexing hours'); resume.click(); await settle(c);
+    expect(c.shadowRoot!.textContent).toContain('still held by reading hours'); resume.click(); await settle(c);
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith('/core.indexing-resume/invoke'))).toBe(false);
   });
   // The retired task tray's hold row now lives in the status panel's Needs you section.
@@ -250,12 +250,12 @@ describe('WP3.8b policy status and actions', () => {
       if (mounted instanceof StatusPill) { mounted.open = true; await settle(mounted); }
       const el = mounted instanceof StatusPill ? mounted.shadowRoot!.querySelector<StatusPanel>('jf-status-panel')! : mounted;
       await settle(el);
-      expect(el.shadowRoot!.textContent).toContain('Outside indexing hours');
+      expect(el.shadowRoot!.textContent).toContain('Outside reading hours');
       expect(el.shadowRoot!.textContent).not.toContain('Work is waiting for Resume'); const controls = [...el.shadowRoot!.querySelectorAll<Mounted>('jf-indexing-controls')];
       for (const c of controls) await settle(c);
       const remedy = tag === 'jf-library-surface' ? controls.find(c => !c.hasAttribute('toolbar')) : controls[0];
-      expect(remedy?.shadowRoot!.textContent).toContain(tag === 'jf-library-surface' ? 'Change when to index' : 'Change hours');
-      if (tag === 'jf-library-surface') expect(controls[0]!.shadowRoot!.textContent).toContain('Pause indexing');
+      expect(remedy?.shadowRoot!.textContent).toContain(tag === 'jf-library-surface' ? 'Change when to read files' : 'Change hours');
+      if (tag === 'jf-library-surface') expect(controls[0]!.shadowRoot!.textContent).toContain('Pause reading');
     });
   }
 });

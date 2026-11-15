@@ -39,7 +39,12 @@ async function settle(el: Mounted): Promise<void> {
 }
 async function mount(tag: string): Promise<Mounted> {
   const el = document.createElement(tag) as Mounted;
-  Object.assign(el, { host_: createMockHostApi(), activeCategory: 'indexing' });
+  // The folder list is not answered: rows are placed by the tests, and a failed read would make them
+  // unconfirmed for every later test sharing the observation (R3).
+  const host = createMockHostApi();
+  const answer = host.data.fetch;
+  host.data.fetch = (path, init) => path.startsWith('/api/indexing-roots/substrate') ? new Promise<Response>(() => {}) : answer(path, init);
+  Object.assign(el, { host_: host, activeCategory: 'indexing' });
   document.body.appendChild(el);
   if (el instanceof StatusPill) el.open = true;
   await settle(el);
@@ -48,7 +53,7 @@ async function mount(tag: string): Promise<Mounted> {
 async function controls(el: Mounted, remedy = false): Promise<Mounted> {
   const root = el.shadowRoot?.querySelector('jf-status-panel')?.shadowRoot ?? el.shadowRoot;
   const control = root?.querySelector(remedy ? 'jf-indexing-controls:not([toolbar])' : 'jf-indexing-controls') as Mounted | null;
-  expect(control, 'surface exposes indexing controls').not.toBeNull();
+  expect(control, 'surface exposes reading controls').not.toBeNull();
   await control!.updateComplete;
   return control!;
 }
@@ -59,7 +64,8 @@ beforeEach(() => {
   __resetConversationListForTest();
   __resetDraftProvidersForTest();
   __resetDraftKeptForTest();
-  fetchMock = vi.fn().mockRejectedValue(new TypeError('Test backend unavailable'));
+  fetchMock = vi.fn((input: RequestInfo | URL) => String(input instanceof Request ? input.url : input).includes('/api/indexing-roots/substrate')
+    ? new Promise<Response>(() => {}) : Promise.reject(new TypeError('Test backend unavailable')));
   vi.stubGlobal('fetch', fetchMock);
 });
 afterEach(async () => {
@@ -77,15 +83,15 @@ describe('WP3.7 shared pause surfaces', () => {
     it(`S37.1 S37.5 S37.6 ${tag} exposes Resume even with nothing queued`, async () => {
       feed('PAUSED', 0);
       const el = await mount(tag);
-      expect(el.shadowRoot!.textContent).toContain('Indexing paused');
+      expect(el.shadowRoot!.textContent).toContain('Reading paused');
       expect(el.shadowRoot!.textContent).toContain('Paused by you');
       const control = await controls(el);
-      expect(button(control).textContent).toContain('Resume indexing');
+      expect(button(control).textContent).toContain('Resume reading');
       expect(button(control).disabled).toBe(false);
       expect(el.hasAttribute('data-empty')).toBe(false);
       feed('RUNNING', 0);
       await settle(el);
-      expect(el.shadowRoot!.textContent).not.toContain('Indexing paused');
+      expect(el.shadowRoot!.textContent).not.toContain('Reading paused');
     });
   }
 
@@ -118,14 +124,14 @@ describe('WP3.7 shared pause surfaces', () => {
     expect(first.args.untilEpochMs).toBeGreaterThanOrEqual(now + 3600000);
     expect(first.args.untilEpochMs).toBeLessThanOrEqual(Date.now() + 3600000);
     expect(JSON.parse(String(calls[1]![1]!.body)).args).toEqual(first.args);
-    expect(el.shadowRoot!.textContent).not.toContain('Indexing paused');
+    expect(el.shadowRoot!.textContent).not.toContain('Reading paused');
     expect(control.shadowRoot!.textContent).toContain('Waiting for status');
     feed('PAUSING');
     await settle(el);
     expect(el.shadowRoot!.textContent).toContain('Pausing — finishing current files');
     feed('PAUSED');
     await settle(el);
-    expect(el.shadowRoot!.textContent).toContain('Indexing paused');
+    expect(el.shadowRoot!.textContent).toContain('Reading paused');
   });
 
   it('S37.1 the progress view pauses indefinitely and a sibling surface resumes from the same observation', async () => {
@@ -145,10 +151,10 @@ describe('WP3.7 shared pause surfaces', () => {
     button(resume).click();
     await settle(resume);
     expect(fetchMock.mock.calls.some(c => String(c[0]).endsWith('/core.indexing-resume/invoke'))).toBe(true);
-    expect(tasks.shadowRoot!.textContent).toContain('Indexing paused');
+    expect(tasks.shadowRoot!.textContent).toContain('Reading paused');
     feed('RUNNING');
     await settle(tasks);
-    expect(tasks.shadowRoot!.textContent).not.toContain('Indexing paused');
+    expect(tasks.shadowRoot!.textContent).not.toContain('Reading paused');
   });
 
   it('S37.1 reports uncertain invocation failures without claiming paused', async () => {
@@ -158,7 +164,7 @@ describe('WP3.7 shared pause surfaces', () => {
     button(control).click();
     await settle(control);
     expect(control.shadowRoot!.textContent).toContain('Could not confirm');
-    expect(el.shadowRoot!.textContent).not.toContain('Indexing paused');
+    expect(el.shadowRoot!.textContent).not.toContain('Reading paused');
   });
 
   it('S37.4 waiting folder work names Resume and retains failure and searchability evidence', () => {
@@ -170,7 +176,7 @@ describe('WP3.7 shared pause surfaces', () => {
     for (const status of ['unavailable', 'error']) {
       const caveat = folderStatus({ ...row, status, walkError: status === 'error' ? 'Read failed' : undefined } as IndexedRootView, ctx);
       expect(caveat.failed).toBe(2);
-      expect(caveat.metaText).not.toContain('Indexing ·');
+      expect(caveat.metaText).not.toContain('Reading ·');
     }
   });
 
@@ -197,8 +203,8 @@ describe('WP3.7 shared pause surfaces', () => {
       feed('PAUSED'); await settle(el);
       feed('RUNNING'); await settle(el);
       feed('RUNNING'); await settle(el);
-      expect(changes.filter(s => s.includes('Indexing paused'))).toHaveLength(1);
-      expect(changes.filter(s => s.includes('Indexing resumed'))).toHaveLength(1);
+      expect(changes.filter(s => s.includes('Reading paused'))).toHaveLength(1);
+      expect(changes.filter(s => s.includes('Reading resumed'))).toHaveLength(1);
     } finally { observer.disconnect(); }
   });
 
@@ -223,8 +229,8 @@ describe('WP3.7 shared pause surfaces', () => {
       feed('RUNNING', 4); await settle(el);
       feed('RUNNING', 0); await settle(el);
       await blip('RUNNING', 0);
-      expect(changes.filter(s => s.includes('Indexing paused'))).toHaveLength(1);
-      expect(changes.filter(s => s.includes('Indexing resumed'))).toHaveLength(1);
+      expect(changes.filter(s => s.includes('Reading paused'))).toHaveLength(1);
+      expect(changes.filter(s => s.includes('Reading resumed'))).toHaveLength(1);
     } finally { observer.disconnect(); }
   });
 
@@ -239,7 +245,7 @@ describe('WP3.7 shared pause surfaces', () => {
     error(1);
     const el = await mount('jf-status-pill');
     const announcer = el.shadowRoot!.querySelector('[data-testid="indexing-announcer"]')!;
-    expect(announcer.textContent).toContain('1 file could not be indexed');
+    expect(announcer.textContent).toContain('1 file could not be read');
     const changes: string[] = [];
     const observer = new MutationObserver(() => changes.push(announcer.textContent!.trim()));
     observer.observe(announcer, { subtree: true, childList: true, characterData: true });
@@ -247,13 +253,13 @@ describe('WP3.7 shared pause surfaces', () => {
       error(1, true); await settle(el);
       error(1); await settle(el);
       error(1); await settle(el);
-      expect(announcer.textContent).toBe('Indexing resumed.');
+      expect(announcer.textContent).toBe('Reading resumed.');
       error(2); await settle(el);
-      expect(announcer.textContent).toContain('Indexing error');
-      expect(announcer.textContent).toContain('2 files could not be indexed');
+      expect(announcer.textContent).toContain('Reading error');
+      expect(announcer.textContent).toContain('2 files could not be read');
       error(2); await settle(el);
-      expect(changes.filter(s => s.includes('Indexing resumed'))).toHaveLength(1);
-      expect(changes.filter(s => s.includes('2 files could not be indexed'))).toHaveLength(1);
+      expect(changes.filter(s => s.includes('Reading resumed'))).toHaveLength(1);
+      expect(changes.filter(s => s.includes('2 files could not be read'))).toHaveLength(1);
     } finally { observer.disconnect(); }
   });
 
@@ -261,14 +267,14 @@ describe('WP3.7 shared pause surfaces', () => {
     feed('PAUSED');
     __feedForTest({ inference: { mode: 'online', available: true, activeModelId: 'test-model' } as never });
     const el = await mount('jf-sv3-window');
-    expect(el.shadowRoot!.textContent).toContain('Indexing paused');
+    expect(el.shadowRoot!.textContent).toContain('Reading paused');
     expect(el.shadowRoot!.textContent).toContain('waiting for Resume');
-    expect(button(await controls(el)).textContent).toContain('Resume indexing');
+    expect(button(await controls(el)).textContent).toContain('Resume reading');
     const composer = el.shadowRoot!.querySelector('jf-sv3-composer') as Mounted;
     await composer.updateComplete;
     (el as unknown as {tier: string}).tier = 'ask'; await settle(el);
     const trigger = composer.shadowRoot!.querySelector<HTMLElement>('[data-testid="sv3-composer-tier"]');
-    expect(trigger, 'existing Ask keeps its mode switch while indexing is paused').not.toBeNull();
+    expect(trigger, 'existing Ask keeps its mode switch while reading is paused').not.toBeNull();
     trigger!.click();
     await composer.updateComplete;
     const ask = composer.shadowRoot!.querySelector<HTMLButtonElement>('[data-tier="ask"]')!;
@@ -276,7 +282,7 @@ describe('WP3.7 shared pause surfaces', () => {
     ask.click();
     await settle(el);
     expect(el.shadowRoot!.textContent).toContain('waiting for Resume');
-    expect(button(await controls(el)).textContent).toContain('Resume indexing');
+    expect(button(await controls(el)).textContent).toContain('Resume reading');
     feed('PAUSED', 0);
     await settle(el);
     expect(el.shadowRoot!.querySelector('jf-indexing-controls')).toBeNull();
@@ -286,7 +292,7 @@ describe('WP3.7 shared pause surfaces', () => {
     const el = await mount('jf-status-pill');
     feed('PAUSED');
     await settle(el);
-    expect(button(await controls(el)).textContent).toContain('Resume indexing');
+    expect(button(await controls(el)).textContent).toContain('Resume reading');
   });
 });
 
@@ -328,7 +334,7 @@ describe('CR37 keyboard continuity and recovery', () => {
       expect(text).toContain('Check exclusions');
       expect(text).not.toMatch(/held until you resume|waiting for Resume/i);
       const control = await controls(el, tag === 'jf-library-surface');
-      expect(control.shadowRoot!.textContent).not.toContain('Resume indexing');
+      expect(control.shadowRoot!.textContent).not.toContain('Resume reading');
       const open = button(control);
       expect(open.textContent).toContain('Open Settings at Reset to defaults');
       expect(control.shadowRoot!.textContent).not.toContain('set View tier to Operator');
@@ -416,9 +422,9 @@ describe('CR37 keyboard continuity and recovery', () => {
     observe('RUNNING');
     await settle(el);
     expect(control.shadowRoot!.activeElement).toBe(resume);
-    expect(resume.textContent).toContain('Resume indexing');
+    expect(resume.textContent).toContain('Resume reading');
     expect(resume.getAttribute('aria-disabled')).toBe('true');
-    expect(control.shadowRoot!.textContent).toContain('Indexing is already running');
+    expect(control.shadowRoot!.textContent).toContain('Reading is already running');
     resume.click(); await settle(control);
     expect(fetchMock.mock.calls.some(c => String(c[0]).endsWith('/core.indexing-resume/invoke'))).toBe(false);
   });
@@ -474,8 +480,8 @@ describe('WP3.7 verifier layout and focus repairs', () => {
       expect(control.isConnected).toBe(false);
       const panel = task.shadowRoot!.querySelector<StatusPanel>('jf-status-panel')!;
       expect(panel.shadowRoot!.activeElement).toBe(panel.shadowRoot!.querySelector('[role=dialog]'));
-      expect(deck.shadowRoot!.textContent).toContain('Indexing resumed.');
-      expect(announcements.filter(t => t.includes('Indexing resumed.'))).toHaveLength(1);
+      expect(deck.shadowRoot!.textContent).toContain('Reading resumed.');
+      expect(announcements.filter(t => t.includes('Reading resumed.'))).toHaveLength(1);
     } finally { observer.disconnect(); }
   });
 
@@ -489,7 +495,7 @@ describe('WP3.7 verifier layout and focus repairs', () => {
     expect(control.shadowRoot!.textContent).toContain('Resuming');
     feed('PAUSED', 3); await settle(pill); await settle(control);
     expect(control.shadowRoot!.textContent, 'still held: no claim that work is running').toContain('Resuming');
-    expect(pill.shadowRoot!.textContent).toContain('Indexing paused');
+    expect(pill.shadowRoot!.textContent).toContain('Reading paused');
     feed('RUNNING', 3); await settle(pill);
     control = await controls(pill); await settle(control);
     expect(control.shadowRoot!.textContent).not.toContain('Resuming');
@@ -515,11 +521,17 @@ describe('WP3.7 verifier layout and focus repairs', () => {
       rootsObserved: true });
     await settle(library);
     const card = () => library.shadowRoot!.querySelector('.card')!;
-    expect(card().textContent).toContain('semantic search waiting for AI install');
+    // V1: the row's status says the word-search state; the meaning caveat is said once, by its name,
+    // in the open row's Search by meaning line.
+    const meaning = () => card().querySelector('.folder-details')?.textContent ?? '';
+    card().querySelector<HTMLButtonElement>('.folder-toggle')!.click(); await settle(library);
+    expect(card().querySelector('.card-meta')?.textContent).toBe('Up to date');
+    expect(meaning()).toMatch(/Search by meaning\s*Needs AI · word search is available/);
     expect(card().querySelector('.status-icon.pending')).not.toBeNull();
     observe('PAUSED'); await settle(library);
-    expect(card().textContent).toContain('semantic search waiting for AI install');
-    expect(card().textContent).toContain('keyword search ready');
+    expect(card().querySelector('.card-meta')?.textContent).toBe('Up to date');
+    expect(meaning()).toMatch(/Search by meaning\s*Needs AI · word search is available/);
+    expect(card().textContent).not.toMatch(/semantic search/i);
     expect(card().querySelector('.status-icon.pending')).not.toBeNull();
     expect(card().querySelector('.status-icon.indexed')).toBeNull();
   });

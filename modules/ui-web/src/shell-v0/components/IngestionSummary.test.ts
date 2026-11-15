@@ -59,14 +59,14 @@ describe('IngestionSummary: real component transport and presentation', () => {
     const el = await mount(fetch);
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(fetch.mock.calls[0]).toEqual(['/api/diagnostics/ingestion/summary?since=0', { signal: expect.any(AbortSignal) }]);
-    expect(text(el)).toContain('17 recorded indexing outcomes');
+    expect(text(el)).toContain('17 recorded reading outcomes');
     expect(text(el)).toContain('A file can appear more than once');
-    expect(text(el)).toContain('File unchanged since its last index');
+    expect(text(el)).toContain('File unchanged since its last read');
     expect(text(el)).toContain('Content extraction failed');
     const badges = [...el.shadowRoot!.querySelectorAll<StatusBadge>('jf-status-badge')];
     expect(badges.map((b) => [b.textContent, b.status])).toEqual([
-      ['Indexed', 'success'], ['Deferred', 'neutral'], ['Skipped', 'neutral'],
-      ['Extraction failed', 'failed'], ['Indexed without content', 'neutral'],
+      ['Read', 'success'], ['Deferred', 'neutral'], ['Skipped', 'neutral'],
+      ['Extraction failed', 'failed'], ['Read without content', 'neutral'],
     ]);
   });
 
@@ -95,10 +95,10 @@ describe('IngestionSummary: real component transport and presentation', () => {
     ]));
     const rows = [...el.shadowRoot!.querySelectorAll('li')].map((li) => li.textContent!.replace(/\s+/g, ' ').trim());
     expect(rows).toHaveLength(3);
-    expect(rows[0]).toContain('Content indexed; some characters could not be decoded');
+    expect(rows[0]).toContain('Content read; some characters could not be decoded');
     expect(rows[0]).not.toContain('extraction limit');
-    expect(rows[1]).toContain('Content indexed up to the extraction limit; some characters could not be decoded');
-    expect(rows[2]).toContain('Content indexed up to the extraction limit');
+    expect(rows[1]).toContain('Content read up to the extraction limit; some characters could not be decoded');
+    expect(rows[2]).toContain('Content read up to the extraction limit');
     expect(rows[2]).not.toContain('could not be decoded');
   });
 
@@ -127,11 +127,11 @@ describe('IngestionSummary: real component transport and presentation', () => {
   it('distinguishes initial loading from a genuinely empty ledger', async () => {
     let resolve!: (response: Response) => void;
     const el = await mount(() => new Promise((r) => { resolve = r; }));
-    expect(text(el)).toContain('Loading indexing activity');
-    expect(text(el)).not.toContain('No indexing outcomes');
+    expect(text(el)).toContain('Loading reading activity');
+    expect(text(el)).not.toContain('No reading outcomes');
     expect(button(el, 'Refresh activity').disabled).toBe(true);
     resolve(response([])); await pump(el);
-    expect(text(el)).toContain('No indexing outcomes in retained history');
+    expect(text(el)).toContain('No reading outcomes in retained history');
     expect(el.shadowRoot!.querySelector('[role="status"]')).not.toBeNull();
   });
 
@@ -144,13 +144,13 @@ describe('IngestionSummary: real component transport and presentation', () => {
   ])('shows honest %s failure and the actual refresh button recovers', async (_, fail) => {
     const fetch = vi.fn().mockImplementationOnce(fail).mockImplementation(async () => response([row()]));
     const el = await mount(fetch);
-    expect(text(el)).toContain('Could not refresh indexing activity');
-    expect(text(el)).not.toContain('No indexing outcomes');
+    expect(text(el)).toContain('Could not refresh reading activity');
+    expect(text(el)).not.toContain('No reading outcomes');
     expect(text(el)).not.toContain('private');
     expect(el.shadowRoot!.querySelector('jf-error-alert')).not.toBeNull();
     await activate(el, 'Retry activity refresh');
     expect(fetch).toHaveBeenCalledTimes(2);
-    expect(text(el)).toContain('1 recorded indexing outcome.');
+    expect(text(el)).toContain('1 recorded reading outcome.');
     expect(el.shadowRoot!.querySelector('jf-error-alert')).toBeNull();
   });
 
@@ -167,7 +167,7 @@ describe('IngestionSummary: real component transport and presentation', () => {
     vi.advanceTimersByTime(11000); await pump(el);
     expect(fetch.mock.calls[1]![1].signal.aborted).toBe(true);
     expect(text(el)).toContain('Showing the last loaded summary');
-    expect(text(el)).toContain('3 recorded indexing outcomes in the last loaded summary');
+    expect(text(el)).toContain('3 recorded reading outcomes in the last loaded summary');
     expect(button(el, 'Retry activity refresh').disabled).toBe(false);
   });
 
@@ -194,8 +194,8 @@ describe('IngestionSummary: real component transport and presentation', () => {
       expect(announcements).toEqual([]);
 
       vi.advanceTimersByTime(4000); __tickClockForTest(); await pump(el);
-      expect(status.textContent).toContain('5 recorded indexing outcomes');
-      expect(announcements).toEqual(['5 recorded indexing outcomes.']);
+      expect(status.textContent).toContain('5 recorded reading outcomes');
+      expect(announcements).toEqual(['5 recorded reading outcomes.']);
       vi.advanceTimersByTime(4000); __tickClockForTest(); await pump(el);
       expect(status.textContent).toContain('in the last loaded summary');
       expect(el.shadowRoot!.querySelector('jf-error-alert')).not.toBeNull();
@@ -213,9 +213,9 @@ describe('IngestionSummary: real component transport and presentation', () => {
     const status = el.shadowRoot!.querySelector('[role="status"]')!;
     await activate(el, 'Refresh activity');
     expect(fetch).toHaveBeenCalledTimes(2);
-    expect(status.textContent).toBe('Refreshing indexing activity…');
+    expect(status.textContent).toBe('Refreshing reading activity…');
     resolve(response([row({ count: 3 })])); await pump(el);
-    expect(status.textContent).toBe('3 recorded indexing outcomes.');
+    expect(status.textContent).toBe('3 recorded reading outcomes.');
   });
 
   it('aborts on disconnect, unsubscribes ticks, clears timers and rejects late data after reconnect', async () => {
@@ -230,9 +230,9 @@ describe('IngestionSummary: real component transport and presentation', () => {
     vi.advanceTimersByTime(20000); __tickClockForTest();
     expect(fetch).toHaveBeenCalledTimes(1);
     document.body.append(el); await pump(el);
-    expect(text(el)).toContain('9 recorded indexing outcomes');
+    expect(text(el)).toContain('9 recorded reading outcomes');
     resolve(response([row({ count: 100 })])); await pump(el);
-    expect(text(el)).toContain('9 recorded indexing outcomes');
+    expect(text(el)).toContain('9 recorded reading outcomes');
     expect(text(el)).not.toContain('100 recorded');
   });
 
@@ -244,7 +244,7 @@ describe('IngestionSummary: real component transport and presentation', () => {
     el.host_ = host(nextFetch); await pump(el);
     expect(oldFetch.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
     resolve(response([row({ count: 100 })])); await pump(el);
-    expect(text(el)).toContain('5 recorded indexing outcomes');
+    expect(text(el)).toContain('5 recorded reading outcomes');
     expect(text(el)).not.toContain('100 recorded');
   });
 });

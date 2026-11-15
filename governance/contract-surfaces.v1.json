@@ -67,13 +67,13 @@
       "name": "FolderBrowseResponse",
       "schema": "SSOT/schemas/folder-browse-response.v1.json",
       "outFile": "folder-browse-response.ts",
-      "consumers": ["modules/ui-web/src/api/domains/browse.ts"]
+      "consumers": ["modules/ui-web/src/api/domains/browse.ts", "modules/ui-web/src/shell-v0/views/BrowseSurface.ts"]
     },
     {
       "name": "FolderFilesResponse",
       "schema": "SSOT/schemas/folder-files-response.v1.json",
       "outFile": "folder-files-response.ts",
-      "consumers": ["modules/ui-web/src/api/domains/browse.ts"]
+      "consumers": ["modules/ui-web/src/api/domains/browse.ts", "modules/ui-web/src/shell-v0/views/BrowseSurface.ts"]
     },
     {
       "name": "IndexedRootView",

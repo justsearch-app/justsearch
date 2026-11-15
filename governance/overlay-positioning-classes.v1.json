@@ -1,7 +1,7 @@
 {
   "version": 1,
   "tempdoc": 559,
-  "note": "Tempdoc 559 Authority I — the catalog the layout-purity gate projects its position:fixed exemptions from (so the gate is catalog-projected per 548 §5.2, not a hardcoded list in the script). Every viewport overlay docks into an OverlayHost slot and drops its own positioning; the ONLY components allowed a free `position: fixed` are the OverlayHost itself + the genuinely-different positioning CLASSES below — they self-position relative to a trigger/cursor (anchored), the native dialog top layer or a dynamically-instantiated modal (dialog), or their instantiation site (toast). This is a semantic taxonomy, NOT a migration backlog: a NEW viewport-docked overlay must dock into a slot; only a genuinely-different positioning class is added here, with its class. Modeled on governance/execution-surfaces.v1.json.",
+  "note": "Tempdoc 559 Authority I \u2014 the catalog the layout-purity gate projects its position:fixed exemptions from (so the gate is catalog-projected per 548 \u00a75.2, not a hardcoded list in the script). Every viewport overlay docks into an OverlayHost slot and drops its own positioning; the ONLY components allowed a free `position: fixed` are the OverlayHost itself + the genuinely-different positioning CLASSES below \u2014 they self-position relative to a trigger/cursor (anchored), the native dialog top layer or a dynamically-instantiated modal (dialog), or their instantiation site (toast). This is a semantic taxonomy, NOT a migration backlog: a NEW viewport-docked overlay must dock into a slot; only a genuinely-different positioning class is added here, with its class. Modeled on governance/execution-surfaces.v1.json.",
   "classes": {
     "anchored": "Positioned relative to a trigger element / cursor by JS (popovers, menus, hover cards). The OverlayHost slots are fixed viewport anchors and deliberately do not own trigger-relative positioning.",
     "dialog": "Native <dialog> top layer or a dynamically-instantiated modal that is not a Shell-mounted OverlayHost child.",
@@ -9,7 +9,7 @@
   },
   "exempt": [
     {
-      "file": "shell-v0/components/ContextMenu.ts",
+      "file": "shell-v0/components/Menu.ts",
       "class": "anchored"
     },
     {

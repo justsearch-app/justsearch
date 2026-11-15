@@ -70,7 +70,7 @@ it('SR1 finds member controls from the same vocabulary as their renderers', () =
 
 it('SR3 names external destinations in results', () => {
   const indexing = searchRegister('schedule').find(hit => hit.section?.key === 'indexing');
-  expect(indexing?.label).toBe('Library › When to index');
+  expect(indexing?.label).toBe('Library › When to read files');
   expect(indexing?.destination).toEqual({ kind: 'indexing-hours' });
   const memory = searchRegister('tokens').find(hit => hit.section?.key === 'context-window');
   expect(memory?.label).toBe('AI Brain › Reading memory');

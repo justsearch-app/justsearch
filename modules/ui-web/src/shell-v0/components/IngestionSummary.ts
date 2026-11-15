@@ -158,23 +158,23 @@ export class IngestionSummary extends JfElement {
   private renderSummary(total: number, visible: IngestionRollup[] | null): TemplateResult {
     return html`<section aria-labelledby="activity-heading" data-testid="ingestion-summary">
       <header>
-        <h3 id="activity-heading">Indexing activity</h3>
+        <h3 id="activity-heading">Reading activity</h3>
         <jf-button .disabled=${this.loading} .onActivate=${() => this.refresh()}>
           ${this.error ? 'Retry activity refresh' : 'Refresh activity'}
         </jf-button>
       </header>
-      <p>Recorded outcomes from retained indexing history. A file can appear more than once;
+      <p>Recorded outcomes from retained reading history. A file can appear more than once;
         these counts do not describe its current search readiness.</p>
       ${this.error ? html`<jf-error-alert status="warning">
-        Could not refresh indexing activity. Check that JustSearch is running, then retry the refresh.
+        Could not refresh reading activity. Check that JustSearch is running, then retry the refresh.
         ${this.rows ? 'Showing the last loaded summary.' : ''}
       </jf-error-alert>` : nothing}
       <p role="status" aria-live="polite">${this.loading && this.announceLoading
-        ? (this.rows ? 'Refreshing indexing activity…' : 'Loading indexing activity…')
-        : this.rows ? (total === 0 ? 'No indexing outcomes in retained history.'
-          : `${total.toLocaleString()} recorded indexing ${total === 1 ? 'outcome' : 'outcomes'}${this.error ? ' in the last loaded summary' : ''}.`)
-          : 'Indexing activity is unavailable.'}</p>
-      ${visible?.length ? html`<ul aria-label="Recorded indexing outcomes">
+        ? (this.rows ? 'Refreshing reading activity…' : 'Loading reading activity…')
+        : this.rows ? (total === 0 ? 'No reading outcomes in retained history.'
+          : `${total.toLocaleString()} recorded reading ${total === 1 ? 'outcome' : 'outcomes'}${this.error ? ' in the last loaded summary' : ''}.`)
+          : 'Reading activity is unavailable.'}</p>
+      ${visible?.length ? html`<ul aria-label="Recorded reading outcomes">
         ${visible.map((row) => {
           const outcome = ingestionOutcomeLabel(row.outcomeClass);
           return html`<li><span class="count">${row.count.toLocaleString()}</span>

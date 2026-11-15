@@ -554,7 +554,7 @@ describe('presentAiEngineVerdict (Design pass 3 — the presentation projection)
     ['starting', 'Starting…', 'warning'],
     ['connecting', 'Connecting…', 'warning'],
     ['online', 'Online', 'success'],
-    ['indexing', 'Indexing', 'warning'],
+    ['indexing', 'Reading', 'warning'],
   ] as const)('kind %s → headline %s, tone %s', (kind, headline, tone) => {
     const p = presentAiEngineVerdict(verdictFor(kind));
     expect(p.headline).toBe(headline);

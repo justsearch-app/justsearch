@@ -15,6 +15,7 @@ export type SavedIndexingRules = {
 /** The indexing editor, extracted from Settings. Only the explicit rule pair is written. */
 export class IndexingRulesEditor extends JfElement {
   static properties = {
+    developer: { type: Boolean },
     apiBase: { type: String, attribute: 'api-base' }, host_: { attribute: false },
     readOnly: { state: true },
     saveWithSettings: { attribute: false },
@@ -25,6 +26,7 @@ export class IndexingRulesEditor extends JfElement {
     indexingRulesMessage: { state: true },
     conflictingRules: { state: true },
   };
+  declare developer: boolean;
   declare apiBase: string;
   declare host_: PluginHostApi | undefined;
   declare readOnly: boolean;
@@ -108,7 +110,7 @@ export class IndexingRulesEditor extends JfElement {
     } else if (startMinute === endMinute) {
       this.indexingRulesError = 'Start and end times must be different.';
     } else if (draft.enabled && !draft.days.length) {
-      this.indexingRulesError = 'Choose at least one day or turn indexing hours off.';
+      this.indexingRulesError = 'Choose at least one day or turn reading hours off.';
     }
     if (this.indexingRulesError) return;
     this.indexingRulesSaving = true;
@@ -124,12 +126,12 @@ export class IndexingRulesEditor extends JfElement {
       this.savedRules = next;
       this.indexingRulesDirty = false;
       this.conflictingRules = null;
-      this.indexingRulesMessage = 'Indexing rules saved.';
+      this.indexingRulesMessage = 'Reading rules saved.';
     } catch (error) {
       const conflict = error instanceof OperationError && (error.httpStatus === 409 || error.errorCode === 'VERSION_CONFLICT');
       this.indexingRulesError = conflict
         ? `Settings changed before this save. Review your draft and save again. ${error.message}`
-        : `Could not save indexing rules. ${error instanceof Error ? error.message : String(error)}`;
+        : `Could not save reading rules. ${error instanceof Error ? error.message : String(error)}`;
       if (conflict) await this.loadSettings('conflict');
     } finally {
       this.indexingRulesSaving = false;
@@ -139,6 +141,7 @@ export class IndexingRulesEditor extends JfElement {
 
   constructor() {
     super();
+    this.developer = false;
     this.apiBase = '';
     this.readOnly = false;
     this.indexingRules = { enabled: false, days: [1, 2, 3, 4, 5, 6, 7], start: '09:00', end: '17:00', pauseOnBattery: false };
@@ -170,7 +173,7 @@ export class IndexingRulesEditor extends JfElement {
     try {
       const res = this.host_ ? await this.host_.data.fetch('/api/settings/v2')
         : await authorizedFetch(`${this.apiBase}/api/settings/v2`);
-      if (!res.ok) throw new Error(`Could not load indexing rules (${res.status}).`);
+      if (!res.ok) throw new Error(`Could not load reading rules (${res.status}).`);
       const data = settingsV2Schema.parse(await res.json());
       if (serial !== this.loadSerial || !this.isConnected) return false;
       this.readOnly = data.settingsMode === 'in_memory';
@@ -192,7 +195,7 @@ export class IndexingRulesEditor extends JfElement {
         this.indexingRulesDirty = false;
         this.conflictingRules = null;
         this.indexingRulesError = '';
-        this.indexingRulesMessage = 'Saved indexing rules loaded.';
+        this.indexingRulesMessage = 'Saved reading rules loaded.';
       }
       this.indexingRulesLoaded = true;
       return true;
@@ -226,9 +229,9 @@ export class IndexingRulesEditor extends JfElement {
     const schedule = saved.schedule;
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     const time = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
-    return html`<section aria-label="Saved indexing rules">
-      <p>Indexing times changed elsewhere. Your draft is kept. Current saved rules:</p>
-      <details open><summary>Current saved indexing rules</summary>
+    return html`<section aria-label="Saved reading rules">
+      <p>Reading times changed elsewhere. Your draft is kept. Current saved rules:</p>
+      <details open><summary>Current saved reading rules</summary>
       <p>${schedule?.enabled ? 'Only between' : 'Any time'}${schedule ? html` · ${time(schedule.startMinute ?? 540)}–${time(schedule.endMinute ?? 1020)}
         · ${(schedule.days ?? []).map(day => days[day - 1]).join(', ')}${!schedule.enabled ? ' (hours turned off; days and times kept)' : ''}` : nothing}
         · Pause while on battery: ${saved.pauseOnBattery ? 'on' : 'off'}</p></details>
@@ -266,10 +269,10 @@ export class IndexingRulesEditor extends JfElement {
 
   override render() {
     return html`<section aria-labelledby="when-to-index">
-      <h3 id="when-to-index" tabindex="-1">When to index</h3>
-      <form @submit=${(event: Event) => void this.saveIndexingRules(event)} novalidate aria-label="Indexing rules">
+      <h3 id="when-to-index" tabindex="-1">When to read files</h3>
+      <form @submit=${(event: Event) => void this.saveIndexingRules(event)} novalidate aria-label="Reading rules">
         <fieldset ?disabled=${!this.indexingRulesLoaded || this.indexingRulesSaving || this.readOnly}
-          aria-label="When to index" aria-describedby="indexing-rules-error">
+          aria-label="When to read files" aria-describedby="indexing-rules-error">
           <div class="rule-choice"><label><input type="radio" name="indexing-hours" .checked=${!this.indexingRules.enabled}
             @change=${() => this.editIndexingRules({ enabled: false })}>Any time</label></div>
           <div class="rule-choice"><label><input id="indexing-hours" type="radio" name="indexing-hours" .checked=${this.indexingRules.enabled}
@@ -278,8 +281,9 @@ export class IndexingRulesEditor extends JfElement {
               @input=${(e: Event) => this.editIndexingRules({ start: (e.target as HTMLInputElement).value })}></label>
             and <label><span class="visually-hidden">End time</span><input type="time" .value=${this.indexingRules.end} aria-describedby="indexing-local-time indexing-rules-error"
               @input=${(e: Event) => this.editIndexingRules({ end: (e.target as HTMLInputElement).value })}></label>
+            ${this.indexingRules.enabled && this.indexingRules.days.length !== 7 ? html`<span class="effective-days">${this.indexingRules.days.map(day => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][day - 1]).join(', ') || 'No days selected'}</span>` : nothing}
           </div>
-          <div class="indexing-days" role="group" aria-label="Indexing days" ?hidden=${!this.indexingRules.enabled}>
+          <div class="indexing-days" role="group" aria-label="Reading days" ?hidden=${!this.developer || !this.indexingRules.enabled}>
             ${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, index) => html`
               <label><input type="checkbox" .checked=${this.indexingRules.days.includes(index + 1)}
                 @change=${(e: Event) => this.editIndexingRules({ days: (e.target as HTMLInputElement).checked
@@ -290,16 +294,16 @@ export class IndexingRulesEditor extends JfElement {
             aria-describedby="indexing-battery-help"
             @change=${(e: Event) => this.editIndexingRules({ pauseOnBattery: (e.target as HTMLInputElement).checked })}>Pause while on battery</label>
         </fieldset>
-        <details><summary>About indexing times</summary>
+        <details><summary>About reading times</summary>
           <p id="indexing-local-time">Hours follow this computer's local time. An end time before the start continues into the next day. Turning hours off keeps your days and times.</p>
-          <p id="indexing-battery-help">Applies only while this computer is known to run on battery. If the power source is unknown, this rule does not hold indexing. Your preference is kept.</p>
+          <p id="indexing-battery-help">Applies only while this computer is known to run on battery. If the power source is unknown, this rule does not hold reading. Your preference is kept.</p>
         </details>
         <button type="submit" ?disabled=${!this.indexingRulesLoaded || this.readOnly}
-          aria-disabled=${this.indexingRulesSaving ? 'true' : 'false'}>${this.indexingRulesSaving ? 'Saving indexing rules…' : 'Save indexing rules'}</button>
+          aria-disabled=${this.indexingRulesSaving ? 'true' : 'false'}>${this.indexingRulesSaving ? 'Saving reading rules…' : 'Save reading rules'}</button>
         ${this.renderSavedRules()}
         <p id="indexing-rules-error" role="alert">${this.indexingRulesError}</p>
         <p role="status">${this.indexingRulesMessage}</p>
-        ${!this.indexingRulesLoaded ? html`<p>Waiting for saved indexing rules.</p>` : nothing}
+        ${!this.indexingRulesLoaded ? html`<p>Waiting for saved reading rules.</p>` : nothing}
         ${this.readOnly ? html`<p>Settings are read-only in this session.</p>` : nothing}
       </form>
     </section>`;

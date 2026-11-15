@@ -41,11 +41,14 @@ async function mountAll() {
   const library = surfaces[2] as LibrarySurface;
   library.host_ = {
     platform: { capabilities: new Set<string>() },
-    data: { fetch: async () => ({ ok: false, status: 503 }) as Response },
+    // The folder list is not answered: rows are placed by the test, and a failed read would make them unconfirmed (R3).
+    data: { fetch: (path: string) => path.startsWith('/api/indexing-roots/substrate') ? new Promise<Response>(() => {})
+      : Promise.resolve({ ok: false, status: 503 } as Response) },
     utilities: { formatRelativeTime: () => 'just now' },
   } as unknown as PluginHostApi;
   for (const el of surfaces) document.body.appendChild(el);
   await flush();
+  library.loading = false;
   library.roots = [{ pathHash: 'test-folder', status: 'indexed', walkCompleted: true,
     fileCount: 10, inFlightCount: 4, failedCount: 0,
     parentDocsTotalEmbedding: 10, parentDocsSettledEmbedding: 0 }];
@@ -65,7 +68,9 @@ beforeEach(() => {
   surfaces = [];
   __resetAiStateForTest();
   __resetTasksForTest();
-  vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { headers: { 'Content-Type': 'application/json' } })));
+  // The folder list is not answered: a failed read would make the Library's placed rows unconfirmed (R3).
+  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => String(input instanceof Request ? input.url : input).includes('/api/indexing-roots/substrate')
+    ? new Promise<Response>(() => {}) : Promise.resolve(new Response('{}', { headers: { 'Content-Type': 'application/json' } }))));
 });
 afterEach(async () => {
   for (const el of surfaces) el.remove();
@@ -81,7 +86,7 @@ describe('WP3.3 shared status surfaces', () => {
     feed(status());
     await mountAll();
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).toContain('Text indexing continues');
+      expect(text, surfaces[i]!.localName).toContain('Text reading continues');
       expect(text, surfaces[i]!.localName).toContain('Meaning search is waiting while the computer saves energy. Some meaning processing can continue between files.');
       expect(text, surfaces[i]!.localName).not.toMatch(/queue[^.]*paused|Paused — saving energy|Batch Processing Active/);
     }
@@ -112,8 +117,8 @@ describe('WP3.3 shared status surfaces', () => {
     feed(stale);
     await flush();
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).toContain('Indexing status unconfirmed');
-      expect(text, surfaces[i]!.localName).not.toContain('Text indexing continues');
+      expect(text, surfaces[i]!.localName).toContain('Reading status unconfirmed');
+      expect(text, surfaces[i]!.localName).not.toContain('Text reading continues');
     }
   });
 
@@ -132,8 +137,8 @@ describe('WP3.3 shared status surfaces', () => {
     await flush();
     expect(getAiState().snapshotLive, 'inference still confirms Engine reachability').toBe(true);
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).toContain('Indexing status unconfirmed');
-      expect(text, surfaces[i]!.localName).not.toMatch(/Text indexing continues|Ready — fully searchable|saves energy/);
+      expect(text, surfaces[i]!.localName).toContain('Reading status unconfirmed');
+      expect(text, surfaces[i]!.localName).not.toMatch(/Text reading continues|Ready — fully searchable|saves energy/);
     }
 
     const recovered = status(jobs, []);
@@ -142,7 +147,7 @@ describe('WP3.3 shared status surfaces', () => {
     feed(recovered);
     await flush();
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).not.toContain('Indexing status unconfirmed');
+      expect(text, surfaces[i]!.localName).not.toContain('Reading status unconfirmed');
       expect(text, surfaces[i]!.localName).not.toContain('saves energy');
     }
   });
@@ -176,7 +181,7 @@ describe('WP3.3 shared status surfaces', () => {
     feed(status(0, ['chat_generating']));
     await mountAll();
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).toContain('Indexing shares time with chat.');
+      expect(text, surfaces[i]!.localName).toContain('Reading shares time with chat.');
     }
     feed(status(0, []));
     await flush();

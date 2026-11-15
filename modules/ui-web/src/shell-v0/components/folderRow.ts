@@ -25,11 +25,12 @@ export interface FolderRow {
   readonly apiBase?: string;
   readonly removalBusy?: boolean;
   readonly filesFound?: string;
+  readonly developer?: boolean;
+  readonly meaningText?: string;
+  readonly reading?: boolean;
   readonly collection?: string;
   readonly wordsVerdict?: string;
-  readonly showProgress?: boolean;
   readonly processingPercent?: number | null;
-  readonly indexedAgo?: string;
   readonly verifiedAgo?: string;
   readonly canReveal?: boolean;
   readonly revealUnavailable?: string;
@@ -63,15 +64,13 @@ export const folderRowStyles = css`
   .chevron { display: inline-flex; }
   .folder-toggle[aria-expanded='true'] .chevron { transform: rotate(90deg); }
   .card-info { min-width: 0; }
+  .folder-name { font-weight: 500; }
   .card-path { font-size: var(--font-size-sm); }
   .folder-name, .folder-path { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
   .folder-path { font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: .2rem; }
   .folder-state { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem;
     font-size: var(--font-size-xs); max-width: 24rem; color: var(--text-secondary); overflow-wrap: anywhere; }
   .files-found { color: var(--text-secondary); font-size: var(--font-size-xs); text-align: end; }
-  .folder-progress { width: 7rem; height: 3px; border: 0; accent-color: var(--accent-tint); }
-  .folder-progress::-webkit-progress-bar { background: var(--border-subtle); border-radius: 4px; }
-  .folder-progress::-webkit-progress-value { background: var(--accent-tint); border-radius: 4px; }
   .folder-details { margin: .8rem 0 .35rem 3.8rem; display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: .4rem 1rem; }
   .folder-details[hidden] { display: none; }
@@ -85,7 +84,7 @@ export const folderRowStyles = css`
   .status-icon.indexed { color: var(--text-success); }
   .status-icon.error { color: var(--text-danger); }
   .status-icon.unverified { color: var(--text-warning); }
-  .remove-action { --jf-button-color: var(--text-danger); }
+
   @media (max-width: 800px) {
     .folder-summary { grid-template-columns: minmax(0, 1fr) auto; gap: .5rem; }
     .folder-state { grid-column: 1 / -1; padding-inline-start: 3.8rem; grid-row: 2; max-width: none; }
@@ -93,7 +92,6 @@ export const folderRowStyles = css`
   }
   @media (forced-colors: active) {
     .card { border-color: CanvasText; }
-    .folder-progress { forced-color-adjust: auto; }
     .folder-toggle:focus-visible { outline-color: Highlight; }
   }
 `;
@@ -116,31 +114,27 @@ export function renderFolderRow(f: FolderRow, actions: RowActions): TemplateResu
       </button>
       <div class="folder-state"><span class="status-icon ${f.status ?? 'pending'}">${icon({ name: glyph, size: 15 })}</span>
         <span class="card-meta">${f.removalBusy ? 'Removing folder…' : f.statusText ?? f.metaText ?? ''}</span>
-        ${f.showProgress && f.processingPercent != null ? html`<progress class="folder-progress" max="100" value=${f.processingPercent}
-          aria-label="Meaning processing progress">${f.processingPercent}%</progress>` : nothing}
-        ${failed ? html`<jf-button class="failed-chip" variant="ghost" size="sm" label=${failed.label}
-          title=${failed.title || nothing} data-last-known=${f.failedLastKnown ? 'true' : 'false'}
-          .disabled=${disabled} .onActivate=${() => { if (!disabled) actions.invoke('show-failed'); }}
-          >${icon({ name: 'alert-circle', size: 12 })} ${failed.text}</jf-button>` : nothing}
-        ${f.needsVerification ? html`<jf-button class="reindex-chip" variant="ghost" size="sm" label="Reindex to verify"
-          .disabled=${disabled} .onActivate=${() => { if (!disabled) actions.invoke('reindex'); }}>Reindex to verify</jf-button>` : nothing}
+        ${f.needsVerification ? html`<span>Deletions unverified</span><jf-button class="reindex-chip" variant="ghost" size="sm" label="Read again to verify"
+          .disabled=${disabled} .onActivate=${() => { if (!disabled) actions.invoke('reindex'); }}>Read again to verify</jf-button>` : nothing}
       </div>
       <span class="files-found">${f.filesFound ?? ''}</span>
     </div>
     ${actions.expanded ? html`<div class="folder-details" id=${`folder-details-${f.pathHash ?? ''}`}>
-      <dl><div><dt>Collection</dt><dd>${f.collection ?? 'default'}</dd></div>
-        <div><dt>Searchable by words</dt><dd>${f.wordsVerdict ?? 'Unconfirmed'}</dd></div>
-        <div><dt>Meaning processing progress</dt><dd>${f.processingPercent != null ? `${f.processingPercent}%` : 'Unconfirmed'}</dd></div></dl>
-      <dl><div><dt>Indexed</dt><dd>${f.indexedAgo || 'Not yet confirmed'}</dd></div>
-        <div><dt>Verified</dt><dd>${f.verifiedAgo || 'Not yet confirmed'}</dd></div>
-        <div><dt>Unreadable files</dt><dd>${failed ? html`<jf-button variant="ghost" size="sm" label=${failed.label}
-          .disabled=${disabled} .onActivate=${() => { if (!disabled) actions.invoke('show-failed'); }}
-          >${failed.text}</jf-button>` : 'None reported'}</dd></div></dl>
-      <div class="row-actions">${f.canReveal ? html`<jf-button variant="ghost" label="Open in Explorer"
+      <dl><div><dt>Search by meaning</dt><dd>${f.meaningText ?? 'Not known · word search availability not known'}</dd></div>
+        <div><dt>Couldn't be read</dt><dd>${failed ? html`<jf-button class="failed-chip" variant="ghost" size="sm" label=${failed.label}
+          title=${failed.title || nothing} data-last-known=${f.failedLastKnown ? 'true' : 'false'}
+          .disabled=${disabled} .onActivate=${() => { if (!disabled) actions.invoke('show-failed'); }}>${failed.text}</jf-button>` : 'None reported'}</dd></div>
+        ${f.developer ? html`<div><dt>Collection</dt><dd>${f.collection ?? 'default'}</dd></div>
+          ${f.walkError ? html`<div><dt>Reason code</dt><dd><code>${f.walkError}</code></dd></div>` : nothing}
+          <div><dt>Searchable by words</dt><dd>${f.wordsVerdict ?? 'Unconfirmed'}</dd></div>
+          <div><dt>Meaning processing progress</dt><dd>${f.processingPercent != null ? `${f.processingPercent}%` : 'Unconfirmed'}</dd></div>` : nothing}</dl>
+      ${f.reading || f.verifiedAgo ? html`<dl>${f.reading ? html`<div><dt>Read</dt><dd>Reading now</dd></div>` : nothing}
+        ${f.verifiedAgo ? html`<div><dt>Checked for changes</dt><dd>${f.verifiedAgo}</dd></div>` : nothing}</dl>` : nothing}
+      <div class="row-actions">${f.canReveal ? html`<jf-button variant="ghost" label="Open in Files"
         title=${f.revealUnavailable || nothing} .disabled=${disabled}
         .availability=${f.revealUnavailable ? unavailableBecause(f.revealUnavailable) : undefined}
         .onActivate=${() => { if (!disabled && !f.revealUnavailable) actions.invoke('reveal'); }}
-        >${icon({ name: 'folder', size: 14 })} Open in Explorer</jf-button>` : nothing}
+        >${icon({ name: 'folder', size: 14 })} Open in Files</jf-button>` : nothing}
         <jf-button class="remove-action" variant="ghost" label=${f.removalBusy ? 'Removing…' : 'Remove from library'}
           .disabled=${disabled} .onActivate=${() => { if (!disabled) actions.invoke('remove'); }}
           >${icon({ name: 'trash-2', size: 14 })} ${f.removalBusy ? 'Removing…' : 'Remove from library'}</jf-button>

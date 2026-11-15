@@ -23,14 +23,19 @@ it('text, corners and bundled variable Inter follow the type ladder under the de
     expect(summary.violations).toBe(0);
     // Slice 7a: AI Brain draws no tab row until answers work (D1: −1 view per theme) and its eight
     // "You get / It costs" openers are developer tools (D5: −8 per theme; audited in
-    // BrainOverview.layout-lockdown), so the fixture's Brain contributes 5 views per theme, not 14.
-    expect(summary.surfaces).toBe(140);
+    // BrainOverview.layout-lockdown), so the fixture's Brain contributes 5 views per theme, not 14
+    // (164 on main after slice 6a, minus 18).
+    expect(summary.surfaces).toBe(146);
     const inventory = JSON.parse(await readFile(path.join(evidence, 'results.json'), 'utf8')) as {
       checks: { id: string; result: string; textElements?: number }[];
     };
     for (const theme of ['dark', 'light']) {
       expect(inventory.checks.find(check => check.id === `${theme}/search-results-filters`)).toMatchObject({ result: 'pass' });
       expect(inventory.checks.find(check => check.id === `${theme}/search-results-filters`)!.textElements).toBeGreaterThan(0);
+      for (const surface of ['library-activity', 'library-activity-expanded-1', 'library-developer', 'library-developer-expanded-1']) {
+        expect(inventory.checks.find(check => check.id === `${theme}/${surface}`)).toMatchObject({ result: 'pass' });
+        expect(inventory.checks.find(check => check.id === `${theme}/${surface}`)!.textElements).toBeGreaterThan(0);
+      }
     }
     passed = true;
   } finally {

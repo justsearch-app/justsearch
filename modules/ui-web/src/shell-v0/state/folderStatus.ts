@@ -30,6 +30,7 @@
 import type { IndexedRootView } from '../../api/generated/schema-types/indexed-root-view.js';
 import type { EnrichmentApplicability } from './indexingProgress.js';
 import { ENRICHMENT_BLOCKED_CAVEAT, ENRICHMENT_CATCHING_UP_CAVEAT } from './enrichmentCoverage.js';
+import { formatCount, formatFileCount } from '../display/format.js';
 
 export type FolderState =
   | 'scanning' // walk in progress — files not yet fully enqueued
@@ -80,6 +81,12 @@ export interface FolderStatusContext {
   readonly verifiedRelativeTime: string;
   /** The system `Stability` axis projected to a boolean (`stability.kind === 'provisional'`). */
   readonly provisional: boolean;
+  /**
+   * Whether the provisional state is an observed rebuild of the search data. `false` names another
+   * transition (an Engine outage, a restart), which must not be called "Rebuilding"; absent keeps the
+   * older reading for callers that do not know the cause.
+   */
+  readonly rebuilding?: boolean;
   /**
    * Tempdoc 813 §4 — which parent enrichment stages apply to this deployment, taken from the ONE
    * index-wide progress derivation (`selectIndexingProgress(...).stages`). The wire row carries
@@ -230,10 +237,7 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
   // otherwise-ready folder: it stays searchable, but we cannot promise stale entries were pruned.
   const deleteDetectionUnverified = row.deleteDetectionUnverified === true;
 
-  const fileCountText =
-    fileCount >= 0
-      ? `${fileCount.toLocaleString()} ${fileCount === 1 ? 'file' : 'files'}`
-      : 'count pending';
+  const fileCountText = formatFileCount(row.fileCount, row.fileCountCapped) || 'count pending';
 
   /**
    * Tempdoc 914 D3, review finding S2-1 — the carry is computed ONCE, ABOVE the branch chain.
@@ -271,10 +275,7 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
     return {
       state: 'unknown',
       glyph: 'pending',
-      metaText:
-        fileCount >= 0
-          ? `${collection} · Rebuilding… · last known ${fileCountText}`
-          : `${collection} · Rebuilding…`,
+      metaText: `${collection} · ${ctx.rebuilding === false ? 'Folder status unconfirmed' : 'Rebuilding…'}${fileCount >= 0 ? ` · last known ${fileCountText}` : ''}`,
       inFlight,
       failed: failedShown,
       failedIsLastKnown,
@@ -309,7 +310,7 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
     return {
       state: 'failed',
       glyph: 'error',
-      metaText: `${collection} · ${walkError}`,
+      metaText: `${collection} · ${walkErrorWords(walkError)}`,
       inFlight,
       failed: failedShown,
       failedIsLastKnown,
@@ -341,10 +342,10 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
       metaText: `${collection} · ${ctx.indexingPaused ? ctx.indexingPauseReason === 'settings_recovery' ? 'Waiting for Settings reset'
         : (ctx.indexingPauseReasons ?? [ctx.indexingPauseReason]).some(r => r === 'schedule' || r === 'on_battery')
           ? `Waiting for ${[
-            (ctx.indexingPauseReasons ?? [ctx.indexingPauseReason]).includes('schedule') ? 'indexing hours' : '',
+            (ctx.indexingPauseReasons ?? [ctx.indexingPauseReason]).includes('schedule') ? 'reading hours' : '',
             (ctx.indexingPauseReasons ?? [ctx.indexingPauseReason]).includes('on_battery') ? 'the battery rule to clear' : '',
             (ctx.indexingPauseReasons ?? [ctx.indexingPauseReason]).includes('user_paused') ? 'Resume' : '',
-          ].filter(Boolean).join(' and ')}` : 'Waiting for Resume' : ctx.retryWaiting ? 'Waiting to retry' : 'Indexing'} · ${inFlight.toLocaleString()} remaining${ctx.indexingPaused && deleteDetectionUnverified ? " · couldn't verify deletions — reindex to be sure" : ''}`,
+          ].filter(Boolean).join(' and ')}` : 'Waiting for Resume' : ctx.retryWaiting ? 'Waiting to retry' : 'Reading'} · ${formatCount(inFlight)} remaining${ctx.indexingPaused && deleteDetectionUnverified ? " · couldn't verify deletions — read again to be sure" : ''}`,
       inFlight,
       failed: failedShown,
       failedIsLastKnown,
@@ -376,16 +377,16 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
     // green ✓ (the 599 false-"✓" class, generalized to reconciliation completeness). It is still
     // searchable, so render a calm "couldn't verify — reindex to be sure", never an alarm.
     if (deleteDetectionUnverified) {
-      const indexedSuffix = ctx.relativeTime ? ` · indexed ${ctx.relativeTime}` : '';
+      const indexedSuffix = ctx.relativeTime ? ` · read ${ctx.relativeTime}` : '';
       return {
         state: 'unverified',
         glyph: 'unverified',
-        metaText: `${collection} · ${fileCountText}${indexedSuffix} · couldn't verify deletions — reindex to be sure`,
+        metaText: `${collection} · ${fileCountText}${indexedSuffix} · couldn't verify deletions — read again to be sure`,
         inFlight,
         failed,
       };
     }
-    const indexedSuffix = ctx.relativeTime ? ` · indexed ${ctx.relativeTime}` : '';
+    const indexedSuffix = ctx.relativeTime ? ` · read ${ctx.relativeTime}` : '';
     // Tempdoc 626 §Recency — the freshness heartbeat. Showing WHEN the index↔disk correspondence was
     // last confirmed turns a bare "✓" into a checkable fact ("Verified 2m ago") and makes a folder the
     // round-robin reconcile hasn't reached lately read as mildly stale ("Verified 8m ago") rather than
@@ -573,9 +574,32 @@ export interface FolderAttention {
 }
 
 const WALK_ERROR_WORDS: Readonly<Record<string, string>> = {
-  INCOMPLETE_COVERAGE: "The last scan couldn't read every file or subfolder (for example, missing permission). Reindex after fixing access.",
-  CLIENT_CANCELLED: 'The last scan was cancelled before it finished. Reindex to cover the whole folder.',
+  INCOMPLETE_COVERAGE: "The last scan couldn't read every file or subfolder (for example, missing permission). Read again after fixing access.",
+  CLIENT_CANCELLED: 'The last scan was cancelled before it finished. Read again to cover the whole folder.',
+  ROOT_NOT_DIRECTORY: 'This folder is missing or is not a folder. Reconnect the drive, or remove it from the library.',
 };
+
+/** Short plain words for the Engine's folder walk codes; the codes themselves are developer detail. */
+const WALK_ERROR_SHORT: Readonly<Record<string, string>> = {
+  ROOT_NOT_DIRECTORY: 'This folder is missing or is not a folder',
+  ROOT_NOT_FILE: 'This folder is missing or is not a folder',
+  ROOT_UNAVAILABLE: 'This folder is missing or is not a folder',
+  INCOMPLETE_COVERAGE: "Some subfolders couldn't be read",
+  CLIENT_CANCELLED: 'The last check was cancelled before it finished',
+  ROOT_IDENTITY_UNAVAILABLE_OR_CHANGED: 'This folder changed since it was added',
+  ROOT_MISMATCH: 'This folder changed since it was added',
+  ROOT_INITIALIZATION_PENDING: 'Getting this folder ready',
+};
+
+/** Whether a walk error is an Engine code rather than words. */
+export function isWalkErrorCode(walkError: string): boolean {
+  return /^[A-Z][A-Z0-9_]+$/.test(walkError.trim());
+}
+
+/** A folder's walk problem in plain words: known codes by name, any other code generically. */
+function walkErrorWords(walkError: string): string {
+  return WALK_ERROR_SHORT[walkError.trim()] ?? (isWalkErrorCode(walkError) ? "This folder couldn't be read completely" : walkError);
+}
 
 /**
  * The folder conditions behind the Library's "N things need your attention" headline. One source
@@ -585,13 +609,25 @@ export function folderAttention(root: IndexedRootView, status: FolderStatus, nam
   const hash = root.pathHash ?? '';
   const items: FolderAttention[] = [];
   if (status.state === 'unavailable') items.push({ key: `missing:${hash}`, kind: 'missing', title: `${name} can't be found`,
-    detail: 'Reconnect the drive or remove it. Last-known indexed content may still be searchable; reindex cannot cover this folder while it is offline.' });
+    detail: 'Reconnect the drive or remove it. Last-known read content may still be searchable; read again cannot cover this folder while it is offline.' });
   else if (root.walkError) items.push({ key: `walk:${hash}`, kind: 'walk', title: `${name} needs attention`,
-    detail: WALK_ERROR_WORDS[root.walkError] ?? root.walkError });
+    detail: WALK_ERROR_WORDS[root.walkError]
+      ?? (isWalkErrorCode(root.walkError) ? `${walkErrorWords(root.walkError)}. Check the folder, then read again.` : root.walkError) });
   if (status.failed > 0) items.push({ key: `files:${hash}`, kind: 'files',
     title: `${status.failed} ${status.failed === 1 ? 'file needs' : 'files need'} review · ${name}${status.failedIsLastKnown ? ' · last known' : ''}`,
     detail: 'Review the named files and their reasons, including unreadable sources, exhausted retries and extraction failures.' });
   if (status.state === 'unverified') items.push({ key: `deletions:${hash}`, kind: 'deletions', title: `${name}: deletions not verified`,
     detail: 'Some stale entries may remain searchable.' });
   return items;
+}
+
+/** Meaning work for this folder that failed, lost its output or cannot be read, in folderStatus's order. */
+export function meaningProblem(root: IndexedRootView, stages: EnrichmentApplicability | null | undefined): 'failed' | 'incomplete' | 'unconfirmed' | null {
+  if (!stages) return null;
+  if ([root.parentDocsTotalEmbedding, root.parentDocsSettledEmbedding, root.parentDocsTotalSplade, root.parentDocsSettledSplade,
+    root.parentDocsTotalNer, root.parentDocsSettledNer, root.chunkDocsTotal, root.chunkDocsSettled]
+    .some(value => typeof value === 'number' && value < 0)) return 'unconfirmed';
+  if (stages.embedding && Object.entries(root.missingArtifactStages ?? {}).some(([id, missing]) => missing && ['embedding', 'chunkVectors'].includes(id))) return 'incomplete';
+  if (Object.entries(root.failedStages ?? {}).some(([id, failed]) => failed && (id === 'chunkVectors' ? stages.embedding : stages[id as keyof EnrichmentApplicability]))) return 'failed';
+  return null;
 }

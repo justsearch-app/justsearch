@@ -96,7 +96,7 @@ export const SETTINGS_CONTROL_LABELS = {
     "cancelImport": "Cancel import"
   },
   "indexing": {
-    "change": "Change when to index"
+    "change": "Change when to read files"
   },
   "context-window": {
     "open": "Reading memory (context window)"

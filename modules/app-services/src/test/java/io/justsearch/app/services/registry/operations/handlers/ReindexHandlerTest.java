@@ -75,6 +75,20 @@ final class ReindexHandlerTest {
   }
 
   @Test
+  void approvalPreviewNamesReadingAgainWithExactTargetsAndUnchangedFiles(@TempDir Path directory) {
+    Path first = directory.resolve("first").toAbsolutePath().normalize();
+    Path second = directory.resolve("second").toAbsolutePath().normalize();
+    ReindexHandler handler = handler(RecordedIngestionService.unavailable(),
+        context -> List.of(new RootBinding(first, null), new RootBinding(second, null)),
+        context -> "generation-1", List.of());
+
+    assertEquals("Read 2 watched locations again, including unchanged files:\n" + first + "\n" + second,
+        handler.approvalPreview(handler.prepare("{\"force\":true}", PROVENANCE, CONTEXT)).summary());
+    assertEquals("Read 2 watched locations again:\n" + first + "\n" + second,
+        handler.approvalPreview(handler.prepare("{}", PROVENANCE, CONTEXT)).summary());
+  }
+
+  @Test
   void malformedArgumentsAreTypedBadRequestPreparationRefusals() {
     ReindexHandler handler = handler(RecordedIngestionService.unavailable(),
         context -> List.of(), context -> "generation-1", List.of());

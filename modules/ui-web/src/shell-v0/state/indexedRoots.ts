@@ -30,11 +30,59 @@ let accepted = 0;
 let profile = getActiveProfileId();
 const listeners = new Set<() => void>();
 const emit = (): void => { for (const listener of listeners) listener(); };
+
+/**
+ * The one source of each watched folder's disk count for Library and Browse. Library's counted read
+ * reports it by path hash and Browse's by path; the newest observation of a folder wins in both, so
+ * the two never disagree and a slower counted answer is not lost behind a newer counts-free one.
+ */
+interface RootCount { readonly fileCount: number; readonly fileCountCapped?: boolean | undefined; readonly order: number }
+let countOrder = 0;
+let countsByHash = new Map<string, RootCount>();
+let countsByPath = new Map<string, RootCount>();
+const pathKey = (path: string): string => path.replace(/(.)[\\/]+$/, '$1');
+const counted = (count: number | undefined, status?: string): boolean =>
+  typeof count === 'number' && (count >= 0 || status !== 'unavailable');
+function resetCounts(): void { countsByHash = new Map(); countsByPath = new Map(); }
+
+/** The newest disk count known for one folder, by its path hash and/or its path. */
+export function rootCount(pathHash: string | undefined, path: string | undefined): { fileCount: number; fileCountCapped?: boolean | undefined } | undefined {
+  const candidates = [pathHash ? countsByHash.get(pathHash) : undefined, path ? countsByPath.get(pathKey(path)) : undefined];
+  if (path && !pathHash) {
+    for (const [hash, resolved] of Object.entries(snapshot.paths)) if (pathKey(resolved) === pathKey(path)) candidates.push(countsByHash.get(hash));
+  }
+  const newest = candidates.reduce<RootCount | undefined>((best, next) => next && (!best || next.order > best.order) ? next : best, undefined);
+  return newest && { fileCount: newest.fileCount, fileCountCapped: newest.fileCountCapped };
+}
+
+/** Rows carrying the shared newest count; `paths` maps a path hash to its resolved path. */
+export function withRootCounts(roots: readonly IndexedRootView[], paths: Readonly<Record<string, string>>): IndexedRootView[] {
+  return roots.map(root => {
+    const count = rootCount(root.pathHash, root.pathHash ? paths[root.pathHash] : undefined);
+    return count && (count.fileCount !== root.fileCount || count.fileCountCapped !== root.fileCountCapped)
+      ? { ...root, fileCount: count.fileCount, fileCountCapped: count.fileCountCapped } : root;
+  });
+}
+
+/** Browse's counted read of the watched folders, by path. */
+export function recordRootCounts(rows: readonly { path: string; fileCount?: number | undefined; fileCountCapped?: boolean | undefined }[]): void {
+  let changed = false;
+  for (const row of rows) {
+    if (!counted(row.fileCount)) continue;
+    countsByPath.set(pathKey(row.path), { fileCount: row.fileCount!, fileCountCapped: row.fileCountCapped, order: ++countOrder });
+    changed = true;
+  }
+  if (!changed) return;
+  snapshot = { ...snapshot, roots: withRootCounts(snapshot.roots, snapshot.paths) };
+  emit();
+}
+
 export function getIndexedRoots(): IndexedRootsObservation {
   if (profile !== getActiveProfileId()) {
     profile = getActiveProfileId();
     barrier = ++serial;
     snapshot = { roots: [], paths: {}, confirmed: false, error: null };
+    resetCounts();
   }
   return snapshot;
 }
@@ -45,11 +93,13 @@ export function subscribeIndexedRoots(listener: () => void): () => void {
 subscribeStatusEpoch(() => {
   barrier = ++serial;
   snapshot = { roots: [], paths: {}, confirmed: false, error: null };
+  resetCounts();
   emit();
 });
 subscribeProfileSwitch(() => {
   barrier = ++serial;
   snapshot = { roots: [], paths: {}, confirmed: false, error: null };
+  resetCounts();
   emit();
 });
 
@@ -71,12 +121,23 @@ export async function readIndexedRoots(
     const response = await fetcher(ENDPOINT + (counts ? '?counts=true' : ''));
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const body = parseWireContract(schema, await response.json(), ENDPOINT);
+    // A counted answer's disk counts stay the newest counts even when a newer counts-free answer won.
+    // A counts-free answer reports no count (-1), which is no observation of the disk.
+    if (valid()) {
+      for (const root of body.items) {
+        if (root.pathHash && (counts ? counted(root.fileCount, root.status) : (root.fileCount ?? -1) >= 0)) {
+          countsByHash.set(root.pathHash, { fileCount: root.fileCount!, fileCountCapped: root.fileCountCapped, order: ++countOrder });
+        }
+      }
+    }
     // Overtaken by a newer answer: the caller receives that answer, never this older one.
-    if (!current()) return valid() ? snapshot : null;
+    if (!current()) {
+      if (!valid()) return null;
+      if (counts) { snapshot = { ...snapshot, roots: withRootCounts(snapshot.roots, snapshot.paths) }; emit(); }
+      return snapshot;
+    }
     accepted = read;
-    const previous = new Map(snapshot.roots.map(root => [root.pathHash, root.fileCount]));
-    const roots = body.items.map(root => !counts && (root.fileCount ?? -1) < 0 && (previous.get(root.pathHash) ?? -1) >= 0
-      ? { ...root, fileCount: previous.get(root.pathHash)! } : root);
+    const roots = withRootCounts(body.items, snapshot.paths);
     const hashes = new Set(roots.map(root => root.pathHash));
     snapshot = { roots, paths: Object.fromEntries(Object.entries(snapshot.paths).filter(([hash]) => hashes.has(hash))), confirmed: true, error: null, receivedAtMs: Date.now(),
       lastKnownFailed: rememberFailedCounts(snapshot.lastKnownFailed ?? {}, roots, { provisional: getAiState().stability.kind === 'provisional' }) };
@@ -106,6 +167,11 @@ export async function readIndexedRoots(
 /** A successful removal is stronger than any earlier in-flight observation. */
 export function forgetIndexedRoots(hashes: readonly string[]): void {
   barrier = ++serial;
+  for (const hash of hashes) {
+    const path = snapshot.paths[hash];
+    countsByHash.delete(hash);
+    if (path) countsByPath.delete(pathKey(path));
+  }
   snapshot = { ...snapshot, roots: snapshot.roots.filter(row => !hashes.includes(row.pathHash ?? '')),
     paths: Object.fromEntries(Object.entries(snapshot.paths).filter(([hash]) => !hashes.includes(hash))) };
   emit();

@@ -820,7 +820,7 @@ export function registerShellActions(deps: ShellActionDeps): void {
   navigateAction('core.action.shell.go-to-library', 'Go to Library', 'core.library-surface', 'Ctrl+2');
   navigateAction('core.action.shell.go-to-settings', 'Go to Settings', 'core.settings-surface', isMac() ? '⌘+,' : 'Ctrl+,');
   // Rules need both saved values; open the Library editor through the shared focus route.
-  shellAction('core.action.shell.go-to-indexing-rules', 'Change indexing rules', () => {
+  shellAction('core.action.shell.go-to-indexing-rules', 'Change reading rules', () => {
     requestIndexingRuleNavigation('hours');
     return { kind: 'noop' as const };
   });

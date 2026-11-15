@@ -16,7 +16,9 @@ import { __resetAiStateForTest } from '../state/aiStateStore.js';
 
 const host = {
   platform: { capabilities: new Set<string>() },
-  data: { fetch: async () => ({ ok: false, status: 503 }) as unknown as Response },
+  // The folder list is not answered: rows are placed by the test, and a failed read would make them unconfirmed (R3).
+  data: { fetch: (path: string) => path.startsWith('/api/indexing-roots/substrate') ? new Promise<Response>(() => {})
+    : Promise.resolve({ ok: false, status: 503 } as unknown as Response) },
   utilities: { formatRelativeTime: () => 'just now' },
 } as unknown as PluginHostApi;
 
@@ -50,8 +52,12 @@ async function mount(
   await el.updateComplete;
   (el as unknown as { roots: IndexedRootView[] }).roots = rows;
   (el as unknown as { lastKnownFailed: Record<string, number> }).lastKnownFailed = lastKnownFailed;
-  (el as unknown as { provisional: boolean }).provisional = provisional;
+  // A provisional fixture here is an observed rebuild: the row may say "Rebuilding" only then (V2).
+  Object.assign(el as unknown as { provisional: boolean; rebuilding: boolean }, { provisional, rebuilding: provisional });
+  el.loading = false;
   el.requestUpdate();
+  await el.updateComplete;
+  el.shadowRoot!.querySelector<HTMLButtonElement>('.folder-toggle')!.click();
   await el.updateComplete;
   return el;
 }

@@ -153,7 +153,7 @@ it.each([false, true])('folder band keeps its identity, keyboard answer and open
 }, 30_000);
 it('collection band keeps its identity and answer when another source arrives and restores its opener on every close', async () => {
   const page = await open();
-  await page.locator('.bottom-links summary').filter({ hasText: 'Added by other apps' }).click();
+  await page.locator('.bottom-links summary').filter({ hasText: 'documents from other apps' }).click();
   const opener = page.locator('jf-button[label="Remove mcp-ingest"] button');
   await opener.focus(); await page.keyboard.press('Enter');
   const band = page.locator('.other-source-confirm jf-confirm-band');

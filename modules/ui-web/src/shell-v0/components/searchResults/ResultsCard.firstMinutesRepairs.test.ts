@@ -22,15 +22,15 @@ it('date is a named text action using the shared keyboard menu and preserves cus
   const menu = document.querySelector<ContextMenu>('jf-context-menu')!; await menu.updateComplete;
   expect(menu.actions.map(a => a.label)).toEqual(['Any time', 'Past week', 'Past month', 'Past year']);
   expect(getFilters().modifiedToMs).toBe(9876);
-  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
-  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  menu.shadowRoot!.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+  (document.querySelector<ContextMenu>('jf-context-menu')!.shadowRoot!.activeElement!).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   for (let n = 0; n < 10; n++) await Promise.resolve(); await card.updateComplete;
   const day = new Date(); day.setHours(0, 0, 0, 0); day.setDate(day.getDate() - 7);
   expect(getFilters()).toEqual({ pathPrefix: '/docs', modifiedFromMs: day.getTime() });
   expect(trigger.textContent).toContain('Past week'); expect(card.shadowRoot!.activeElement).toBe(trigger);
   trigger.click(); await card.updateComplete;
   const again = document.querySelector<ContextMenu>('jf-context-menu')!; await again.updateComplete;
-  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  (document.querySelector<ContextMenu>('jf-context-menu')!.shadowRoot!.activeElement!).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   for (let n = 0; n < 10; n++) await Promise.resolve(); await card.updateComplete;
   expect(getFilters()).toEqual({ pathPrefix: '/docs' }); expect(trigger.textContent).toContain('Any time');
 });

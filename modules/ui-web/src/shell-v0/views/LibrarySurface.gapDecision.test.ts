@@ -48,7 +48,7 @@ describe('Library recorded migration gap decision', () => {
     // DE1 — the destructive confirmation is in place, under the rebuild it would stop.
     cancel?.onActivate?.();
     await pump(el);
-    expect(band()!.consequence).toContain('current index stays available');
+    expect(band()!.consequence).toContain('current search data stays available');
     expect(band()!.actionLabel).toBe('Cancel rebuild');
     await answer('keep');
     expect(band()).toBeNull();
@@ -88,7 +88,7 @@ describe('Library recorded migration gap decision', () => {
 
     expect(el.shadowRoot?.textContent).toContain('document-7: The file could not be read by its parser.');
     const buttons = Array.from(el.shadowRoot?.querySelectorAll('jf-button') ?? []);
-    const accept = buttons.find((button) => button.getAttribute('label') === 'Use the new index without them') as (Element & { onActivate?: () => void }) | undefined;
+    const accept = buttons.find((button) => button.getAttribute('label') === 'Use the new search data without them') as (Element & { onActivate?: () => void }) | undefined;
     expect(accept).toBeDefined();
     accept?.onActivate?.();
     await pump(el);
@@ -155,7 +155,7 @@ describe('Library recorded migration gap decision', () => {
     expect(el.shadowRoot?.textContent).toContain('current-gap: The file could not be read by its parser.');
     expect(el.shadowRoot?.textContent).not.toContain('obsolete-gap');
     expect(Array.from(el.shadowRoot?.querySelectorAll('jf-button') ?? [])
-      .some((button) => button.getAttribute('label') === 'Use the new index without them')).toBe(true);
+      .some((button) => button.getAttribute('label') === 'Use the new search data without them')).toBe(true);
     el.remove();
   });
 
@@ -178,7 +178,7 @@ describe('Library recorded migration gap decision', () => {
     await pump(el);
 
     const accept = Array.from(el.shadowRoot?.querySelectorAll('jf-button') ?? [])
-      .find((button) => button.getAttribute('label') === 'Use the new index without them') as (Element & { onActivate?: () => void }) | undefined;
+      .find((button) => button.getAttribute('label') === 'Use the new search data without them') as (Element & { onActivate?: () => void }) | undefined;
     expect(accept).toBeDefined();
     accept?.onActivate?.();
     await pump(el);

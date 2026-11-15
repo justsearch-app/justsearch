@@ -63,7 +63,7 @@ describe('folderStatus — the failed chip survives a retry re-queue (914 D3)', 
     const fs = folderStatus(row({ inFlightCount: 2, failedCount: 0 }), ctx(2));
     // The state line stays truthful: the queue IS working on two jobs right now.
     expect(fs.state).toBe('indexing');
-    expect(fs.metaText).toBe('default · Indexing · 2 remaining');
+    expect(fs.metaText).toBe('default · Reading · 2 remaining');
     // ...and the drill-down stays reachable, which is the defect this closes.
     expect(fs.failed).toBe(2);
     expect(fs.failedIsLastKnown).toBe(true);

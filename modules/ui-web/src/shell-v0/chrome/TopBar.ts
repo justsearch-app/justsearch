@@ -19,13 +19,12 @@
  * Desktop: the bar's background moves the window (Tauri drag region) and its end keeps room for the
  * window layer's controls beside it; the switcher, the status slot and the menus never start a drag.
  */
-import { html, css, nothing, type TemplateResult, type PropertyValues } from 'lit';
+import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { isMac } from '../commands/KeybindingRegistry.js';
-import { TransientController } from '../primitives/transientController.js';
+import { menuStyles } from '../components/Menu.js';
 import { icon, type IconName } from '../components/Icon.js';
 import { hasWindowLayer } from '../../utils/windowLayer.js';
-import { cssLength, shiftIntoWindow } from './menuPlacement.js';
 
 /** One place the bar can open: an area in the switcher, or a window listed in Menu. */
 export interface TopBarDestination {
@@ -84,10 +83,6 @@ export class TopBar extends JfElement {
   declare openMenu: OpenMenu;
   declare showBackend: boolean;
 
-  private readonly transient = new TransientController(this, {
-    layer: 'transient', id: 'top-bar-menu', managesDismiss: true, close: () => this.closeMenu(),
-  });
-
   constructor() {
     super();
     this.areas = [];
@@ -104,7 +99,7 @@ export class TopBar extends JfElement {
     this.showBackend = false;
   }
 
-  static override styles = css`
+  static override styles = [menuStyles, css`
     /* The bar is the container its layout reads: the room left after the desktop window controls,
        in rem so enlarged text picks a smaller layout. In the browser that room is the window width. */
     :host {
@@ -159,28 +154,6 @@ export class TopBar extends JfElement {
     /* The pill may give way only through the notice beside it (which wraps); its own words never shrink. */
     ::slotted([slot='status']) { flex: 0 1 auto; min-width: 0; }
     .menu-anchor { position: relative; flex: none; }
-    /* Under its button; placeMenu() moves it along the bar only as far as keeps it inside the window. */
-    .menu { position: absolute; top: calc(100% + var(--jf-space-2)); z-index: var(--z-overlay-transient);
-      translate: var(--top-bar-menu-shift, 0px) 0;
-      min-inline-size: min(var(--frame-menu-width), 100vw - 2 * var(--jf-space-2)); max-inline-size: calc(100vw - 2 * var(--jf-space-2));
-      max-block-size: calc(100dvh - var(--frame-topbar-height) - var(--jf-space-4)); overflow-y: auto;
-      box-sizing: border-box; padding: var(--jf-space-2); background: var(--surface-1); color: var(--text-primary);
-      border: var(--frame-hairline) solid var(--border-emphasized); border-radius: var(--frame-panel-radius);
-      box-shadow: var(--shadow-float); text-align: start; }
-    .menu.more { inset-inline-end: 0; }
-    .menu.areas { inset-inline-start: 0; }
-    .group + .group { margin-top: var(--jf-space-2); padding-top: var(--jf-space-2); border-top: var(--frame-hairline) solid var(--border-subtle); }
-    .group-label { display: flex; justify-content: space-between; gap: var(--jf-space-3);
-      padding: var(--jf-space-1) var(--jf-space-3); color: var(--text-secondary); font-size: var(--font-size-xs); }
-    [role='menuitem'], [role='menuitemradio'] { display: flex; align-items: center; gap: var(--jf-space-3); inline-size: 100%;
-      box-sizing: border-box; min-block-size: var(--frame-control-size); padding: var(--jf-space-1) var(--jf-space-3);
-      border-radius: var(--frame-control-radius); text-align: start; color: var(--text-primary); }
-    [role='menuitem']:hover, [role='menuitem']:focus-visible, [role='menuitemradio']:hover, [role='menuitemradio']:focus-visible { background: var(--surface-2); }
-    [role='menuitemradio'][aria-checked='true'] svg { color: var(--text-secondary); }
-    .item-label { flex: 1; min-width: 0; }
-    .item-detail, kbd { color: var(--text-secondary); font-size: var(--font-size-xs); white-space: nowrap; }
-    kbd { font: inherit; font-size: var(--font-size-xs); padding: 0 var(--jf-space-1);
-      border: var(--frame-hairline) solid var(--border-subtle); border-radius: var(--frame-control-radius); }
     .backend { padding: var(--jf-space-1) var(--jf-space-3); color: var(--text-secondary); font-family: var(--font-mono, monospace);
       font-size: var(--font-size-xs); overflow-wrap: anywhere; }
     .visually-hidden { position: absolute; inline-size: var(--frame-hairline); block-size: var(--frame-hairline);
@@ -222,7 +195,7 @@ export class TopBar extends JfElement {
       .menu { border-color: CanvasText; }
       [role='menuitem']:focus-visible, [role='menuitemradio']:focus-visible { outline: var(--frame-focus-width) solid Highlight; }
     }
-  `;
+  `];
 
   /** The bar's own size and the area menu's button (only the minimal bar has one) as they come and go. */
   private sizes: ResizeObserver | null = null;
@@ -265,30 +238,8 @@ export class TopBar extends JfElement {
       if (focusInside) this.shadowRoot?.querySelector<HTMLButtonElement>('.segment[aria-current="page"]')?.focus();
       return;
     }
-    this.placeMenu();
+    this.shadowRoot?.querySelector<import('../components/Menu.js').Menu>('jf-menu')?.place();
   };
-
-  /** The one placement of the bar's menus: see {@link shiftIntoWindow}. */
-  private placeMenu(): void {
-    const menu = this.shadowRoot?.querySelector<HTMLElement>('.menu');
-    if (!menu) return;
-    this.style.setProperty('--top-bar-menu-shift', '0px');
-    const shift = shiftIntoWindow(menu.getBoundingClientRect(), cssLength(this, '--jf-space-2'));
-    this.style.setProperty('--top-bar-menu-shift', `${shift}px`);
-  }
-
-  protected override updated(changed: PropertyValues): void {
-    // Any change while a menu is open (rows added from another window, the backend address shown) can change its width.
-    this.placeMenu();
-    if (changed.has('openMenu')) {
-      if (this.openMenu) {
-        this.transient.open();
-        this.menuItems()[0]?.focus();
-      } else {
-        this.transient.close();
-      }
-    }
-  }
 
   private select(selection: TopBarSelection): void {
     this.closeMenu(false);
@@ -312,26 +263,6 @@ export class TopBar extends JfElement {
     if (restoreFocus && focusInside) {
       this.shadowRoot?.querySelector<HTMLButtonElement>(menu === 'more' ? '.more-trigger' : '.area-trigger')?.focus();
     }
-  }
-
-  private menuItems(): HTMLElement[] {
-    return [...(this.shadowRoot?.querySelectorAll<HTMLElement>('[role="menu"] [role^="menuitem"]') ?? [])];
-  }
-
-  /** Roving arrow-key movement inside a menu; Escape closes and returns focus; Tab leaves and closes. */
-  private onMenuKeydown(e: KeyboardEvent): void {
-    const items = this.menuItems();
-    const current = items.indexOf(this.shadowRoot?.activeElement as HTMLElement);
-    let next: number | null = null;
-    if (e.key === 'ArrowDown') next = (current + 1) % items.length;
-    else if (e.key === 'ArrowUp') next = (current - 1 + items.length) % items.length;
-    else if (e.key === 'Home') next = 0;
-    else if (e.key === 'End') next = items.length - 1;
-    else if (e.key === 'Escape') { e.preventDefault(); this.closeMenu(); return; }
-    else if (e.key === 'Tab') { this.closeMenu(false); return; }
-    if (next === null || items.length === 0) return;
-    e.preventDefault();
-    items[next]?.focus();
   }
 
   private segment(area: TopBarDestination): TemplateResult {
@@ -361,7 +292,9 @@ export class TopBar extends JfElement {
 
   private renderMoreMenu(): TemplateResult {
     const primary = [this.system, this.help, this.about].filter((d): d is TopBarDestination => d !== null);
-    return html`<div class="menu more" role="menu" aria-label="Menu" data-tauri-drag-region=${this.noDrag} @keydown=${this.onMenuKeydown}>
+    return html`<jf-menu label="Menu" data-tauri-drag-region=${this.noDrag}
+      .trigger=${this.shadowRoot?.querySelector<HTMLElement>('.more-trigger') ?? null}
+      @menu-close=${() => this.closeMenu(false)} .content=${html`
       <div class="group" role="group" aria-label="App">
         <button type="button" role="menuitem" tabindex="-1" data-surface-id="core.settings-surface"
           aria-label="Settings" aria-keyshortcuts=${isMac() ? 'Meta+,' : 'Control+,'} aria-haspopup="dialog"
@@ -382,7 +315,7 @@ export class TopBar extends JfElement {
           @click=${() => this.select({ kind: 'logs' })}>${icon({ name: 'file-text', size: 16 })}<span class="item-label">Logs</span></button>
         ${this.showBackend ? html`<div class="backend" data-testid="backend-address">${this.backendAddress}</div>` : nothing}
       </div>` : nothing}
-    </div>`;
+    `}></jf-menu>`;
   }
 
   override render(): TemplateResult {
@@ -398,8 +331,9 @@ export class TopBar extends JfElement {
             aria-label=${active ? `${active.label}, choose area` : 'Choose area'} @click=${() => this.toggleMenu('areas')}>
             ${active ? html`${icon({ name: active.icon, size: 16 })}<span class="trigger-label">${active.label}</span>` : html`<span class="trigger-label">Areas</span>`}
             ${icon({ name: 'chevron-down', size: 14 })}</button>
-          ${this.openMenu === 'areas' ? html`<div class="menu areas" role="menu" aria-label="Areas" data-tauri-drag-region=${this.noDrag} @keydown=${this.onMenuKeydown}>
-            ${this.areas.map(a => this.menuRow(a, 'area'))}</div>` : nothing}
+          ${this.openMenu === 'areas' ? html`<jf-menu label="Areas" align="start" data-tauri-drag-region=${this.noDrag}
+            .trigger=${this.shadowRoot?.querySelector<HTMLElement>('.area-trigger') ?? null}
+            @menu-close=${() => this.closeMenu(false)} .content=${html`${this.areas.map(a => this.menuRow(a, 'area'))}`}></jf-menu>` : nothing}
         </span>
       </nav>
       <div class="end">

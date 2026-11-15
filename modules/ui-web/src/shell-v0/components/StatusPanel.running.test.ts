@@ -50,7 +50,7 @@ describe('Running (moved from the task tray and indexing overlay)', () => {
     expect(m.progress.phase).toBe('blocked'); expect(m.pill.kind).toBe('needs');
     expect(m.sections.needs[0]!.percent).toBeNull();
     const panel = await render(m); expect(panel.shadowRoot!.querySelector('progress')).toBeNull();
-    expect(panel.textContent).not.toContain('Everything is indexed and enriched');
+    expect(panel.textContent).not.toContain('Everything is read and enriched');
   });
   it('persisted vectors with the model removed do not fabricate unfinished work', () => {
     const m = model({ core: { indexState: 'IDLE', pendingJobs: 0 }, enrichment: {
@@ -62,7 +62,7 @@ describe('Running (moved from the task tray and indexing overlay)', () => {
   it('stale retained indexing suppresses bars and qualifies its last-known activity', async () => {
     const m = model({ core: { indexState: 'INDEXING', pendingJobs: 400 }, enrichment: {} }, { phase: 'stale', indexingStatusLive: false });
     const row = m.sections.running.find(r => r.id === 'indexing')!;
-    expect(row.stale).toBe(true); expect(row.title).toContain('Indexing'); expect(row.percent).toBeNull();
+    expect(row.stale).toBe(true); expect(row.title).toContain('Reading'); expect(row.percent).toBeNull();
     const panel = await render(m); expect(panel.shadowRoot!.querySelector('progress')).toBeNull();
     expect(panel.shadowRoot!.textContent).toContain('Last seen'); expect(m.pill.label).toContain('last seen');
   });

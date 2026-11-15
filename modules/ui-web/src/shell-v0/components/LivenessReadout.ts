@@ -123,7 +123,7 @@ export class LivenessReadout extends JfElement {
       || (verdict?.kind === 'transitioning' && verdict.reasons[0] === 'channel-stale');
     const statusPast = !!state && !currency.head && !aboutReaching;
     const indexingTransition = state?.verdict?.kind === 'transitioning' && state.verdict.reasons.some(isIndexingObservation);
-    const activity = state && (state.statusLabel === 'Indexing' || indexingTransition)
+    const activity = state && (state.statusLabel === 'Reading' || indexingTransition)
       ? healthIndexingProgress(state, currency).activity
       : null;
     const indexingText = activity && (!indexingTransition || !activity.confirmed);

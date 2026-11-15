@@ -1087,12 +1087,12 @@
       "$comment": "indexing rules moved from Settings to Library (Library redesign L8)",
       "uiShotStep": "library-indexing-rules-dark",
       "requiredSelectors": [
-        "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+        "form[aria-label=\"Reading rules\"] input[type=\"time\"]",
         "#indexing-hours"
       ],
       "elements": [
         {
-          "selector": "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+          "selector": "form[aria-label=\"Reading rules\"] input[type=\"time\"]",
           "maxHeightPx": 28
         }
       ]
@@ -1101,12 +1101,12 @@
       "$comment": "indexing rules moved from Settings to Library (Library redesign L8)",
       "uiShotStep": "library-indexing-rules-light",
       "requiredSelectors": [
-        "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+        "form[aria-label=\"Reading rules\"] input[type=\"time\"]",
         "#indexing-hours"
       ],
       "elements": [
         {
-          "selector": "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+          "selector": "form[aria-label=\"Reading rules\"] input[type=\"time\"]",
           "maxHeightPx": 28
         }
       ]
@@ -1115,12 +1115,12 @@
       "$comment": "indexing rules moved from Settings to Library (Library redesign L8)",
       "uiShotStep": "library-indexing-rules-forced",
       "requiredSelectors": [
-        "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+        "form[aria-label=\"Reading rules\"] input[type=\"time\"]",
         "#indexing-hours"
       ],
       "elements": [
         {
-          "selector": "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+          "selector": "form[aria-label=\"Reading rules\"] input[type=\"time\"]",
           "maxHeightPx": 28
         }
       ]
@@ -1129,12 +1129,12 @@
       "$comment": "indexing rules moved from Settings to Library (Library redesign L8)",
       "uiShotStep": "library-indexing-rules-minimum",
       "requiredSelectors": [
-        "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+        "form[aria-label=\"Reading rules\"] input[type=\"time\"]",
         "#indexing-hours"
       ],
       "elements": [
         {
-          "selector": "form[aria-label=\"Indexing rules\"] input[type=\"time\"]",
+          "selector": "form[aria-label=\"Reading rules\"] input[type=\"time\"]",
           "maxHeightPx": 28
         }
       ]
@@ -2410,6 +2410,88 @@
       "requiredSelectors": [
         "[data-testid=\"search-result-row\"]",
         "[data-testid=\"sv3-pane-document\"]"
+      ]
+    },
+    {
+      "uiShotStep": "library-menu",
+      "requiredSelectors": [
+        "[role=\"menu\"]"
+      ],
+      "elements": [
+        {
+          "selector": "[role=\"menu\"]",
+          "minWidthPx": 280,
+          "maxWidthPx": 300,
+          "maxBottomPx": 700
+        }
+      ]
+    },
+    {
+      "uiShotStep": "library-browse",
+      "requiredSelectors": [
+        ".row.file:hover .actions",
+        ".column-heads"
+      ],
+      "elements": [
+        {
+          "selector": ".row.file",
+          "minHeightPx": 34,
+          "maxHeightPx": 34.5
+        }
+      ]
+    },
+    {
+      "uiShotStep": "library-browse-failure",
+      "requiredSelectors": [
+        "jf-button[label=\"Retry Documents\"]"
+      ],
+      "elements": [
+        {
+          "selector": ".row.folder",
+          "minHeightPx": 34,
+          "maxHeightPx": 34.5
+        }
+      ]
+    },
+    {
+      "uiShotStep": "library-menu-light",
+      "requiredSelectors": [
+        "[role=\"menu\"]"
+      ],
+      "elements": [
+        {
+          "selector": "[role=\"menu\"]",
+          "minWidthPx": 280,
+          "maxWidthPx": 300,
+          "maxBottomPx": 700
+        }
+      ]
+    },
+    {
+      "uiShotStep": "library-browse-light",
+      "requiredSelectors": [
+        ".row.file:hover .actions",
+        ".column-heads"
+      ],
+      "elements": [
+        {
+          "selector": ".row.file",
+          "minHeightPx": 34,
+          "maxHeightPx": 34.5
+        }
+      ]
+    },
+    {
+      "uiShotStep": "library-browse-failure-light",
+      "requiredSelectors": [
+        "jf-button[label=\"Retry Documents\"]"
+      ],
+      "elements": [
+        {
+          "selector": ".row.folder",
+          "minHeightPx": 34,
+          "maxHeightPx": 34.5
+        }
       ]
     }
   ]
