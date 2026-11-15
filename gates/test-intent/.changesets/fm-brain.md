@@ -3185,3 +3185,14 @@ expected value is computed by production code: the locked-Memory words are today
   "note": "Entry 30: R1/R3 fail-before depends on absent .switch-state markup; cited intermediate repair failures have no attached D4 evidence. Entry 12 weakens the offline-picture unconfirmed assertion to an unlit step, dropping the uncertainty wording without a source retiring that fact. Supply semantic repair evidence and retain the uncertainty assertion."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "d2dcf46d-e8f1-44e5-9ccf-298f78f575a2",
+  "verdict": "accept",
+  "digest": "sha256:6ec09fae435e8ce5d36ea887a31bf3961e01f3800b68d078099b44aaa3e5132c",
+  "note": "Accept: all 37 entries re-judged on digest 6ec09fae. Prior rejection resolved: R1/R3/R5 and R2/R4 checks (switch-repairs, step-repairs) fail on 2f670abba7 by assertion on their defects via aria-checked/visible text/consent dialog, reproduced per case; entry 12 asserts 'Not confirmed yet'; entry 17 asserts the reasons. All 35 flagged files pass on the candidate; every new file fails on 777b598043 by behavioural assertion (preservation file passes)."
+}
+```
