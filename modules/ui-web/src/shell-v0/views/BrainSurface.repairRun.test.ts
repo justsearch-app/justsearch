@@ -83,6 +83,8 @@ beforeEach(() => {
     installStatus: { state: 'completed', installedFully: true, repairNeeded: true, startedAtEpochMs: 100, updatedAtEpochMs: 100 },
     runtime: { mode: 'offline', installed: { known: true, value: true } },
     runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] },
+    // X1: meaning search works only with the Worker's COMPATIBLE reading.
+    status: { embedding: { compatState: 'COMPATIBLE' } },
     capabilities: { chat: false },
   } as unknown as AiState;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {

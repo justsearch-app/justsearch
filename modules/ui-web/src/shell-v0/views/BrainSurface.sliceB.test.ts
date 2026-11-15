@@ -195,6 +195,9 @@ describe('Brain Advanced controls', () => {
   it('renders the four groups in place, keeps optional part choices, and never writes on open', async () => {
     const el = await mount(); await advanced(el);
     for (const label of ['Answer settings', 'Graphics card settings', 'Downloaded files', 'Maintenance']) expect(el.shadowRoot!.querySelector(`section[aria-label="${label}"]`)).not.toBeNull();
+    // Slice 7a (X6, AM5): the component list that holds the optional part choices is a developer tool, live.
+    expect(el.shadowRoot!.querySelector('[data-testid="install-component-list"]')).toBeNull();
+    setShowDeveloperTools(true); await settle(el);
     for (const id of ['splade', 'ner', 'citation-scorer']) expect(el.shadowRoot!.querySelector(`[data-testid="component-toggle-${id}"]`)?.getAttribute('role')).toBe('switch');
     // In place: the sliders are there once Advanced is open, with no further section to expand.
     for (const id of ['brain-contextWindow', 'brain-maxTokens', 'brain-gpuLayers']) expect(el.shadowRoot!.getElementById(id), id).not.toBeNull();
@@ -298,6 +301,7 @@ describe('Brain step 1 review repairs', () => {
     expect(el.shadowRoot!.querySelector('[data-step="reranker"] .step-note')!.textContent).toBe('Not confirmed yet');
   });
   it('S2 Advanced applies the same rule: a loaded but inactive feature is not in use or counted active', async () => {
+    setShowDeveloperTools(true); // Slice 7a (X6, AM5): component rows and observed features are developer tools.
     emit({ runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }, { id: 'reranker', status: 'inactive', modelActive: true }] } });
     const el = await mount(); await advanced(el);
     expect(el.shadowRoot!.querySelector('[data-testid="component-row-embedding"]')!.textContent).toContain('in use');
@@ -340,9 +344,13 @@ describe('Brain step 1 review repairs', () => {
     expect(headline()).toBe('Reading text in scans and images');
     emit({ snapshotLive: false }); await el.updateComplete;
     expect(headline()).toBe('Checking AI status…');
+    // W5: the last-known truth is said once, in the sentence (main's wording).
+    expect(el.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('Pictures were being read when last observed');
     emit({ installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, status: { inference: { chatEnabledSpec: true, procedure: 'NONE' } } as AiState['status'] }); await el.updateComplete;
     expect(headline()).not.toBe('Reading text in scans and images');
     expect(headline()).not.toBe('Checking AI status…');
+    // A live completion clears the last-observed uncertainty (kept from main).
+    expect(el.shadowRoot!.textContent).not.toContain('last observed');
   });
   // Slice 7a (D2, D5): one opener per step, its name, and only with developer tools.
   it('S7 every step opener shares expanded state and panel association (developer tools)', async () => {

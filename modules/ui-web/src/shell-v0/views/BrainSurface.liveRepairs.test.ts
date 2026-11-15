@@ -53,8 +53,10 @@ beforeEach(() => {
     installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
     runtime: { mode: 'online', installed: { known: true, value: true }, modelId: 'answer-model' },
     installStatus: { state: 'completed', installedFully: true },
-    runtimeStatus: { installedVariants: [{ variantId: 'cuda' }], active: { activeVariantId: 'cuda', modelPath: '/answer', mmprojActive: true }, onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }, { id: 'reranker', status: 'active', modelActive: true }] },
-    capabilities: { chat: true }, status: { inference: { chatEnabledSpec: true } },
+    // X5: the running engine names the standard profile, so the answer package's size matches it;
+    // X1: meaning search works only with the Worker's COMPATIBLE reading.
+    runtimeStatus: { installedVariants: [{ variantId: 'cuda' }], active: { activeVariantId: 'cuda', chatProfile: 'standard', modelPath: '/answer', mmprojActive: true }, onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }, { id: 'reranker', status: 'active', modelActive: true }] },
+    capabilities: { chat: true }, status: { inference: { chatEnabledSpec: true }, embedding: { compatState: 'COMPATIBLE' } },
   } as unknown as AiState;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input);
@@ -253,6 +255,7 @@ describe('Brain live redesign repairs', () => {
 
 describe('Brain review repairs', () => {
   it.each(['install', 'runtime'] as const)('G1 failed %s reads override a reachable origin and settled verdict', async endpoint => {
+    setShowDeveloperTools(true); // X6 (AM5): Advanced's component list and observed features are developer tools.
     const el = await mount();
     emit(endpoint === 'install' ? { installObservationLive: false } : { runtimeObservationLive: false });
     await el.updateComplete;
@@ -264,6 +267,7 @@ describe('Brain review repairs', () => {
     expect(el.shadowRoot!.querySelector('[data-testid="component-row-chat"]')!.textContent).not.toContain('in use');
   });
   it.each(['connecting', 'missing install'] as const)('G2 Advanced shares the page gate for %s observations', async state => {
+    setShowDeveloperTools(true); // X6 (AM5): Advanced's component list and observed features are developer tools.
     emit(state === 'connecting' ? { aiEngine: { kind: 'connecting', stability: { kind: 'provisional', cause: 'checking' }, installFailure: null } } : { installStatus: null });
     const el = await mount(); await advanced(el); const root = el.shadowRoot!;
     expect(root.querySelector('[data-testid="brain-observed-features"]')!.textContent).toContain('when last observed');

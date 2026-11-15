@@ -342,6 +342,8 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
     el.inference = { mode: 'online' };
     // Slice 7a: live meaning evidence for the positive heading (AM3); Start/Stop answers is a developer tool (D5).
     (el as unknown as { runtimeStatus: unknown }).runtimeStatus = { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] };
+    // X1: and the Worker's COMPATIBLE reading.
+    (el as unknown as { systemStatus: unknown }).systemStatus = { embedding: { compatState: 'COMPATIBLE' } };
     (el as unknown as { devTools: boolean }).devTools = true;
     const aiEngine = computeAiEngineVerdict({
       installStatus: el.installStatus,

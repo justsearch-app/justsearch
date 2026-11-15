@@ -111,14 +111,18 @@ describe('picture reading live switch', () => {
     expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false']);
   });
 
-  it('answer files not downloaded yet: Off, unlit', async () => {
+  // X2/W2: an unset choice is drawn as the Engine's effective default (On), nothing is written, and the
+  // step says why it is not working (W1 note).
+  it('answer files not downloaded yet: an unset choice reads On, says its files are missing, unlit', async () => {
     emit(false);
     preview = { totalDownloadBytes: 1024, components: [
       { id: 'chat', label: 'Answer model', state: 'to-download', totalBytes: 1024, downloadBytes: 1024 },
     ] };
     const el = await mount();
-    expect(word(el)).toBe('Off');
+    expect(word(el)).toBe('On');
+    expect(el.shadowRoot!.querySelector('[data-step="pictures"]')!.textContent).toContain('Not working — its files are missing');
     expect(el.shadowRoot!.querySelector('[data-step="pictures"]')!.getAttribute('data-lit')).toBe('false');
+    expect(posts).toEqual([]);
   });
 
   it('reconciles an interrupted delivery with an unchanged witness using the original attempt', async () => {

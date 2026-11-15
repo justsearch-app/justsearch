@@ -10,6 +10,7 @@ function panel(procedure: string | undefined, live = true, engineReason = 'autom
     policy: unknown;
     installStatus: unknown;
     runtimeStatus: unknown;
+    systemStatus: unknown;
     inference: unknown;
     _unifiedAiState: unknown;
     renderSimplePanel(): TemplateResult;
@@ -24,8 +25,10 @@ function panel(procedure: string | undefined, live = true, engineReason = 'autom
     installObservationLive: live, runtimeObservationLive: live, snapshotLive: live,
     status: { inference: {
       procedure, engineReason, chatEnabledSpec: engineReason !== 'inference.up_for_background',
-    } },
+    }, embedding: { compatState: 'COMPATIBLE' } },
   };
+  // X1: meaning search works only with the Worker's COMPATIBLE reading, which the page reads off the status.
+  element.systemStatus = (element._unifiedAiState as { status: unknown }).status;
   const container = document.createElement('div');
   render(element.renderSimplePanel(), container);
   return container;

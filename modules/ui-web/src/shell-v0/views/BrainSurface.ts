@@ -278,6 +278,19 @@ export function featureInUse(f: OnnxFeatureRow | undefined): boolean | null {
   return f.status !== 'inactive' && f.modelActive === true;
 }
 
+/**
+ * AI Brain's words for the causes that a full read of the files fixes (X7, AM9). The embedding causes
+ * share the agreed sentence (W1); the others keep their meaning in read words.
+ */
+const BRAIN_READ_AGAIN_WORDS: Readonly<Record<string, string>> = {
+  'index.blocked_legacy': 'Read everything again to restore full search.',
+  'index.embedding_legacy': 'Read everything again to restore full search.',
+  'index.embedding_mismatch': 'Read everything again to restore full search.',
+  'index.schema_mismatch': 'Search works fully; reading everything again adds newer search features.',
+  'index.rebuild_brake_exhausted': 'Reading everything again did not finish after repeated attempts. Search works on what was read, but new files are not added. Read everything again to try once more.',
+  'index.rebuild_brake_unreadable': 'Your files need reading again, but the record of earlier attempts could not be opened, so it does not start by itself. Search works on what was read, but new files are not added. Read everything again to continue.',
+};
+
 /** Whether `node` sits inside `host`, across shadow roots. */
 function composedWithin(node: Node, host: Element): boolean {
   for (let current: Node | null = node; current; ) {
@@ -692,6 +705,7 @@ export class BrainSurface extends JfElement {
   /** Whether answers work here, as last observed; an unknown observation keeps it (AM1). */
   private answersShown = false;
   private focusHeadlinePending = false;
+  private focusHeadlineVisit = 0;
   declare planLoading: boolean;
   declare planError: string | null;
   private readonly featureTransient = new TransientController(this, {
@@ -1472,7 +1486,18 @@ export class BrainSurface extends JfElement {
     super.updated(changed);
     if (this.focusHeadlinePending) {
       this.focusHeadlinePending = false;
-      this.shadowRoot?.querySelector<HTMLElement>('.brain-headline')?.focus({ preventScroll: true });
+      // The heading is drawn through the tab host's slot: focus it only once the host has drawn the
+      // row-less Overview, and only if this visit is still the one that lost focus (AM7, X4).
+      const visit = ++this.focusHeadlineVisit;
+      const tabs = this.shadowRoot?.querySelector<HTMLElement & { updateComplete?: Promise<boolean> }>('jf-surface-tabs');
+      void Promise.resolve(tabs?.updateComplete).then(() => {
+        if (visit !== this.focusHeadlineVisit || !this.isConnected || this.activeTab !== 'runtime' || this.answersShown) return;
+        const active = deepActiveElement();
+        // Still lost: nothing, a removed element, or the tab host's own row — not the Overview it draws.
+        const lost = !active || active === this.ownerDocument.body || !active.isConnected
+          || (tabs != null && composedWithin(active, tabs) && active.getRootNode() !== this.shadowRoot);
+        if (lost) this.shadowRoot?.querySelector<HTMLElement>('.brain-headline')?.focus({ preventScroll: true });
+      });
     }
     if (this.readingMemoryArrival && this.readingMemoryFrame === null) {
       // Let the navigation close Settings' modal before trying to focus the area underneath it.
@@ -1691,8 +1716,10 @@ export class BrainSurface extends JfElement {
   /**
    * Whether answers work on this computer now (AM1), from the answer runtime alone: the answer model is
    * installed, answers are not switched off, and the runtime is ready, starting, or unloaded but
-   * started again by a question (processor operation counts). `null` when the observation is not
-   * live, so the caller keeps what it last showed. Search / Ask keeps its own readiness.
+   * started again by a question (processor operation counts). An unloaded model the runtime will not
+   * load again (`operating.chat.reloadAllowed === false`) refuses questions, so it does not count.
+   * `null` when the observation is not live, so the caller keeps what it last showed. Search / Ask
+   * keeps its own readiness.
    */
   private answersWorkNow(): boolean | null {
     if (!this.aiKnown()) return null;
@@ -1701,7 +1728,9 @@ export class BrainSurface extends JfElement {
     if (off || state.chatFailureReason) return false;
     const kind = state.aiEngine.kind;
     if (!this.packagePresent('chat') && state.capabilities?.chat !== true && kind !== 'online') return false;
-    return kind === 'online' || kind === 'starting' || state.capabilities?.chat === true || state.chatUnloadedReason != null;
+    const reloadBlocked = (this.systemStatus ?? state.status)?.operating?.chat?.reloadAllowed === false;
+    return kind === 'online' || kind === 'starting' || state.capabilities?.chat === true
+      || (state.chatUnloadedReason != null && !reloadBlocked);
   }
 
   /** Why a part cannot work on this computer, in ordinary words; the planner's reason is support detail. */
@@ -1720,16 +1749,18 @@ export class BrainSurface extends JfElement {
   }
 
   /**
-   * The answer package's download size, only while it measures the model answers run with: a compact
-   * or custom answer model has no matching size here, so none is shown (AM8).
+   * The answer package's download size, only while it measures the model answers run with (AM8).
+   * Before the files are downloaded it is the download Install would make. Once they are, only the
+   * running engine's profile names a matching package: a saved model path, or no profile at all (an
+   * operator's model, or no engine observed; null is not "standard"), has no trustworthy size here.
    */
   private answerSize(component: { totalBytes?: number } | undefined): number | null {
-    const profile = this.runtimeStatus?.active?.chatProfile;
     if ((this.llm.modelPath ?? '').trim() !== '') return null;
-    if (profile && profile !== 'standard') {
-      return this.planPreview?.components?.find(c => c.id === `chat-${profile}`)?.totalBytes ?? null;
-    }
-    return component?.totalBytes ?? null;
+    if (!this.packagePresent('chat')) return component?.totalBytes ?? null;
+    const profile = this.runtimeStatus?.active?.chatProfile;
+    if (profile == null) return null;
+    if (profile === 'standard') return component?.totalBytes ?? null;
+    return this.planPreview?.components?.find(c => c.id === `chat-${profile}`)?.totalBytes ?? null;
   }
 
   /** The installer replaces the previous run's package records only after planning. */
@@ -1767,13 +1798,16 @@ export class BrainSurface extends JfElement {
       const selected = runtimeControl
         ? id === 'reranker' ? this.rerankerSettings?.rerankerEnabled !== false : storedAnswers
         : !unavailable && wanted;
-      // Meaning search does not work while the files' meaning must be read again or new models wait
-      // for activation, whatever the encoder reports (AM3).
+      // Meaning search does not work while the files' meaning must be read again (or is being read
+      // again) or new models wait for activation, whatever the encoder reports (AM3). It works only
+      // while the Worker accepts meaning queries, which it does only in COMPATIBLE (X1).
+      const compat = this.systemStatus?.embedding?.compatState;
       const meaningBlocked = id === 'meaning' && (this.installStatus?.phase === 'activation_required'
-        || this.systemStatus?.embedding?.compatState === 'BLOCKED_LEGACY' || this.systemStatus?.embedding?.compatState === 'BLOCKED_MISMATCH');
+        || compat === 'BLOCKED_LEGACY' || compat === 'BLOCKED_MISMATCH' || compat === 'REBUILDING');
+      const encoder = onnx?.status == null || onnx.status === 'unknown' ? null : onnx.status === 'active' && onnx.modelActive === true;
       const active = !live ? null : meaningBlocked ? false : id === 'chat' ? this._unifiedAiState?.capabilities?.chat === true
         || (this.answersWorkNow() === true && this._unifiedAiState?.chatUnloadedReason != null)
-        : onnx?.status == null || onnx.status === 'unknown' ? null : onnx.status === 'active' && onnx.modelActive === true;
+        : id === 'meaning' && encoder === true && compat !== 'COMPATIBLE' ? null : encoder;
       const percent = packageProgress?.bytesTotal && packageProgress.bytesTotal > 0
         ? Math.floor(((packageProgress.bytesDownloaded ?? 0) / packageProgress.bytesTotal) * 100) : null;
       const stopped = this.installStatus?.state === 'cancelled';
@@ -1825,8 +1859,9 @@ export class BrainSurface extends JfElement {
     const mmproj = live && this._unifiedAiState?.runtime?.mode === 'online'
       ? this.runtimeStatus?.active?.mmprojActive ?? null : null;
     const pictureOverride = this.rerankerSettings?.pictureReadingOverrideEnabled;
-    // Unset keeps the installed projector's historical behaviour: on while the answer model's files are there.
-    const pictureChoice = pictureOverride ?? this.rerankerSettings?.pictureReadingEnabled ?? this.packagePresent('chat');
+    // Unset is drawn as the Engine's effective default, On, and nothing is written (W2); the note says
+    // when it cannot work, e.g. while the answer model's files are missing.
+    const pictureChoice = pictureOverride ?? this.rerankerSettings?.pictureReadingEnabled ?? true;
     const pictureFiles = this.modelPresence?.packages?.find(p => p.id === 'chat')?.complete
       ?? this.planPreview?.components?.find(c => c.id === 'chat')?.state === 'installed';
     const pictureMismatch = mmproj === true && pictureChoice === false && this.pictureApplied === null;
@@ -3078,6 +3113,9 @@ export class BrainSurface extends JfElement {
         return ['Reading text in scans and images', this._unifiedAiState?.status?.inference?.engineReason === 'automatic-vdu'
           ? 'Answers resume after the current document.' : 'Everything below runs on this computer.'];
       }
+      if (this.systemStatus?.embedding?.compatState === 'REBUILDING') {
+        return ['Reading your files again for meaning search', 'Search still finds files by their words until then.'];
+      }
       if (aiState === 'starting') return ['Starting…', sc.sub];
       if (meaning === true && answers === true && aiState === 'online') {
         return [processorOnly ? 'AI is running on the processor' : 'AI is ready', 'Everything below runs on this computer.'];
@@ -3227,7 +3265,14 @@ export class BrainSurface extends JfElement {
       ),
     ];
     const activity = this.indexingProgress().activity;
-    const canonicalWordings = reindexCauses.map((code) => reasonFor(code, activity).wording);
+    // X7/AM9 — on AI Brain the same causes are said in read words (the app reads files, it does not
+    // "index" them); the canonical wording stays the shared vocabulary everywhere else. The shared
+    // projection's qualification of an unconfirmed observation ("… — last observed: ") is kept.
+    const canonicalWordings = [...new Set(reindexCauses.map((code) => {
+      const qualified = reasonFor(code, activity).wording;
+      const brainWords = BRAIN_READ_AGAIN_WORDS[code];
+      return brainWords ? qualified.replace(reasonFor(code).wording, brainWords) : qualified;
+    }))];
     return html`
       <div class="section warning-section">
         <div class="status-layout">
@@ -3950,8 +3995,9 @@ export class BrainSurface extends JfElement {
       <section aria-label="Downloaded files"><h3 class="advanced-heading">Downloaded files</h3>
         <p class="advanced-note">Files on this computer, measured on disk. Remove files deletes a switched-off part's downloaded files; Download again asks first.</p>
         ${this.renderDownloadedFiles()}
-        <p class="advanced-note">Download choices use registry sizes. Skipping a part keeps its existing files.</p>
-        ${this.renderComponentList()}${this.renderTierBreakdown()}${this.renderPackageHistory()}${this.renderSearchQualityFeatures()}
+        ${/* Not in the pictures (AM5): the legacy panels are developer tools, live. */ ''}
+        ${this.devTools ? html`<p class="advanced-note">Download choices use registry sizes. Skipping a part keeps its existing files.</p>
+          ${this.renderComponentList()}${this.renderTierBreakdown()}${this.renderPackageHistory()}${this.renderSearchQualityFeatures()}` : nothing}
         ${this.renderPackImport()}
       </section>
       <section aria-label="Maintenance"><h3 class="advanced-heading">Maintenance</h3>

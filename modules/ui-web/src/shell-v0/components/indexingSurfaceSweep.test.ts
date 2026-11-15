@@ -336,7 +336,9 @@ describe('WP3.3 complete surface sweep', () => {
       state.verdict = { kind: 'degraded', severity: 'warn', reasons };
       const el = harness('jf-brain-surface', state);
       const callout = dom(el.renderCompatibilityCallouts());
-      expect(callout.textContent).toContain(reasons.length ? 'built before semantic search' : 'Read everything again'); // Slice 7a (AM9)
+      // Slice 7a (AM9, X7): populated causes and the fallback both in read words on Brain.
+      expect(callout.textContent).toContain(reasons.length ? 'Read everything again to restore full search.' : 'Read everything again');
+      expect(callout.textContent).not.toContain('built before semantic search');
       if (unconfirmed(which)) expect(callout.textContent, which).toContain(UNCONFIRMED);
     }
   });

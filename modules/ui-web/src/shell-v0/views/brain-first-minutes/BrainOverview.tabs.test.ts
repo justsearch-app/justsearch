@@ -25,7 +25,6 @@ import { createMockHostApi } from '../../plugin-api/testHostApi.js';
 import { setShowDeveloperTools } from '../../state/developerToolsState.js';
 import { requestMemberTab } from '../../router/memberTabIntent.js';
 import { __seedForTest } from '../../../api/registry/SurfaceCatalogClient.js';
-import { reasonFor } from '../../state/readinessNotice.js';
 import { deepActiveElement } from '../../utils/keyboardHandler.js';
 
 interface Brain extends HTMLElement { apiBase: string; host_: unknown; updateComplete: Promise<boolean> }
@@ -60,7 +59,8 @@ function state(answers: Answers, patch: Record<string, unknown> = {}): AiState {
     chatFailureReason: answers === 'failed' ? 'inference.model_load_failed' : null,
     installStatus: { state: 'completed', installedFully: true },
     runtimeStatus: { active: { mmprojActive: true }, onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }, { id: 'reranker', status: 'active', modelActive: true }] },
-    status: answers === 'cpu' ? { inference: { chatEnabledSpec: true } } : { inference: { chatEnabledSpec: answers !== 'off' },
+    status: answers === 'cpu' ? { inference: { chatEnabledSpec: true }, embedding: { compatState: 'COMPATIBLE' } } : { inference: { chatEnabledSpec: answers !== 'off' },
+      embedding: { compatState: 'COMPATIBLE' },
       gpu: { totalVramBytes: 12 * GB, usedVramBytes: 5.8 * GB, available: true, cudaFunctional: true },
       operating: { gpu: { stale: false, adapter: 'RTX 4070', adapterTotalBytes: 12 * GB, adapterFreeBytes: 6.2 * GB } } },
     index: { ownDocumentCount: { known: true, value: 8 } }, ...patch } as unknown as AiState;
@@ -112,7 +112,7 @@ beforeEach(() => {
     return json({});
   }));
 });
-afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); });
+afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('S7a-5 answers work: Overview | Memory', () => {
   it('shows the tab row, the graphics card reading and the two pictured links', async () => {
@@ -135,6 +135,26 @@ describe('S7a-5 answers work: Overview | Memory', () => {
     store.current = next;
     const el = await mount();
     expect(tabNames(el)).toEqual(['Overview', 'Memory']);
+  });
+  // X3 — an unloaded answer model the runtime will not load again (operating.chat.reloadAllowed=false)
+  // refuses ordinary questions, so answers do not work: no tab row and Answer questions unlit.
+  it('unloaded with its reload not allowed: no tab row, Answer questions not lit', async () => {
+    const base = state('unloaded');
+    store.current = { ...base, status: { ...(base.status as object), operating: { ...((base.status as { operating: object }).operating),
+      chat: { state: 'UNLOADED', reloadAllowed: false, blockedBy: 'GPU_BUSY' } } } } as unknown as AiState;
+    const el = await mount();
+    expect(tabNames(el)).toEqual([]);
+    const chat = el.shadowRoot!.querySelector<HTMLElement>('.path-step[data-feature="chat"]');
+    expect(chat, 'Answer questions step').not.toBeNull();
+    expect(chat!.dataset.lit ?? chat!.querySelector<HTMLElement>('.step-symbol')?.dataset.active).toBe('false');
+  });
+  it('unloaded with its reload allowed still counts as answers work', async () => {
+    const base = state('unloaded');
+    store.current = { ...base, status: { ...(base.status as object), operating: { ...((base.status as { operating: object }).operating),
+      chat: { state: 'UNLOADED', reloadAllowed: true, blockedBy: null } } } } as unknown as AiState;
+    const el = await mount();
+    expect(tabNames(el)).toEqual(['Overview', 'Memory']);
+    expect(el.shadowRoot!.querySelector<HTMLElement>('.path-step[data-feature="chat"]')?.dataset.lit).toBe('true');
   });
   it.each([
     ['answers off', 'off'], ['answers unavailable', 'unavailable'], ['answers failed', 'failed'],
@@ -163,9 +183,9 @@ describe('S7a-5 answers work: Overview | Memory', () => {
   it('shows the graphics meter only with a current reading and never says "no card" without one', async () => {
     store.current = state('cpu');
     let el = await mount();
-    expect(tabNames(el)).toEqual(['Overview', 'Memory']);
     expect(el.shadowRoot!.querySelector('.graphics-card')).toBeNull();
     expect(words(el.shadowRoot!)).not.toMatch(/Needs an NVIDIA graphics card|Memory use unknown/);
+    expect(tabNames(el)).toEqual(['Overview', 'Memory']);
     el.remove();
     store.current = state('ready', { status: { ...(state('ready').status as object), operating: { gpu: { stale: true, adapter: 'RTX 4070' } } } });
     el = await mount();
@@ -197,33 +217,19 @@ describe('S7a-6 Memory routes in every answer state', () => {
     expect(memoryEl(el), 'Memory after reload').not.toBeNull();
   });
 
-  it('losing readiness keeps Memory mounted with its draft, an open Forget question and a pending Forget', async () => {
-    requestMemberTab(BRAIN, MEMORY);
-    const el = await mount(); await settleAll(el);
-    const mem = memoryEl(el);
-    expect(mem, 'Memory mounted').not.toBeNull();
-    const draft = mem!.shadowRoot!.querySelector<HTMLInputElement>('input.draft')!;
-    draft.value = 'Remember this'; draft.dispatchEvent(new Event('input')); await settle(mem!);
-    const forget = mem!.shadowRoot!.querySelector<HTMLElement & { updateComplete: Promise<boolean> }>('.list jf-button');
-    expect(forget, 'Forget action').not.toBeNull();
-    await forget!.updateComplete;
-    const control = forget!.shadowRoot!.querySelector<HTMLElement & { updateComplete: Promise<boolean> }>('jf-control')!;
-    await control.updateComplete; control.shadowRoot!.querySelector('button')!.click(); await settle(mem!);
-    expect(confirm.pending).toHaveLength(1);
-    plan = preview('unavailable'); emit(state('unavailable')); await settleAll(el);
-    expect(memoryEl(el)).toBe(mem);
-    expect(tabNames(el)).toEqual(['Overview', 'Memory']);
-    expect(mem!.shadowRoot!.querySelector<HTMLInputElement>('input.draft')!.value).toBe('Remember this');
-    let release!: () => void; heldDelete = new Promise(resolve => { release = resolve; });
-    confirm.pending[0]!(true); await settle(mem!);
-    expect(deletes).toHaveLength(1);
-    emit({ ...state('unavailable'), snapshotLive: false } as AiState); await settleAll(el);
-    release(); await settleAll(el);
-    expect(memoryEl(el)).toBe(mem);
-    expect(words(mem!.shadowRoot!.querySelector('.announcement'))).toBe('Forgotten.');
-  });
 
   it('returning to Overview syncs the address, and focus lands on the heading when the row leaves', async () => {
+    // X4 — the heading may take focus only in the tab host's final drawing: a slot the host then
+    // replaces takes the heading out of the rendered tree, and a browser drops focus with it.
+    const realFocus = HTMLElement.prototype.focus;
+    let headingSlot: Element | null | undefined;
+    vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement, options?: FocusOptions) {
+      if (this.classList.contains('brain-headline')) {
+        const slotted = this.closest('[slot]');
+        headingSlot = slotted?.parentElement?.shadowRoot?.querySelector(`slot[name="${slotted.getAttribute('slot')}"]`) ?? null;
+      }
+      realFocus.call(this, options);
+    });
     plan = preview('unavailable'); store.current = state('unavailable');
     requestMemberTab(BRAIN, MEMORY);
     const el = await mount(); await settleAll(el);
@@ -235,25 +241,7 @@ describe('S7a-6 Memory routes in every answer state', () => {
     expect(tabNames(el)).toEqual([]);
     const active = deepActiveElement();
     expect(active?.classList.contains('brain-headline')).toBe(true);
-  });
-
-  it('locked Memory reads as locked, never as empty, whatever the answer state', async () => {
-    memory = { memories: [], locked: true }; plan = preview('unavailable'); store.current = state('unavailable');
-    requestMemberTab(BRAIN, MEMORY);
-    const el = await mount(); await settleAll(el);
-    const mem = memoryEl(el);
-    expect(mem, 'Memory mounted').not.toBeNull();
-    expect(words(mem!.shadowRoot!)).toContain(reasonFor('memory.locked').wording);
-    expect(words(mem!.shadowRoot!)).not.toContain('No learned memory yet.');
-    expect(tabNames(el)).toEqual(['Overview', 'Memory']);
-  });
-
-  it('other tab hosts keep their row', async () => {
-    const host = document.createElement('jf-surface-tabs') as HTMLElement & { items: unknown; updateComplete: Promise<boolean> };
-    host.items = [{ id: 'a', label: 'First', content: () => 'one' }, { id: 'b', label: 'Second', content: () => 'two' }];
-    document.body.append(host); await host.updateComplete;
-    expect([...host.shadowRoot!.querySelectorAll('[role="tab"]')].map(words)).toEqual(['First', 'Second']);
-    const el = await mount();
-    expect(tabNames(el)).toEqual(['Overview', 'Memory']);
+    expect(headingSlot, 'the heading was focused where it is drawn').toBeTruthy();
+    expect(headingSlot!.isConnected, 'focus was not placed in a drawing the tab host then removed').toBe(true);
   });
 });

@@ -60,7 +60,8 @@ beforeEach(() => {
   store.current = {
     aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null }, installObservationLive: true, runtimeObservationLive: true, snapshotLive: true,
     runtime: { mode: 'online', modelId: 'answer-model', modelLabel: 'Answer model', installed: { known: true, value: true } },
-    capabilities: { chat: true }, status: { gpu: { totalVramBytes: 8192, usedVramBytes: 4096 }, inference: { chatEnabledSpec: true }, operating: { gpu: { stale: false, adapter: 'Test adapter', adapterTotalBytes: 8192, adapterFreeBytes: 4096 } } },
+    // X1: meaning search works only with the Worker's COMPATIBLE reading.
+    capabilities: { chat: true }, status: { embedding: { compatState: 'COMPATIBLE' }, gpu: { totalVramBytes: 8192, usedVramBytes: 4096 }, inference: { chatEnabledSpec: true }, operating: { gpu: { stale: false, adapter: 'Test adapter', adapterTotalBytes: 8192, adapterFreeBytes: 4096 } } },
     installStatus: { state: 'completed', phase: 'done', installedFully: true },
     runtimeStatus: { active: { mmprojActive: true }, onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }, { id: 'reranker', status: 'active', modelActive: true }] },
     index: { documentCount: { known: true, value: 24 } },

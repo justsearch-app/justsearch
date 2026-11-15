@@ -52,8 +52,9 @@ beforeEach(() => {
     aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
     runtime: { mode: 'online', installed: { known: true, value: true } },
     installStatus: { state: 'completed', installedFully: true }, capabilities: { chat: true },
-    // Slice 7a (AM3): "AI is ready" needs live meaning evidence.
+    // Slice 7a (AM3, X1): "AI is ready" needs live meaning evidence: the encoder and the Worker's COMPATIBLE reading.
     runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] },
+    status: { embedding: { compatState: 'COMPATIBLE' } },
   } as AiState;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input);

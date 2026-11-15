@@ -13,30 +13,49 @@ picture cannot, each switch sits once under its step with its state in words, on
 are lit, the tab row "Overview | Memory" appears only once answers work, and what the pictures do
 not show sits behind Settings › Advanced › Show developer tools. The sources are the owner's adopted
 rules and picture notes, the pictures' words (quoted in each entry, because tmp/design is not in
-git), the slice 7a decisions D1-D6 and AM1-AM10, and the orchestrator decisions W1-W5 of
+git), the slice 7a decisions D1-D6 and AM1-AM10, and the orchestrator decisions W1-W6 and X1-X8 of
 2026-11-15, all under the implementation delegation.
+
+After the review of 2026-11-15 the page repairs seven defects, each with its check: meaning counts
+as working only while the Worker accepts meaning queries (COMPATIBLE), and a rebuild in progress is
+said in read words (X1); an unset picture-reading choice is drawn On with its missing-files note
+(X2); an unloaded answer model whose reload is not allowed does not count as answers working (X3);
+focus returns to the heading only once the tab host has drawn the row-less Overview (X4); the answer
+size is shown only for a model with a matching package value (X5); Advanced's legacy panels need
+developer tools (X6); populated reindex causes and the rebuild action use read words, the action's
+served label being slice 6a's "Rebuild all search data" (X7).
 
 There is one entry per flagged file. The seven new files under brain-first-minutes/ are not isolated:
 the same diff deletes brainPage.test.ts, and repository-wide scanners read them. Each has a New
-entry with its evidence. The evidence for the six repaired files is
-gates/test-intent/evidence/fm-brain.json, written by run-evidence with --before origin/main
-(8a312d1484). Every case that fails on the before-state fails by assertion; none by exception or
-timeout. The style= source guard passes on the before-state too. The seventh file,
-BrainOverview.preservation.test.ts, holds two preservation checks that pass on origin/main; its
-evidence is gates/test-intent/evidence/fm-brain-preservation.json, whose fail-before run records
-that they pass there. Modified files have Obsolete entries naming the source of each changed
-expectation. installCause has an Adaptation entry, because only its locator moved.
+entry with its evidence. The new checks find elements by what the base page draws too (role,
+accessible name, visible text, test ids, the steps' data-feature, lit read from data-lit or the
+base's data-active), so on origin/main they fail on the behaviour they claim, not on missing slice
+7a markup (X8). The evidence for the six repaired files is gates/test-intent/evidence/fm-brain.json,
+written by run-evidence with --before origin/main (8a312d1484), one --check per file. Every case
+that fails on the before-state fails by assertion on its claimed behaviour; none by exception,
+timeout or absent markup. In the layout file the fm-13 and keyboard cases fail on the base; its
+fm-10 and fm-14 cases, the audit self-check, the developer-tools panel and the style= guard pass
+there and guard the candidate. Cases that hold on the base (the genuine idle Repair and the install
+flows, the AM6 recovery routes, Memory whatever the answer state, the repair heading while meaning's
+files are missing, and the two W4 checks) are in BrainOverview.preservation.test.ts; its evidence is
+gates/test-intent/evidence/fm-brain-preservation.json, whose fail-before run records that they pass
+there. The layout audit applies the repository's ladder rule exactly as
+modules/ui-web/e2e/type-ladder-chromium.mjs does (all four corners, each axis, no rounding) and
+proves it reports 12.4 px text and a 7 px corner (X8). Modified files have Obsolete entries naming
+the source of each changed expectation; installCause has an Adaptation entry, because only its
+locator moved.
 
 Exact words and values the pictures do not spell come from the orchestrator decisions: the state
 words and notes, the exceptional headlines and sentences and "Read everything again to restore full
 search." (W1), the unset picture-reading choice drawn as the effective default (W2), Space/Enter and
 the ladder sizes and radii with the owner's ladder rule (W3), literal expected sizes and the two
-preservation checks (W4), and the last-observed picture-reading sentence said once, with the
-checking status not repeated under every step (W5). Literal sizes follow from the fixture bytes and
-the app's existing size display; byte units are D6, a later slice. One expected value has no source
-of its own: "Not part of this install" (BrainSurface.sliceB.test.ts line 131, the not-in-mode
-reason); it is named in that entry and returned as an open question.
-This builder wrote no acceptance record.
+preservation checks (W4), the last-observed picture-reading sentence said once (W5), "Not part of
+this install" for a part the install mode does not include (W6), and "Rebuild all search data"
+(X7). Literal sizes follow from the fixture bytes and the app's existing size display; byte units
+are D6, a later slice. Words this change chose without an exact source (the REBUILDING heading and
+the read words of the schema and rebuild-brake causes) are asserted by their meaning only. No
+expected value is computed by production code: the locked-Memory words are today's literal wording
+(X8). This builder wrote no acceptance record.
 
 ```json
 {
@@ -90,15 +109,23 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X6 (2026-11-15): Brain Advanced legacy panels (component list, tier breakdown, package history, observed ONNX features) behind the live developer-tools preference; AM6 routes stay."
         }
       ],
       "behaviour": "The production type-ladder audit still requires zero violations across every reached view; the number of views it reaches is 140 because AI Brain (fixture state without working answers) now contributes 5 views per theme instead of 14.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "summary.surfaces is 158.",
           "newAssertion": "summary.surfaces is 140; violations stay 0.",
-          "reason": "Observed with modules/ui-web/e2e/type-ladder-chromium.mjs on both trees (2026-11-15, headless, private Vite): before (origin/main 8a312d1484) 158 views, 0 violations; candidate 140 views, 0 violations. The 18 views that left, per theme (dark, light): ai-brain-tab-1 (the click on the Brain tab row, which D1/handover \"No tab row until answers work\" removes for this fixture) and ai-brain-tab-1-expanded-1..8 (each 37 text elements: the eight aria-expanded feature openers of the old page, the sentence phrases (.feature-phrase) and step openers that open the \"You get / It costs\" panel, which D5/AM5 put behind Settings › Advanced › Show developer tools). The four remaining Brain expansions (Advanced settings, Other options, Use another, Change: 83-87 text elements before, 72-76 now) are still audited as ai-brain-expanded-1..4 because type-ladder-chromium.mjs now expands sub-views of a surface without a tab row. Where the removed text is now checked: the \"You get / It costs\" panel with developer tools on in dark and light in BrainOverview.layout-lockdown.test.ts (\"developer tools: the %s \"You get / It costs\" panel stays on the ladders\", one panel per theme, the panel template is shared by the four steps); the Overview without tab row at 1024/600 px and 200% zoom in BrainOverview.layout-lockdown.test.ts; the tab row itself (fm-14 state) in the same file's fm-14 cases. No source still requires a Brain tab row or default-visible feature panels in a state where answers do not work."
+          "reason": "Observed with modules/ui-web/e2e/type-ladder-chromium.mjs on both trees (2026-11-15, headless, private Vite): before (origin/main 8a312d1484) 158 views, 0 violations; candidate 140 views, 0 violations. The 18 views that left, per theme (dark, light): ai-brain-tab-1 (the click on the Brain tab row, which D1/handover \"No tab row until answers work\" removes for this fixture) and ai-brain-tab-1-expanded-1..8 (each 37 text elements: the eight aria-expanded feature openers of the old page, the sentence phrases (.feature-phrase) and step openers that open the \"You get / It costs\" panel, which D5/AM5 put behind Settings › Advanced › Show developer tools). The four remaining Brain expansions (Advanced settings, Other options, Use another, Change: 83-87 text elements before, 61-65 now, remeasured 2026-11-15 after X6 put the component list, tier breakdown, package history and observed features behind developer tools) are still audited as ai-brain-expanded-1..4 because type-ladder-chromium.mjs now expands sub-views of a surface without a tab row. Where the removed text is now checked: the \"You get / It costs\" panel with developer tools on in dark and light in BrainOverview.layout-lockdown.test.ts (\"developer tools: the %s \"You get / It costs\" panel stays on the ladders\", one panel per theme, the panel template is shared by the four steps); the Overview without tab row at 1024/600 px and 200% zoom in BrainOverview.layout-lockdown.test.ts; the tab row itself (fm-14 state) in the same file's fm-14 cases. No source still requires a Brain tab row or default-visible feature panels in a state where answers do not work."
         }
       ]
     },
@@ -153,10 +180,26 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decision W1 (2026-11-15): State words and notes adopted verbatim (mine): switch state words \"On\", \"Off\", \"Not known\", \"Included\", \"Not included\", \"Changing…\"; notes \"Checking after an interrupted change\", \"Not confirmed yet\", \"Set by an operator override\", \"Not working — its files are missing\", \"Not working now\", \"Not available with this answer model\", \"Off is not applied yet\"; exceptional headlines/sentences \"Answers paused while files are read\" + \"Answers resume when JustSearch finishes reading the files.\", \"Reading text in scans and images\" + \"Answers resume after the current document.\", \"Read everything again to restore full search.\"",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X7 (2026-11-15): Populated compatibility reason codes and the rebuild action use read words (\"Rebuild all search data\", as slice 6a); tested on populated paths."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X8 (2026-11-15): Tests: ladder audit uses the repository ladder rule exactly (no rounding beyond the check's own rule, all four corners); new checks' fail-before must come from the behaviour (query by role/name/text that exists on main, not new-only markup); literal expected wording instead of reasonFor; restore the cleared-after-recovery assertion."
         }
       ],
-      "behaviour": "AI Brain's simple panel no longer repeats the reading-work hold reason (it lives in the status panel, Health and Brain's enrichment card) and still never infers indexing activity from runtime mode; the compatibility callout without reasons offers reading everything again in read words.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "behaviour": "AI Brain's simple panel no longer repeats the reading-work hold reason (it lives in the status panel, Health and Brain's enrichment card) and still never infers indexing activity from runtime mode; the compatibility callout without reasons offers reading everything again in read words; with a populated reindex code it says the cause in read words, still qualified when the observation is unconfirmed.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "S33.1/S33.4/S33.6 Brain simple panel: panel text contains expectedReason(which) (the hold reason or \"Indexing status unconfirmed\") for every case, job count and awaitingChatEnable; never \"Indexing embeddings\".",
@@ -167,6 +210,11 @@ This builder wrote no acceptance record.
           "oldAssertion": "Compatibility callout without reasons contains \"Rebuild the index\".",
           "newAssertion": "It contains \"Read everything again\" (the built-before-semantic-search branch and the UNCONFIRMED check are unchanged).",
           "reason": "AM9 moves \"Rebuild the index\" on Brain's exceptional states to read words; owner words \"the app reads files (not \\\"indexes\\\")\". The callout check (line 339) matches the first words of the sentence adopted verbatim in W1, \"Read everything again to restore full search.\" The callout's remedy and its unconfirmed treatment stay required (D5) and are kept."
+        },
+        {
+          "oldAssertion": "S33.4 Brain compatibility callout with the populated code index.blocked_legacy contains \"built before semantic search\" (the canonical index wording), and \"Indexing status unconfirmed\" when the observation is unconfirmed.",
+          "newAssertion": "It contains \"Read everything again to restore full search.\" and not \"built before semantic search\"; the \"Indexing status unconfirmed\" qualification for unconfirmed observations is kept.",
+          "reason": "X7: populated compatibility reason codes use read words on Brain; the sentence is W1 verbatim (literal, X8). The S33.4 oracle that a retained observation is qualified as unconfirmed is unchanged: Brain keeps the shared projection's \"… — last observed: \" qualification around its own words."
         }
       ]
     },
@@ -202,7 +250,7 @@ This builder wrote no acceptance record.
         }
       ],
       "behaviour": "A restarted head that confirms nothing cannot inherit the previous head's Online; the oracle is unchanged. The test now turns developer tools on so the Start/Stop answers action it observes is rendered.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Start/Stop answers action observed on the default page.",
@@ -248,20 +296,33 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decision W1 (2026-11-15): State words and notes adopted verbatim (mine): switch state words \"On\", \"Off\", \"Not known\", \"Included\", \"Not included\", \"Changing…\"; notes \"Checking after an interrupted change\", \"Not confirmed yet\", \"Set by an operator override\", \"Not working — its files are missing\", \"Not working now\", \"Not available with this answer model\", \"Off is not applied yet\"; exceptional headlines/sentences \"Answers paused while files are read\" + \"Answers resume when JustSearch finishes reading the files.\", \"Reading text in scans and images\" + \"Answers resume after the current document.\", \"Read everything again to restore full search.\"",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X1 (2026-11-15): Meaning positive only when vector queries are live-compatible (COMPATIBLE); REBUILDING shows the rebuilding state in read words, Meaning unlit."
         }
       ],
       "behaviour": "An Engine pause observation drives the answers-paused wording in a second window; the switch converges; the answer model stays loaded. Words are read/answers words.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Heading is \"Answers paused while indexing\"; sentence contains \"Answers resume automatically when bulk file indexing ends.\"",
           "newAssertion": "Heading is \"Answers paused while files are read\"; sentence contains \"Answers resume when JustSearch finishes reading the files.\"; \"answer model stays loaded\", convergence and the switch write are unchanged.",
-          "reason": "AM9 moves \"indexing\" words on Brain's states to read/answers words; owner words \"the app reads files (not \\\"indexes\\\")\". The exact heading and sentence (lines 102-103) are adopted verbatim in W1 (\"Answers paused while files are read\" + \"Answers resume when JustSearch finishes reading the files.\")."
+          "reason": "AM9 moves \"indexing\" words on Brain's states to read/answers words; owner words \"the app reads files (not \\\"indexes\\\")\". The exact heading and sentence (lines 103-104) are adopted verbatim in W1 (\"Answers paused while files are read\" + \"Answers resume when JustSearch finishes reading the files.\")."
         },
         {
           "oldAssertion": "Fixture without runtime meaning evidence.",
           "newAssertion": "Fixture adds runtimeStatus onnxFeatures embed active.",
           "reason": "AM3: the positive \"AI is ready\" heading needs live meaning evidence; the fixture supplies the evidence the scenario (installed, online) implies. Oracle unchanged."
+        },
+        {
+          "oldAssertion": "The heading reads \"AI is ready\" with a live encoder in the fixture (runtimeStatus embed active).",
+          "newAssertion": "Unchanged expectation (\"AI is ready\"); the fixture adds status.embedding.compatState COMPATIBLE.",
+          "reason": "The fixture's status now carries embedding.compatState COMPATIBLE: the positive heading needs the Worker's live meaning-query compatibility as well as the encoder (X1). Without it, meaning search is not known to work and the heading stays neutral."
         }
       ]
     },
@@ -297,7 +358,7 @@ This builder wrote no acceptance record.
         }
       ],
       "behaviour": "Answers with a removed answer model: every route that turns answers on asks first, Cancel saves nothing, Accept starts the download without switching answers on. The Start answers route is a developer tool.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "the Start answers action observed with developer tools off (the default).",
@@ -354,15 +415,23 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decision W1 (2026-11-15): State words and notes adopted verbatim (mine): switch state words \"On\", \"Off\", \"Not known\", \"Included\", \"Not included\", \"Changing…\"; notes \"Checking after an interrupted change\", \"Not confirmed yet\", \"Set by an operator override\", \"Not working — its files are missing\", \"Not working now\", \"Not available with this answer model\", \"Off is not applied yet\"; exceptional headlines/sentences \"Answers paused while files are read\" + \"Answers resume when JustSearch finishes reading the files.\", \"Reading text in scans and images\" + \"Answers resume after the current document.\", \"Read everything again to restore full search.\"",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X1 (2026-11-15): Meaning positive only when vector queries are live-compatible (COMPATIBLE); REBUILDING shows the rebuilding state in read words, Meaning unlit."
         }
       ],
       "behaviour": "While loaded answers lend their server to an automatic picture-reading pass, the page says pictures are being read and that answers resume after the current document; after the hold closes, or on stale observations, it never claims picture reading; explicit and chat-off passes keep the normal sentence.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Panel text contains \"Reading pictures. Chat resumes after the current document.\" and not \"Chat and summaries ready.\"; the Start/Stop action exists.",
           "newAssertion": "Heading is \"Reading text in scans and images\"; sentence is \"Answers resume after the current document.\"; the fm-14 sentence \"Everything below runs on this computer.\" is absent; the Answer questions step exists.",
-          "reason": "AM9 (answers words, not \"Chat\"), fm-14 sentence words; the step name \"Text in scans and images\" is the pictures' name. D2: the answer switch sits under its step, so the step replaces the old action as the control that must remain. The exact headline and sentence (lines 37, 38, 52, 54) are adopted verbatim in W1 (\"Reading text in scans and images\" + \"Answers resume after the current document.\")."
+          "reason": "AM9 (answers words, not \"Chat\"), fm-14 sentence words; the step name \"Text in scans and images\" is the pictures' name. D2: the answer switch sits under its step, so the step replaces the old action as the control that must remain. The exact headline and sentence (lines 40, 41, 55, 57) are adopted verbatim in W1 (\"Reading text in scans and images\" + \"Answers resume after the current document.\")."
         },
         {
           "oldAssertion": "After the hold closes the text contains \"Chat and summaries ready.\"; stale VDU does not contain \"Reading pictures.\"",
@@ -373,6 +442,11 @@ This builder wrote no acceptance record.
           "oldAssertion": "Explicit and chat-off automatic passes keep \"Chat and summaries ready.\" and never \"Chat resumes after the current document.\"",
           "newAssertion": "For those passes the heading is \"Reading text in scans and images\" and the sentence equals the normal sentence; never \"Answers resume after the current document.\"",
           "reason": "Same oracle (no resume promise when answers are not lent) in answers words (AM9). The heading reports the observed live VDU pass, which is true in these fixtures. Headline words: W1."
+        },
+        {
+          "oldAssertion": "After the hold closes the sentence is \"Everything below runs on this computer.\"; explicit and chat-off passes keep that sentence.",
+          "newAssertion": "Unchanged expectations; the harness gives the page its status (systemStatus) with embedding.compatState COMPATIBLE.",
+          "reason": "The fixture's status now carries embedding.compatState COMPATIBLE: the positive heading needs the Worker's live meaning-query compatibility as well as the encoder (X1). The page reads compatibility from the status it was given, so the harness sets the same status object on both fields."
         }
       ]
     },
@@ -422,7 +496,7 @@ This builder wrote no acceptance record.
         }
       ],
       "behaviour": "In every chat-lifecycle state the answer escape action exists and writes core.set-chat-enabled with the expected value; it never posts core.switch-inference-mode. Where answers cannot work the step is drawn not reachable, with its reason once in ordinary words and no switch.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "The primary action is data-testid=\"brain-simple-action\" with a non-empty label; activating it writes the intent.",
@@ -474,7 +548,7 @@ This builder wrote no acceptance record.
         }
       ],
       "behaviour": "The component list (download choices per part, declines) works as before; before install it is reached with developer tools on, because fm-10 shows no Advanced settings.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Advanced settings (the component list) before install observed with developer tools off (the default).",
@@ -510,7 +584,7 @@ This builder wrote no acceptance record.
           "label": "agent choice"
         }
       ],
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read."
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read."
     },
     {
       "items": [
@@ -603,10 +677,42 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decision W5 (2026-11-15T19:40Z): Restore last-known truth: when the AI observation is lost while pictures were being read, the page says once, in its sentence, \"Pictures were being read when last observed; current answer availability is unconfirmed.\" (main's wording, state/brainPage.ts:38/48 at 8a312d1484); per-step 'Unknown — checking AI status' is not repeated as a separate fact on every step when the page already says it once (fm-10 'each fact stands once').",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X1 (2026-11-15): Meaning positive only when vector queries are live-compatible (COMPATIBLE); REBUILDING shows the rebuilding state in read words, Meaning unlit."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X5 (2026-11-15): Model size shown only with a trustworthy matching package value for the observed model; custom/unknown -> no size."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X6 (2026-11-15): Brain Advanced legacy panels (component list, tier breakdown, package history, observed ONNX features) behind the live developer-tools preference; AM6 routes stay."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
         }
       ],
       "behaviour": "Live redesign repairs keep their oracles (whole page waits for live observations and says so once, in its heading, not under every step, repair stays primary, previews cannot overwrite saved choices, no step claims Downloading for a stopped run, a required-component message stands once, picture branch layout), with one switch per feature under its step, the plain fm-14 sentence, and the graphics meter shown only with a current reading.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Repair-available page: sentence contains \"Answers are off; background work can continue\"; two answer switches both aria-checked false.",
@@ -647,6 +753,16 @@ This builder wrote no acceptance record.
           "oldAssertion": "D2 the whole page waits for live install and verdict (no observation, retained negative, unconfirmed verdict): some path step contains \"Unknown\", and every path step contains \"Unknown\".",
           "newAssertion": "The path has steps; no path step contains \"Unknown — checking AI status\" and every path step is unlit (data-lit \"false\"); the heading still contains \"Checking AI\", the sentence makes no install/answers/meaning claim, and every switch is disabled (kept).",
           "reason": "W5: per-step \"Unknown — checking AI status\" is not repeated on every step when the page already says it once; the heading \"Checking AI status…\" says it (fm-10 \"each fact stands once\"). The oracle that nothing is claimed as working while observations are not live is kept: every step is unlit and every switch disabled."
+        },
+        {
+          "oldAssertion": "D1: the sentence is \"Everything below runs on this computer.\"; D8: the answer step shows the plan's 1.0 KB size after an older preview resolves.",
+          "newAssertion": "Unchanged expectations; the fixture adds status.embedding.compatState COMPATIBLE and runtimeStatus.active.chatProfile \"standard\".",
+          "reason": "The fixture's status now carries embedding.compatState COMPATIBLE: the positive heading needs the Worker's live meaning-query compatibility as well as the encoder (X1). X5: once the answer files are downloaded, the size is shown only when the running engine names a profile with a matching package value; \"standard\" is the profile whose package the plan sizes (ChatModelProfile STANDARD \"standard\")."
+        },
+        {
+          "oldAssertion": "G1/G2: with Advanced open, the observed search features and the component rows say \"when last observed\"/\"last observed\" and never \"in use\".",
+          "newAssertion": "Unchanged expectations, with developer tools switched on first.",
+          "reason": "X6 (AM5) puts the component list and the observed search features behind the live developer-tools preference; the last-observed oracle is kept where the panels now are."
         }
       ]
     },
@@ -672,7 +788,7 @@ This builder wrote no acceptance record.
         }
       ],
       "behaviour": "A genuinely fresh install is untouched by the paused-download handling: \"AI isn't installed yet\", the fm-10 sentence, no \"Download Paused\".",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Text contains \"Install AI models to get started\".",
@@ -751,7 +867,7 @@ This builder wrote no acceptance record.
         }
       ],
       "behaviour": "Saved picture reading with an answer model that cannot read pictures: delayed reads cannot overturn newer receipts, interrupted changes reconcile, refusals keep the prior choice, unconfirmed projector reports never read as text-only. The one switch under the step shows the stored choice; the step's light and note show what works now; the sentence carries no per-feature part.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "view() reads the path copy's last .step-meta (\"path\") and the sentence's pictures phrase (\"sentence\"); two switches.",
@@ -856,10 +972,26 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decision W1 (2026-11-15): State words and notes adopted verbatim (mine): switch state words \"On\", \"Off\", \"Not known\", \"Included\", \"Not included\", \"Changing…\"; notes \"Checking after an interrupted change\", \"Not confirmed yet\", \"Set by an operator override\", \"Not working — its files are missing\", \"Not working now\", \"Not available with this answer model\", \"Off is not applied yet\"; exceptional headlines/sentences \"Answers paused while files are read\" + \"Answers resume when JustSearch finishes reading the files.\", \"Reading text in scans and images\" + \"Answers resume after the current document.\", \"Read everything again to restore full search.\"",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X2 (2026-11-15): Unset picture reading with missing answer files: drawn On (default, W2) with note \"Not working — its files are missing\" (W1); nothing written."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision W2 (2026-11-15): Unset picture-reading choice is drawn as the Engine's effective default (today On) with nothing written (like unset answers, AM2); its note says why it is not working when it is not.",
+          "label": "agent choice"
         }
       ],
       "behaviour": "The picture reading switch: unknown saved choices read \"Not known\" without a switch and post nothing; Off reads Off and is drawn off; interrupted deliveries reconcile; refusals keep the prior choice and show the refusal; a pending change locks the one switch; stale second windows refresh and converge; operator overrides lock it; consent before downloading the answer model; where answers cannot work, no switch and no download, and the step says simple scans are read already.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Unknown saved choice: two disabled unchecked switches; the sentence and path both show \"Saved picture reading choice is not known. Refresh settings before changing it.\" as their describedby text and contain no On/Off; clicking posts nothing.",
@@ -884,12 +1016,12 @@ This builder wrote no acceptance record.
         {
           "oldAssertion": "Interrupted change text \"Unknown — checking picture reading after an interrupted change\"; reconciled text \"Off - files and read text kept\".",
           "newAssertion": "Interrupted text \"Checking after an interrupted change\"; reconciled word \"Off\"; replay/witness assertions unchanged.",
-          "reason": "AM2 (Not known / note) and fm-13 (\"Off\"); D4 one kept-files wording. The note \"Checking after an interrupted change\" (lines 129-163) is adopted verbatim in W1."
+          "reason": "AM2 (Not known / note) and fm-13 (\"Off\"); D4 one kept-files wording. The note \"Checking after an interrupted change\" (lines 133-167) is adopted verbatim in W1."
         },
         {
           "oldAssertion": "Pending Off: the step contains \"Stopping picture reading…\" and the switches are disabled and still checked; after receipt \"Off - files and read text kept\" and step symbol data-active false.",
           "newAssertion": "Pending Off: the word is \"Changing…\" (also after settleTransients), the one switch disabled and still checked; after receipt word \"Off\" and the step unlit.",
-          "reason": "D2: the state in words under the step; the switch shows the stored selection until the applied receipt (kept). \"Changing…\" (lines 174, 178) is the base's pending word for Best match first, now shared, and adopted verbatim in W1."
+          "reason": "D2: the state in words under the step; the switch shows the stored selection until the applied receipt (kept). \"Changing…\" (lines 178, 182) is the base's pending word for Best match first, now shared, and adopted verbatim in W1."
         },
         {
           "oldAssertion": "Switch arrays of two (sentence copy and path copy), e.g. [\"true\",\"true\"]; the second copy ([1]) clicked.",
@@ -900,6 +1032,11 @@ This builder wrote no acceptance record.
           "oldAssertion": "Unavailable picture reader: two disabled switches; clicking posts nothing; text \"Text in scans and images is unavailable on this computer\".",
           "newAssertion": "No switch; nothing posted, no operation; the step contains \"Simple scans are read already\".",
           "reason": "fm-10/fm-13 picture words for the pictures step on a computer where answers cannot work (\"Text in scans and images: Simple scans are read already\", no switch); fm-10 \"A switch exists only under its step\". The no-download/no-post oracle is kept."
+        },
+        {
+          "oldAssertion": "Answer files not downloaded yet, picture choice unset: the step reads \"Off\" and is not lit.",
+          "newAssertion": "The step reads \"On\", says \"Not working — its files are missing\", is not lit, and nothing is posted.",
+          "reason": "X2 and W2: an unset picture choice is drawn as the Engine's effective default (On) and nothing is written; the note words are W1 verbatim. \"Not lit\" stays (only steps that work now are lit)."
         }
       ]
     },
@@ -982,10 +1119,18 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decision W5 (2026-11-15T19:40Z): Restore last-known truth: when the AI observation is lost while pictures were being read, the page says once, in its sentence, \"Pictures were being read when last observed; current answer availability is unconfirmed.\" (main's wording, state/brainPage.ts:38/48 at 8a312d1484); per-step 'Unknown — checking AI status' is not repeated as a separate fact on every step when the page already says it once (fm-10 'each fact stands once').",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X1 (2026-11-15): Meaning positive only when vector queries are live-compatible (COMPATIBLE); REBUILDING shows the rebuilding state in read words, Meaning unlit."
         }
       ],
       "behaviour": "AI Brain redesign behaviour: one saved answer switch with one busy state; stopping keeps files and background work; runtime evidence shows in the step light and unknown observations disable switches; unset answers stay automatic without a write; feature panels (developer tools) keep focus behaviour; acquisitions and consent unchanged; the graphics meter only with a current reading.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Two answer switches with distinct ids, both checked; both disabled while busy; after stop both unchecked and the text contains \"Answers are off; background work can continue\".",
@@ -1026,6 +1171,11 @@ This builder wrote no acceptance record.
           "oldAssertion": "keeps runtime evidence in the step light ...: after the snapshot is no longer live, the pictures step contains \"Unknown\".",
           "newAssertion": "The heading is \"Checking AI status…\"; the pictures step does not contain \"Unknown — checking AI status\" and is unlit; both switches stay present and disabled (kept).",
           "reason": "W5: per-step \"Unknown — checking AI status\" is not repeated when the page already says it once, in the heading (fm-10 \"each fact stands once\"). The oracle that an unknown observation is not shown as working is kept by the unlit step and the disabled switches."
+        },
+        {
+          "oldAssertion": "After the paused install completes, the heading reads \"AI is ready\".",
+          "newAssertion": "Unchanged expectation; the fixture's status adds embedding.compatState COMPATIBLE.",
+          "reason": "The fixture's status now carries embedding.compatState COMPATIBLE: the positive heading needs the Worker's live meaning-query compatibility as well as the encoder (X1)."
         }
       ]
     },
@@ -1066,15 +1216,46 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decision W1 (2026-11-15): State words and notes adopted verbatim (mine): switch state words \"On\", \"Off\", \"Not known\", \"Included\", \"Not included\", \"Changing…\"; notes \"Checking after an interrupted change\", \"Not confirmed yet\", \"Set by an operator override\", \"Not working — its files are missing\", \"Not working now\", \"Not available with this answer model\", \"Off is not applied yet\"; exceptional headlines/sentences \"Answers paused while files are read\" + \"Answers resume when JustSearch finishes reading the files.\", \"Reading text in scans and images\" + \"Answers resume after the current document.\", \"Read everything again to restore full search.\"",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X7 (2026-11-15): Populated compatibility reason codes and the rebuild action use read words (\"Rebuild all search data\", as slice 6a); tested on populated paths."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X8 (2026-11-15): Tests: ladder audit uses the repository ladder rule exactly (no rounding beyond the check's own rule, all four corners); new checks' fail-before must come from the behaviour (query by role/name/text that exists on main, not new-only markup); literal expected wording instead of reasonFor; restore the cleared-after-recovery assertion."
         }
       ],
-      "behaviour": "The compatibility callout without a reindex code falls back to one generic remedy line (no per-cause fork), in read words.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "behaviour": "The compatibility callout says each populated reindex cause in AI Brain's read words (one agreed sentence for the embedding causes), keeps the technical detail and the schema arm's real vocabulary, and falls back to one generic remedy line without a code.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Text contains \"Rebuild the index to restore full search.\"",
           "newAssertion": "Text contains \"Read everything again to restore full search.\"",
           "reason": "AM9 names \"Rebuild the index\" among the words that move to read words; owner words \"the app reads files (not \\\"indexes\\\")\"; D5 keeps the compatibility warning's actionable words. The exact sentence \"Read everything again to restore full search.\" (line 77) is adopted verbatim in W1."
+        },
+        {
+          "oldAssertion": "index.embedding_legacy: the callout contains reasonFor('index.embedding_legacy').wording (the canonical index wording).",
+          "newAssertion": "It contains \"Read everything again to restore full search.\" and not the canonical sentence \"Semantic search isn't available on this index yet — rebuild it to enable meaning-based results.\" (literal).",
+          "reason": "X7: populated reason codes use read words on Brain; owner words \"the app reads files (not \\\"indexes\\\")\"; the sentence is W1 verbatim. X8: literals instead of reasonFor. The canonical vocabulary stays for the other surfaces (readinessNotice.ts is unchanged)."
+        },
+        {
+          "oldAssertion": "Schema BLOCKED_MISMATCH: the callout contains reasonFor('index.schema_mismatch').wording.",
+          "newAssertion": "It does not contain the canonical sentence (literal), says \"Search works fully\" and \"reading everything again\"; \"Schema incompatible\" and the schema_mismatch detail are kept.",
+          "reason": "X7 read words; the cause keeps its meaning (search is fully working; reading again adds newer features). The exact sentence is an agent choice under X7, so only its meaning is asserted (no exact value without a source)."
+        },
+        {
+          "oldAssertion": "Schema BLOCKED_LEGACY with index.blocked_legacy: the callout contains reasonFor('index.blocked_legacy').wording.",
+          "newAssertion": "It contains \"Read everything again to restore full search.\" and not the canonical sentence (literal); the remedy is still offered.",
+          "reason": "X7 and W1 as above; X8 literals."
         }
       ]
     },
@@ -1118,7 +1299,7 @@ This builder wrote no acceptance record.
         }
       ],
       "behaviour": "The removal band in real Chromium (confirm, refuse, Escape handling, outcomes) is unchanged; its fixture observes no AI state, so Advanced settings is opened with developer tools on.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Advanced settings (the removal band) in a fixture without AI observations observed with developer tools off (the default).",
@@ -1184,10 +1365,18 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decision W5 (2026-11-15T19:40Z): Restore last-known truth: when the AI observation is lost while pictures were being read, the page says once, in its sentence, \"Pictures were being read when last observed; current answer availability is unconfirmed.\" (main's wording, state/brainPage.ts:38/48 at 8a312d1484); per-step 'Unknown — checking AI status' is not repeated as a separate fact on every step when the page already says it once (fm-10 'each fact stands once').",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X1 (2026-11-15): Meaning positive only when vector queries are live-compatible (COMPATIBLE); REBUILDING shows the rebuilding state in read words, Meaning unlit."
         }
       ],
       "behaviour": "Running repair controls: Cancel says the download paused or shows the completed state; planning never shows Downloading for declined or unavailable parts; heading after completion says what works.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "After the install completes, the heading is \"AI is ready\".",
@@ -1208,6 +1397,11 @@ This builder wrote no acceptance record.
           "oldAssertion": "A failed install read gates a retained running download/plan observation: the meaning step contains \"Unknown — checking AI status\".",
           "newAssertion": "The heading is \"Checking AI status…\" (kept); the meaning step does not contain \"Unknown — checking AI status\" and is unlit; no progress, Pause or Cancel (kept).",
           "reason": "W5: per-step \"Unknown — checking AI status\" is not repeated when the page already says it once, in the heading (fm-10 \"each fact stands once\"). The gate oracle (no retained progress shown as current) is unchanged; the unlit step keeps \"nothing claimed as working\"."
+        },
+        {
+          "oldAssertion": "After the install finished first, the heading reads \"Search understands meaning\".",
+          "newAssertion": "Unchanged expectation; the fixture adds status.embedding.compatState COMPATIBLE.",
+          "reason": "The fixture's status now carries embedding.compatState COMPATIBLE: the positive heading needs the Worker's live meaning-query compatibility as well as the encoder (X1)."
         }
       ]
     },
@@ -1257,7 +1451,7 @@ This builder wrote no acceptance record.
         }
       ],
       "behaviour": "The Best match first switch: waits for completion, refuses operator-controlled changes, reconciles invalid receipts, converges second windows, completes consented enables, keeps a saved On that does not run as On with a not-working note, cancels consent without a transfer.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Switch arrays of two (sentence copy and path copy), e.g. [\"true\",\"true\"]; the second copy ([1]) clicked.",
@@ -1398,10 +1592,34 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "W6: a part that the current install mode does not include (state not-in-mode) shows the reason \"Not part of this install\".",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X6 (2026-11-15): Brain Advanced legacy panels (component list, tier breakdown, package history, observed ONNX features) behind the live developer-tools preference; AM6 routes stay."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X8 (2026-11-15): Tests: ladder audit uses the repository ladder rule exactly (no rounding beyond the check's own rule, all four corners); new checks' fail-before must come from the behaviour (query by role/name/text that exists on main, not new-only markup); literal expected wording instead of reasonFor; restore the cleared-after-recovery assertion."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
         }
       ],
       "behaviour": "Slice A/B review repairs keep their oracles: chosen answers are switched on once and persist; unavailable or not-in-mode answers are never promised and are drawn not reachable; unknown runtime observations stay unconfirmed; saved LLM values are not reverted; inactive loaded features are not shown as working; unknown saved answer intent blocks changes until settings are read; picture-reading holds use last-observed uncertainty (the heading here; the \"when last observed\" sentence in BrainOverview.preservation.test.ts); step openers (developer tools) share expanded state.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "R1: the second mount has two answer switches, both checked.",
@@ -1411,7 +1629,7 @@ This builder wrote no acceptance record.
         {
           "oldAssertion": "R2 unavailable/not-in-mode: the sentence does not contain \"and answer your questions with sources\" but contains \"answers unavailable on this computer\"; the pictures step contains \"unavailable on this computer\"; no answer switch.",
           "newAssertion": "The sentence mentions no answers at all; the answer step is drawn not reachable (data-reach=\"na\") with a reason (\"Not part of this install\" for not-in-mode, non-empty otherwise); the planner reason \"No supported graphics card\" is not shown; the pictures step contains \"Simple scans are read already\"; no answer switch.",
-          "reason": "fm-10: \"What can't work here is said once, in ordinary words, and drawn as not reachable\" and pictures \"Simple scans are read already\"; D4 the reason once. The never-promise oracle is kept and strengthened. \"Not part of this install\" (line 131, the not-in-mode reason) is not among the words W1 adopts and no quoted source spells it; it is the one expected value in this changeset without its own source, returned to the orchestrator as an open question."
+          "reason": "fm-10: \"What can't work here is said once, in ordinary words, and drawn as not reachable\" and pictures \"Simple scans are read already\"; D4 the reason once. The never-promise oracle is kept and strengthened. \"Not part of this install\" (line 131, the not-in-mode reason) is W6 verbatim."
         },
         {
           "oldAssertion": "R4 unknown runtime: the sentence contains \"Understanding meaning is unconfirmed\" and \"best match first unconfirmed\"; the steps contain \"Unknown\".",
@@ -1421,7 +1639,7 @@ This builder wrote no acceptance record.
         {
           "oldAssertion": "S2 inactive loaded sessions: reranker and meaning steps contain \"Off\"; the sentence contains \"without best match first\"; Advanced reranker step contains \"Off\".",
           "newAssertion": "Reranker and meaning steps are unlit with the note \"Not working now\"; unknown -> note \"Not confirmed yet\"; Advanced: reranker step unlit (component-row and 1/2 active assertions unchanged).",
-          "reason": "AM2: \"Switch projection from stored selection only (never runtime) ... saved On/runtime Off shows On with the step's words saying it is not working\". The old checks drew the runtime as Off, which AM2 retires; \"never promised\" is kept by the unlit step. The notes \"Not working now\" and \"Not confirmed yet\" (lines 294-298) are adopted verbatim in W1."
+          "reason": "AM2: \"Switch projection from stored selection only (never runtime) ... saved On/runtime Off shows On with the step's words saying it is not working\". The old checks drew the runtime as Off, which AM2 retires; \"never promised\" is kept by the unlit step. The notes \"Not working now\" and \"Not confirmed yet\" (lines 297-301) are adopted verbatim in W1."
         },
         {
           "oldAssertion": "S3 unknown saved answer intent (pending or failed settings): the path contains \"Saved answer choice is not known\" and not \"automatic\"; every answer switch is disabled with that describedby text and clicking writes nothing; after settings arrive the switch is enabled and pending shows \"automatic (no saved answer choice)\".",
@@ -1431,7 +1649,7 @@ This builder wrote no acceptance record.
         {
           "oldAssertion": "S5 VDU hold: the sentence contains \"while pictures are being read\"; when the snapshot goes stale it contains \"Pictures were being read when last observed\"; after a live completion it contains \"answers your questions\" and not \"last observed\".",
           "newAssertion": "The heading is \"Reading text in scans and images\" during the hold; stale -> the heading is \"Checking AI status…\" (no current picture-reading claim); after a live completion it is neither.",
-          "reason": "D2 removes the per-feature sentence that carried the last-observed phrase; the page heading falls back to the base neutral heading \"Checking AI status…\" (lines 340, 344). The never-claim-stale-reading oracle is kept here. The words \"when last observed\" for this hold are now checked in BrainOverview.preservation.test.ts (\"while pictures are being read, a lost observation says the answers state when last observed\"): the page's sentence says once \"Pictures were being read when last observed; current answer availability is unconfirmed.\" (W5, main's wording; W4 brings that preservation check back). The live headline \"Reading text in scans and images\" is adopted verbatim in W1."
+          "reason": "D2 removes the per-feature sentence that carried the last-observed phrase; the page heading falls back to the base neutral heading \"Checking AI status…\" (lines 346, 351). The never-claim-stale-reading oracle is kept here. The words \"when last observed\" for this hold are now checked in BrainOverview.preservation.test.ts (\"while pictures are being read, a lost observation says the answers state when last observed\"): the page's sentence says once \"Pictures were being read when last observed; current answer availability is unconfirmed.\" (W5, main's wording; W4 brings that preservation check back). The live headline \"Reading text in scans and images\" is adopted verbatim in W1."
         },
         {
           "oldAssertion": "S7: more than 8 openers (sentence phrases, step openers, About), all collapsed; 4 for answers.",
@@ -1442,6 +1660,21 @@ This builder wrote no acceptance record.
           "oldAssertion": "the step openers (S7) observed with developer tools off (the default).",
           "newAssertion": "Developer tools are turned on (setShowDeveloperTools(true)) before the step openers (S7) is observed; they are turned off again after the test.",
           "reason": "Owner words \"What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.\" with D5/AM5 (Brain's Advanced shows only where fm-13/fm-14 show it, plus the AM6 recovery routes). Every assertion about the control itself is kept; only the precondition that makes it visible changed."
+        },
+        {
+          "oldAssertion": "Advanced open: the four groups render, and the optional parts (splade, ner, citation-scorer) have include switches.",
+          "newAssertion": "The four groups render; the component list is absent without developer tools; switching developer tools on, live, shows the optional parts' include switches.",
+          "reason": "X6 (AM5): the component list is a developer tool, live; the four pictured groups stay (fm-14 Advanced settings)."
+        },
+        {
+          "oldAssertion": "S2: component rows say in use/Downloaded and the observed features read 1/2 active.",
+          "newAssertion": "Unchanged expectations, with developer tools switched on first.",
+          "reason": "X6 (AM5) as above."
+        },
+        {
+          "oldAssertion": "S5 (this branch before this round): after a live completion the heading is neither \"Reading text in scans and images\" nor \"Checking AI status…\".",
+          "newAssertion": "Also: while disconnected the sentence contains \"Pictures were being read when last observed\"; after the live completion the page no longer contains \"last observed\".",
+          "reason": "X8 restores the assertion that the last-observed uncertainty clears after live recovery (origin/main had it on the sentence: not.toContain('last observed')); W5 restores main's last-observed sentence, said once. The restored check reads the whole page, which is at least as strict as main's sentence-only check."
         }
       ]
     },
@@ -1494,10 +1727,18 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decision W5 (2026-11-15T19:40Z): Restore last-known truth: when the AI observation is lost while pictures were being read, the page says once, in its sentence, \"Pictures were being read when last observed; current answer availability is unconfirmed.\" (main's wording, state/brainPage.ts:38/48 at 8a312d1484); per-step 'Unknown — checking AI status' is not repeated as a separate fact on every step when the page already says it once (fm-10 'each fact stands once').",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X1 (2026-11-15): Meaning positive only when vector queries are live-compatible (COMPATIBLE); REBUILDING shows the rebuilding state in read words, Meaning unlit."
         }
       ],
       "behaviour": "With the backend gone the card no longer reads as working, the heading says once that AI status is being checked and the answer step is unlit without a note of its own; a live observation still renders \"AI is ready\", the fm-14 sentence, the On answer step and an available Stop answers (developer tool).",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Round-13: text does not contain \"Chat and summaries ready.\"; anti-regression: text contains \"Chat and summaries ready.\".",
@@ -1518,6 +1759,11 @@ This builder wrote no acceptance record.
           "oldAssertion": "Round-13: the answer step state is \"Unknown — checking AI status\".",
           "newAssertion": "Round-13: the heading is \"Checking AI status…\"; the answer step is unlit (data-lit \"false\") and has no note of its own; the heading is not \"AI is ready\" (kept).",
           "reason": "W5: per-step \"Unknown — checking AI status\" is not repeated when the page already says it once, in the heading (fm-10 \"each fact stands once\"). The oracle that a retained \"on\" observation is not reported as current is kept by the heading and the unlit step."
+        },
+        {
+          "oldAssertion": "A live observation renders the heading \"AI is ready\".",
+          "newAssertion": "Unchanged expectation; the harness sets systemStatus.embedding.compatState COMPATIBLE.",
+          "reason": "The fixture's status now carries embedding.compatState COMPATIBLE: the positive heading needs the Worker's live meaning-query compatibility as well as the encoder (X1)."
         }
       ]
     },
@@ -1559,7 +1805,7 @@ This builder wrote no acceptance record.
         }
       ],
       "behaviour": "Developer telemetry belongs to Health; Brain never polls telemetry with Advanced closed or open; the Engine history link focuses Health's AI Engine section whether Health is mounted already or later.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Advanced settings and the Engine history link (fixture without AI observations) observed with developer tools off (the default).",
@@ -1605,7 +1851,7 @@ This builder wrote no acceptance record.
         }
       ],
       "behaviour": "Opening Brain's Advanced never writes ui.mode, under either global detail level.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Advanced settings (fixture without AI observations) observed with developer tools off (the default).",
@@ -1666,7 +1912,7 @@ This builder wrote no acceptance record.
         }
       ],
       "behaviour": "Settings arrives at Reading memory with focus, from cold and from the Memory tab; queued keyboard changes return to the saved Reading memory after a refused save.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "The \"Memory tab\" case clicks button[data-tab-id=\"core.memory-surface\"] on the Brain tab row.",
@@ -1712,7 +1958,7 @@ This builder wrote no acceptance record.
         }
       ],
       "behaviour": "Reading memory has one home (AI Brain Advanced); save ownership, refusals and conflicts unchanged.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "AI Brain's Advanced settings (fixture without AI observations) observed with developer tools off (the default).",
@@ -1798,7 +2044,7 @@ This builder wrote no acceptance record.
         }
       ],
       "behaviour": "composeBrainSentence (one sentence carrying a phrase per feature) is removed from brainPage.ts with its test: the pictures' sentence says only what the picture cannot, and each feature's state sits once under its step.",
-      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none. Matches only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
           "oldAssertion": "Installed, 27 combinations: meaning phrase \"It understands what your files are about\"; reranker/answers/pictures phrases for true/false/null; ending \". Everything runs on this computer.\"",
@@ -1844,7 +2090,7 @@ This builder wrote no acceptance record.
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "A first install that runs is not an installed AI with a missing file; a genuine idle missing file still offers Repair; Install opens the licences then installs, Pause and Cancel act on the run; Ask in Search keeps its own readiness while Brain counts processor answers as working. Expectations and their sources: (1) running first install: the panel starts with \"Installing\", contains no repair/\"already installed\"/installed words, no Repair button or install-repair-needed notice, no enabled step switch, and offers Pause download and Cancel - AM4 (\"idle missing-file Repair and \\\"already installed\\\" wording are suppressed and a first running install is not projected as installed\"); \"Pause download\" and \"Cancel\" are the base's existing labels for the run. (2) idle missing file: heading \"Installed — repair available\" and Repair runs core.repair-ai-install after one confirmation - AM4 \"genuine idle Repair stays\" and D3 \"Genuine failure/repair/policy headlines stay\" (base heading words). (3) Install: the Install AI button opens the consent dialog, Accept and download runs core.start-ai-install, then pause posts /install/pause and Cancel runs core.cancel-ai-install - fm-10 \"the Install button is the one filled action\", existing handlers (D2 \"existing handlers and meanings only\"). (4) processor answers ready with two files: Brain shows the tab row with first tab \"Overview\" while the Search composer shows no tier controls (data-tier list empty) - AM1 \"CPU operation counts ... NOT the composer's document/GPU gate; Ask behaviour itself unchanged\"; fm-14 \"its first tab is \\\"Overview\\\"\". Fail-before (origin/main): all four cases fail by assertion; cases 2 and 3 fail first on the data-step guard (the base page has no step markup), not on the Repair/Install behaviour, which the base already had. Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "behaviour": "A first install that runs is not an installed AI with a missing file, and Ask in Search keeps its own readiness while Brain counts processor answers as working. Expectations and their sources: (1) running first install: the panel starts with \"Installing\", contains no repair/\"already installed\"/installed words, no Repair button or install-repair-needed notice, no enabled step switch, and offers Pause download and Cancel - AM4 (\"idle missing-file Repair and \\\"already installed\\\" wording are suppressed and a first running install is not projected as installed\"); \"Pause download\" and \"Cancel\" are the base's existing labels for the run. (2) processor answers ready with two files: Brain shows the tab row with first tab \"Overview\" while the Search composer shows no tier controls (data-tier list empty) - AM1 \"CPU operation counts ... NOT the composer's document/GPU gate; Ask behaviour itself unchanged\"; fm-14 \"its first tab is \\\"Overview\\\"\". Fail-before (origin/main 8a312d1484): both cases fail by assertion on that behaviour: (1) the base panel reads \"Installing… 33% Understanding meaning…\" with installed/repair words during a first install; (2) the base's first tab is \"AI Brain\". The base's genuine idle Repair and its Install, Pause and Cancel flows are behaviour the base already had; they are preservation checks in BrainOverview.preservation.test.ts (X8). Elements are found by what the base page draws too: the steps by .path-step[data-feature] (.files-step, .read-step), switches by role \"switch\" and accessible name \"Use <step name>\", tabs by role \"tab\", headings by .brain-headline, buttons by their labels and panels by their test ids; lit is read from data-lit on the step or, before slice 7a, data-active on its symbol (X8). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -1881,6 +2127,14 @@ This builder wrote no acceptance record.
           "quote": "AI Brain on a computer without an NVIDIA card (most computers). The sentence says only what the picture cannot; each fact stands once (the card under its step, sizes under theirs). A switch exists only under its step, with its state in words. What can't work here is said once, in ordinary words, and drawn as not reachable. Only the steps that work now are lit; the Install button is the one filled action.",
           "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
           "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X8 (2026-11-15): Tests: ladder audit uses the repository ladder rule exactly (no rounding beyond the check's own rule, all four corners); new checks' fail-before must come from the behaviour (query by role/name/text that exists on main, not new-only markup); literal expected wording instead of reasonFor; restore the cleared-after-recovery assertion."
         }
       ],
       "evidence": "gates/test-intent/evidence/fm-brain.json",
@@ -1896,7 +2150,7 @@ This builder wrote no acceptance record.
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "AI Brain's Overview in real headless Chromium with isolated fixture responses (private Vite on port 0, no Engine, no shared stack, CUDA hidden) for the fm-10, fm-13 and fm-14 states, light and dark, at 1024x700, 600 px and 200% zoom; the developer-tools feature panel; keyboard operation of a step switch; and the Brain template source free of style= attributes. Expectations and their sources: (1) per picture, theme and size: more than 10 text elements, no horizontal scroll of .brain-scroll, no clipped text, every text size on the ladder {11, 12, 13, 15, 20, 28} px and every corner radius in {4, 8, 14} px (or pill/circle) - the six sizes and the four radii (4, 8, 14 px and pill; lines 121, 133) are the owner's rule \"From slice 2 on: no text size outside the six and no radius outside the four, proven by the check, not by eye.\" (W3), with the values of the repository-wide type-ladder rule (modules/ui-web/e2e/type-ladder-chromium.mjs sizes [11, 12, 13, 15, 20, 28] and radii [0, 4, 8, 14, 9999] at the base); the three states are the three pictures. (2) developer tools on: the reranker step opener opens one feature panel whose text and corners stay on the same ladders, dark and light - D5/AM5 (the panel exists only with developer tools); this replaces the type-ladder audit's eight default panel views (see the type-ladder-lockdown entry). (3) the reranker switch in fm-14 toggles off with Space and on with Enter and is not left disabled (lines 175-185) - W3 \"Space and Enter toggle a switch (S7a-4)\", D2 \"each switch sits under its step\". (4) BrainSurface.ts contains no style= template attribute - owner words \"In the app, never set style= on an element: the desktop window drops it.\" (the check passes on the base too; it is a preservation guard; it does not cover .style= property bindings). Fail-before: every rendered case fails by assertion on the before-state (expect.poll guard: no [data-step=\"chat\"] on the base page); case 4 passes on the base. Needs headless Chromium (PLAYWRIGHT_BROWSERS_PATH from tmp/ui-checks); it ran in this sandbox. Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "behaviour": "AI Brain's Overview in real headless Chromium with isolated fixture responses (private Vite on port 0, no Engine, no shared stack, CUDA hidden) for the fm-10, fm-13 and fm-14 states, light and dark, at 1024x700, 600 px and 200% zoom; the audit's own reach; the developer-tools feature panel; keyboard operation of a step switch; and the Brain template source free of style= attributes. Expectations and their sources: (1) per picture, theme and size: more than 10 text elements, no horizontal scroll of .brain-scroll, no clipped or off-screen text, and the repository ladder rule exactly as modules/ui-web/e2e/type-ladder-chromium.mjs applies it at the base - every element's four corners, each axis 50% or a px value in [0, 4, 8, 14, 9999]; rendered text and generated ::before/::after text at a size in [11, 12, 13, 15, 20, 28] px compared unrounded (parseFloat); text at 15 px or less without the display optical size and 20/28 px text with opsz 32 - the owner's rule \"From slice 2 on: no text size outside the six and no radius outside the four, proven by the check, not by eye.\" (W3) applied with the repository check's own rule (X8: no extra rounding, all four corners). The three states are the three pictures. (2) the audit itself: a probe paragraph at 12.4 px with a 7 px top-right corner inside the Brain surface is reported exactly once on each ladder (X8; it shows the audit can fail on the two defects the acceptor named). (3) developer tools on: the reranker step opener opens one feature panel whose text and corners stay on the same ladders, dark and light - D5/AM5. (4) the reranker switch in fm-14 toggles off with Space and on with Enter and is not left disabled - W3 \"Space and Enter toggle a switch (S7a-4)\", D2 and AM2 (the switch shows the saved choice). (5) BrainSurface.ts contains no style= template attribute - owner words \"In the app, never set style= on an element: the desktop window drops it.\" (a preservation guard; it does not cover .style= property bindings). The fixture statuses carry embedding.compatState COMPATIBLE (X1). The page is ready when its Answer questions step (.path-step[data-feature=\"chat\"]) is drawn, which the base draws too. Fail-before (origin/main 8a312d1484): the six fm-13 cases fail by assertion on the clipping check (the base clips the picture switch's blocked reason \"Text in scans and images is un…\" in the sentence and in the path: span#brain-sentence-pictures-reason.switch-reason and span#brain-path-pictures-reason.switch-reason); the keyboard case fails by assertion (after Space the base switch still reads aria-checked \"true\": it draws the running feature, not the saved choice). The fm-10 and fm-14 cases, the audit self-check, the two developer-tools panel cases and the style= guard pass on the base: the base page already kept those states on the ladders, so these cases guard the candidate rather than show a repair. Needs headless Chromium (PLAYWRIGHT_BROWSERS_PATH from tmp/ui-checks); it ran in this sandbox. Elements are found by what the base page draws too: the steps by .path-step[data-feature] (.files-step, .read-step), switches by role \"switch\" and accessible name \"Use <step name>\", tabs by role \"tab\", headings by .brain-headline, buttons by their labels and panels by their test ids; lit is read from data-lit on the step or, before slice 7a, data-active on its symbol (X8). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
       "sources": [
         {
           "kind": "owner-words",
@@ -1957,6 +2211,30 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decision W3 (2026-11-15): Space and Enter toggle a switch (S7a-4); ladder sizes/radii from the owner's \"no text size outside the six and no radius outside the four\".",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X1 (2026-11-15): Meaning positive only when vector queries are live-compatible (COMPATIBLE); REBUILDING shows the rebuilding state in read words, Meaning unlit."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X8 (2026-11-15): Tests: ladder audit uses the repository ladder rule exactly (no rounding beyond the check's own rule, all four corners); new checks' fail-before must come from the behaviour (query by role/name/text that exists on main, not new-only markup); literal expected wording instead of reasonFor; restore the cleared-after-recovery assertion."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM2 (D2) Switch projection from stored selection only (never runtime): saved Off/runtime On shows Off; saved On/runtime Off shows On with the step's words saying it is not working; unknown settings show \"Not known\" (not an unchecked switch) with the existing refresh route; unset answers show automatic without writing a default; operator overrides explained. Existing picture tests encoding the old drawing change (listed).",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/fm-brain.json",
@@ -1972,7 +2250,7 @@ This builder wrote no acceptance record.
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "What the pictures do not show sits behind Settings › Advanced › Show developer tools, live; the links row has only the pictured links; recovery routes stay reachable without developer tools. Expectations and their sources: (1) Start/Stop answers, Refresh status and the step \"You get / It costs\" openers are absent with developer tools off, appear when they are turned on (live, no reload), the panel shows \"You get\" then \"It costs\", and they leave again when turned off - owner words on developer tools, D5 (names exactly these three), AM5 \"live preference change\". (2) links row is exactly [\"Advanced settings\", \"Engine history in Health\"] in the answers-working state - fm-14 picture words; D5 \"Advanced settings and Engine history stay as in fm-14\". (3) downloads disabled before install: Advanced settings is reachable and contains \"Import an offline package\" - AM6 \"pack import when downloads are disabled\" (\"Import an offline package\" is the base's label for that route). (4) not installed otherwise: no Advanced settings link - fm-10 picture (no links row). (5) manual repair URL and target path stay on the page - AM6 \"manual repair URLs/destinations\". (6) an interrupted removal outcome reads \"The removal was interrupted\" under Advanced settings - AM6 \"removal refusals/interrupted outcomes\" (base wording). (7) the Settings › Reading memory request focuses #brain-contextWindow on a not-installed page - AM6 \"Settings \\\"Reading memory\\\" link opens and focuses its control\". Fail-before: all seven fail by assertion (cases 3, 5, 6, 7 first on the data-step guard; their routes existed at the base and are preservation checks). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "behaviour": "What the pictures do not show sits behind Settings › Advanced › Show developer tools, live, including Brain's own Advanced legacy panels, and the fm-10 page offers no Advanced settings link without a recovery need. Expectations and their sources: (1) without developer tools there is no Stop/Start answers, no Refresh status and no step or phrase opener; switching developer tools on shows Stop answers, Refresh status and the reranker step opener, whose panel says \"You get\" and \"It costs\"; switching them off removes Stop answers and the panel - D5/AM5, owner words \"What a picture does not show ... goes behind Settings › Advanced › Show developer tools, or away.\" (2) fm-14's links row holds exactly \"Advanced settings\" and \"Engine history in Health\" - fm-14 picture words, D5. (3) X6: with Advanced settings open and developer tools off, the component list, the tier breakdown, the package history and the observed search features are absent while Downloaded files stays; developer tools on, live, shows all four; off again hides them - X6 (AM5 \"Brain's own Advanced keeps only what fm-14 shows plus AM6 routes\"). (4) fm-10 without a recovery need has no Advanced settings link - fm-10 picture words. Fail-before (origin/main 8a312d1484): all four cases fail by assertion on that behaviour: the base offers Stop answers by default; its links row has four entries; its Advanced shows legacy panels without developer tools (the component list and the tier breakdown among them); its fm-10 page has an Advanced settings link. The recovery routes that work without developer tools (AM6) are behaviour the base already had; they are preservation checks in BrainOverview.preservation.test.ts (X8). Elements are found by what the base page draws too: the steps by .path-step[data-feature] (.files-step, .read-step), switches by role \"switch\" and accessible name \"Use <step name>\", tabs by role \"tab\", headings by .brain-headline, buttons by their labels and panels by their test ids; lit is read from data-lit on the step or, before slice 7a, data-active on its symbol (X8). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
       "sources": [
         {
           "kind": "owner-words",
@@ -2021,6 +2299,22 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "AM6 Recovery routes stay reachable without developer tools: pack import when downloads are disabled, settings refresh for unknown choices, manual repair URLs/destinations, removal refusals/interrupted outcomes, Settings \"Reading memory\" link opens and focuses its control.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X6 (2026-11-15): Brain Advanced legacy panels (component list, tier breakdown, package history, observed ONNX features) behind the live developer-tools preference; AM6 routes stay."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X8 (2026-11-15): Tests: ladder audit uses the repository ladder rule exactly (no rounding beyond the check's own rule, all four corners); new checks' fail-before must come from the behaviour (query by role/name/text that exists on main, not new-only markup); literal expected wording instead of reasonFor; restore the cleared-after-recovery assertion."
         }
       ],
       "evidence": "gates/test-intent/evidence/fm-brain.json",
@@ -2036,7 +2330,7 @@ This builder wrote no acceptance record.
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "AI Brain's Overview as drawn in fm-10 (not installed) and fm-13 (installed, no NVIDIA card): the heading says what works, each fact stands once, only working steps are lit; meaning not working keeps its remedy and claims nothing; sizes are downloads; read words; heading and status panel agree. Expectations and their sources: fm-10: heading \"AI isn't installed yet\", sentence \"Search already works with exact words. Installing AI adds the steps that are not lit yet.\" with no control in it, one filled action \"Install AI · <plan total>\", \"You see each licence before anything downloads. Everything runs on this computer.\", lit = files and read only, \"8 files\", \"Built in\", pictures \"Simple scans are read already\" without switch, meaning without switch and with its size, reranker size and one \"Included\" switch checked - all fm-10 picture words/drawing and the fm-10 note; the Install label and sizes are literal text (\"Install AI · 2.51 GB\", \"1.20 GB download\", \"341.0 MB download\", \"5.70 GB\") - W4; they follow from the fixture bytes (SIZES: 1.2 GB, 341 MB, 5.7 GB, 500/300/200 MB) and the app's existing size display (formatBytes at the base, modules/ui-web/src/shell-v0/display/format.ts: two decimals for GB, one for MB); byte units are D6, a later slice (7b), so the picture's \"2.6 GB\" is not the expected value here. Answers no card: drawn not reachable, no switch, \"Needs an NVIDIA graphics card\" exactly once on the page, no answer size, no CUDA or \"answers unavailable on this computer\", no tab row - fm-10 note and picture, D4 \"the CUDA reason once\" (here: not on the default page), handover tab rule. Linux: a non-empty reason without planner/technical words, not the NVIDIA words, once - AM10(a). Included: toggling posts/deletes only the decline (no settings write, no operation), the word becomes \"Not included\", the Install total drops by the part size, and the choice survives remount and a new mount - handover \"Included\" note and D2 \"pre-install Included = package decline\" (\"Included\" and \"Not included\" adopted verbatim in W1; the total after the decline is the literal \"Install AI · 2.18 GB\", W4). fm-13: heading \"Search understands meaning\", sentence \"It finds files by what they are about, not only by their words.\", never \"AI Offline\"/\"Installed with limitations\", lit = files, read, meaning, Best match first one switch unchecked reading \"Off\", answers not reachable with the NVIDIA words once, pictures \"Simple scans are read already\", no tab row, no graphics card, no filled action - fm-13 picture words and note, D3, AM8. Lost observation in the fm-13 state (snapshot no longer live, saved choices unread): the heading is \"Checking AI status…\", the page and no step (files, read, pictures, meaning, best match, answers) says \"Unknown — checking AI status\", and the Best match first word stays \"Not known\" - W5 (\"per-step 'Unknown — checking AI status' is not repeated ... when the page already says it once\", fm-10 \"each fact stands once\"), W1 \"Not known\". Meaning not working (inactive, unknown, absent+missing file, activation required, incompatible embeddings, answers working while meaning not): meaning unlit, no positive heading, never \"AI Offline\"; repair heading \"Installed — repair available\", activation heading \"Downloaded — activation required\" (base headings, D3 \"Genuine ... headlines stay\"); incompatible: no index/rebuild words in the heading, the core.rebuild-index operation still offered, no \"Rebuild the index\" - AM3, AM9. Sizes: each step's size line contains its download size and the word download, never on disk/registry/footprint; no step line starts with a separator; compact or custom answer model shows no answer size - AM8, D4. At most one \"kept\" on the page and no CUDA on the default no-card page - D4. Read/answers words: four answer/read-again states never show indexing, \"Resume Chat AI\", \"Rebuild the index\" or \"Chat AI\" - AM9. Status coherence: the fm-13 heading stands with no search-limited/search-reduced/indexing status rows, and an install failure heading equals the status panel row title - AM9 \"page/status coherence\". Fail-before: all 21 cases fail by assertion on the before-state. Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "behaviour": "AI Brain's Overview as drawn in fm-10 and fm-13: the heading says what works, each fact stands once, only working steps are lit, sizes keep what they measure, Brain says read and answers words, and the heading agrees with the status panel. Expectations and their sources (picture words quoted in the sources): fm-10 heading, sentence, one filled action \"Install AI · 2.51 GB\", the licence line, lit steps (files, read only), \"8 files\", \"Built in\", \"Simple scans are read already\", sizes \"1.20 GB download\" and \"341.0 MB download\" (literal text: the fixture bytes in the app's existing size display, W4), the Included switch and its words \"Included\"/\"Not included\" (W1), the answer step drawn as not reachable with \"Needs an NVIDIA graphics card\" once and no CUDA words (fm-10, D4), the Linux exclusion said once without the planner's words (AM10 a); Included changes only the decline and the plan total (\"Install AI · 2.18 GB\"), across page return and restart (D2, existing handler); fm-13 heading \"Search understands meaning\" with its sentence, Off drawn as off, no tab row, no graphics meter, no filled action (fm-13, D3); a lost observation said once by the heading with an unknown choice \"Not known\" (W5, W1); no positive heading and meaning unlit for an inactive or unknown encoder, for embeddings being read again (REBUILDING: the heading says it in read words, the panel has no index/rebuild/semantic/embedding words) and for an unreported compatibility (X1, AM3); activation required keeps its heading, meaning unlit; incompatible embeddings keep the read-again remedy without index words; answers working while meaning does not makes no positive claim (AM3); package sizes labelled as downloads, never as disk use, no leading separators (AM8, D4); no answer size for a compact model, a saved custom path, or an operator's model whose runtime names no profile (X5, AM8); one kept-files wording at most and no CUDA words (D4); read and answers words for the waiting, off, paused and read-again states (AM9); X7: for each populated reason code (index.embedding_mismatch, index.embedding_legacy, index.blocked_legacy, index.rebuild_brake_exhausted, index.rebuild_brake_unreadable, index.schema_mismatch) the callout has one heading in read words without index/rebuild/semantic/embedding words - exactly \"Read everything again to restore full search.\" (W1) for the three embedding causes - and its rebuild action, rendered through the real catalog button from the served registry-operation.en.properties, reads \"Rebuild all search data\" (X7, slice 6a's label); the words of the other three causes are an agent choice under X7, so only their meaning is asserted; the positive heading never stands beside a search problem and the install-failed heading equals the status row's title and reads the base words \"AI install failed\" (AM9 page/status coherence; D3 genuine failure headlines stay). The fixture status carries embedding.compatState COMPATIBLE where meaning works (X1); the size case's runtime names the \"standard\" profile (X5). Fail-before (origin/main 8a312d1484): every case fails by assertion on its claimed behaviour - the base headings \"AI Offline\", \"Rebuild search to use these models\", \"AI is ready\" beside a non-working meaning step, its \"Indexing …\" and canonical index/rebuild words, its sentence, its planner and CUDA words, its \"· 1.20 GB registry footprint · needed\" size and its 5.70 GB answer size for custom models, its per-step \"Unknown — checking AI status\", its missing state words (\"Included\"), and its lit meaning step while activation is required (data-active \"true\"). The repair heading while meaning's files are missing holds on the base; it is a preservation check in BrainOverview.preservation.test.ts (X8). Elements are found by what the base page draws too: the steps by .path-step[data-feature] (.files-step, .read-step), switches by role \"switch\" and accessible name \"Use <step name>\", tabs by role \"tab\", headings by .brain-headline, buttons by their labels and panels by their test ids; lit is read from data-lit on the step or, before slice 7a, data-active on its symbol (X8). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
       "sources": [
         {
           "kind": "owner-words",
@@ -2173,6 +2467,38 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decision W5 (2026-11-15T19:40Z): Restore last-known truth: when the AI observation is lost while pictures were being read, the page says once, in its sentence, \"Pictures were being read when last observed; current answer availability is unconfirmed.\" (main's wording, state/brainPage.ts:38/48 at 8a312d1484); per-step 'Unknown — checking AI status' is not repeated as a separate fact on every step when the page already says it once (fm-10 'each fact stands once').",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X1 (2026-11-15): Meaning positive only when vector queries are live-compatible (COMPATIBLE); REBUILDING shows the rebuilding state in read words, Meaning unlit."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X5 (2026-11-15): Model size shown only with a trustworthy matching package value for the observed model; custom/unknown -> no size."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X7 (2026-11-15): Populated compatibility reason codes and the rebuild action use read words (\"Rebuild all search data\", as slice 6a); tested on populated paths."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X8 (2026-11-15): Tests: ladder audit uses the repository ladder rule exactly (no rounding beyond the check's own rule, all four corners); new checks' fail-before must come from the behaviour (query by role/name/text that exists on main, not new-only markup); literal expected wording instead of reasonFor; restore the cleared-after-recovery assertion."
         }
       ],
       "evidence": "gates/test-intent/evidence/fm-brain.json",
@@ -2188,7 +2514,7 @@ This builder wrote no acceptance record.
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "Each switch sits under its step and shows the stored choice only; the step's light and words show what works now; unknown choices read \"Not known\"; unset answers stay unset; overrides are explained; pending and interrupted changes are said in words; other windows' choices arrive and stale reads do not undo them. Expectations and their sources: Exactly one switch each for Best match first, Answer questions and Text in scans and images, under its step, word \"On\", none in the sentence - handover/D2, fm-14 picture (\"On\" switches). Saved Off while the runtime runs it: unchecked, word \"Off\", step lit - AM2 \"saved Off/runtime On shows Off\". Saved On while the runtime does not run it: checked, word \"On\", unlit, note matching /not working/i - AM2, W1 (\"Not working now\"). Settings unreadable: the three words are \"Not known\" (W1) with no switch, a \"Refresh status\" button is reachable without developer tools and refreshing reads settings again and shows \"On\" - AM2 \"with the existing refresh route\", AM6 \"settings refresh for unknown choices\" (\"Refresh status\" is the base label). Unset answers: word \"Automatic\", switch present, no write - AM2/D2. Operator override Off with saved On: switch unchecked, disabled, described by operator/administrator words, word \"Off\" - AM2 \"operator overrides explained\". Invalid receipt after a click: word \"Not known\", no switch - AM2. Pending change: word \"Changing…\", switch disabled across remount, a second click posts nothing, then \"Off\" - D2 state in words (\"Changing…\", lines 177 and 181, is the base's pending word for Best match first, adopted verbatim in W1). Another window: a newer witness shows \"Off\"; an older delayed read does not undo it - D2/AM2 stored selection. Fail-before: all nine cases fail by assertion. Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "behaviour": "Each switch sits under its step and shows the stored choice only; the step's light and words show what works now. Expectations and their sources: one switch per choice (Best match first, Answer questions, Text in scans and images) under its step, none in the sentence, each with its state in words \"On\" (D2, W1); saved Off while the runtime runs it: unchecked, \"Off\", lit; saved On while the runtime does not: checked, \"On\", unlit, note \"not working\" (AM2); unknown saved choices: no unchecked switch, \"Not known\", and the Refresh status route reads them again (AM2, AM6); unset answers read \"Automatic\" and nothing is written (AM2); X2: an unset picture choice with the answer model's files missing is checked, reads \"On\", says \"Not working — its files are missing\" and writes nothing (X2, W2, W1); an operator override locks the switch at the override, is described as an operator's, reads \"Off\" (AM2, W1); an interrupted change reads \"Not known\" until checked (W1); a pending change stays locked as \"Changing…\" across navigation (W1); another window's saved choice arrives and a delayed older read does not undo it, the switch showing the saved choice rather than the running feature (AM2). Fail-before (origin/main 8a312d1484): every case fails by assertion on its claimed behaviour - the base draws two switches per choice (sentence and path), draws the running feature rather than the saved choice (aria-checked \"true\" for a saved or overridden Off and after another window's Off), draws an unchecked switch for an unknown choice, draws an unset picture choice Off when the answer files are missing, and has no state words (\"\" for On, Automatic, Not known and Changing…). Elements are found by what the base page draws too: the steps by .path-step[data-feature] (.files-step, .read-step), switches by role \"switch\" and accessible name \"Use <step name>\", tabs by role \"tab\", headings by .brain-headline, buttons by their labels and panels by their test ids; lit is read from data-lit on the step or, before slice 7a, data-active on its symbol (X8). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
       "sources": [
         {
           "kind": "owner-words",
@@ -2247,6 +2573,30 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decision W1 (2026-11-15): State words and notes adopted verbatim (mine): switch state words \"On\", \"Off\", \"Not known\", \"Included\", \"Not included\", \"Changing…\"; notes \"Checking after an interrupted change\", \"Not confirmed yet\", \"Set by an operator override\", \"Not working — its files are missing\", \"Not working now\", \"Not available with this answer model\", \"Off is not applied yet\"; exceptional headlines/sentences \"Answers paused while files are read\" + \"Answers resume when JustSearch finishes reading the files.\", \"Reading text in scans and images\" + \"Answers resume after the current document.\", \"Read everything again to restore full search.\"",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X2 (2026-11-15): Unset picture reading with missing answer files: drawn On (default, W2) with note \"Not working — its files are missing\" (W1); nothing written."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X8 (2026-11-15): Tests: ladder audit uses the repository ladder rule exactly (no rounding beyond the check's own rule, all four corners); new checks' fail-before must come from the behaviour (query by role/name/text that exists on main, not new-only markup); literal expected wording instead of reasonFor; restore the cleared-after-recovery assertion."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision W2 (2026-11-15): Unset picture-reading choice is drawn as the Engine's effective default (today On) with nothing written (like unset answers, AM2); its note says why it is not working when it is not.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/fm-brain.json",
@@ -2262,7 +2612,7 @@ This builder wrote no acceptance record.
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "AI Brain has a tab row only once answers work here, and then \"Overview | Memory\"; Memory stays reachable by its routes in every answer state; Memory transitions keep state; the graphics meter shows only with a current reading. Expectations and their sources: Answers working (GPU fm-14 state): tabs exactly [\"Overview\", \"Memory\"], graphics card text \"5.80 GB of 12.00 GB in use · RTX 4070\", links contain \"Advanced settings\" and \"Engine history in Health\", heading \"AI is ready\", sentence \"Everything below runs on this computer.\" - fm-14 picture words and note; the meter figures are literal text - W4; they follow from the fixture bytes (5.8 GB used of 12 GB) and the app's existing size display (formatBytes at the base, modules/ui-web/src/shell-v0/display/format.ts: two decimals for GB); byte units are D6, a later slice (7b), so the picture's \"5.8 of 12 GB\" is not the expected value here. Ready with zero files, unloaded-but-startable, processor, starting: the row shows - AM1 (its listed test states; \"starting\" read as startable). Answers off, unavailable, failed: tab host present, no tabs, heading present - D1/handover. Stale or unknown observation keeps the row as last shown (absent when first seen stale; present stays present) - AM1 \"no flicker\". Meter: none on the processor and never \"Needs an NVIDIA graphics card\" or \"Memory use unknown\" there; none for a stale reading; none while installing - AM8, owner rule on no made-up values. Memory routes for ready/off/unavailable/starting: a member-tab request opens Memory with tabs [\"Overview\", \"Memory\"] and Memory selected; back to Overview unmounts it; forward mounts it again; reload opens it - D1. Losing readiness with Memory open keeps the same Memory element, its draft, an open Forget question, then a pending Forget completes with \"Forgotten.\" - AM7 (\"Forgotten.\" is Memory's base wording). Returning to Overview emits tab-change {id: runtime, previous: memory}, removes the row and focuses the heading - AM7. Locked Memory shows the memory.locked reason wording, never \"No learned memory yet.\" - AM7 (base wordings). Another SurfaceTabs host keeps its row [\"First\", \"Second\"] - AM7 \"other SurfaceTabs hosts unchanged\". Fail-before: all 18 cases fail by assertion (the base shows the row [\"AI Brain\", \"Memory\"] in every state). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "behaviour": "AI Brain has a tab row only once answers work here, and then \"Overview | Memory\"; Memory stays reachable by its routes in every answer state. Expectations and their sources: answers working shows \"Overview | Memory\", the graphics card reading \"5.80 GB of 12.00 GB in use · RTX 4070\" (literal, W4), the two pictured links and fm-14's heading and sentence (fm-14, D1); ready with zero files, unloaded but startable, on the processor and starting count as answers work (AM1); X3: unloaded with operating.chat.reloadAllowed false shows no tab row and an unlit Answer questions step, while reloadAllowed true still counts (X3, AM1); answers off, unavailable or failed show no tab row (D1); a stale or unknown observation keeps the row as last shown (AM1); the graphics meter only with a current reading, never \"no card\" or \"Memory use unknown\" without one (AM8); deep link, address tab, Back/Forward and reload open Memory with Overview reachable in every answer state (D1); X4: returning to Overview where the row leaves syncs the address (tab-change detail) and focuses the heading only in the tab host's final drawing - the focus spy records the slot through which the heading is drawn when it takes focus, and that slot must still be connected after the host renders (a slot the host then replaces takes the heading out of the rendered tree, and a browser drops focus with it) (X4, AM7). The fixture statuses carry embedding.compatState COMPATIBLE (X1). Fail-before (origin/main 8a312d1484): every case fails by assertion on its claimed behaviour - the base always shows the row \"AI Brain | Memory\" (first tab not \"Overview\", and a row where none is due), and draws its graphics section for processor answers. Losing readiness while Memory is open, locked Memory and other tab hosts hold on the base; they are preservation checks in BrainOverview.preservation.test.ts (X8). Elements are found by what the base page draws too: the steps by .path-step[data-feature] (.files-step, .read-step), switches by role \"switch\" and accessible name \"Use <step name>\", tabs by role \"tab\", headings by .brain-headline, buttons by their labels and panels by their test ids; lit is read from data-lit on the step or, before slice 7a, data-active on its symbol (X8). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
       "sources": [
         {
           "kind": "owner-words",
@@ -2327,6 +2677,38 @@ This builder wrote no acceptance record.
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decision W4 (2026-11-15): Expected sizes in tests are literal text, not computed with formatBytes; the two lost preservation checks come back (picture reading \"when last observed\" wording; Answer questions unlit when AI installed but answer model not downloaded).",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X1 (2026-11-15): Meaning positive only when vector queries are live-compatible (COMPATIBLE); REBUILDING shows the rebuilding state in read words, Meaning unlit."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X3 (2026-11-15): \"Answers work\" (AM1) excludes unloaded states whose reload is not allowed (operating.chat.reloadAllowed=false): no tab row, Answer questions unlit."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X4 (2026-11-15): Returning from Memory without readiness: restore focus after SurfaceTabs has rendered (await update, with navigation/connection guards)."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X8 (2026-11-15): Tests: ladder audit uses the repository ladder rule exactly (no rounding beyond the check's own rule, all four corners); new checks' fail-before must come from the behaviour (query by role/name/text that exists on main, not new-only markup); literal expected wording instead of reasonFor; restore the cleared-after-recovery assertion."
         }
       ],
       "evidence": "gates/test-intent/evidence/fm-brain.json",
@@ -2342,7 +2724,7 @@ This builder wrote no acceptance record.
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "Two behaviours the AI Brain page had before the first-minutes Overview and keeps after it, checked as preservation (not repaired: both cases pass on origin/main 8a312d1484). (a) While pictures are being read (status procedure VDU_BATCH) and the observation is then lost (snapshot no longer live), the page says \"Pictures were being read when last observed\" (it does not say \"when last observed\" while the observation is live) - W4 brings this check back; W5 \"the page says once, in its sentence, \\\"Pictures were being read when last observed; current answer availability is unconfirmed.\\\" (main's wording, state/brainPage.ts:38/48 at 8a312d1484)\". It failed on the slice 7a candidate before the W5 product change (heading \"Checking AI status…\" with \"Waiting for live install and AI observations.\"), and passes after it. (b) With AI installed but the answer model not downloaded (chat package incomplete and to-download, no chat capability), the Answer questions step exists, carries its name, and is not lit (data-lit on the step for slice 7a, data-active on its symbol before it) - W4; fm-13 \"The headline says what now works\" (a step that does not work is not drawn as working). The two lit encodings are read so that the same check runs on the before-state and the candidate. Evidence: gates/test-intent/evidence/fm-brain-preservation.json, run-evidence with --before origin/main; its fail-before records \"passed\" for this file (both cases pass on the base), which is what a preservation check shows; repaired is false, so no fail-before assertion is required. Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "behaviour": "Behaviours the AI Brain page had before the first-minutes Overview and keeps after it, checked as preservation (not repaired: every case passes on origin/main 8a312d1484 and on the candidate). (a) While pictures are being read and the observation is then lost, the page says \"Pictures were being read when last observed\" (not while live) - W4, W5 (main's wording, state/brainPage.ts:38/48 at 8a312d1484). (b) With AI installed but the answer model not downloaded, the Answer questions step exists, carries its name and is not lit - W4. (c) The page's install flows: a genuine idle missing file heads \"Installed — repair available\" and Repair runs core.repair-ai-install after one confirmation (AM4 \"genuine idle Repair stays\"; D3 \"Genuine failure/repair/policy headlines stay\"); meaning's files missing keeps that heading with meaning unlit (AM3 keeps the remedy headline); Install AI opens the licences, Accept and download runs core.start-ai-install, Pause download posts /install/pause and Cancel runs core.cancel-ai-install (D2 \"existing handlers\"). (d) AM6 recovery routes without developer tools: pack import (\"Import an offline package\") under Advanced settings when downloads are disabled before install; manual repair links and destinations (the package URL and target path) on the page; an interrupted removal outcome (\"The removal was interrupted\") under Advanced settings; Settings › Reading memory opens Advanced and focuses #brain-contextWindow. (e) Memory whatever the answer state (D1, AM7): losing readiness keeps the same Memory element mounted with its draft, an open Forget question and a pending Forget that completes as \"Forgotten.\", with both tabs still in the row; locked Memory reads \"What the AI has learned is encrypted and locked\" and never \"No learned memory yet.\" - the literal is today's locked wording (readinessNotice.ts memory.locked at the base, unchanged by this change), replacing the reasonFor oracle (X8); another tab host keeps its row \"First | Second\". These cases moved here from the install, placement, steps and tabs checks, without the slice 7a markup guards that made them fail on the base for absent markup (X8). Evidence: gates/test-intent/evidence/fm-brain-preservation.json, run-evidence with --before origin/main; its fail-before records \"passed\" for this file, which is what a preservation check shows; repaired is false, so no fail-before assertion is required. Elements are found by what the base page draws too: the steps by .path-step[data-feature] (.files-step, .read-step), switches by role \"switch\" and accessible name \"Use <step name>\", tabs by role \"tab\", headings by .brain-headline, buttons by their labels and panels by their test ids; lit is read from data-lit on the step or, before slice 7a, data-active on its symbol (X8). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
       "sources": [
         {
           "kind": "delegated-choice",
@@ -2371,6 +2753,62 @@ This builder wrote no acceptance record.
           "quote": "Installed, no NVIDIA card. The headline says what now works, never \"AI Offline\" or \"Installed with limitations\". An off switch reads \"Off\" and is drawn off.",
           "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
           "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X8 (2026-11-15): Tests: ladder audit uses the repository ladder rule exactly (no rounding beyond the check's own rule, all four corners); new checks' fail-before must come from the behaviour (query by role/name/text that exists on main, not new-only markup); literal expected wording instead of reasonFor; restore the cleared-after-recovery assertion."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM3 (D3) Positive \"Search understands meaning\" heading only with live meaning evidence; embedding absent/inactive/unknown, activation required, incompatible embeddings, answers-working-but-meaning-not keep their remedy headline; unknown -> neutral headline.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM4 Minimal A2 presentation guard moves into 7a: while an install runs, idle missing-file Repair and \"already installed\" wording are suppressed and a first running install is not projected as installed; genuine idle Repair stays. Transport/install repairs stay 7b.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM6 Recovery routes stay reachable without developer tools: pack import when downloads are disabled, settings refresh for unknown choices, manual repair URLs/destinations, removal refusals/interrupted outcomes, Settings \"Reading memory\" link opens and focuses its control.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM7 Memory transitions: losing readiness while Memory is open keeps it mounted with a draft, a Forget confirmation and an unresolved Forget response; address and focus sync when returning to Overview and the row disappears; locked/unreadable Memory distinct from empty; other SurfaceTabs hosts unchanged.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D1 Tab row hidden until answers work (same readiness as slice 4's Search / Ask); then \"Overview | Memory\". Explicit Memory navigation (justsearch://surface/core.memory-surface, ?tab=core.memory-surface, palette \"Open AI Brain › Memory\", Back/Forward, reload) still opens Memory and then shows the tab row so Overview is reachable; Memory facts stay readable/forgettable whatever the answer state.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D3 Heading says what works: installed with working meaning search and answers unavailable -> a \"Search understands meaning\" style heading (as fm-13), never \"AI Offline\"/\"Installed with limitations\"; answers unavailable said once under its step in ordinary words. Genuine failure/repair/policy headlines stay.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/fm-brain-preservation.json",
@@ -2378,6 +2816,137 @@ This builder wrote no acceptance record.
         "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.preservation.test.ts"
       ],
       "repaired": false
+    },
+    {
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "items": [
+        "modules/ui-web/src/shell-v0/components/rebuildLabel.test.ts"
+      ],
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Every fact has one home on a screen. ... The same thing has one name everywhere: the app reads files (not \"indexes\")",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X7 (2026-11-15): Populated compatibility reason codes and the rebuild action use read words (\"Rebuild all search data\", as slice 6a); tested on populated paths."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM9 Brain wording in 7a: \"indexing\", \"Resume Chat AI\", \"Rebuild the index\" and similar on Brain's default and exceptional states move to read/answers words; page/status coherence for Brain states (S7-25 subset); verdict ids unchanged.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "The served rebuild label, visible on the catalog button and its accessible name, is \"Rebuild all search data\"; the typed confirmation stays \"rebuild\".",
+      "assertionChanges": [
+        {
+          "oldAssertion": "messages['ops.rebuild-index.label'] is \"Rebuild search index\" and the rendered button text is \"Rebuild search index\".",
+          "newAssertion": "Both are \"Rebuild all search data\"; the confirm word \"rebuild\" and the visible-text-as-name check are unchanged.",
+          "reason": "X7: the rebuild action uses read words, \"Rebuild all search data\", as slice 6a; the label lives in the served catalog, which OpButton always reads (it has no label property), so the catalog line changes. Slice 6a made the identical catalog change (commit 791ad9ee76 on worktree-fm-s6, registry-operation.en.properties lines 35-36 and this test's two expectations): the label and description lines here are byte-identical to it, so the two slices merge cleanly."
+        }
+      ]
+    },
+    {
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts"
+      ],
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X6 (2026-11-15): Brain Advanced legacy panels (component list, tier breakdown, package history, observed ONNX features) behind the live developer-tools preference; AM6 routes stay."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM6 Recovery routes stay reachable without developer tools: pack import when downloads are disabled, settings refresh for unknown choices, manual repair URLs/destinations, removal refusals/interrupted outcomes, Settings \"Reading memory\" link opens and focuses its control.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "With stale installed rows, including a part from the component list asks first (opens the consent) instead of withdrawing its decline; the Best match first switch does the same.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "The component-toggle-reranker switch in Advanced is clicked without developer tools; the consent opens and no decline or operation is sent.",
+          "newAssertion": "Unchanged expectations, with developer tools switched on first (reset after each case).",
+          "reason": "X6 (AM5) puts the component list behind the live developer-tools preference. The same ask-first oracle without developer tools is kept by the step switch case just above it (Best match first). AM6 routes are not in the component list."
+        }
+      ]
+    },
+    {
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
+      "items": [
+        "modules/ui-web/src/shell-v0/views/BrainSurface.skipReason.test.ts"
+      ],
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X6 (2026-11-15): Brain Advanced legacy panels (component list, tier breakdown, package history, observed ONNX features) behind the live developer-tools preference; AM6 routes stay."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM5 (D5) Unpictured controls: either removed (named) or behind Settings > Advanced > Show developer tools (live preference change); Brain's own Advanced keeps only what fm-14 shows plus AM6 routes; no \"or Advanced\" dumping ground.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "The package history under Advanced names each skipped package's status and reason and replaces a never-downloaded byte count with the status word.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "With Advanced open (Detailed mode), the package history text contains \"Unsupported here\", the hardware reason, \"Declined\", the decline reason and \"114.4 MB\", and no GB size.",
+          "newAssertion": "Unchanged expectations, with developer tools switched on in the harness (reset after each case).",
+          "reason": "X6 (AM5): the package history is a legacy Advanced panel behind the live developer-tools preference; its skip-reason oracle is kept there."
+        }
+      ]
     }
   ]
 }

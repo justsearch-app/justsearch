@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
-// Slice 7a — a first install that runs is not an installed AI with a missing file (S7a-7, AM4), and
-// the page's install, pause, cancel and repair still work as before; Ask stays as it was (S7a-11).
+// Slice 7a — a first install that runs is not an installed AI with a missing file (S7a-7, AM4); Ask
+// stays as it was while Brain counts processor answers as working (S7a-11).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AiState } from '../../state/aiStateStore.js';
 import type { InstallPlanPreview } from '../../utils/aiInstallPoll.js';
@@ -46,12 +46,6 @@ function firstInstallRunning(): AiState {
         { packageId: 'reranker', state: 'downloading', bytesDownloaded: 0, bytesTotal: GB },
         { packageId: 'chat', state: 'pending', bytesDownloaded: 0, bytesTotal: GB }] } } as unknown as AiState;
 }
-function installedMissingFile(): AiState {
-  return { ...live, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null },
-    runtime: { mode: 'offline', installed: { known: true, value: true } },
-    installStatus: { state: 'idle', installedFully: true, repairNeeded: true,
-      packages: [{ packageId: 'reranker', state: 'failed', functionalStatus: 'inactive' }] } } as unknown as AiState;
-}
 async function settle(el: Brain) {
   for (let i = 0; i < 5; ++i) { await new Promise(resolve => setTimeout(resolve, 0)); await el.updateComplete; }
 }
@@ -66,13 +60,6 @@ async function mount() {
 }
 const words = (node: Element | ShadowRoot | null | undefined) => (node?.textContent ?? '').replace(/\s+/g, ' ').trim();
 const buttons = (el: Brain) => [...el.shadowRoot!.querySelectorAll<Control>('jf-button')];
-async function press(el: Brain, label: string) {
-  const host = buttons(el).find(b => b.label === label);
-  expect(host, `${label}; shown: ${buttons(el).map(b => b.label).join(', ')}`).toBeTruthy();
-  await host!.updateComplete;
-  const control = host!.shadowRoot!.querySelector<Control>('jf-control')!; await control.updateComplete;
-  control.shadowRoot!.querySelector('button')!.click(); await settle(el);
-}
 
 beforeEach(() => {
   setShowDeveloperTools(false);
@@ -100,39 +87,15 @@ describe('S7a-7 a first install that runs', () => {
     expect(page).not.toMatch(/repair|already installed|\binstalled\b/i);
     expect(buttons(el).map(b => b.label)).not.toContain('Repair');
     expect(el.shadowRoot!.querySelector('[data-testid="install-repair-needed"]')).toBeNull();
-    expect(el.shadowRoot!.querySelector('[data-step="reranker"]'), 'Best match first step').not.toBeNull();
-    expect(el.shadowRoot!.querySelectorAll('[data-step] [role="switch"]:not([aria-disabled="true"])')).toHaveLength(0);
+    expect(el.shadowRoot!.querySelector('.path-step[data-feature="reranker"]'), 'Best match first step').not.toBeNull();
+    expect(el.shadowRoot!.querySelectorAll('.path-step [role="switch"]:not([aria-disabled="true"])')).toHaveLength(0);
     expect(buttons(el).map(b => b.label)).toEqual(expect.arrayContaining(['Pause download', 'Cancel']));
-  });
-
-  it('a genuine idle missing file still offers Repair', async () => {
-    store.current = installedMissingFile(); preview = plan('installed');
-    const el = await mount();
-    expect(el.shadowRoot!.querySelector('.brain-headline')?.textContent?.trim()).toBe('Installed — repair available');
-    expect(el.shadowRoot!.querySelector('[data-step="reranker"]'), 'Best match first step').not.toBeNull();
-    await press(el, 'Repair');
-    expect(confirms).toHaveLength(1);
-    expect(operations.map(o => o.id)).toEqual(['core.repair-ai-install']);
   });
 });
 
-describe('S7a-11 the page’s install flows still work', () => {
-  it('Install opens the licences, then installs; pause and cancel act on the run', async () => {
-    store.current = { ...live, aiEngine: { kind: 'not_installed', stability: { kind: 'settled' }, installFailure: null },
-      runtime: { mode: 'offline', installed: { known: true, value: false } }, installStatus: { state: 'idle', installedFully: false } } as unknown as AiState;
-    let el = await mount();
-    expect(el.shadowRoot!.querySelector('[data-step="meaning"]'), 'Understand meaning step').not.toBeNull();
-    await press(el, buttons(el).find(b => b.label?.startsWith('Install AI'))?.label ?? 'Install AI');
-    expect(el.shadowRoot!.querySelector<HTMLDialogElement>('dialog.consent')?.open).toBe(true);
-    await press(el, 'Accept and download');
-    expect(operations.map(o => o.id)).toEqual(['core.start-ai-install']);
-    el.remove(); store.current = firstInstallRunning(); el = await mount();
-    await press(el, 'Pause download');
-    expect(posts.filter(p => p.endsWith('/install/pause'))).toHaveLength(1);
-    await press(el, 'Cancel');
-    expect(operations.map(o => o.id)).toEqual(['core.start-ai-install', 'core.cancel-ai-install']);
-  });
-
+// The page's install, pause, cancel and genuine Repair flows are preservation checks
+// (BrainOverview.preservation.test.ts); here only what slice 7a changes.
+describe('S7a-11 Ask in Search', () => {
   it('Ask in Search keeps its own readiness while Brain counts processor answers as working', async () => {
     setFirstUseRoots(null, new Map());
     const entry = (id: string, mountTag: string, extra = {}) => ({ id, mountTag, presentation: { labelKey: id, descriptionKey: '', iconHint: null, category: null },

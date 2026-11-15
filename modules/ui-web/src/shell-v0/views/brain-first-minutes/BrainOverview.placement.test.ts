@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 // Slice 7a (S7a-8; D5, AM5, AM6) — what the pictures do not show sits behind Settings › Advanced › Show
-// developer tools, live; recovery routes stay reachable without developer tools.
+// developer tools, live, including Brain's own Advanced legacy panels (X6).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AiState } from '../../state/aiStateStore.js';
 import type { InstallPlanPreview } from '../../utils/aiInstallPoll.js';
@@ -16,8 +16,6 @@ vi.mock('../../state/aiStateStore.js', async original => ({
 import '../BrainSurface.js';
 import { createMockHostApi } from '../../plugin-api/testHostApi.js';
 import { setShowDeveloperTools } from '../../state/developerToolsState.js';
-import { requestReadingMemoryFocus } from '../../router/readingMemoryIntent.js';
-import { deepActiveElement } from '../../utils/keyboardHandler.js';
 
 interface Brain extends HTMLElement { apiBase: string; host_: unknown; updateComplete: Promise<boolean> }
 interface Control extends HTMLElement { updateComplete: Promise<boolean>; label?: string }
@@ -81,11 +79,11 @@ describe('S7a-8 unpictured controls are developer tools, live', () => {
     expect(labels(el)).not.toEqual(expect.arrayContaining(['Stop answers']));
     expect(labels(el)).not.toContain('Start answers');
     expect(labels(el)).not.toContain('Refresh status');
-    expect(el.shadowRoot!.querySelectorAll('[data-step] button.step-info, button.feature-phrase')).toHaveLength(0);
+    expect(el.shadowRoot!.querySelectorAll('.path-step button.step-info, button.feature-phrase')).toHaveLength(0);
     setShowDeveloperTools(true); await settle(el);
     expect(labels(el)).toContain('Stop answers');
     expect(labels(el)).toContain('Refresh status');
-    const info = el.shadowRoot!.querySelector<HTMLButtonElement>('[data-step="reranker"] button.step-info');
+    const info = el.shadowRoot!.querySelector<HTMLButtonElement>('.path-step[data-feature="reranker"] button.step-info');
     expect(info, 'feature disclosure').not.toBeNull();
     info!.click(); await settle(el);
     expect(words(el.shadowRoot!.querySelector('.feature-panel'))).toMatch(/You get.*It costs/);
@@ -102,49 +100,39 @@ describe('S7a-8 unpictured controls are developer tools, live', () => {
   });
 });
 
-describe('S7a-8 recovery routes without developer tools', () => {
-  it('pack import is reachable when downloads are disabled before install', async () => {
-    store.current = notInstalled(); preview = plan('to-download'); policy = { downloadsEnabled: false };
+// X6 (AM5) — Brain's Advanced settings is not the place for unpictured panels: the component list,
+// the tier breakdown, the package history and the observed search features need developer tools, live.
+describe('S7a-8 Advanced settings keeps its legacy panels behind developer tools', () => {
+  it('component list, tiers, package history and observed features appear only with developer tools', async () => {
+    preview = { ...plan('installed'), tiers: [{ tier: 'core', label: 'Core search tier', totalBytes: 2048, downloadBytes: 0, includedByIntent: true }] } as InstallPlanPreview;
+    store.current = { ...ready(), installStatus: { state: 'completed', installedFully: true,
+      packages: [{ packageId: 'reranker', label: 'Reranker package', state: 'installed', bytesTotal: 1024 }] } } as unknown as AiState;
     const el = await mount();
-    expect(el.shadowRoot!.querySelector('[data-step="meaning"]'), 'Understand meaning step').not.toBeNull();
     const open = advanced(el);
     expect(open, 'Advanced settings').not.toBeNull();
     open!.click(); await settle(el);
-    expect(words(el.shadowRoot!)).toContain('Import an offline package');
+    const legacy = () => ({
+      components: el.shadowRoot!.querySelector('[data-testid="install-component-list"]') !== null,
+      tiers: words(el.shadowRoot!).includes('Core search tier'),
+      packages: el.shadowRoot!.querySelector('[data-testid="package-row-reranker"]') !== null,
+      observed: el.shadowRoot!.querySelector('[data-testid="brain-observed-features"]') !== null,
+    });
+    expect(legacy()).toEqual({ components: false, tiers: false, packages: false, observed: false });
+    expect(el.shadowRoot!.querySelector('[aria-label="Advanced settings"] [aria-label="Downloaded files"]'), 'Downloaded files stays').not.toBeNull();
+    setShowDeveloperTools(true); await settle(el);
+    expect(legacy()).toEqual({ components: true, tiers: true, packages: true, observed: true });
+    setShowDeveloperTools(false); await settle(el);
+    expect(legacy()).toEqual({ components: false, tiers: false, packages: false, observed: false });
   });
+});
 
+// The recovery routes that work without developer tools (AM6) are preservation checks
+// (BrainOverview.preservation.test.ts); here only what slice 7a changes.
+describe('S7a-8 fm-10 without a recovery need', () => {
   it('a not-installed page shows no Advanced settings link otherwise (fm-10)', async () => {
     store.current = notInstalled(); preview = plan('to-download');
     const el = await mount();
     expect(advanced(el)).toBeNull();
-    expect(el.shadowRoot!.querySelector('[data-step="meaning"]'), 'Understand meaning step').not.toBeNull();
-  });
-
-  it('manual repair links stay on the page', async () => {
-    store.current = { ...ready(), installStatus: { state: 'idle', installedFully: true, repairNeeded: true, packages: [{ packageId: 'reranker',
-      label: 'Search reranker', terminalReason: 'transport', attempts: 3, url: 'https://example.invalid/reranker.onnx', targetPath: 'C:/models/reranker.onnx', error: 'timed out' }] } } as unknown as AiState;
-    const el = await mount();
-    expect(el.shadowRoot!.querySelector('[data-step="reranker"]'), 'Best match first step').not.toBeNull();
-    const manual = el.shadowRoot!.querySelector('[data-testid="install-manual-fallback"]');
-    expect(words(manual)).toContain('https://example.invalid/reranker.onnx');
-    expect(words(manual)).toContain('C:/models/reranker.onnx');
-  });
-
-  it('an interrupted or refused removal outcome is reachable under Advanced settings', async () => {
-    downloaded = { parts: [{ id: 'chat', label: 'Chat model', state: 'downloaded', sizeOnDiskBytes: 10, removable: true, previewDigest: 'd' }],
-      removal: { packageId: 'chat', label: 'Chat model', state: 'interrupted', message: 'The app closed during removal.', deleted: [], kept: [] } };
-    const el = await mount();
-    expect(el.shadowRoot!.querySelector('[data-step="chat"]'), 'Answer questions step').not.toBeNull();
-    advanced(el)!.click(); await settle(el);
-    expect(words(el.shadowRoot!.querySelector('[data-testid="removal-outcome"]'))).toContain('The removal was interrupted');
-  });
-
-  it('Settings › Reading memory opens Advanced and focuses its control', async () => {
-    store.current = notInstalled(); preview = plan('to-download');
-    const el = await mount();
-    expect(el.shadowRoot!.querySelector('[data-step="meaning"]'), 'Understand meaning step').not.toBeNull();
-    requestReadingMemoryFocus(); await settle(el);
-    await new Promise(resolve => requestAnimationFrame(() => resolve(null))); await settle(el);
-    expect(deepActiveElement()?.id).toBe('brain-contextWindow');
+    expect(el.shadowRoot!.querySelector('.path-step[data-feature="meaning"]'), 'Understand meaning step').not.toBeNull();
   });
 });
