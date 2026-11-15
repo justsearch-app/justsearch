@@ -28,7 +28,7 @@ function button(root: ParentNode, words: string): HTMLButtonElement {
 }
 const row = { pathHash: 'slice6b1', status: 'indexed', fileCount: 8, fileCountCapped: false,
   failedCount: 0, inFlightCount: 0, walkCompleted: true };
-async function library() {
+async function library(items: unknown[] = [row]) {
   __feedForTest({ status: { worker: { core: { indexedDocuments: 8, ownSearchableDocuments: 8,
     indexState: 'IDLE', indexHealthy: true }, migration: { migrationState: 'IDLE' },
     enrichment: { embeddingEnabled: false, spladeEnabled: false, nerEnabled: false,
@@ -37,7 +37,7 @@ async function library() {
       completedNerCount: 0, chunk: { chunkDocCount: 2, chunkEmbeddingPendingCount: 2, chunkVectorsReady: false } } },
     readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] } } } } as unknown as StatusSnapshot });
   const host = createMockHostApi();
-  host.data.fetch = vi.fn(async path => path.startsWith('/api/indexing-roots/substrate') ? Response.json({ items: [row] })
+  host.data.fetch = vi.fn(async path => path.startsWith('/api/indexing-roots/substrate') ? Response.json({ items })
     : path.startsWith('/api/operation-history/') ? Response.json({ state: 'complete', historySince: 0 }) : new Response('{}', { status: 503 }));
   const el = document.createElement('jf-library-surface') as LibrarySurface;
   el.host_ = host; el.resolvedPaths = { slice6b1: '/Documents' };
@@ -82,6 +82,29 @@ it('6b1-2: the quiet foot action asks in place, and Cancel runs nothing and rest
   expect(action.getAttribute('aria-expanded')).toBe('false');
   expect(invoke).not.toHaveBeenCalled();
   expect(el.shadowRoot!.querySelector('[style]')).toBeNull();
+});
+it('6b1-8: with no watched folders Read everything again is not on the page', async () => {
+  const el = await library([]);
+  expect(el.shadowRoot).not.toBeNull();
+  expect([...el.shadowRoot!.querySelectorAll('button')].some(b => b.textContent?.includes('Read everything again'))).toBe(false);
+  expect(el.shadowRoot!.querySelector('[data-reread], #reread-confirmation')).toBeNull();
+});
+it('6b1-8: the ask closes when the last watched folder leaves, and the action stays disabled while a read-again request is in flight', async () => {
+  let accept!: (value: unknown) => void;
+  vi.spyOn(getOperationClient(''), 'invokeWithConsent').mockReturnValue(new Promise(resolve => { accept = resolve; }) as never);
+  const el = await library();
+  button(must(el.shadowRoot, '.bottom-links'), 'Read everything again').click(); await settle(el);
+  must(el.shadowRoot, '[role="region"][aria-label="Read every watched folder again?"]');
+  el.roots = []; await settle(el);
+  expect(el.shadowRoot!.querySelector('[data-reread], [role="region"][aria-label="Read every watched folder again?"]')).toBeNull();
+  el.roots = [row]; await settle(el);
+  const action = button(must(el.shadowRoot, '.bottom-links'), 'Read everything again');
+  expect(action.getAttribute('aria-expanded')).toBe('false');
+  action.click(); await settle(el);
+  button(must(el.shadowRoot, '[role="region"][aria-label="Read every watched folder again?"]'), 'Read again').click(); await settle(el);
+  expect(button(must(el.shadowRoot, '.bottom-links'), 'Read everything again').disabled).toBe(true);
+  accept({ success: true, message: 'Reading accepted', structuredData: { operationKey: '0194f72c-0000-7000-8000-000000000068' } }); await settle(el);
+  expect(button(must(el.shadowRoot, '.bottom-links'), 'Read everything again').disabled).toBe(false);
 });
 it('6b1-2: confirmation uses consent and recorded outcome', async () => {
   const invoke = vi.spyOn(getOperationClient(''), 'invokeWithConsent').mockResolvedValue({ success: true, message: 'Reading accepted',

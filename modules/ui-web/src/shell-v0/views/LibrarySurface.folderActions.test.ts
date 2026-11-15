@@ -341,9 +341,7 @@ it('distinguishes accepted reindex from the recorded completion and failure', as
 it('explains an empty reindex scope and offline folders without claiming a full reindex', async () => {
   const { el } = await mount();
   el.roots = []; await pump(el);
-  const action = el.shadowRoot!.querySelector<HTMLButtonElement>('[data-reread]');
-  expect(action).not.toBeNull();
-  expect(action!.title).toBe('No folders yet'); expect(action!.disabled).toBe(true);
+  expect(el.shadowRoot!.querySelector('[data-reread]')).toBeNull();
   el.roots = [{ ...root('a'), status: 'unavailable' }]; await pump(el);
   expect(el.shadowRoot!.textContent).toContain('offline');
 });

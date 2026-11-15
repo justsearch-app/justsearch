@@ -958,6 +958,8 @@ export class LibrarySurface extends JfElement {
     if (changed.has('roots') && this.removeConfirm && !this.roots.some(root => root.pathHash === this.removeConfirm?.hash)) {
       this.removeConfirm = null;
     }
+    // With no watched folder there is nothing to read again: the action and its ask leave the page.
+    if (changed.has('roots') && this.rereadConfirmOpen && this.noWatchedFolders()) this.rereadConfirmOpen = false;
     // L18 — the same for a collection: a band whose source left the list closes for good; it opens
     // again only on a press, never because the source came back.
     if (changed.has('otherSources') && this.collectionConfirm
@@ -2230,6 +2232,11 @@ export class LibrarySurface extends JfElement {
     return this.developer && plain !== message && message ? `${plain} (${message})` : plain;
   }
 
+  /** Confirmed empty folder list (not merely unread or provisional). */
+  private noWatchedFolders(): boolean {
+    return this.rootsObserved && this.roots.length === 0 && !this.provisional;
+  }
+
   private async runLibraryAction(operation: 'core.reindex'): Promise<void> {
     if (this.rereadBusy) return;
     this.shadowRoot?.querySelector<HTMLElement>('[data-reread]')?.focus();
@@ -2447,9 +2454,8 @@ export class LibrarySurface extends JfElement {
           ${formatCount(otherDocumentCount)} ${otherDocumentCount === 1 ? 'document' : 'documents'} from other apps${this.otherSources.truncated ? ' · incomplete list' : ''}
         </summary>${this.renderOtherSources()}</details>` : nothing}
         <jf-button variant="ghost" label="Activity" .onActivate=${() => { this.activityOpen = !this.activityOpen; }}>Activity</jf-button>
-        <button type="button" class="text-action" data-reread
-          ?disabled=${this.rereadBusy || this.rootsObserved && this.roots.length === 0 && !this.provisional}
-          title=${this.rootsObserved && this.roots.length === 0 && !this.provisional ? 'No folders yet' : nothing}
+        ${this.noWatchedFolders() ? nothing : html`<button type="button" class="text-action" data-reread
+          ?disabled=${this.rereadBusy}
           aria-expanded=${String(this.rereadConfirmOpen)} aria-controls="reread-confirmation"
           @click=${() => { this.rereadConfirmOpen = true; }}>Read everything again</button>
         <div id="reread-confirmation" class="reread-confirmation" aria-live="polite">${this.rereadConfirmOpen ? html`
@@ -2460,7 +2466,7 @@ export class LibrarySurface extends JfElement {
               this.rereadConfirmOpen = false;
               this.shadowRoot?.querySelector<HTMLButtonElement>('[data-reread]')?.focus();
             }}>Cancel</button>
-          </section>` : nothing}</div>
+          </section>` : nothing}</div>`}
         ${this.activeTab === 'folders' && (this.developer || this.activityOpen) ? html`<jf-ingestion-summary compact .host_=${this.host_}></jf-ingestion-summary>` : nothing}
       </div>
     `;

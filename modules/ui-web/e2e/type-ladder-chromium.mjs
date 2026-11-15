@@ -61,7 +61,8 @@ async function fixture(route) {
   if (p === '/api/settings/v2') return json(route, { ui: {}, ai: { enabled: true } });
   if (p === '/api/ai/install/plan-preview') return json(route, { totalDownloadBytes: 1000, components: [{ id: 'chat', label: 'Chat model', state: 'to-download', downloadBytes: 1000 }] });
   if (p === '/api/ai/install/downloaded-files') return json(route, { parts: [] });
-  if (p === '/api/indexing-roots/substrate') return json(route, { items: [] });
+  // One watched folder, matching /api/indexing/roots, so Library's folder state and its Read everything again ask are audited.
+  if (p === '/api/indexing-roots/substrate') return json(route, { items: [{ pathHash: 'csp-root', status: 'indexed', fileCount: 2, fileCountCapped: false, failedCount: 0, inFlightCount: 0, walkCompleted: true }] });
   if (p === '/api/inference/status') return json(route, { mode: 'offline', installed: false });
   return json(route, { entries: [], items: [], results: [], facets: {}, jobs: [], count: 0 });
 }

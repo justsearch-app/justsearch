@@ -21,7 +21,9 @@ it('text, corners and bundled variable Inter follow the type ladder under the de
       });
     const summary = JSON.parse(stdout.slice(stdout.lastIndexOf('\n{') + 1)) as { violations: number; surfaces: number };
     expect(summary.violations).toBe(0);
-    expect(summary.surfaces).toBe(164);
+    // 168 observed on slice 6b-1 (main: 164): the fixture's one watched folder adds its Library row
+    // disclosure and the Read everything again ask, each in dark and light.
+    expect(summary.surfaces).toBe(168);
     const inventory = JSON.parse(await readFile(path.join(evidence, 'results.json'), 'utf8')) as {
       checks: { id: string; result: string; textElements?: number }[];
     };
