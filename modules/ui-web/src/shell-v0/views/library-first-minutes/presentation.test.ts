@@ -110,9 +110,9 @@ it('K6/M5: Browse column heads, stable root count, byte and shared date presenta
   expect(el.shadowRoot!.textContent).toContain('2000'); expect(el.shadowRoot!.querySelector('[style]')).toBeNull();
   expect(el.shadowRoot!.querySelector('[aria-label="Open file"]')).not.toBeNull();
 });
-it('M8: failed Browse children provide Try again and never say empty', async () => {
+it('M8: failed Browse children provide Retry and never say empty', async () => {
   const { el } = await browse(true); must<HTMLElement>(el.shadowRoot, '[role="treeitem"]').click(); await settle(el);
-  expect(el.shadowRoot!.textContent).toContain("Couldn't load this folder"); expect(el.shadowRoot!.textContent).toContain('Try again');
+  expect(el.shadowRoot!.textContent).toContain("Couldn't load this folder"); expect(el.shadowRoot!.querySelector('jf-button[label="Retry Documents"]')?.textContent?.trim()).toBe('Retry Documents');
   expect(el.shadowRoot!.textContent).not.toContain('Folder is empty');
 });
 it('M8: truncated, filtered-empty and confirmed-empty are distinct', async () => {

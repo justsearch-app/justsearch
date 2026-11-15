@@ -82,11 +82,11 @@ hours, skip rules, settings persistence and operation implementations are outsid
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "Replace Library-menu and waiting-work expectations with the foot action, no Library menu or waiting action, and resetting the in-place ask when hidden. Keep the top-bar outside-click/Escape checks and Browse recovery, now using Couldn't load this folder / Try again.",
+          "choice": "Replace Library-menu and waiting-work expectations with the foot action, no Library menu or waiting action, and resetting the in-place ask when hidden. Keep the top-bar outside-click/Escape checks and Browse recovery: the failure line says the plain Couldn't load this folder without browser error text, and M8 keeps the old folder-naming retry, now asserting Retry Documents as both the control's label and its visible text.",
           "label": "agent choice"
         }
       ],
-      "behaviour": "Replace Library-menu and waiting-work expectations with the foot action, no Library menu or waiting action, and resetting the in-place ask when hidden. Keep the top-bar outside-click/Escape checks and Browse recovery, now using Couldn't load this folder / Try again.",
+      "behaviour": "Replace Library-menu and waiting-work expectations with the foot action, no Library menu or waiting action, and resetting the in-place ask when hidden. Keep the top-bar outside-click/Escape checks and Browse recovery: the failure line says the plain Couldn't load this folder without browser error text, and M8 keeps the old folder-naming retry, now asserting Retry Documents as both the control's label and its visible text.",
       "conflictSearch": "Repository docs/decisions searched for Library, Browse, menus and reading again: no presentation decision conflicts. The earlier fm-library changeset cites the old Library menu; the supplied later owner decision Q2 supersedes it. Private records were not read, per the builder brief."
     },
     {
@@ -107,36 +107,11 @@ hours, skip rules, settings persistence and operation implementations are outsid
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "Replace the removed menu count-detail assertion with the same literal singular 1 file in the retained folder row. Enter rereading through the foot action and Read again; preserve forced-read outcomes, refreshed file counts and plain failure wording. Browse retry uses Couldn't load this folder / Try again while keeping cached-row and recovery checks.",
+          "choice": "Replace the removed menu count-detail assertion with the same literal singular 1 file in the retained folder row. Enter rereading through the foot action and Read again; preserve forced-read outcomes, refreshed file counts and plain failure wording. Browse retry keeps the old folder-naming control labelled Retry Documents; only the failure words become the plain Couldn't load this folder, and the cached-row and recovery checks are unchanged.",
           "label": "agent choice"
         }
       ],
-      "behaviour": "Replace the removed menu count-detail assertion with the same literal singular 1 file in the retained folder row. Enter rereading through the foot action and Read again; preserve forced-read outcomes, refreshed file counts and plain failure wording. Browse retry uses Couldn't load this folder / Try again while keeping cached-row and recovery checks.",
-      "conflictSearch": "Repository docs/decisions searched for Library, Browse, menus and reading again: no presentation decision conflicts. The earlier fm-library changeset cites the old Library menu; the supplied later owner decision Q2 supersedes it. Private records were not read, per the builder brief."
-    },
-    {
-      "items": [
-        "modules/ui-web/src/shell-v0/views/library-first-minutes/browse-lockdown.test.ts"
-      ],
-      "change": "modified",
-      "kind": "test-code",
-      "class": "Obsolete",
-      "sources": [
-        {
-          "kind": "owner-words",
-          "quote": "the Library \"more\" button is removed together with the Library menu; \"Read everything again\" becomes a quiet text action at the page foot beside \"Activity\" and asks in place before starting. The shared menu component stays for the top bar and Browse's context menu.",
-          "location": "task t-20261113-fmimpl agreement, owner decision Q2 of 2026-11-15 (delegated answer via session justsearch-fd)"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "You are supposed to be the implementation session",
-          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
-          "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "Browse folder failures offer Try again; retain the failed-load recovery-state check and never claim the failed folder is empty.",
-          "label": "agent choice"
-        }
-      ],
-      "behaviour": "Browse folder failures offer Try again; retain the failed-load recovery-state check and never claim the failed folder is empty.",
+      "behaviour": "Replace the removed menu count-detail assertion with the same literal singular 1 file in the retained folder row. Enter rereading through the foot action and Read again; preserve forced-read outcomes, refreshed file counts and plain failure wording. Browse retry keeps the old folder-naming control labelled Retry Documents; only the failure words become the plain Couldn't load this folder, and the cached-row and recovery checks are unchanged.",
       "conflictSearch": "Repository docs/decisions searched for Library, Browse, menus and reading again: no presentation decision conflicts. The earlier fm-library changeset cites the old Library menu; the supplied later owner decision Q2 supersedes it. Private records were not read, per the builder brief."
     },
     {
@@ -246,11 +221,11 @@ hours, skip rules, settings persistence and operation implementations are outsid
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "Implement contract 6b1: remove Library More and picture-only waiting work; use an announced, named, in-page reread ask with Read again / Cancel and focus restoration; keep forced reindex consent/history tracking; Escape on either answer cancels like Cancel, runs nothing and returns focus to the action, while Escape outside the ask leaves it open; with no watched folders the action is absent from the whole Library tree, menus included; while a read-again request is in flight the action is aria-disabled, ignores activation and keeps focus; singular 1 document from other apps and plural otherwise; no-AI reread completion says Up to date once; Browse loading/failure stays below column heads, hides raw browser errors, names the folder in each folder failure line and offers working Try again; focused toolbar Resume updates to enabled Pause on confirmed running status. Preserve top-bar and Browse context-menu outside-click/Escape dismissal.",
+          "choice": "Implement contract 6b1: remove Library More and picture-only waiting work; use an announced, named, in-page reread ask with Read again / Cancel and focus restoration; keep forced reindex consent/history tracking; Escape on either answer cancels like Cancel, runs nothing and returns focus to the action, while Escape outside the ask leaves it open; with no watched folders the action is absent from the whole Library tree, menus included; while a read-again request is in flight the action is aria-disabled, ignores activation and keeps focus; singular 1 document from other apps and plural otherwise; no-AI reread completion says Up to date once; Browse loading/failure stays below column heads, hides raw browser errors, names the folder in each folder failure line and keeps main's folder-naming retry (Retry <folder>, or Retry loading folders for the folder list) as accessible name and visible text, with two failed folders of one name shown by enough of their paths to tell them apart; focused toolbar Resume updates to enabled Pause on confirmed running status. Preserve top-bar and Browse context-menu outside-click/Escape dismissal.",
           "label": "agent choice"
         }
       ],
-      "behaviour": "Nineteen happy-dom cases cover the slice-6b1 obligations, including literal wording, focus, operation arguments and recorded completion, retry recovery, and preserved shared menus. 6b1-8 checks that with no watched folders no element anywhere in the Library shadow tree, including an opened menu, says Read everything again; that the ask closes when the last folder leaves; and that while a read-again request is in flight the focused action is aria-disabled, keeps focus and ignores activation. 6b1-2 Escape cases check that Escape on Read again or Cancel closes the ask, is consumed there, runs nothing and returns focus to the action, and that Escape outside the ask leaves it open. 6b1-5 checks that two failing folders give two failure lines naming Documents and Photos. On baseline 777b598043 fifteen fail by assertion and four pass (zero/multiple other-app documents and the two shared-menu dismissal paths); the no-folders case finds the disabled item in the opened old menu. On 5a21ba3003 the in-flight, both Escape-on-answer and several-failures cases fail by assertion.",
+      "behaviour": "Twenty happy-dom cases cover the slice-6b1 obligations, including literal wording, focus, operation arguments and recorded completion, retry recovery, and preserved shared menus. 6b1-8 checks that with no watched folders no element anywhere in the Library shadow tree, including an opened menu, says Read everything again; that the ask closes when the last folder leaves; and that while a read-again request is in flight the focused action is aria-disabled, keeps focus and ignores activation. 6b1-2 Escape cases check that Escape on Read again or Cancel closes the ask, is consumed there, runs nothing and returns focus to the action, and that Escape outside the ask leaves it open. 6b1-5 checks that two failing folders give two failure lines naming Documents and Photos, each with its own Retry Documents / Retry Photos control, that the folder and root retries carry Retry Documents and Retry loading folders as label and visible text, and that failed /home/a/Documents and /home/b/Documents read a/Documents and b/Documents in both line and Retry. On baseline 777b598043 sixteen fail by assertion and four pass (zero/multiple other-app documents and the two shared-menu dismissal paths); the no-folders case finds the disabled item in the opened old menu. On 5a21ba3003 the in-flight, both Escape-on-answer and several-failures cases fail by assertion. On ef183306ac (Try again) the four 6b1-5 cases fail by assertion.",
       "repaired": true,
       "evidence": "gates/test-intent/evidence/fm-library-6b1.json",
       "newChecks": [
@@ -351,7 +326,7 @@ Repair for the typography audit (2026-11-15 UTC, on dac30b0694 with uncommitted 
 
 These lockdown files directly reference Library, Browse or the reading toolbar. They were located
 by searching for the surface classes/tags and Pause/Resume labels; none was executed in this sandbox.
-The two changed browser files are included. Run the relevant full application checks in light
+The changed review-repairs-lockdown.test.ts and browse-lockdown.test.ts (now unchanged from main) are included. Run the relevant full application checks in light
 and dark, including foot-action keyboard/announcement behavior and toolbar focus.
 
 - `modules/ui-web/src/boot/boot-frame-lockdown.test.ts`
@@ -381,6 +356,21 @@ Also preserve the shared top-bar menu in:
 - `modules/ui-web/src/boot/boot-topbar-lockdown.test.ts`
 - `modules/ui-web/src/shell-v0/chrome/TopBar.placement-lockdown.test.ts`
 
+## Review repairs (2026-11-16 UTC, on ef183306ac with uncommitted changes)
+
+- Acceptor y5s7jhvz rejected renaming Browse's folder retry to `Try again`. Per the orchestrator's
+  delegated decision, every Browse folder failure again offers main's folder-naming retry,
+  `Retry <folder>` (e.g. `Retry Documents`), as both accessible name and visible text, and a failed
+  folder list offers main's `Retry loading folders`. The 6b-1 placement in the list area and the plain
+  `Couldn't load this folder` / `Couldn't load folders` words without browser error text stay. Where two
+  failed folders share a name, the line and its Retry show enough of the path's end to tell them apart.
+- `browse-lockdown.test.ts`, the proportion baseline's Browse failure rows and the harness step's wait
+  are back to main's `Retry Documents`; its entry is removed because the file no longer differs from main.
+  presentation.test.ts M8 and the review-repairs retry case assert the folder-naming name again.
+- `docs/reference/secondary-views-behavior.md` names the retry controls and the same-name rule.
+- Evidence regenerated with `run-evidence.mjs --before origin/main` for slice-6b1.test.ts and
+  slice-6b1-lockdown.test.ts: both pass on the candidate and fail by assertion on 777b598043.
+
 ## Acceptance records
 
 Pending independent verification and acceptance on the committed candidate.
@@ -391,8 +381,8 @@ Pending independent verification and acceptance on the committed candidate.
   the action is aria-disabled rather than disabled while a confirmed request is in flight, so focus stays.
 - Browse folder failure lines name their folder (`Documents: Couldn't load this folder`).
 - The harness step index and the a11y/proportion baselines use `library-reread(-light)`; the proportion
-  rows assert the ask region, the expanded action and no `More Library actions`, and Browse failure rows
-  require `Try again`. `scripts/jsharness/tests/test_ui_step_index.py` now also checks that every
+  rows assert the ask region, the expanded action and no `More Library actions`; Browse failure rows
+  keep requiring `Retry Documents` (see the ef183306ac repair above). `scripts/jsharness/tests/test_ui_step_index.py` now also checks that every
   baseline row names a registered step (out of test-intent scope: scripts/ self-tests).
 - `run-evidence.mjs --before origin/main` covers slice-6b1.test.ts and slice-6b1-lockdown.test.ts:
   both pass on the candidate and fail by assertion on 777b598043.

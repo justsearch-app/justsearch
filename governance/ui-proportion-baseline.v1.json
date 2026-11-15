@@ -2445,7 +2445,7 @@
     {
       "uiShotStep": "library-browse-failure",
       "requiredSelectors": [
-        "jf-button[label=\"Try again\"]"
+        "jf-button[label=\"Retry Documents\"]"
       ],
       "elements": [
         {
@@ -2488,7 +2488,7 @@
     {
       "uiShotStep": "library-browse-failure-light",
       "requiredSelectors": [
-        "jf-button[label=\"Try again\"]"
+        "jf-button[label=\"Retry Documents\"]"
       ],
       "elements": [
         {

@@ -161,12 +161,12 @@ it('ordinary Browse reloads roots on show and replaces cached children on each e
   expect(fetch.mock.calls.filter(([path]) => path.includes('/api/indexing/roots'))).toHaveLength(2);
 });
 
-it('a failed child reload preserves cached rows and exposes Try again, which replaces them on success', async () => {
+it('a failed child reload preserves cached rows and exposes Retry, which replaces them on success', async () => {
   const { el, setEntries, fail } = await browse();
   const folder = must<HTMLElement>(el.shadowRoot, '[data-path="/Documents"]');
   folder.click(); await settle(el); folder.click(); await settle(el); fail(true);
   folder.click(); await settle(el);
-  const retry = must<HTMLElement & { onActivate(): void }>(el.shadowRoot, '[label="Try again"]');
+  const retry = must<HTMLElement & { onActivate(): void }>(el.shadowRoot, '[label="Retry Documents"]');
   expect(el.shadowRoot!.textContent).toContain("Couldn't load this folder");
   expect(el.shadowRoot!.querySelector('[data-path="/Documents/old.md"]')).not.toBeNull();
   fail(false); setEntries(['replacement.md']); retry.onActivate(); await settle(el);

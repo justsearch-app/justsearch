@@ -223,7 +223,7 @@ it.each(['outside click', 'Escape'])('6b1-1 preservation: top bar and Browse con
   await settle(shared); expect(must(context.shadowRoot, '[role="menu"]').getAttribute('aria-label')).toBe('File actions');
   close(); await settle(el); expect(document.querySelector('jf-context-menu')).toBeNull();
 });
-it('6b1-5: root loading and failure occupy the list area, hide browser errors, and Try again reloads', async () => {
+it('6b1-5: root loading and failure occupy the list area, hide browser errors, and Retry loading folders reloads', async () => {
   let reject!: (error: Error) => void;
   const fetch = vi.fn(() => new Promise<Response>((_resolve, fail) => { reject = fail; }));
   const el = await browse(fetch);
@@ -232,12 +232,13 @@ it('6b1-5: root loading and failure occupy the list area, hide browser errors, a
   const failure = inList(el, '.browse-error');
   expect(failure.textContent).toContain("Couldn't load folders");
   expect(el.shadowRoot!.textContent).not.toContain('Load failed');
-  const retry = must<HTMLElement & { onActivate(): void }>(failure, 'jf-button[label="Try again"]');
+  const retry = must<HTMLElement & { onActivate(): void }>(failure, 'jf-button[label="Retry loading folders"]');
+  expect(retry.textContent?.trim()).toBe('Retry loading folders');
   fetch.mockResolvedValue(Response.json({ roots: [{ path: '/Documents' }] }));
   retry.onActivate(); await settle(el);
   expect(must(el.shadowRoot, '[role="treeitem"]').textContent).toContain('Documents');
 });
-it('6b1-5: folder loading/failure sit after heads, with plain failure and a working Try again', async () => {
+it('6b1-5: folder loading/failure sit after heads, with plain failure and a working Retry that names the folder', async () => {
   let reject!: (error: Error) => void;
   const fetch = vi.fn((path: string) => path.includes('/api/indexing/roots') ? Promise.resolve(Response.json({ roots: [{ path: '/Documents' }] }))
     : path.endsWith('/folders') ? Promise.resolve(Response.json({ folders: [] }))
@@ -249,12 +250,13 @@ it('6b1-5: folder loading/failure sit after heads, with plain failure and a work
   const failure = inList(el, '.notice');
   expect(failure.textContent).toContain("Couldn't load this folder");
   expect(el.shadowRoot!.textContent).not.toContain('Load failed');
-  const retry = must<HTMLElement & { onActivate(): void }>(failure, 'jf-button[label="Try again"]');
+  const retry = must<HTMLElement & { onActivate(): void }>(failure, 'jf-button[label="Retry Documents"]');
+  expect(retry.textContent?.trim()).toBe('Retry Documents');
   fetch.mockImplementation(async (path: string) => Response.json(path.endsWith('/folders') ? { folders: [] } : { files: [], totalCount: 0 }));
   retry.onActivate(); await settle(el);
   expect(inList(el, '.notice').textContent).toContain('No searchable files in this folder');
 });
-it('6b1-5: several folder failures each name their folder', async () => {
+it('6b1-5: several folder failures each name their folder, in the line and in its Retry', async () => {
   const fetch = vi.fn(async (path: string) => {
     if (path.includes('/api/indexing/roots')) return Response.json({ roots: [{ path: '/Documents' }, { path: '/Photos' }] });
     throw new TypeError('Load failed');
@@ -262,9 +264,22 @@ it('6b1-5: several folder failures each name their folder', async () => {
   const el = await browse(fetch);
   for (const item of [...el.shadowRoot!.querySelectorAll<HTMLElement>('[role="treeitem"]')]) { item.click(); await settle(el); }
   const failures = [...el.shadowRoot!.querySelectorAll('.notice')].filter(n => n.textContent?.includes("Couldn't load this folder"));
-  expect(failures.map(n => n.textContent?.replace('Try again', '').trim())).toEqual(
+  expect(failures.map(n => n.textContent?.replace(/Retry \S+/, '').trim())).toEqual(
     ["Documents: Couldn't load this folder", "Photos: Couldn't load this folder"]);
-  for (const failure of failures) must(failure, 'jf-button[label="Try again"]');
+  expect(failures.map(n => must(n, 'jf-button').getAttribute('label'))).toEqual(['Retry Documents', 'Retry Photos']);
+  expect(failures.map(n => must(n, 'jf-button').textContent?.trim())).toEqual(['Retry Documents', 'Retry Photos']);
+});
+it('6b1-5: two failed folders of one name show enough of their paths to tell them apart', async () => {
+  const fetch = vi.fn(async (path: string) => {
+    if (path.includes('/api/indexing/roots')) return Response.json({ roots: [{ path: '/home/a/Documents' }, { path: '/home/b/Documents' }, { path: '/home/c/Photos' }] });
+    throw new TypeError('Load failed');
+  });
+  const el = await browse(fetch);
+  for (const item of [...el.shadowRoot!.querySelectorAll<HTMLElement>('[role="treeitem"]')]) { item.click(); await settle(el); }
+  const failures = [...el.shadowRoot!.querySelectorAll('.notice')].filter(n => n.textContent?.includes("Couldn't load this folder"));
+  expect(failures.map(n => must(n, 'jf-button').getAttribute('label'))).toEqual(['Retry a/Documents', 'Retry b/Documents', 'Retry Photos']);
+  expect(failures.map(n => n.textContent?.replace(/Retry \S+/, '').trim())).toEqual(
+    ["a/Documents: Couldn't load this folder", "b/Documents: Couldn't load this folder", "Photos: Couldn't load this folder"]);
 });
 it('6b1-6: focused Resume becomes enabled Pause when observation confirms reading runs', async () => {
   vi.spyOn(getOperationClient(''), 'invokeWithConsent').mockResolvedValue({ success: true, message: 'Resume accepted' });

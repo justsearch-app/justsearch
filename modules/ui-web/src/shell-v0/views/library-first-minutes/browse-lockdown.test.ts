@@ -85,7 +85,7 @@ it('a failed browser load is a recoverable failure rather than an empty folder',
   const page = await open(true);
   try {
     await page.getByRole('treeitem').first().click();
-    await expect.poll(() => page.getByRole('button', { name: 'Try again', exact: true }).isVisible(), { timeout: 3000 }).toBe(true);
+    await expect.poll(() => page.getByRole('button', { name: 'Retry Documents', exact: true }).isVisible(), { timeout: 3000 }).toBe(true);
     expect(await page.locator('body').innerText()).not.toContain('No searchable files in this folder');
   } finally { await page.close(); }
 }, 15_000);

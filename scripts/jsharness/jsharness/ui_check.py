@@ -1236,7 +1236,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                 tree = page.locator('jf-browse-surface [role="tree"]')
                 await tree.get_by_role("treeitem").first.click()
                 if state == "failure":
-                    await page.get_by_role("button", name="Try again", exact=True).wait_for()
+                    await page.get_by_role("button", name="Retry Documents", exact=True).wait_for()
                 else:
                     await tree.get_by_role("treeitem").filter(has_text="bulletin.html").hover()
                     await page.locator('jf-browse-surface .row.file').nth(7).wait_for()

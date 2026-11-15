@@ -88,8 +88,10 @@ other sizes and dates use the shared formatters. Row actions **Open file** and s
 The tree has one tab stop, Up/Down movement, Right expand/first-child, Left collapse/parent and
 Enter open. Row actions are reachable by Tab; Shift+F10 or the Menu key opens a file's context menu.
 Loading and failure lines sit in the list area below the column heads. A failure says
-**Couldn't load this folder** after the folder's name (or **Couldn't load folders**) with **Try again**,
-without browser error text. Partial, filtered-empty and confirmed-empty observations stay distinct.
+**Couldn't load this folder** after the folder's name with a Retry naming the folder (**Retry Documents**),
+or **Couldn't load folders** with **Retry loading folders**, without browser error text. Two failed folders
+of one name show enough of their paths to tell them apart. Loading, failed-with-Retry, partial,
+filtered-empty and confirmed-empty observations stay distinct.
 
 ---
 
