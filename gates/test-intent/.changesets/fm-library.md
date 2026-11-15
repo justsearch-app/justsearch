@@ -9,8 +9,8 @@ author-session: codex-builder-fm-s6-20261115
 
 This is the intermediate presentation slice. Save-on-change is deferred to 6b.
 The independent verifier must inspect the per-file diffs and accept this changeset;
-no acceptance records were written by this builder. New isolated presentation and
-count tests exercise the supplied decisions. Fail-before evidence for the five new files is
+no acceptance records were written by this builder. New presentation and
+count tests (the four frontend files have a New entry because the test-only import scanner reads every tracked source) exercise the supplied decisions. Fail-before evidence for the five new files is
 gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a312d1484; each fails by assertion).
 
 ```json
@@ -1654,7 +1654,84 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "reason": "The cited owner wording and supplied K/M decisions replace that presentation while preserving the remaining behavioural assertions."
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/browse-lockdown.test.ts",
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/operation-wording.test.ts",
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/palette-wording.test.ts",
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/presentation.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Library shows one state headline, one scoped folder count (capped as 50,000+, unknown as none), expanded facts that keep uncertainty, reading-in-progress and deletion recovery; expert sections are opt-in while unfinished/unknown removals, interrupted imports, missing folders and other sources stay reachable; hidden weekday restrictions stay effective and visible; the Library menu is the shared menu (dismissal and arbitration with the bar menu) and says what each operation runs; Browse has column heads, a stable root count, byte/date presentation, no inline styles, distinct kind icons shared with search results, failed/truncated/filtered-empty/confirmed-empty states, and a keyboard tree with one tab stop, Right/Left, focus recovery and actions that never open the row; operation and command-palette labels use reading words.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "The same thing has one name everywhere: the app reads files (not \"indexes\"), the button is \"Add a folder\".",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Library. The headline says the state, the folder row says how many and how current; nothing is said twice.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "The Library \"more\" menu is the same menu as everywhere else: same surface, rows, hover. It closes on outside click, Escape, or opening another menu.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "File browser. An icon per kind of file, files indented under their folder, column heads, sizes in sensible units. The row under the pointer shows its actions without changing height.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "In the app, never set style= on an element: the desktop window drops it.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Slice 6a decisions K1-K7 as amended by M1-M12 (Library presentation, shared menu, Browse; save-on-change deferred), as quoted in the acceptor brief.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/fm-library.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/browse-lockdown.test.ts",
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/operation-wording.test.ts",
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/palette-wording.test.ts",
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/presentation.test.ts"
+      ],
+      "repaired": true
     }
   ]
+}
+```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-5yh5fsbk",
+  "verdict": "reject",
+  "digest": "sha256:328f16bba2ace72f1b027094b78a87b6b1f9ebfa8b04f7e0d927623c15021037",
+  "note": "The four exempt modules/ui-web/src/shell-v0/views/library-first-minutes/*.test.ts files are not isolated: scripts/governance/gates/test-intent/units.test.mjs:775 calls scanTestOnlyImports, whose recursive tracked-source scan reads all four. The supplied no-scanner/no-other-test exemption condition is unmet. Add explicit test-intent entries with sources and execution evidence for these files."
 }
 ```
