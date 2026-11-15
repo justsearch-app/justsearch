@@ -697,7 +697,9 @@ export class LibrarySurface extends JfElement {
       .window-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
       @media (max-width: 45rem) { .window-actions { gap: .25rem; } }
       .more-actions { position: relative; }
-      .more-trigger { display: inline-grid; place-items: center; width: 1.875rem; height: 1.875rem; padding: 0;
+      /* The trigger is its fixed-size icon plus a text-sized margin: 30px at default text, and at 200%
+         small enough that Library's three actions still share one row beside a 600px window's tabs. */
+      .more-trigger { display: inline-grid; place-items: center; width: calc(18px + .75rem); height: calc(18px + .75rem); padding: 0;
         border: 0; border-radius: 8px; color: var(--text-primary); background: transparent; cursor: pointer; }
       .more-trigger:hover, .more-trigger[aria-expanded=true] { background: var(--surface-2); }
       .more-trigger:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
