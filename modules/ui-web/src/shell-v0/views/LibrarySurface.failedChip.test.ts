@@ -16,7 +16,9 @@ import { __resetAiStateForTest } from '../state/aiStateStore.js';
 
 const host = {
   platform: { capabilities: new Set<string>() },
-  data: { fetch: async () => ({ ok: false, status: 503 }) as unknown as Response },
+  // The folder list is not answered: rows are placed by the test, and a failed read would make them unconfirmed (R3).
+  data: { fetch: (path: string) => path.startsWith('/api/indexing-roots/substrate') ? new Promise<Response>(() => {})
+    : Promise.resolve({ ok: false, status: 503 } as unknown as Response) },
   utilities: { formatRelativeTime: () => 'just now' },
 } as unknown as PluginHostApi;
 

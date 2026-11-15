@@ -41,11 +41,14 @@ async function mountAll() {
   const library = surfaces[2] as LibrarySurface;
   library.host_ = {
     platform: { capabilities: new Set<string>() },
-    data: { fetch: async () => ({ ok: false, status: 503 }) as Response },
+    // The folder list is not answered: rows are placed by the test, and a failed read would make them unconfirmed (R3).
+    data: { fetch: (path: string) => path.startsWith('/api/indexing-roots/substrate') ? new Promise<Response>(() => {})
+      : Promise.resolve({ ok: false, status: 503 } as Response) },
     utilities: { formatRelativeTime: () => 'just now' },
   } as unknown as PluginHostApi;
   for (const el of surfaces) document.body.appendChild(el);
   await flush();
+  library.loading = false;
   library.roots = [{ pathHash: 'test-folder', status: 'indexed', walkCompleted: true,
     fileCount: 10, inFlightCount: 4, failedCount: 0,
     parentDocsTotalEmbedding: 10, parentDocsSettledEmbedding: 0 }];
@@ -65,7 +68,9 @@ beforeEach(() => {
   surfaces = [];
   __resetAiStateForTest();
   __resetTasksForTest();
-  vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { headers: { 'Content-Type': 'application/json' } })));
+  // The folder list is not answered: a failed read would make the Library's placed rows unconfirmed (R3).
+  vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => String(input instanceof Request ? input.url : input).includes('/api/indexing-roots/substrate')
+    ? new Promise<Response>(() => {}) : Promise.resolve(new Response('{}', { headers: { 'Content-Type': 'application/json' } }))));
 });
 afterEach(async () => {
   for (const el of surfaces) el.remove();

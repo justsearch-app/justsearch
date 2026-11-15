@@ -60,7 +60,7 @@ public final class ReindexHandler implements OperationHandler {
     String targets = plan.roots().stream().limit(6).map(root -> root.path().toString())
         .map(path -> path.length() > 256 ? path.substring(0, 253) + "..." : path)
         .collect(java.util.stream.Collectors.joining("\n"));
-    return new OperationApprovalPreview("Reindex " + plan.roots().size() + " watched locations"
+    return new OperationApprovalPreview("Read " + plan.roots().size() + " watched locations again"
         + (forceOf(prepared.argumentsJson()) ? ", including unchanged files" : "")
         + ":\n" + targets + (plan.roots().size() > 6 ? "\nAdditional locations: " + (plan.roots().size() - 6) : ""));
   }

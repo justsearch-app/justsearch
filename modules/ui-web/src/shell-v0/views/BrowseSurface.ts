@@ -28,6 +28,7 @@ interface BrowseFolder { path: string; name: string; fileCount?: number; fileCou
 interface BrowseFile { path: string; name: string; size?: number; fileKind?: string; mimeBase?: string; modifiedAt?: number }
 type TreeRow = { id: string; path: string; parent?: string; level: number; position: number; size: number; folder?: BrowseFolder; file?: BrowseFile };
 const lastSeg = (path: string): string => path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || path;
+const samePath = (a: string, b: string): boolean => a.replace(/(.)[\\/]+$/, '$1') === b.replace(/(.)[\\/]+$/, '$1');
 /** Folders, then files, each by name, the order the Engine already gives folders (case-insensitive). */
 const NAMES = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
 const byName = <T extends { name: string; path: string }>(rows: T[]): T[] =>
@@ -113,7 +114,9 @@ export class BrowseSurface extends JfElement {
   `];
   override connectedCallback(): void {
     super.connectedCallback(); this.developer = getShowDeveloperTools();
-    this.developerUnsub = subscribeShowDeveloperTools(show => { this.developer = show; });
+    // The filter is a developer tool: it is cleared when they turn off, so no hidden filter applies.
+    this.developerUnsub = subscribeShowDeveloperTools(show => { this.developer = show; if (!show) this.filter = ''; });
+    if (!this.developer) this.filter = '';
     void this.loadRoots();
     this.aiUnsub = subscribeAiState(state => { this.provisional = state.stability.kind === 'provisional'; this.aiState = state; });
     // Library and Browse show one count per folder: the newest disk count either of them read.
@@ -142,7 +145,7 @@ export class BrowseSurface extends JfElement {
       const data = parseWireContract(rootsSchema, await res.json(), '/api/indexing/roots');
       if (generation !== this.generation) return;
       recordRootCounts(data.roots);
-      this.roots = data.roots.map(root => ({ ...root, ...rootCount(undefined, root.path), name: lastSeg(root.path) }));
+      this.roots = byName(data.roots.map(root => ({ ...root, ...rootCount(undefined, root.path), name: lastSeg(root.path) })));
     } catch (error) { if (generation === this.generation) this.error = `Could not load folders. ${error instanceof Error ? error.message : String(error)}`;
     } finally { if (generation === this.generation) this.refreshing = false; }
   }
@@ -189,7 +192,14 @@ export class BrowseSurface extends JfElement {
       }
     }
   }
-  private matchesFilter(name: string): boolean { return name.toLocaleLowerCase().includes(this.filter.trim().toLocaleLowerCase()); }
+  /** The filter in effect: none while developer tools are off. */
+  private get activeFilter(): string { return this.developer ? this.filter.trim() : ''; }
+  private matchesFilter(name: string): boolean { return name.toLocaleLowerCase().includes(this.activeFilter.toLocaleLowerCase()); }
+  /** Every occurrence of a watched folder, nested ones included, shows its one shared disk count. */
+  private folderCount(folder: BrowseFolder): string {
+    const root = this.roots.find(item => samePath(item.path, folder.path)) ?? folder;
+    return formatFileCount(root.fileCount, root.fileCountCapped);
+  }
   private rows(): TreeRow[] {
     const rows: TreeRow[] = [];
     const addFolders = (folders: BrowseFolder[], ancestors: string[] = [], files: BrowseFile[] = []) => {
@@ -277,7 +287,7 @@ export class BrowseSurface extends JfElement {
       <span class="row-name"><span class="toggle">${folder ? icon({ name: this.expanded[row.id] ? 'chevron-down' : 'chevron-right', size: 12 }) : nothing}</span>
         <span class="icon" data-kind=${file ? fileKindPresentation(file.fileKind, file.mimeBase, file.path).kind : 'folder'}>${icon({ name: folder ? 'folder' : fileKindPresentation(file?.fileKind, file?.mimeBase, file?.path).icon, size: 16 })}</span>
         <span class="name">${folder?.name ?? file?.name}</span></span>
-      <span class="meta">${folder ? formatFileCount(folder.fileCount, folder.fileCountCapped)
+      <span class="meta">${folder ? this.folderCount(folder)
         : size !== undefined && size >= 0 ? size < 1024 ? `${size} bytes` : formatBytes(size) : ''}</span>
       <span class="meta">${date && Number.isFinite(date.getTime()) ? formatShortDate(date) : ''}</span>
       <span class="actions" @click=${(event: Event) => event.stopPropagation()} @keydown=${(event: KeyboardEvent) => event.stopPropagation()}>
@@ -293,7 +303,7 @@ export class BrowseSurface extends JfElement {
     return html`${this.rows().filter(row => row.folder && this.expanded[row.id]).map(({ path }) => {
       const folders = this.folderChildren[path], files = this.fileChildren[path];
       const count = (folders?.length ?? 0) + (files?.length ?? 0);
-      const empty = folders !== undefined && files !== undefined && (this.filter && ![...folders, ...files].some(item => this.matchesFilter(item.name))
+      const empty = folders !== undefined && files !== undefined && (this.activeFilter && ![...folders, ...files].some(item => this.matchesFilter(item.name))
         ? `${lastSeg(path)}: No matching files in the loaded entries.` : count === 0 ? `${lastSeg(path)}: No searchable files in this folder.` : '');
       const partial = folders !== undefined && files !== undefined && this.partial[path] ? `${lastSeg(path)}: Showing first ${formatCount(count)} entries.` : '';
       // The live region stays so a later message is announced; with nothing to say it takes no room.
@@ -323,7 +333,7 @@ export class BrowseSurface extends JfElement {
             : state && !activity.confirmed ? `${activity.summary}. Waiting for a fresh observation of folders.`
             : this.provisional && rebuilding ? 'Reading your files again… your watched folders will reappear when it finishes.'
             : this.provisional ? 'Waiting for a fresh observation of folders.'
-            : this.filter ? 'No matching folders in the loaded entries.' : 'No folders yet. Add a folder in Library.'}</div>`}
+            : this.activeFilter ? 'No matching folders in the loaded entries.' : 'No folders yet. Add a folder in Library.'}</div>`}
       </div>`;
   }
 }

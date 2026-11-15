@@ -48,9 +48,9 @@ function feedRebuilding(): void {
   __tickClockForTest();
 }
 
-async function mount(): Promise<LibrarySurface> {
+async function mount(host: PluginHostApi = stubHost): Promise<LibrarySurface> {
   const el = document.createElement('jf-library-surface') as LibrarySurface;
-  el.host_ = stubHost;
+  el.host_ = host;
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -94,8 +94,12 @@ describe('LibrarySurface — transition-aware empty state (595 §4.3)', () => {
       } as unknown as StatusSnapshot,
     });
     __tickClockForTest();
-    const el = await mount();
+    // Genuinely no watched folders: the Engine answers an empty folder list. A failed read is not
+    // "no folders" (R3).
+    const el = await mount({ ...stubHost, data: { fetch: async (path: string) => path.startsWith('/api/indexing-roots/substrate')
+      ? Response.json({ items: [] }) : ({ ok: false, status: 503 }) as unknown as Response } } as unknown as PluginHostApi);
     try {
+      await vi.waitFor(() => expect(el.loading).toBe(false));
       await el.updateComplete;
       const text = el.shadowRoot?.textContent ?? '';
       expect(el.shadowRoot?.querySelector('h2')?.textContent).toBe('Add a folder to start searching');
@@ -280,27 +284,28 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
   afterEach(() => __resetAiStateForTest());
 
   async function mountWithRow(): Promise<LibrarySurface> {
+    const row: IndexedRootView = {
+      pathHash: HASH,
+      collection: 'default',
+      fileCount: 400,
+      lastIndexedIsoTime: '2026-08-06T00:00:00Z',
+      status: 'indexed',
+      inFlightCount: 0,
+      failedCount: 0,
+      walkCompleted: true,
+    };
     const el = document.createElement('jf-library-surface') as LibrarySurface;
     el.host_ = {
       platform: { capabilities: new Set<string>() },
-      data: { fetch: async () => ({ ok: false, status: 503 }) as unknown as Response },
+      // The Engine reports the row under test; a failed folder-list read would make it unconfirmed (R3).
+      data: { fetch: async (path: string) => path.startsWith('/api/indexing-roots/substrate')
+        ? Response.json({ items: [row] }) : ({ ok: false, status: 503 }) as unknown as Response },
       utilities: { formatRelativeTime: () => 'just now' },
     } as unknown as PluginHostApi;
     document.body.appendChild(el);
     await el.updateComplete;
     await vi.waitFor(() => expect(el.loading).toBe(false));
-    el.roots = [
-      {
-        pathHash: HASH,
-        collection: 'default',
-        fileCount: 400,
-        lastIndexedIsoTime: '2026-08-06T00:00:00Z',
-        status: 'indexed',
-        inFlightCount: 0,
-        failedCount: 0,
-        walkCompleted: true,
-      },
-    ];
+    el.roots = [row];
     el.resolvedPaths = { [HASH]: '/home/me/Documents/seed-corpus' };
     el.requestUpdate();
     await el.updateComplete;
@@ -410,14 +415,18 @@ it('L1 library retry waiting appears once outside folder rows', async () => {
     failure: { nextRetryAtMs: retry },
   } } as unknown as StatusSnapshot });
   __tickClockForTest();
+  const root = { pathHash: 'wait-root', collection: 'notes', fileCount: 37,
+    indexed: true, inFlightCount: 8, failedCount: 0 } as IndexedRootView;
   const el = document.createElement('jf-library-surface') as LibrarySurface;
-  el.host_ = { ...stubHost, utilities: { formatRelativeTime: () => 'just now' } } as unknown as PluginHostApi;
+  // The Engine reports the rows under test; a failed folder-list read would make them unconfirmed (R3).
+  el.host_ = { ...stubHost, data: { fetch: async (path: string) => path.startsWith('/api/indexing-roots/substrate')
+    ? Response.json({ items: [root, { ...root, pathHash: 'second-root' }].map(({ indexed: _wireless, ...row }: IndexedRootView & { indexed?: boolean }) => row) })
+    : ({ ok: false, status: 503 }) as unknown as Response },
+  utilities: { formatRelativeTime: () => 'just now' } } as unknown as PluginHostApi;
   document.body.appendChild(el);
   await el.updateComplete;
   await vi.waitFor(() => expect(el.loading).toBe(false));
   try {
-    const root = { pathHash: 'wait-root', collection: 'notes', fileCount: 37,
-      indexed: true, inFlightCount: 8, failedCount: 0 } as IndexedRootView;
     el.roots = [root, { ...root, pathHash: 'second-root' }];
     await el.updateComplete;
     const rows = el.shadowRoot!.querySelectorAll('.folder-state');

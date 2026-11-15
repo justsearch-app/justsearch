@@ -20,7 +20,9 @@ function observe(indexState = 'IDLE', catchingUp = false, migrationState = 'IDLE
 async function mount(empty: boolean) {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('{}', { status: 503 }));
   const host = createMockHostApi();
-  host.data.fetch = vi.fn(async () => new Response('{}', { status: 503 }));
+  // The folder list is not answered: rows are placed by the test, and a failed read would make them unconfirmed (R3).
+  host.data.fetch = vi.fn((path: string) => path.startsWith('/api/indexing-roots/substrate')
+    ? new Promise<Response>(() => {}) : Promise.resolve(new Response('{}', { status: 503 })));
   const el = document.createElement('jf-library-surface') as LibrarySurface;
   el.host_ = host;
   document.body.append(el); await settle(el);

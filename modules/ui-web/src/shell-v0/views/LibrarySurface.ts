@@ -1134,10 +1134,13 @@ export class LibrarySurface extends JfElement {
     });
   }
 
-  /** A retained inventory is last known after its read fails, independently of status polls. */
+  /**
+   * A failed inventory read leaves the folders unchecked, independently of status polls: whether or
+   * not an earlier read succeeded, and whether or not rows were retained across an Engine change.
+   */
   private get rootsUnconfirmed(): boolean {
     const observation = getIndexedRoots();
-    return this.rootsObserved && !observation.confirmed && observation.receivedAtMs !== undefined;
+    return !observation.confirmed && observation.error !== null;
   }
 
   private projectFolder(root: IndexedRootView): FolderRow {
@@ -1150,8 +1153,13 @@ export class LibrarySurface extends JfElement {
     const unknown = !confirmed || this.provisional || fs.state === 'unavailable';
     const files = formatFileCount(root.fileCount, root.fileCountCapped);
     // Meaning state is said once, in the open row's "Search by meaning" line: a folder that word search
-    // covers, and that nothing else is reading, is up to date.
-    const statusText = fs.state === 'ready' || fs.state === 'keyword-only' || fs.state === 'enriching' && this.enrichmentBlocked ? 'Up to date'
+    // covers, and whose meaning work only waits for AI, is up to date. Failed or missing meaning work
+    // is a problem with this folder, so the row says so.
+    const meaningProblem = fs.state === 'keyword-only' || fs.state === 'unknown' && fs.glyph === 'unverified' ? this.meaningProblem(root) : null;
+    const statusText = meaningProblem === 'failed' ? 'Reading for meaning failed for some files. Word search remains available.'
+      : meaningProblem === 'incomplete' ? 'Reading for meaning is incomplete for some files. Word search remains available.'
+      : meaningProblem === 'unconfirmed' ? 'Reading for meaning is unconfirmed. Word search remains available.'
+      : fs.state === 'ready' || fs.state === 'keyword-only' || fs.state === 'enriching' && this.enrichmentBlocked ? 'Up to date'
       : fs.state === 'empty' ? 'No files to read'
       : fs.state === 'enriching' ? `Meaning processing${progress?.percent != null ? ` · ${progress.percent}%` : ''}`
       : fs.state === 'failed' && !root.walkError ? 'Files need review'
@@ -2195,6 +2203,18 @@ export class LibrarySurface extends JfElement {
     return html`<div class="header"><div class="header-left"><h2>${headline}</h2></div></div>`;
   }
 
+  /** Meaning work for this folder that failed, lost its output or cannot be read, in folderStatus's order. */
+  private meaningProblem(root: IndexedRootView): 'failed' | 'incomplete' | 'unconfirmed' | null {
+    const stages = this.enrichmentStages;
+    if (!stages) return null;
+    if ([root.parentDocsTotalEmbedding, root.parentDocsSettledEmbedding, root.parentDocsTotalSplade, root.parentDocsSettledSplade,
+      root.parentDocsTotalNer, root.parentDocsSettledNer, root.chunkDocsTotal, root.chunkDocsSettled]
+      .some(value => typeof value === 'number' && value < 0)) return 'unconfirmed';
+    if (stages.embedding && Object.entries(root.missingArtifactStages ?? {}).some(([id, missing]) => missing && ['embedding', 'chunkVectors'].includes(id))) return 'incomplete';
+    if (Object.entries(root.failedStages ?? {}).some(([id, failed]) => failed && (id === 'chunkVectors' ? stages.embedding : stages[id as keyof EnrichmentApplicability]))) return 'failed';
+    return null;
+  }
+
   private meaningText(root: IndexedRootView, status: FolderStatus): string {
     const words = status.state === 'ready' || status.state === 'enriching' || status.state === 'keyword-only' || status.state === 'unverified';
     const fallback = words ? ' · word search is available' : ' · word search availability not known';
@@ -2343,7 +2363,8 @@ export class LibrarySurface extends JfElement {
       ${this.loading
         ? html`<div class="empty">Loading…</div>`
         : this.roots.length === 0
-          ? this.contactUnconfirmed || !this.indexProgress.live || this.rootsUnconfirmed
+          // During an observed rebuild the folders are expected to be unreadable; that is said instead.
+          ? this.contactUnconfirmed || !this.indexProgress.live || this.rootsUnconfirmed && !(this.provisional && this.rebuilding)
             ? html`<div class="empty">Reading status unconfirmed. Folder details are last known; current status is unconfirmed.</div>`
             : this.provisional && !this.rebuilding
             ? html`<div class="empty">${this.provisionalHeadline} ${!this.indexingActivity.confirmed ? `${this.indexingActivity.summary}. ` : ''}Folder details are unconfirmed.</div>`

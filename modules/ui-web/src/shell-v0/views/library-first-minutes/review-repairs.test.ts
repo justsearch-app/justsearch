@@ -13,6 +13,7 @@ import { __feedForTest, __resetAiStateForTest, type StatusSnapshot } from '../..
 import { getIndexedRoots, readIndexedRoots } from '../../state/indexedRoots.js';
 import { folderStatus } from '../../state/folderStatus.js';
 import { setShowDeveloperTools } from '../../state/developerToolsState.js';
+import { observeStatusSignal } from '../../../api/statusInvalidation.js';
 
 function must<T extends Element = HTMLElement>(root: ParentNode | null, selector: string): T {
   expect(root, `root for ${selector}`).not.toBeNull();
@@ -334,4 +335,92 @@ it('V7: maintenance actions the command palette shows without developer tools do
     expect(labels[key], key).toBeDefined();
     expect(labels[key]).not.toMatch(/index/i);
   }
+});
+
+it.each([
+  ['failed', { failedStages: { embedding: true } }, 'Reading for meaning failed for some files'],
+  ['missing', { missingArtifactStages: { embedding: true } }, 'Reading for meaning is incomplete for some files'],
+])('R1: %s meaning work keeps a visible row status, unlike meaning work that only waits for AI', async (_name, facts, words) => {
+  const { el } = await library();
+  Object.assign(el, { enrichmentStages: { embedding: true, splade: false, ner: false }, enrichmentBlocked: false,
+    roots: [{ ...root, ...facts }] });
+  await settle(el);
+  const status = must(el.shadowRoot, '.card-meta').textContent ?? '';
+  expect(status).not.toBe('Up to date');
+  expect(status).toContain(words);
+  expect(status).toContain('Word search remains available');
+  expect(status).not.toMatch(/enrichment|keyword|index/i);
+  expect(must(el.shadowRoot, '.status-icon').classList.contains('unverified')).toBe(true);
+});
+
+it('R3: a first inventory read that fails says the folders could not be checked, not that there are none', async () => {
+  const { el } = await library(root, observe);
+  expect(must(el.shadowRoot, 'h2').textContent).toBe('Your files are searchable');
+  document.body.replaceChildren();
+  observe();
+  const host = createMockHostApi();
+  host.data.fetch = vi.fn(async () => new Response('{}', { status: 503 }));
+  const fresh = document.createElement('jf-library-surface') as LibrarySurface;
+  fresh.host_ = host;
+  await readIndexedRoots(async () => new Response('{}', { status: 503 }));
+  document.body.append(fresh); await settle(fresh);
+  expect(getIndexedRoots().confirmed).toBe(false);
+  expect(fresh.roots).toHaveLength(0);
+  expect(must(fresh.shadowRoot, 'h2').textContent).toBe('Reading status unconfirmed');
+  expect(fresh.shadowRoot!.textContent).not.toMatch(/Add a folder to/);
+  expect(fresh.shadowRoot!.textContent).not.toContain('Your files are searchable');
+});
+
+it('R3: after an Engine change, rows retained through a failed inventory read are not Up to date', async () => {
+  await observeStatusSignal('r3-epoch-a', 1);
+  const { el, host } = await library();
+  expect(must(el.shadowRoot, '.card-meta').textContent).toBe('Up to date');
+  await observeStatusSignal('r3-epoch-b', 1);
+  host.data.fetch = vi.fn(async () => new Response('{}', { status: 503 }));
+  await readIndexedRoots(async () => new Response('{}', { status: 503 }));
+  observe(); await settle(el);
+  expect(getIndexedRoots().confirmed).toBe(false);
+  expect(getIndexedRoots().roots, 'the Engine change cleared the shared inventory').toHaveLength(0);
+  expect(el.roots).toHaveLength(1);
+  expect(must(el.shadowRoot, 'h2').textContent).toBe('Reading status unconfirmed');
+  expect(el.shadowRoot!.textContent).not.toContain('Up to date');
+});
+
+async function browseNested(roots: Root[]) {
+  const host = createMockHostApi();
+  host.data.fetch = vi.fn(async (path: string) => path.includes('/api/indexing/roots') ? Response.json({ roots })
+    : path.endsWith('/folders') ? Response.json({ folders: [{ path: '/Documents/Nested', name: 'Nested', fileCount: 8 }] })
+    : Response.json({ files: [] }));
+  const el = document.createElement('jf-browse-surface') as BrowseSurface;
+  el.host_ = host; document.body.append(el); await settle(el);
+  return el;
+}
+
+it('R4: every occurrence of a watched folder shows the shared count with its cap, nested ones included', async () => {
+  const el = await browseNested([{ path: '/Documents', fileCount: 100, fileCountCapped: false },
+    { path: '/Documents/Nested', fileCount: 50000, fileCountCapped: true }]);
+  must<HTMLElement>(el.shadowRoot, '[data-path="/Documents"]').click(); await settle(el);
+  const copies = [...el.shadowRoot!.querySelectorAll<HTMLElement>('[data-path="/Documents/Nested"]')];
+  expect(copies).toHaveLength(2);
+  expect(copies.map(row => must(row, '.meta').textContent)).toEqual(['50,000+ files', '50,000+ files']);
+});
+
+it('R5: turning developer tools off clears the filter, and no filter applies while they are off', async () => {
+  setShowDeveloperTools(true);
+  const { el } = await browse();
+  const input = must<HTMLInputElement>(el.shadowRoot, '.filter-input');
+  input.value = 'zzz'; input.dispatchEvent(new Event('input')); await settle(el);
+  expect(el.shadowRoot!.querySelector('[data-path="/Documents"]')).toBeNull();
+  setShowDeveloperTools(false); await settle(el);
+  expect(el.filter).toBe('');
+  expect(el.shadowRoot!.querySelector('[data-path="/Documents"]')).not.toBeNull();
+  el.filter = 'zzz'; await settle(el);
+  expect(el.shadowRoot!.querySelector('[data-path="/Documents"]')).not.toBeNull();
+  expect(el.shadowRoot!.textContent).not.toContain('No matching');
+});
+
+it('R7: top-level Browse folders are listed by name like their children', async () => {
+  const { el } = await browse([{ path: '/b/Zeta' }, { path: '/a/alpha' }, { path: '/c/Beta' }]);
+  expect([...el.shadowRoot!.querySelectorAll<HTMLElement>('[role="treeitem"][aria-level="1"]')].map(row => row.dataset.path))
+    .toEqual(['/a/alpha', '/c/Beta', '/b/Zeta']);
 });

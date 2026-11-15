@@ -422,6 +422,12 @@ public final class WatchedRootsState {
     if (!current.roots().contains(scope)) return;
     boolean changed = completeCoverage(root, fence, eligibleFiles);
     changed |= markRootReturned(root);
+    // A complete pass that wrote this root's files, a forced one included, is its newest write.
+    // A pass with nothing to write keeps the time; other walk errors keep their owners.
+    if (!changed && eligibleFiles > 0 && !walkErrors.containsKey(root)) {
+      markIndexed(root);
+      changed = true;
+    }
     if (changed) persist();
   }
 

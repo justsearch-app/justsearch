@@ -39,7 +39,12 @@ async function settle(el: Mounted): Promise<void> {
 }
 async function mount(tag: string): Promise<Mounted> {
   const el = document.createElement(tag) as Mounted;
-  Object.assign(el, { host_: createMockHostApi(), activeCategory: 'indexing' });
+  // The folder list is not answered: rows are placed by the tests, and a failed read would make them
+  // unconfirmed for every later test sharing the observation (R3).
+  const host = createMockHostApi();
+  const answer = host.data.fetch;
+  host.data.fetch = (path, init) => path.startsWith('/api/indexing-roots/substrate') ? new Promise<Response>(() => {}) : answer(path, init);
+  Object.assign(el, { host_: host, activeCategory: 'indexing' });
   document.body.appendChild(el);
   if (el instanceof StatusPill) el.open = true;
   await settle(el);
@@ -59,7 +64,8 @@ beforeEach(() => {
   __resetConversationListForTest();
   __resetDraftProvidersForTest();
   __resetDraftKeptForTest();
-  fetchMock = vi.fn().mockRejectedValue(new TypeError('Test backend unavailable'));
+  fetchMock = vi.fn((input: RequestInfo | URL) => String(input instanceof Request ? input.url : input).includes('/api/indexing-roots/substrate')
+    ? new Promise<Response>(() => {}) : Promise.reject(new TypeError('Test backend unavailable')));
   vi.stubGlobal('fetch', fetchMock);
 });
 afterEach(async () => {

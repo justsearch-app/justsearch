@@ -30,7 +30,9 @@ function observe() {
 async function library() {
   observe(); setShowDeveloperTools(false);
   const host = createMockHostApi();
-  host.data.fetch = vi.fn(async () => new Response('{}', { status: 503 }));
+  // The folder list is not answered: rows are placed by the test, and a failed read would make them unconfirmed (R3).
+  host.data.fetch = vi.fn((path: string) => path.startsWith('/api/indexing-roots/substrate')
+    ? new Promise<Response>(() => {}) : Promise.resolve(new Response('{}', { status: 503 })));
   const el = document.createElement('jf-library-surface') as LibrarySurface;
   el.host_ = host; document.body.append(el); await settle(el);
   Object.assign(el, { loading: false, rootsObserved: true, forgetReadStatus: 'ready', roots: [{ pathHash: 'a',
@@ -134,6 +136,8 @@ it('M8: failed Browse children provide Retry and never say empty', async () => {
 it('M8: truncated, filtered-empty and confirmed-empty are distinct', async () => {
   const { el } = await browse(); must<HTMLElement>(el.shadowRoot, '[role="treeitem"]').click(); await settle(el);
   expect(el.shadowRoot!.textContent).toContain('Showing first');
+  // The filter is a developer tool and applies only while they are on (R5).
+  setShowDeveloperTools(true); await settle(el);
   el.filter = 'no-such-file'; await settle(el); expect(el.shadowRoot!.textContent).toContain('No matching');
   el.filter = ''; el.folderChildren = { '/Documents': [] }; el.fileChildren = { '/Documents': [] };
   el.partial = { '/Documents': false }; await settle(el);
