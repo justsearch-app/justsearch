@@ -263,6 +263,7 @@ it('V5: the shared formatter groups digits even where the runtime does not', asy
   expect(new Intl.NumberFormat().format(50000)).toBe('50000');
   vi.resetModules();
   const format = await import('../../display/format.js');
+  expect(typeof format.formatFileCount, 'format.formatFileCount').toBe('function');
   expect(format.formatFileCount(50_000, true)).toBe('50,000+ files');
   expect(format.formatCount(1234)).toBe('1,234');
 });
