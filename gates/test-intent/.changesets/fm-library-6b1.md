@@ -396,3 +396,13 @@ Pending independent verification and acceptance on the committed candidate.
   baseline row names a registered step (out of test-intent scope: scripts/ self-tests).
 - `run-evidence.mjs --before origin/main` covers slice-6b1.test.ts and slice-6b1-lockdown.test.ts:
   both pass on the candidate and fail by assertion on 777b598043.
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "ggpfz020",
+  "verdict": "accept",
+  "digest": "sha256:00f174bfefac89111f3c770f1a7fe77f0604a23a422fc0832a62a646cd99175c"
+}
+```
