@@ -15,7 +15,6 @@ vi.mock('../../state/aiStateStore.js', async original => ({
 }));
 import '../BrainSurface.js';
 import { createMockHostApi } from '../../plugin-api/testHostApi.js';
-import { formatBytes } from '../../display/format.js';
 import { setShowDeveloperTools } from '../../state/developerToolsState.js';
 import { deriveFrameStatus } from '../../state/frameStatus.js';
 
@@ -138,7 +137,7 @@ describe('S7a-1 not installed (fm-10)', () => {
     expect(words(sentence(el))).toBe('Search already works with exact words. Installing AI adds the steps that are not lit yet.');
     expect(sentence(el)!.querySelectorAll('button, [role="switch"]')).toHaveLength(0);
     const filled = [...panel(el)!.querySelectorAll('jf-button')].filter(b => b.getAttribute('variant') === 'primary');
-    expect(filled.map(b => b.getAttribute('label'))).toEqual([`Install AI · ${formatBytes(preview.totalDownloadBytes!)}`]);
+    expect(filled.map(b => b.getAttribute('label'))).toEqual(['Install AI · 2.51 GB']);
     expect(words(panel(el))).toContain('You see each licence before anything downloads. Everything runs on this computer.');
     expect(lit(el)).toEqual({ files: 'true', read: 'true', pictures: 'false', meaning: 'false', reranker: 'false', chat: 'false' });
     expect(words(step(el, 'files'))).toContain('8 files');
@@ -146,8 +145,8 @@ describe('S7a-1 not installed (fm-10)', () => {
     expect(words(step(el, 'pictures'))).toContain('Simple scans are read already');
     expect(step(el, 'pictures')!.querySelectorAll('[role="switch"]')).toHaveLength(0);
     expect(step(el, 'meaning')!.querySelectorAll('[role="switch"]')).toHaveLength(0);
-    expect(words(step(el, 'meaning'))).toContain(formatBytes(SIZES.embedding));
-    expect(words(step(el, 'reranker'))).toContain(formatBytes(SIZES.reranker));
+    expect(words(step(el, 'meaning'))).toContain('1.20 GB download');
+    expect(words(step(el, 'reranker'))).toContain('341.0 MB download');
     const included = step(el, 'reranker')!.querySelectorAll<HTMLElement>('[role="switch"]');
     expect(included).toHaveLength(1);
     expect(included[0]!.getAttribute('aria-checked')).toBe('true');
@@ -162,7 +161,7 @@ describe('S7a-1 not installed (fm-10)', () => {
     expect(chat!.querySelectorAll('[role="switch"]')).toHaveLength(0);
     expect(words(chat)).toContain('Needs an NVIDIA graphics card');
     expect(occurrences(words(el.shadowRoot!), 'Needs an NVIDIA graphics card')).toBe(1);
-    expect(words(chat)).not.toContain(formatBytes(SIZES.chat));
+    expect(words(chat)).not.toContain('5.70 GB');
     expect(words(el.shadowRoot!)).not.toMatch(/CUDA|answers unavailable on this computer/i);
     expect(tablist(el)).toBeNull();
   });
@@ -182,7 +181,6 @@ describe('S7a-1 not installed (fm-10)', () => {
   });
 
   it('Included changes only the decline and the plan total, and survives page return and restart', async () => {
-    const before = preview.totalDownloadBytes!;
     let el = await mount();
     const included = step(el, 'reranker')?.querySelector<HTMLElement>('[role="switch"]');
     expect(included, 'Included switch').toBeTruthy();
@@ -191,7 +189,7 @@ describe('S7a-1 not installed (fm-10)', () => {
     expect(mutations).toEqual([]); expect(operations).toEqual([]);
     expect(step(el, 'reranker')!.querySelector('[role="switch"]')!.getAttribute('aria-checked')).toBe('false');
     expect(words(step(el, 'reranker')!.querySelector('.switch-state'))).toBe('Not included');
-    const after = `Install AI · ${formatBytes(before - SIZES.reranker)}`;
+    const after = 'Install AI · 2.18 GB';
     expect([...panel(el)!.querySelectorAll('jf-button')].map(b => b.getAttribute('label'))).toContain(after);
     el.remove(); document.body.append(el); await settle(el);
     expect(step(el, 'reranker')!.querySelector('[role="switch"]')!.getAttribute('aria-checked')).toBe('false');
@@ -290,8 +288,8 @@ describe('S7a-9 sizes and words', () => {
     store.current = { ...installedNoCard(), aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
       capabilities: { chat: true, rag: true, extract: true, embedding: true } } as unknown as AiState;
     const el = await mount();
-    for (const [id, pkg] of [['meaning', 'embedding'], ['reranker', 'reranker'], ['chat', 'chat']] as const) {
-      const size = [...(step(el, id)?.querySelectorAll('.step-meta') ?? [])].map(words).find(t => t.includes(formatBytes(SIZES[pkg])));
+    for (const [id, bytes] of [['meaning', '1.20 GB'], ['reranker', '341.0 MB'], ['chat', '5.70 GB']] as const) {
+      const size = [...(step(el, id)?.querySelectorAll('.step-meta') ?? [])].map(words).find(t => t.includes(bytes));
       expect(size, `${id} size`).toBeTruthy();
       expect(size).toMatch(/download/i);
       expect(size).not.toMatch(/on disk|registry|footprint/i);
@@ -311,9 +309,9 @@ describe('S7a-9 sizes and words', () => {
       capabilities: { chat: true, rag: true, extract: true, embedding: true },
       runtimeStatus: { ...runtimeStatus, onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] } } as unknown as AiState;
     const el = await mount();
-    expect(words(el.shadowRoot!)).not.toContain(formatBytes(SIZES.chat));
+    expect(words(el.shadowRoot!)).not.toContain('5.70 GB');
     expect(step(el, 'chat'), 'Answer questions step').not.toBeNull();
-    expect(words(step(el, 'meaning'))).toContain(formatBytes(SIZES.embedding));
+    expect(words(step(el, 'meaning'))).toContain('1.20 GB download');
   });
   it('keeps one kept-files wording at most and no CUDA reason on the default page', async () => {
     preview = plan(true, 'no-card'); settings = { ...settings, rerankerEnabled: false };

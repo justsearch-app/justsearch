@@ -25,7 +25,6 @@ import { createMockHostApi } from '../../plugin-api/testHostApi.js';
 import { setShowDeveloperTools } from '../../state/developerToolsState.js';
 import { requestMemberTab } from '../../router/memberTabIntent.js';
 import { __seedForTest } from '../../../api/registry/SurfaceCatalogClient.js';
-import { formatBytes } from '../../display/format.js';
 import { reasonFor } from '../../state/readinessNotice.js';
 import { deepActiveElement } from '../../utils/keyboardHandler.js';
 
@@ -121,7 +120,7 @@ describe('S7a-5 answers work: Overview | Memory', () => {
     expect(tabNames(el)).toEqual(['Overview', 'Memory']);
     const meter = el.shadowRoot!.querySelector('.graphics-card');
     expect(meter, 'graphics card meter').not.toBeNull();
-    expect(words(meter)).toContain(`${formatBytes(5.8 * GB)} of ${formatBytes(12 * GB)} in use · RTX 4070`);
+    expect(words(meter)).toContain('5.80 GB of 12.00 GB in use · RTX 4070');
     const links = words(el.shadowRoot!.querySelector('.brain-links'));
     expect(links).toContain('Advanced settings'); expect(links).toContain('Engine history in Health');
     expect(el.shadowRoot!.querySelector('.brain-headline')?.textContent?.trim()).toBe('AI is ready');
