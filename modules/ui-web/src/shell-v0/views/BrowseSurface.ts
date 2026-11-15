@@ -175,7 +175,7 @@ export class BrowseSurface extends JfElement {
       }))) };
       this.partial = { ...this.partial, [path]: folders.truncated === true || (files.totalCount ?? 0) > (files.files?.length ?? 0) };
     } catch {
-      if (generation === this.generation) this.folderErrors = { ...this.folderErrors, [path]: "Couldn't load this folder" };
+      if (generation === this.generation) this.folderErrors = { ...this.folderErrors, [path]: `${lastSeg(path)}: Couldn't load this folder` };
     } finally { if (generation === this.generation) { const next = { ...this.inflight }; delete next[path]; this.inflight = next; } }
   }
   private async toggle(row: TreeRow): Promise<void> {

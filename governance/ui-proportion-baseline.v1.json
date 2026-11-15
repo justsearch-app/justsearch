@@ -2413,15 +2413,17 @@
       ]
     },
     {
-      "uiShotStep": "library-menu",
+      "uiShotStep": "library-reread",
       "requiredSelectors": [
-        "[role=\"menu\"]"
+        "[data-reread][aria-expanded=\"true\"]",
+        "[role=\"region\"][aria-label=\"Read every watched folder again?\"]"
+      ],
+      "absentSelectors": [
+        "[aria-label=\"More Library actions\"]"
       ],
       "elements": [
         {
-          "selector": "[role=\"menu\"]",
-          "minWidthPx": 280,
-          "maxWidthPx": 300,
+          "selector": "[role=\"region\"][aria-label=\"Read every watched folder again?\"]",
           "maxBottomPx": 700
         }
       ]
@@ -2443,7 +2445,7 @@
     {
       "uiShotStep": "library-browse-failure",
       "requiredSelectors": [
-        "jf-button[label=\"Retry Documents\"]"
+        "jf-button[label=\"Try again\"]"
       ],
       "elements": [
         {
@@ -2454,15 +2456,17 @@
       ]
     },
     {
-      "uiShotStep": "library-menu-light",
+      "uiShotStep": "library-reread-light",
       "requiredSelectors": [
-        "[role=\"menu\"]"
+        "[data-reread][aria-expanded=\"true\"]",
+        "[role=\"region\"][aria-label=\"Read every watched folder again?\"]"
+      ],
+      "absentSelectors": [
+        "[aria-label=\"More Library actions\"]"
       ],
       "elements": [
         {
-          "selector": "[role=\"menu\"]",
-          "minWidthPx": 280,
-          "maxWidthPx": 300,
+          "selector": "[role=\"region\"][aria-label=\"Read every watched folder again?\"]",
           "maxBottomPx": 700
         }
       ]
@@ -2484,7 +2488,7 @@
     {
       "uiShotStep": "library-browse-failure-light",
       "requiredSelectors": [
-        "jf-button[label=\"Retry Documents\"]"
+        "jf-button[label=\"Try again\"]"
       ],
       "elements": [
         {

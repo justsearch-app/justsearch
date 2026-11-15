@@ -698,7 +698,8 @@ export class LibrarySurface extends JfElement {
       .text-action { align-self: center; padding: .25rem 0; border: 0; background: transparent;
         color: var(--text-secondary); font: inherit; cursor: pointer; }
       .text-action:hover { color: var(--text-primary); text-decoration: underline; }
-      .text-action:disabled { cursor: default; opacity: .65; }
+      .text-action[aria-disabled="true"] { cursor: default; opacity: .65; }
+      .text-action[aria-disabled="true"]:hover { color: var(--text-secondary); text-decoration: none; }
       .text-action:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
       .reread-confirmation { flex-basis: 100%; }
       .reread-confirmation:empty { display: none; }
@@ -2237,6 +2238,13 @@ export class LibrarySurface extends JfElement {
     return this.rootsObserved && this.roots.length === 0 && !this.provisional;
   }
 
+  /** Close the in-place ask without reading anything; the keyboard returns to its opener. */
+  private cancelReread(): void {
+    this.rereadConfirmOpen = false;
+    this.shadowRoot?.querySelector<HTMLButtonElement>('[data-reread]')?.focus();
+  }
+
+  /** While a request is in flight the opener is aria-disabled, not disabled, so the focus it was given stays. */
   private async runLibraryAction(operation: 'core.reindex'): Promise<void> {
     if (this.rereadBusy) return;
     this.shadowRoot?.querySelector<HTMLElement>('[data-reread]')?.focus();
@@ -2455,17 +2463,17 @@ export class LibrarySurface extends JfElement {
         </summary>${this.renderOtherSources()}</details>` : nothing}
         <jf-button variant="ghost" label="Activity" .onActivate=${() => { this.activityOpen = !this.activityOpen; }}>Activity</jf-button>
         ${this.noWatchedFolders() ? nothing : html`<button type="button" class="text-action" data-reread
-          ?disabled=${this.rereadBusy}
+          aria-disabled=${this.rereadBusy ? 'true' : 'false'}
           aria-expanded=${String(this.rereadConfirmOpen)} aria-controls="reread-confirmation"
-          @click=${() => { this.rereadConfirmOpen = true; }}>Read everything again</button>
+          @click=${() => { if (!this.rereadBusy) this.rereadConfirmOpen = true; }}>Read everything again</button>
         <div id="reread-confirmation" class="reread-confirmation" aria-live="polite">${this.rereadConfirmOpen ? html`
-          <section role="region" aria-label="Read every watched folder again?">
+          <section role="region" aria-label="Read every watched folder again?" @keydown=${(event: KeyboardEvent) => {
+            if (event.key !== 'Escape' || event.isComposing) return;
+            event.preventDefault(); event.stopPropagation(); this.cancelReread();
+          }}>
             <p>Read every watched folder again?</p>
             <button type="button" class="text-action" @click=${() => void this.runLibraryAction('core.reindex')}>Read again</button>
-            <button type="button" class="text-action" @click=${() => {
-              this.rereadConfirmOpen = false;
-              this.shadowRoot?.querySelector<HTMLButtonElement>('[data-reread]')?.focus();
-            }}>Cancel</button>
+            <button type="button" class="text-action" @click=${() => this.cancelReread()}>Cancel</button>
           </section>` : nothing}</div>`}
         ${this.activeTab === 'folders' && (this.developer || this.activityOpen) ? html`<jf-ingestion-summary compact .host_=${this.host_}></jf-ingestion-summary>` : nothing}
       </div>

@@ -32,11 +32,11 @@ hours, skip rules, settings persistence and operation implementations are outsid
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "Reach forced rereading through the page-foot action and in-place Read again confirmation; retain accepted/completed/failed outcomes, force:true and offline-folder feedback. With no watched folders the action is not shown (replacing the disabled state titled No folders yet); it stays disabled only while a read-again request is in flight.",
+          "choice": "Reach forced rereading through the page-foot action and in-place Read again confirmation; retain accepted/completed/failed outcomes, force:true and offline-folder feedback. With no watched folders the action is not shown (replacing the disabled state titled No folders yet); while a read-again request is in flight it is blocked (aria-disabled, activation ignored) and keeps keyboard focus.",
           "label": "agent choice"
         }
       ],
-      "behaviour": "Reach forced rereading through the page-foot action and in-place Read again confirmation; retain accepted/completed/failed outcomes, force:true and offline-folder feedback. With no watched folders the action is not shown (replacing the disabled state titled No folders yet); it stays disabled only while a read-again request is in flight.",
+      "behaviour": "Reach forced rereading through the page-foot action and in-place Read again confirmation; retain accepted/completed/failed outcomes, force:true and offline-folder feedback. With no watched folders the action is not shown (replacing the disabled state titled No folders yet); while a read-again request is in flight it is blocked (aria-disabled, activation ignored) and keeps keyboard focus.",
       "conflictSearch": "Repository docs/decisions searched for Library, Browse, menus and reading again: no presentation decision conflicts. The earlier fm-library changeset cites the old Library menu; the supplied later owner decision Q2 supersedes it. Private records were not read, per the builder brief."
     },
     {
@@ -246,15 +246,44 @@ hours, skip rules, settings persistence and operation implementations are outsid
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "Implement contract 6b1: remove Library More and picture-only waiting work; use an announced, named, in-page reread ask with Read again / Cancel and focus restoration; keep forced reindex consent/history tracking; with no watched folders the action is not shown, and while a read-again request is in flight it stays disabled; singular 1 document from other apps and plural otherwise; no-AI reread completion says Up to date once; Browse loading/failure stays below column heads, hides raw browser errors and offers working Try again; focused toolbar Resume updates to enabled Pause on confirmed running status. Preserve top-bar and Browse context-menu outside-click/Escape dismissal.",
+          "choice": "Implement contract 6b1: remove Library More and picture-only waiting work; use an announced, named, in-page reread ask with Read again / Cancel and focus restoration; keep forced reindex consent/history tracking; Escape on either answer cancels like Cancel, runs nothing and returns focus to the action, while Escape outside the ask leaves it open; with no watched folders the action is absent from the whole Library tree, menus included; while a read-again request is in flight the action is aria-disabled, ignores activation and keeps focus; singular 1 document from other apps and plural otherwise; no-AI reread completion says Up to date once; Browse loading/failure stays below column heads, hides raw browser errors, names the folder in each folder failure line and offers working Try again; focused toolbar Resume updates to enabled Pause on confirmed running status. Preserve top-bar and Browse context-menu outside-click/Escape dismissal.",
           "label": "agent choice"
         }
       ],
-      "behaviour": "Fifteen happy-dom cases cover the slice-6b1 obligations, including literal wording, focus, operation arguments and recorded completion, retry recovery, and preserved shared menus. Two 6b1-8 cases check that with no watched folders Read everything again and its ask are absent, that the ask closes when the last folder leaves, and that the action stays disabled while a read-again request is in flight. On baseline 777b598043 ten fail by assertion and five pass (zero/multiple other-app documents, the two shared-menu dismissal paths, and the no-folders absence, since that baseline kept the action inside the menu). On dac30b0694 both 6b1-8 cases fail by assertion.",
+      "behaviour": "Nineteen happy-dom cases cover the slice-6b1 obligations, including literal wording, focus, operation arguments and recorded completion, retry recovery, and preserved shared menus. 6b1-8 checks that with no watched folders no element anywhere in the Library shadow tree, including an opened menu, says Read everything again; that the ask closes when the last folder leaves; and that while a read-again request is in flight the focused action is aria-disabled, keeps focus and ignores activation. 6b1-2 Escape cases check that Escape on Read again or Cancel closes the ask, is consumed there, runs nothing and returns focus to the action, and that Escape outside the ask leaves it open. 6b1-5 checks that two failing folders give two failure lines naming Documents and Photos. On baseline 777b598043 fifteen fail by assertion and four pass (zero/multiple other-app documents and the two shared-menu dismissal paths); the no-folders case finds the disabled item in the opened old menu. On 5a21ba3003 the in-flight, both Escape-on-answer and several-failures cases fail by assertion.",
       "repaired": true,
       "evidence": "gates/test-intent/evidence/fm-library-6b1.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/library-first-minutes/slice-6b1.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/slice-6b1-lockdown.test.ts"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "the Library \"more\" button is removed together with the Library menu; \"Read everything again\" becomes a quiet text action at the page foot beside \"Activity\" and asks in place before starting. The shared menu component stays for the top bar and Browse's context menu.",
+          "location": "task t-20261113-fmimpl agreement, owner decision Q2 of 2026-11-15 (delegated answer via session justsearch-fd)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Check the in-place Read everything again ask in a real browser, where disabling a focused button drops focus to the page: after confirming with the keyboard, focus stays on the action through a held request and after it settles, the action ignores Enter/Space while blocked, and Escape on either answer closes the ask, runs nothing and returns focus to the action.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "Two Chromium cases mount Library over a stubbed backend with one watched folder and a held read-again request. One confirms with the keyboard and asserts focus is on Read everything again while the request is held and after it settles, that it is aria-disabled meanwhile and that Enter/Space neither reopen the ask nor invoke again. The other presses Escape on Read again and on Cancel and asserts the ask closes, focus returns to the action and nothing is invoked. On 5a21ba3003 they fail by assertion (focus is on the page body; the ask stays open after Escape). On baseline 777b598043 both fail by assertion because there is no Read everything again button.",
+      "repaired": true,
+      "evidence": "gates/test-intent/evidence/fm-library-6b1.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/slice-6b1-lockdown.test.ts"
       ]
     }
   ]
@@ -355,3 +384,15 @@ Also preserve the shared top-bar menu in:
 ## Acceptance records
 
 Pending independent verification and acceptance on the committed candidate.
+
+## Review repairs (2026-11-16 UTC, on 5a21ba3003 with uncommitted changes)
+
+- Escape on either answer of the in-place ask cancels it (handler on the ask's region, consumed there);
+  the action is aria-disabled rather than disabled while a confirmed request is in flight, so focus stays.
+- Browse folder failure lines name their folder (`Documents: Couldn't load this folder`).
+- The harness step index and the a11y/proportion baselines use `library-reread(-light)`; the proportion
+  rows assert the ask region, the expanded action and no `More Library actions`, and Browse failure rows
+  require `Try again`. `scripts/jsharness/tests/test_ui_step_index.py` now also checks that every
+  baseline row names a registered step (out of test-intent scope: scripts/ self-tests).
+- `run-evidence.mjs --before origin/main` covers slice-6b1.test.ts and slice-6b1-lockdown.test.ts:
+  both pass on the candidate and fail by assertion on 777b598043.

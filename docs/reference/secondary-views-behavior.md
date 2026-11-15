@@ -63,7 +63,8 @@ warnings and recovery actions remain visible even without a verification timesta
 
 **Read everything again** is a quiet text action at the foot of **Folders**, beside **Activity**.
 It asks **Read every watched folder again?** in the page; **Read again** includes unchanged files,
-and **Cancel** starts nothing and returns focus to the action. Library has no more menu or
+and **Cancel** or Escape starts nothing and returns focus to the action. While a confirmed request
+is in flight the action stays focused but does nothing. Library has no more menu or
 waiting-work action. Operation acceptance and completion are distinct.
 
 **Skip these files** and **When to read files** retain explicit Save behaviour in this intermediate
@@ -87,8 +88,8 @@ other sizes and dates use the shared formatters. Row actions **Open file** and s
 The tree has one tab stop, Up/Down movement, Right expand/first-child, Left collapse/parent and
 Enter open. Row actions are reachable by Tab; Shift+F10 or the Menu key opens a file's context menu.
 Loading and failure lines sit in the list area below the column heads. A failure says
-**Couldn't load this folder** (or **Couldn't load folders**) with **Try again**, without browser error
-text. Partial, filtered-empty and confirmed-empty observations stay distinct.
+**Couldn't load this folder** after the folder's name (or **Couldn't load folders**) with **Try again**,
+without browser error text. Partial, filtered-empty and confirmed-empty observations stay distinct.
 
 ---
 

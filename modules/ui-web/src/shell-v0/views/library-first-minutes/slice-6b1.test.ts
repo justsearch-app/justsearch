@@ -83,11 +83,20 @@ it('6b1-2: the quiet foot action asks in place, and Cancel runs nothing and rest
   expect(invoke).not.toHaveBeenCalled();
   expect(el.shadowRoot!.querySelector('[style]')).toBeNull();
 });
-it('6b1-8: with no watched folders Read everything again is not on the page', async () => {
+/** Every element under root, through every open shadow root (a menu renders its items in its own). */
+function deepElements(root: ParentNode): Element[] {
+  return [...root.querySelectorAll('*')].flatMap(el => [el, ...(el.shadowRoot ? deepElements(el.shadowRoot) : [])]);
+}
+it('6b1-8: with no watched folders Read everything again is not on the page, in a menu or not', async () => {
   const el = await library([]);
   expect(el.shadowRoot).not.toBeNull();
-  expect([...el.shadowRoot!.querySelectorAll('button')].some(b => b.textContent?.includes('Read everything again'))).toBe(false);
-  expect(el.shadowRoot!.querySelector('[data-reread], #reread-confirmation')).toBeNull();
+  // The before tree kept a disabled item inside its menu: open any such menu so the item cannot hide there.
+  const more = el.shadowRoot!.querySelector<HTMLButtonElement>('[aria-label="More Library actions"]');
+  if (more) { more.click(); await settle(el); for (const menu of deepElements(el.shadowRoot!).filter(e => e.localName === 'jf-menu')) await settle(menu as unknown as LibrarySurface); }
+  const everything = deepElements(el.shadowRoot!);
+  expect(everything.length).toBeGreaterThan(0);
+  expect(everything.filter(e => e.textContent?.includes('Read everything again'))).toEqual([]);
+  expect(everything.filter(e => e.matches('[data-reread], #reread-confirmation'))).toEqual([]);
 });
 it('6b1-8: the ask closes when the last watched folder leaves, and the action stays disabled while a read-again request is in flight', async () => {
   let accept!: (value: unknown) => void;
@@ -101,10 +110,48 @@ it('6b1-8: the ask closes when the last watched folder leaves, and the action st
   const action = button(must(el.shadowRoot, '.bottom-links'), 'Read everything again');
   expect(action.getAttribute('aria-expanded')).toBe('false');
   action.click(); await settle(el);
-  button(must(el.shadowRoot, '[role="region"][aria-label="Read every watched folder again?"]'), 'Read again').click(); await settle(el);
-  expect(button(must(el.shadowRoot, '.bottom-links'), 'Read everything again').disabled).toBe(true);
+  const confirm = button(must(el.shadowRoot, '[role="region"][aria-label="Read every watched folder again?"]'), 'Read again');
+  confirm.focus(); confirm.click(); await settle(el);
+  const busy = button(must(el.shadowRoot, '.bottom-links'), 'Read everything again');
+  // Blocked, not disabled: a disabled button would drop the focus the confirmation just gave it.
+  expect(busy.getAttribute('aria-disabled')).toBe('true');
+  expect(busy.disabled).toBe(false);
+  expect(el.shadowRoot!.activeElement).toBe(busy);
+  busy.click(); await settle(el);
+  expect(el.shadowRoot!.querySelector('[role="region"][aria-label="Read every watched folder again?"]')).toBeNull();
+  expect(busy.getAttribute('aria-expanded')).toBe('false');
   accept({ success: true, message: 'Reading accepted', structuredData: { operationKey: '0194f72c-0000-7000-8000-000000000068' } }); await settle(el);
-  expect(button(must(el.shadowRoot, '.bottom-links'), 'Read everything again').disabled).toBe(false);
+  expect(busy.getAttribute('aria-disabled')).toBe('false');
+  expect(el.shadowRoot!.activeElement).toBe(busy);
+});
+it.each(['Read again', 'Cancel'])('6b1-2: Escape on %s cancels the ask, runs nothing and returns focus to the action', async answer => {
+  const invoke = vi.spyOn(getOperationClient(''), 'invokeWithConsent');
+  const outside = vi.fn();
+  document.addEventListener('keydown', outside);
+  try {
+    const el = await library();
+    const action = button(must(el.shadowRoot, '.bottom-links'), 'Read everything again');
+    action.click(); await settle(el);
+    const target = button(must(el.shadowRoot, '[role="region"][aria-label="Read every watched folder again?"]'), answer);
+    target.focus(); expect(el.shadowRoot!.activeElement).toBe(target);
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true, cancelable: true });
+    target.dispatchEvent(escape); await settle(el);
+    expect(el.shadowRoot!.querySelector('[role="region"][aria-label="Read every watched folder again?"]')).toBeNull();
+    expect(action.getAttribute('aria-expanded')).toBe('false');
+    expect(el.shadowRoot!.activeElement).toBe(action);
+    expect(escape.defaultPrevented).toBe(true);
+    expect(outside).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalled();
+  } finally { document.removeEventListener('keydown', outside); }
+});
+it('6b1-2: Escape outside the ask leaves it open', async () => {
+  const el = await library();
+  const foot = must(el.shadowRoot, '.bottom-links');
+  button(foot, 'Read everything again').click(); await settle(el);
+  must(el.shadowRoot, '[role="region"][aria-label="Read every watched folder again?"]');
+  const activity = must(foot, '[label="Activity"]');
+  activity.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true, cancelable: true })); await settle(el);
+  must(el.shadowRoot, '[role="region"][aria-label="Read every watched folder again?"]');
 });
 it('6b1-2: confirmation uses consent and recorded outcome', async () => {
   const invoke = vi.spyOn(getOperationClient(''), 'invokeWithConsent').mockResolvedValue({ success: true, message: 'Reading accepted',
@@ -206,6 +253,18 @@ it('6b1-5: folder loading/failure sit after heads, with plain failure and a work
   fetch.mockImplementation(async (path: string) => Response.json(path.endsWith('/folders') ? { folders: [] } : { files: [], totalCount: 0 }));
   retry.onActivate(); await settle(el);
   expect(inList(el, '.notice').textContent).toContain('No searchable files in this folder');
+});
+it('6b1-5: several folder failures each name their folder', async () => {
+  const fetch = vi.fn(async (path: string) => {
+    if (path.includes('/api/indexing/roots')) return Response.json({ roots: [{ path: '/Documents' }, { path: '/Photos' }] });
+    throw new TypeError('Load failed');
+  });
+  const el = await browse(fetch);
+  for (const item of [...el.shadowRoot!.querySelectorAll<HTMLElement>('[role="treeitem"]')]) { item.click(); await settle(el); }
+  const failures = [...el.shadowRoot!.querySelectorAll('.notice')].filter(n => n.textContent?.includes("Couldn't load this folder"));
+  expect(failures.map(n => n.textContent?.replace('Try again', '').trim())).toEqual(
+    ["Documents: Couldn't load this folder", "Photos: Couldn't load this folder"]);
+  for (const failure of failures) must(failure, 'jf-button[label="Try again"]');
 });
 it('6b1-6: focused Resume becomes enabled Pause when observation confirms reading runs', async () => {
   vi.spyOn(getOperationClient(''), 'invokeWithConsent').mockResolvedValue({ success: true, message: 'Resume accepted' });
