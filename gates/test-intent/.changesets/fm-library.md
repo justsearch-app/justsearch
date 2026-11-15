@@ -165,6 +165,14 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Packaged-run repair decisions V1 (no-AI headline 'Your files are searchable', row 'Up to date', meaning state once in the open row's 'Search by meaning' line, no 'semantic search') and V2 ('Rebuilding' only when a rebuild is observed; raw codes in plain words).",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "R3: a failed folder-list (roots) read is uncertainty whether or not an earlier observation exists; it is never 'no folders' and never leaves rows 'Up to date'.",
+          "label": "agent choice"
         }
       ],
       "behaviour": "Reading labels replace indexing labels; assertions about observation freshness, counts, holds, errors, destinations and state transitions remain.",
@@ -179,6 +187,11 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "oldAssertion": "Row text contains 'semantic search waiting for AI install' and 'keyword search ready' (paused and running).",
           "newAssertion": "Row status is 'Up to date'; open row says 'Search by meaning Needs AI · word search is available' (word search still stated available, M3) while running and paused; no 'semantic search'; pending/indexed icon assertions unchanged.",
           "reason": "Decisions V1/V2 (cited) after the packaged-app check; the remaining behavioural assertions are kept."
+        },
+        {
+          "oldAssertion": "Test host answered the folder-list read with a failure (503/rejected fetch) while rows were placed directly.",
+          "newAssertion": "The folder-list read is left unanswered (or answered with the rows under test); every assertion is unchanged.",
+          "reason": "R3 (cited) makes a failed folder-list read visible uncertainty, so a fixture failing that read no longer represents the placed rows' scenario; the oracle is kept."
         }
       ]
     },
@@ -311,6 +324,14 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "quote": "The same thing has one name everywhere: the app reads files (not \"indexes\"), the button is \"Add a folder\".",
           "location": "task t-20261113-fmimpl agreement, adopted rules quoted in supplied slice 6a builder brief",
           "label": "owner words quoted in the supplied brief"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "R3: a failed folder-list (roots) read is uncertainty whether or not an earlier observation exists; it is never 'no folders' and never leaves rows 'Up to date'.",
+          "label": "agent choice"
         }
       ],
       "behaviour": "Reading labels replace indexing labels; assertions about observation freshness, counts, holds, errors, destinations and state transitions remain.",
@@ -320,6 +341,11 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "oldAssertion": "Prior presentation labels, collapsed facts or private component interaction path.",
           "newAssertion": "Reading labels replace indexing labels; assertions about observation freshness, counts, holds, errors, destinations and state transitions remain.",
           "reason": "The cited owner wording and supplied K/M decisions replace that presentation while preserving the remaining behavioural assertions."
+        },
+        {
+          "oldAssertion": "Test host answered the folder-list read with a failure (503/rejected fetch) while rows were placed directly.",
+          "newAssertion": "The folder-list read is left unanswered (or answered with the rows under test); every assertion is unchanged.",
+          "reason": "R3 (cited) makes a failed folder-list read visible uncertainty, so a fixture failing that read no longer represents the placed rows' scenario; the oracle is kept."
         }
       ]
     },
@@ -962,6 +988,14 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Packaged-run repair decisions V1 (no-AI headline 'Your files are searchable', row 'Up to date', meaning state once in the open row's 'Search by meaning' line, no 'semantic search') and V2 ('Rebuilding' only when a rebuild is observed; raw codes in plain words).",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "R3: a failed folder-list (roots) read is uncertainty whether or not an earlier observation exists; it is never 'no folders' and never leaves rows 'Up to date'.",
+          "label": "agent choice"
         }
       ],
       "behaviour": "Failure facts move from the collapsed summary chip to the expanded Couldn't be read line. Open that folder first, then retain failure drill-down, per-folder scope, last-known treatment, focus and list behaviour assertions.",
@@ -976,6 +1010,11 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "oldAssertion": "Fixture set provisional only.",
           "newAssertion": "Fixture sets provisional and the observed rebuild flag together, so the same 'Rebuilding' assertions apply to an observed rebuild; assertions unchanged.",
           "reason": "Decisions V1/V2 (cited) after the packaged-app check; the remaining behavioural assertions are kept."
+        },
+        {
+          "oldAssertion": "Test host answered the folder-list read with a failure (503/rejected fetch) while rows were placed directly.",
+          "newAssertion": "The folder-list read is left unanswered (or answered with the rows under test); every assertion is unchanged.",
+          "reason": "R3 (cited) makes a failed folder-list read visible uncertainty, so a fixture failing that read no longer represents the placed rows' scenario; the oracle is kept."
         }
       ]
     },
@@ -1163,6 +1202,14 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "delegationScope": "implement the agreed first-minutes design; slice 6a Library and file-browser presentation only",
           "choice": "K2 headline = state in words, no count subtitle; M5 counts keep scope and cap; M7 headline truthful when only other sources exist.",
           "label": "agent choice; K/M decisions supplied by the orchestrator"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "R3: a failed folder-list (roots) read is uncertainty whether or not an earlier observation exists; it is never 'no folders' and never leaves rows 'Up to date'.",
+          "label": "agent choice"
         }
       ],
       "behaviour": "The repeated searchable-document subtitle is retired. Assert its absence, keep the one disk-file count per root, and retain own-versus-Help readiness and unknown/late-count headline cases.",
@@ -1172,6 +1219,11 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "oldAssertion": "Prior presentation labels, collapsed facts or private component interaction path.",
           "newAssertion": "The repeated searchable-document subtitle is retired. Assert its absence, keep the one disk-file count per root, and retain own-versus-Help readiness and unknown/late-count headline cases.",
           "reason": "The cited owner wording and supplied K/M decisions replace that presentation while preserving the remaining behavioural assertions."
+        },
+        {
+          "oldAssertion": "Test host answered the folder-list read with a failure (503/rejected fetch) while rows were placed directly.",
+          "newAssertion": "The folder-list read is left unanswered (or answered with the rows under test); every assertion is unchanged.",
+          "reason": "R3 (cited) makes a failed folder-list read visible uncertainty, so a fixture failing that read no longer represents the placed rows' scenario; the oracle is kept."
         }
       ]
     },
@@ -1196,6 +1248,14 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "delegationScope": "implement the agreed first-minutes design; slice 6a Library and file-browser presentation only",
           "choice": "K2 default Library facts and no count subtitle; M3 meaning distinctions and word-search availability remain; M4 active reading never shows a bare past Read time; M5 count scope/cap; M7 other-app-only headline is truthful.",
           "label": "agent choice; K/M decisions supplied by the orchestrator"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "R3: a failed folder-list (roots) read is uncertainty whether or not an earlier observation exists; it is never 'no folders' and never leaves rows 'Up to date'.",
+          "label": "agent choice"
         }
       ],
       "behaviour": "Default rows expose the agreed meaning/failure/read facts rather than Collection and redundant word-search facts. Remove subtitle assertions or move exceptional wait/retry detail assertions to the attention detail. Retain stale-state, disclosure, path, recovery and themed/fallback parity checks.",
@@ -1205,6 +1265,11 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "oldAssertion": "Prior presentation labels, collapsed facts or private component interaction path.",
           "newAssertion": "Default rows expose the agreed meaning/failure/read facts rather than Collection and redundant word-search facts. Remove subtitle assertions or move exceptional wait/retry detail assertions to the attention detail. Retain stale-state, disclosure, path, recovery and themed/fallback parity checks.",
           "reason": "The cited owner wording and supplied K/M decisions replace that presentation while preserving the remaining behavioural assertions."
+        },
+        {
+          "oldAssertion": "Test host answered the folder-list read with a failure (503/rejected fetch) while rows were placed directly.",
+          "newAssertion": "The folder-list read is left unanswered (or answered with the rows under test); every assertion is unchanged.",
+          "reason": "R3 (cited) makes a failed folder-list read visible uncertainty, so a fixture failing that read no longer represents the placed rows' scenario; the oracle is kept."
         }
       ]
     },
@@ -1243,6 +1308,28 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Packaged-run repair decisions V1 (no-AI headline 'Your files are searchable', row 'Up to date', meaning state once in the open row's 'Search by meaning' line, no 'semantic search') and V2 ('Rebuilding' only when a rebuild is observed; raw codes in plain words).",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "R3: a failed folder-list (roots) read is uncertainty whether or not an earlier observation exists; it is never 'no folders' and never leaves rows 'Up to date'.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "P1 (narrowing after the second real-app failure): the folder's 'Read <time>' fact is removed because the root time follows scans, not writes; 'Reading now' shows only while reading; 'Checked for changes' stays.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Anything a picture shows that the app has no data for: build the screen without it and name it in the delivery. Never fill it with a made-up value.",
+          "location": "task t-20261113-fmimpl agreement, adopted design handover 'Not decided: do not guess' (picture author's rule)",
+          "label": "owner-adopted design note"
         }
       ],
       "behaviour": "Default rows expose the agreed meaning/failure/read facts rather than Collection and redundant word-search facts. Remove subtitle assertions or move exceptional wait/retry detail assertions to the attention detail. Retain stale-state, disclosure, path, recovery and themed/fallback parity checks.",
@@ -1257,6 +1344,21 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "oldAssertion": "Text contains 'semantic search waiting for AI install'.",
           "newAssertion": "Open row's details match 'Search by meaning Needs AI'; no 'semantic search'; 'fully searchable' still absent; enrichmentBlocked still true.",
           "reason": "Decisions V1/V2 (cited) after the packaged-app check; the remaining behavioural assertions are kept."
+        },
+        {
+          "oldAssertion": "Test host answered the folder-list read with a failure (503/rejected fetch) while rows were placed directly.",
+          "newAssertion": "The folder-list read is left unanswered (or answered with the rows under test); every assertion is unchanged.",
+          "reason": "R3 (cited) makes a failed folder-list read visible uncertainty, so a fixture failing that read no longer represents the placed rows' scenario; the oracle is kept."
+        },
+        {
+          "oldAssertion": "Open row of a settled folder matches 'Read just now' (two tests).",
+          "newAssertion": "Open row contains 'Search by meaning' and matches neither 'Reading now' nor 'Read just now'.",
+          "reason": "P1 (cited) removes the read time; the settled folder still claims no reading in progress."
+        },
+        {
+          "oldAssertion": "Empty library mounted with a failing folder-list read.",
+          "newAssertion": "Empty library mounted with an Engine answer of an empty folder list; same empty-library assertions.",
+          "reason": "R3 (cited): a failed read is not 'no folders'."
         }
       ]
     },
@@ -1314,6 +1416,14 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "delegationScope": "implement the agreed first-minutes design; slice 6a Library and file-browser presentation only",
           "choice": "M7 headline truthful when only other sources exist. K2 keeps unknown/last-known truth.",
           "label": "agent choice; K/M decisions supplied by the orchestrator"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "R3: a failed folder-list (roots) read is uncertainty whether or not an earlier observation exists; it is never 'no folders' and never leaves rows 'Up to date'.",
+          "label": "agent choice"
         }
       ],
       "behaviour": "Keep transient, stale and recovery headline assertions; a current positive own-file observation with no watched folders now remains searchable rather than asking the user to start searching.",
@@ -1323,6 +1433,11 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "oldAssertion": "Prior presentation labels, collapsed facts or private component interaction path.",
           "newAssertion": "Keep transient, stale and recovery headline assertions; a current positive own-file observation with no watched folders now remains searchable rather than asking the user to start searching.",
           "reason": "The cited owner wording and supplied K/M decisions replace that presentation while preserving the remaining behavioural assertions."
+        },
+        {
+          "oldAssertion": "Test host answered the folder-list read with a failure (503/rejected fetch) while rows were placed directly.",
+          "newAssertion": "The folder-list read is left unanswered (or answered with the rows under test); every assertion is unchanged.",
+          "reason": "R3 (cited) makes a failed folder-list read visible uncertainty, so a fixture failing that read no longer represents the placed rows' scenario; the oracle is kept."
         }
       ]
     },
@@ -1759,6 +1874,36 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Slice 6a decisions K1-K7 as amended by M1-M12 (Library presentation, shared menu, Browse; save-on-change deferred), as quoted in the acceptor brief.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "R3: a failed folder-list (roots) read is uncertainty whether or not an earlier observation exists; it is never 'no folders' and never leaves rows 'Up to date'.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "R5: the Browse filter is a developer tool; it is cleared when developer tools turn off and never applies while they are off.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "P1 (narrowing after the second real-app failure): the folder's 'Read <time>' fact is removed because the root time follows scans, not writes; 'Reading now' shows only while reading; 'Checked for changes' stays.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Anything a picture shows that the app has no data for: build the screen without it and name it in the delivery. Never fill it with a made-up value.",
+          "location": "task t-20261113-fmimpl agreement, adopted design handover 'Not decided: do not guess' (picture author's rule)",
+          "label": "owner-adopted design note"
         }
       ],
       "evidence": "gates/test-intent/evidence/fm-library.json",
@@ -1768,7 +1913,24 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
         "modules/ui-web/src/shell-v0/views/library-first-minutes/palette-wording.test.ts",
         "modules/ui-web/src/shell-v0/views/library-first-minutes/presentation.test.ts"
       ],
-      "repaired": true
+      "repaired": true,
+      "assertionChanges": [
+        {
+          "oldAssertion": "Test host answered the folder-list read with a failure (503/rejected fetch) while rows were placed directly.",
+          "newAssertion": "The folder-list read is left unanswered (or answered with the rows under test); every assertion is unchanged.",
+          "reason": "R3 (cited) makes a failed folder-list read visible uncertainty, so a fixture failing that read no longer represents the placed rows' scenario; the oracle is kept."
+        },
+        {
+          "oldAssertion": "M8 filter test filters with developer tools off.",
+          "newAssertion": "Turns developer tools on first, then the same filter assertions.",
+          "reason": "R5 (cited)."
+        },
+        {
+          "oldAssertion": "M4: paused meaning work keeps a 'Read' line whose value is not 'Reading now'.",
+          "newAssertion": "M4: paused meaning work shows 'Search by meaning', never 'Reading now', and no 'Read' term.",
+          "reason": "P1 (cited); the never-'Reading now' half of M4 is kept."
+        }
+      ]
     },
     {
       "items": [
@@ -1863,6 +2025,34 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
       "evidence": "gates/test-intent/evidence/fm-library.json",
       "newChecks": [
         "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerCountPresentationTest.java"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/ReindexHandlerTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The consent preview for reading everything again uses reading words and keeps the exact targets: forced 'Read N watched locations again, including unchanged files:' plus each path; not forced 'Read N watched locations again:' plus each path.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "The same thing has one name everywhere: the app reads files (not \"indexes\"), the button is \"Add a folder\".",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "R6: the Library authorization dialog's 'Reindex N watched locations.' becomes 'Read N watched locations again:' (forced: 'Read N watched locations again, including unchanged files:') followed by the same exact target paths, one per line (M2: Read everything again runs a forced reread).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/fm-library.json",
+      "newChecks": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/ReindexHandlerTest.java"
       ],
       "repaired": true
     }
