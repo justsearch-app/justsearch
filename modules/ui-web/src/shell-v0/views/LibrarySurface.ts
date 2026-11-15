@@ -1180,7 +1180,7 @@ export class LibrarySurface extends JfElement {
       filesFound: files ? `${unknown ? 'Last known ' : ''}${files}` : '',
       developer: this.developer,
       meaningText: this.meaningText(root, fs),
-      reading: confirmed && !this.indexProgress.pause && (fs.state === 'indexing' || fs.state === 'scanning' || fs.state === 'enriching'),
+      reading: confirmed && !this.indexProgress.pause && (fs.state === 'indexing' || fs.state === 'scanning'),
       collection: root.collection ?? 'default',
       wordsVerdict: fs.state === 'ready' || fs.state === 'enriching' || fs.state === 'keyword-only' || fs.state === 'unverified'
         ? `${confirmed ? 'Now' : 'Last known'}${fs.state === 'unverified' ? ' · deletions unverified' : ''}`

@@ -444,3 +444,35 @@ it('P1: the open row has no Read time; it says Reading now only while reading an
   expect(details()).not.toContain('2026-01-01');
   expect(facts().find(([term]) => term === 'Checked for changes')).toEqual(['Checked for changes', 'at 2026-01-02T00:00:00Z']);
 });
+
+it.each(['blocked', 'deferred', 'paused'] as const)('P3: %s meaning work does not claim Reading now', async state => {
+  const { el } = await library({ ...root, parentDocsTotalEmbedding: 8, parentDocsSettledEmbedding: 4 }, () => {
+    __feedForTest({ status: {
+      operating: { indexing: { state: state === 'paused' ? 'PAUSED' : 'RUNNING',
+        reasons: state === 'paused' ? ['user_paused'] : state === 'deferred' ? ['energy_saver'] : [] } },
+      worker: {
+        core: { indexedDocuments: 8, ownSearchableDocuments: 8, pendingJobs: 0, indexState: 'IDLE', indexHealthy: true },
+        migration: { migrationState: 'IDLE' },
+        enrichment: { embeddingEnabled: true, embeddingAvailable: state !== 'blocked',
+          embeddingDocCount: 8, embeddingPendingCount: 4, spladeEnabled: false, nerEnabled: false },
+      },
+    } as unknown as StatusSnapshot });
+  });
+  expect(el.indexingActivity.confirmed).toBe(true);
+  expect(el.enrichmentBlocked).toBe(state === 'blocked');
+  expect(el.indexingActivity.enrichmentDeferred).toBe(true);
+  if (state === 'blocked') expect(must(el.shadowRoot, '.card-meta').textContent).toBe('Up to date');
+  must<HTMLButtonElement>(el.shadowRoot, '.folder-toggle').click(); await settle(el);
+  const details = must(el.shadowRoot, '.folder-details');
+  const meaning = [...details.querySelectorAll('dl > div')].find(row => row.querySelector('dt')?.textContent === 'Search by meaning');
+  expect(meaning).toBeDefined();
+  expect(must(meaning!, 'dd').textContent).toBe(`${state === 'blocked' ? 'Blocked' : 'In progress'} · word search is available`);
+  expect(details.textContent).not.toContain('Reading now');
+});
+
+it('P3: file jobs in flight still show Reading now', async () => {
+  const { el } = await library({ ...root, inFlightCount: 2 });
+  expect(el.indexingActivity.confirmed).toBe(true);
+  must<HTMLButtonElement>(el.shadowRoot, '.folder-toggle').click(); await settle(el);
+  expect(must(el.shadowRoot, '.folder-details').textContent).toContain('Reading now');
+});
