@@ -30,6 +30,7 @@
 import type { IndexedRootView } from '../../api/generated/schema-types/indexed-root-view.js';
 import type { EnrichmentApplicability } from './indexingProgress.js';
 import { ENRICHMENT_BLOCKED_CAVEAT, ENRICHMENT_CATCHING_UP_CAVEAT } from './enrichmentCoverage.js';
+import { formatFileCount } from '../display/format.js';
 
 export type FolderState =
   | 'scanning' // walk in progress — files not yet fully enqueued
@@ -230,10 +231,7 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
   // otherwise-ready folder: it stays searchable, but we cannot promise stale entries were pruned.
   const deleteDetectionUnverified = row.deleteDetectionUnverified === true;
 
-  const fileCountText =
-    fileCount >= 0
-      ? `${fileCount.toLocaleString()} ${fileCount === 1 ? 'file' : 'files'}`
-      : 'count pending';
+  const fileCountText = formatFileCount(row.fileCount, row.fileCountCapped) || 'count pending';
 
   /**
    * Tempdoc 914 D3, review finding S2-1 — the carry is computed ONCE, ABOVE the branch chain.

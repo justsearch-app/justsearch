@@ -25,6 +25,13 @@ export function formatCount(n: number): string {
   return NUM.format(n);
 }
 
+/** Disk inventory count. Older Engines omit the cap flag at their 50,000-file limit. */
+export function formatFileCount(count: number | null | undefined, capped?: boolean): string {
+  if (count == null || !Number.isFinite(count) || count < 0) return '';
+  const cap = capped === true || capped === undefined && count === 50_000;
+  return `${formatCount(count)}${cap ? '+' : ''} ${count === 1 && !cap ? 'file' : 'files'}`;
+}
+
 /** Local numeric date and time, including seconds (Date#toLocaleString's default fields). */
 export function formatDateTime(date: Date): string {
   if (Number.isNaN(date.getTime())) return 'Invalid Date';

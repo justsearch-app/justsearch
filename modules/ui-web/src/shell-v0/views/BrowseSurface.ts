@@ -17,7 +17,7 @@ import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { openLocalFile } from '../plugin-api/capabilities/platform.js';
 import { compose } from '../utils/compose.js';
 import { fileKindPresentation } from '../display/fileKind.js';
-import { formatBytes, formatShortDate } from '../display/format.js';
+import { formatBytes, formatFileCount, formatShortDate } from '../display/format.js';
 import { folderBrowseResponseSchema } from '../../api/generated/schema-types/folder-browse-response.js';
 import { folderFilesResponseSchema } from '../../api/generated/schema-types/folder-files-response.js';
 import { parseWireContract } from '../../api/schemas.js';
@@ -25,7 +25,7 @@ import { parseWireContract } from '../../api/schemas.js';
 const rootsSchema = z.object({ roots: z.array(z.object({ path: z.string(), fileCount: z.number().optional(), fileCountCapped: z.boolean().optional() }).loose()) });
 interface BrowseFolder { path: string; name: string; fileCount?: number; fileCountCapped?: boolean }
 interface BrowseFile { path: string; name: string; size?: number; fileKind?: string; mimeBase?: string; modifiedAt?: number }
-type TreeRow = { path: string; parent?: string; level: number; position: number; size: number; folder?: BrowseFolder; file?: BrowseFile };
+type TreeRow = { id: string; path: string; parent?: string; level: number; position: number; size: number; folder?: BrowseFolder; file?: BrowseFile };
 const lastSeg = (path: string): string => path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || path;
 
 export class BrowseSurface extends JfElement {
@@ -34,7 +34,7 @@ export class BrowseSurface extends JfElement {
     apiBase: { attribute: 'api-base', type: String }, host_: { attribute: false }, roots: { state: true },
     folderChildren: { state: true }, fileChildren: { state: true }, expanded: { state: true }, inflight: { state: true },
     filter: { state: true }, refreshing: { state: true }, error: { state: true }, provisional: { state: true },
-    aiState: { state: true }, folderErrors: { state: true }, partial: { state: true }, activePath: { state: true },
+    aiState: { state: true }, folderErrors: { state: true }, partial: { state: true }, activeRowId: { state: true },
   };
   declare developer: boolean;
   private developerUnsub: (() => void) | undefined;
@@ -52,7 +52,7 @@ export class BrowseSurface extends JfElement {
   declare aiState: AiState | null;
   declare folderErrors: Record<string, string>;
   declare partial: Record<string, boolean>;
-  declare activePath: string;
+  declare activeRowId: string;
   private aiUnsub: (() => void) | null = null;
   private generation = 0;
   private recoveryParent: Record<string, string | undefined> = {};
@@ -62,7 +62,7 @@ export class BrowseSurface extends JfElement {
     super(); this.developer = false; this.apiBase = ''; this.host_ = undefined as unknown as PluginHostApi;
     this.roots = []; this.folderChildren = {}; this.fileChildren = {}; this.expanded = {}; this.inflight = {};
     this.filter = ''; this.refreshing = false; this.error = null; this.provisional = false; this.aiState = null;
-    this.folderErrors = {}; this.partial = {}; this.activePath = '';
+    this.folderErrors = {}; this.partial = {}; this.activeRowId = '';
   }
   static styles = [surfaceLayoutStyles, buttonBaseStyles, css`
     .header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .75rem 1.5rem; }
@@ -129,7 +129,7 @@ export class BrowseSurface extends JfElement {
     } finally { if (generation === this.generation) this.refreshing = false; }
   }
   private async loadFolder(path: string): Promise<void> {
-    if (this.inflight[path] || this.folderChildren[path] !== undefined && this.fileChildren[path] !== undefined) return;
+    if (this.inflight[path]) return;
     const generation = this.generation;
     this.inflight = { ...this.inflight, [path]: true };
     this.folderErrors = { ...this.folderErrors, [path]: '' };
@@ -155,69 +155,75 @@ export class BrowseSurface extends JfElement {
       if (generation === this.generation) this.folderErrors = { ...this.folderErrors, [path]: `Could not load ${lastSeg(path)}. ${error instanceof Error ? error.message : String(error)}` };
     } finally { if (generation === this.generation) { const next = { ...this.inflight }; delete next[path]; this.inflight = next; } }
   }
-  private async toggle(path: string): Promise<void> {
-    this.expanded = { ...this.expanded, [path]: !this.expanded[path] };
-    if (this.expanded[path]) await this.loadFolder(path);
+  private async toggle(row: TreeRow): Promise<void> {
+    this.expanded = { ...this.expanded, [row.id]: !this.expanded[row.id] };
+    if (this.expanded[row.id]) await this.loadFolder(row.path);
   }
   private async refresh(): Promise<void> {
-    ++this.generation; this.folderChildren = {}; this.fileChildren = {}; this.inflight = {}; this.folderErrors = {}; this.partial = {};
+    const generation = ++this.generation; this.inflight = {}; this.folderErrors = {};
     await this.loadRoots();
-    for (const root of this.roots) if (this.expanded[root.path]) await this.loadExpanded(root.path);
-  }
-  private async loadExpanded(path: string): Promise<void> {
-    await this.loadFolder(path);
-    for (const folder of this.folderChildren[path] ?? []) if (this.expanded[folder.path]) await this.loadExpanded(folder.path);
+    // Expand by occurrence, but fetch each physical folder only once per refresh.
+    const loaded = new Set<string>();
+    for (let index = 0; generation === this.generation && index < this.rows().length; index++) {
+      const row = this.rows()[index]!;
+      if (row.folder && this.expanded[row.id] && !loaded.has(row.path)) {
+        loaded.add(row.path); await this.loadFolder(row.path);
+      }
+    }
   }
   private matchesFilter(name: string): boolean { return name.toLocaleLowerCase().includes(this.filter.trim().toLocaleLowerCase()); }
   private rows(): TreeRow[] {
     const rows: TreeRow[] = [];
-    const addFolders = (folders: BrowseFolder[], level: number, parent?: string, files: BrowseFile[] = []) => {
+    const addFolders = (folders: BrowseFolder[], ancestors: string[] = [], files: BrowseFile[] = []) => {
+      const parent = ancestors.length ? JSON.stringify(ancestors) : undefined;
+      const level = ancestors.length + 1;
       const matchingFiles = files.filter(file => this.matchesFilter(file.name));
       // Ancestors stay present so a filter never strands a visible descendant.
-      const visibleFolders = folders.filter(folder => this.matchesFilter(folder.name) || this.expanded[folder.path]);
+      const visibleFolders = folders.filter(folder => this.matchesFilter(folder.name) || this.expanded[JSON.stringify([...ancestors, folder.path])]);
       const size = visibleFolders.length + matchingFiles.length;
       visibleFolders.forEach((folder, index) => {
-        rows.push({ path: folder.path, parent, level, position: index + 1, size, folder });
-        if (this.expanded[folder.path]) addFolders(this.folderChildren[folder.path] ?? [], level + 1, folder.path, this.fileChildren[folder.path] ?? []);
+        const chain = [...ancestors, folder.path], id = JSON.stringify(chain);
+        rows.push({ id, path: folder.path, parent, level, position: index + 1, size, folder });
+        if (this.expanded[id]) addFolders(this.folderChildren[folder.path] ?? [], chain, this.fileChildren[folder.path] ?? []);
       });
-      matchingFiles.forEach((file, index) => rows.push({ path: file.path, parent, level, position: visibleFolders.length + index + 1, size, file }));
+      matchingFiles.forEach((file, index) => rows.push({ id: JSON.stringify([...ancestors, file.path]), path: file.path, parent, level, position: visibleFolders.length + index + 1, size, file }));
     };
-    addFolders(this.roots, 1); return rows;
+    addFolders(this.roots); return rows;
   }
   protected override willUpdate(_changed: PropertyValues): void {
     const rows = this.rows();
     const active = this.shadowRoot?.activeElement as HTMLElement | null;
     this.recoverFocus = !!active?.closest('[role="treeitem"]');
-    if (!rows.some(row => row.path === this.activePath)) {
-      let parent = this.recoveryParent[this.activePath];
-      while (parent && !rows.some(row => row.path === parent)) parent = this.recoveryParent[parent];
-      this.activePath = parent ?? rows[0]?.path ?? '';
+    if (!rows.some(row => row.id === this.activeRowId)) {
+      let parent = this.recoveryParent[this.activeRowId];
+      while (parent && !rows.some(row => row.id === parent)) parent = this.recoveryParent[parent];
+      this.activeRowId = parent ?? rows[0]?.id ?? '';
     }
-    this.recoveryParent = Object.fromEntries(rows.map(row => [row.path, row.parent]));
+    this.recoveryParent = Object.fromEntries(rows.map(row => [row.id, row.parent]));
   }
   protected override updated(): void {
-    if (this.recoverFocus && !this.shadowRoot?.activeElement?.closest('[role="treeitem"]')) this.focusRow(this.activePath);
+    if (this.recoverFocus && !this.shadowRoot?.activeElement?.closest('[role="treeitem"]')) this.focusRow(this.activeRowId);
   }
-  private focusRow(path: string): void {
-    this.activePath = path;
-    const row = [...(this.shadowRoot?.querySelectorAll<HTMLElement>('[role="treeitem"]') ?? [])].find(row => row.dataset.path === path);
+  private focusRow(id: string): void {
+    this.activeRowId = id;
+    const row = [...(this.shadowRoot?.querySelectorAll<HTMLElement>('[role="treeitem"]') ?? [])].find(row => row.dataset.rowId === id);
     if (row) row.focus(); else (this.shadowRoot?.querySelector<HTMLElement>('.filter-input, .empty-state'))?.focus();
   }
   private async onKey(event: KeyboardEvent, row: TreeRow): Promise<void> {
     if (event.target !== event.currentTarget) return;
-    const rows = this.rows(), index = rows.findIndex(item => item.path === row.path);
+    const rows = this.rows(), index = rows.findIndex(item => item.id === row.id);
     switch (event.key) {
-      case 'ArrowDown': event.preventDefault(); this.focusRow(rows[Math.min(index + 1, rows.length - 1)]!.path); break;
-      case 'ArrowUp': event.preventDefault(); this.focusRow(rows[Math.max(0, index - 1)]!.path); break;
-      case 'Home': event.preventDefault(); this.focusRow(rows[0]!.path); break;
-      case 'End': event.preventDefault(); this.focusRow(rows[rows.length - 1]!.path); break;
+      case 'ArrowDown': event.preventDefault(); this.focusRow(rows[Math.min(index + 1, rows.length - 1)]!.id); break;
+      case 'ArrowUp': event.preventDefault(); this.focusRow(rows[Math.max(0, index - 1)]!.id); break;
+      case 'Home': event.preventDefault(); this.focusRow(rows[0]!.id); break;
+      case 'End': event.preventDefault(); this.focusRow(rows[rows.length - 1]!.id); break;
       case 'ArrowRight':
         event.preventDefault(); if (row.folder) {
-          if (!this.expanded[row.path]) await this.toggle(row.path);
-          else if (rows[index + 1]?.parent === row.path) this.focusRow(rows[index + 1]!.path);
+          if (!this.expanded[row.id]) await this.toggle(row);
+          else if (rows[index + 1]?.parent === row.id) this.focusRow(rows[index + 1]!.id);
         } break;
-      case 'ArrowLeft': event.preventDefault(); if (row.folder && this.expanded[row.path]) await this.toggle(row.path); else if (row.parent) this.focusRow(row.parent); break;
-      case 'Enter': event.preventDefault(); if (row.file) await this.openFile(row.path); else await this.toggle(row.path); break;
+      case 'ArrowLeft': event.preventDefault(); if (row.folder && this.expanded[row.id]) await this.toggle(row); else if (row.parent) this.focusRow(row.parent); break;
+      case 'Enter': event.preventDefault(); if (row.file) await this.openFile(row.path); else await this.toggle(row); break;
       case 'ContextMenu': case 'F10':
         if (event.key === 'ContextMenu' || event.shiftKey) {
           if (row.file) { event.preventDefault(); const rect = (event.currentTarget as HTMLElement).getBoundingClientRect(); await this.fileMenu(row.file, rect.left, rect.bottom); }
@@ -241,20 +247,19 @@ export class BrowseSurface extends JfElement {
     else if (result === 'ask-about') compose({ operation: 'core.ask', source: 'BUTTON', userPrompt: `Tell me about the document at ${file.name}`, docIds: [file.path], docName: file.name });
   }
   private renderRow(row: TreeRow): TemplateResult {
-    const folder = row.folder, file = row.file, focused = this.activePath === row.path;
-    const count = folder?.fileCount;
+    const folder = row.folder, file = row.file, focused = this.activeRowId === row.id;
     const size = file?.size;
     const date = file?.modifiedAt !== undefined ? new Date(file.modifiedAt) : null;
     return html`<div class="row ${folder ? 'folder' : 'file'} level-${Math.min(8, row.level - 1)}" role="treeitem"
-      data-path=${row.path} title=${row.path} tabindex=${focused ? '0' : '-1'} aria-level=${row.level}
-      aria-posinset=${row.position} aria-setsize=${row.size} aria-expanded=${folder ? String(!!this.expanded[row.path]) : nothing}
-      @focus=${() => { this.activePath = row.path; }} @keydown=${(event: KeyboardEvent) => void this.onKey(event, row)}
-      @click=${() => { this.focusRow(row.path); if (folder) void this.toggle(row.path); else void this.openFile(row.path); }}
-      @contextmenu=${(event: MouseEvent) => { if (file) { event.preventDefault(); this.focusRow(row.path); void this.fileMenu(file, event.clientX, event.clientY); } }}>
-      <span class="row-name"><span class="toggle">${folder ? icon({ name: this.expanded[row.path] ? 'chevron-down' : 'chevron-right', size: 12 }) : nothing}</span>
+      data-row-id=${row.id} data-path=${row.path} title=${row.path} tabindex=${focused ? '0' : '-1'} aria-level=${row.level}
+      aria-posinset=${row.position} aria-setsize=${row.size} aria-expanded=${folder ? String(!!this.expanded[row.id]) : nothing}
+      @focus=${() => { this.activeRowId = row.id; }} @keydown=${(event: KeyboardEvent) => void this.onKey(event, row)}
+      @click=${() => { this.focusRow(row.id); if (folder) void this.toggle(row); else void this.openFile(row.path); }}
+      @contextmenu=${(event: MouseEvent) => { if (file) { event.preventDefault(); this.focusRow(row.id); void this.fileMenu(file, event.clientX, event.clientY); } }}>
+      <span class="row-name"><span class="toggle">${folder ? icon({ name: this.expanded[row.id] ? 'chevron-down' : 'chevron-right', size: 12 }) : nothing}</span>
         <span class="icon" data-kind=${file ? fileKindPresentation(file.fileKind, file.mimeBase, file.path).kind : 'folder'}>${icon({ name: folder ? 'folder' : fileKindPresentation(file?.fileKind, file?.mimeBase, file?.path).icon, size: 16 })}</span>
         <span class="name">${folder?.name ?? file?.name}</span></span>
-      <span class="meta">${folder ? count !== undefined && count >= 0 ? `${count.toLocaleString()}${folder.fileCountCapped ? '+' : ''} files` : ''
+      <span class="meta">${folder ? formatFileCount(folder.fileCount, folder.fileCountCapped)
         : size !== undefined && size >= 0 ? size < 1024 ? `${size} bytes` : formatBytes(size) : ''}</span>
       <span class="meta">${date && Number.isFinite(date.getTime()) ? formatShortDate(date) : ''}</span>
       <span class="actions" @click=${(event: Event) => event.stopPropagation()} @keydown=${(event: KeyboardEvent) => event.stopPropagation()}>
@@ -266,7 +271,7 @@ export class BrowseSurface extends JfElement {
     </div>`;
   }
   private renderNotices(): TemplateResult {
-    return html`${Object.keys(this.expanded).filter(path => this.expanded[path]).map(path => {
+    return html`${this.rows().filter(row => row.folder && this.expanded[row.id]).map(({ path }) => {
       const folders = this.folderChildren[path], files = this.fileChildren[path];
       const count = (folders?.length ?? 0) + (files?.length ?? 0);
       return html`<div class="notice" role="status">${this.inflight[path] ? `Loading ${lastSeg(path)}…`
@@ -282,7 +287,7 @@ export class BrowseSurface extends JfElement {
     const rows = this.rows();
     const state = this.aiState;
     const activity = selectIndexingProgress(state?.status ?? null, state?.indexingStatusLive ?? false, state?.episodeMaxPendingJobs ?? 0, state?.enrichSettleSamples ?? []).activity;
-    return html`${this.developer || this.filter ? html`<div class="header"><jf-button variant="ghost" size="icon" label="Refresh"
+    return html`${this.developer ? html`<div class="header"><jf-button variant="ghost" size="icon" label="Refresh"
       .availability=${this.refreshing ? unavailableBecause('Refreshing…', true) : undefined} .onActivate=${() => void this.refresh()}>
       ${icon({ name: 'refresh-cw', size: 14, spin: this.refreshing })}</jf-button></div>
       <div class="search-bar"><input class="filter-input" type="search" aria-label="Filter files" placeholder="Filter files…"
@@ -291,7 +296,7 @@ export class BrowseSurface extends JfElement {
       <div class="body">
         <div class="column-heads" aria-hidden="true"><span>Name</span><span>Size</span><span>Changed</span><span></span></div>
         ${this.renderNotices()}
-        ${rows.length ? html`<div role="tree" aria-label="Browse searchable files">${repeat(rows, row => row.path, row => this.renderRow(row))}</div>`
+        ${rows.length ? html`<div role="tree" aria-label="Browse searchable files">${repeat(rows, row => row.id, row => this.renderRow(row))}</div>`
           : html`<div class="empty-state" tabindex="-1" role="status">${this.refreshing ? 'Loading folders…' : this.error ? ''
             : state && !activity.confirmed ? `${activity.summary}. Waiting for a fresh observation of folders.`
             : this.provisional ? 'Reading your files again… your watched folders will reappear when it finishes.'

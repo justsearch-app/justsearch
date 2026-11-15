@@ -40,6 +40,7 @@ import '../components/SurfaceTabs.js';
 import type { SurfaceTabs, SurfaceTabItem } from '../components/SurfaceTabs.js';
 import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { present } from '../display/present.js';
+import { formatFileCount } from '../display/format.js';
 import { offerReversal, ReversalClosedError } from '../state/ownReversals.js';
 import { FocusKeeper, focusRowsUnder } from '../primitives/focusKeeper.js';
 import '../components/ConfirmBand.js';
@@ -144,7 +145,7 @@ function rebuildGapReason(code: string): string {
     INPUT_TOO_LARGE: 'The file exceeds the size limit.',
     OFFICE_INPUT_TOO_LARGE: 'The Office document exceeds the size limit.',
     WRITE_FAILED: 'The document could not be saved to the new search data.',
-    WRITE_UNAVAILABLE_DRAINING: 'The index was unavailable while finishing other work.',
+    WRITE_UNAVAILABLE_DRAINING: 'The search data was unavailable while finishing other work.',
     MISSING_AT_PROCESSING: 'The source file was missing when processing started.',
     DELETED_OR_MISSING: 'The source file was deleted or could not be found.',
     DELETED_AFTER_SNAPSHOT: 'The source file was deleted during the rebuild.',
@@ -1131,13 +1132,21 @@ export class LibrarySurface extends JfElement {
     });
   }
 
+  /** A retained inventory is last known after its read fails, independently of status polls. */
+  private get rootsUnconfirmed(): boolean {
+    const observation = getIndexedRoots();
+    return this.rootsObserved && !observation.confirmed && observation.receivedAtMs !== undefined;
+  }
+
   private projectFolder(root: IndexedRootView): FolderRow {
     const pathHash = root.pathHash ?? '';
     const fullPath = this.resolvedPaths[pathHash];
     const name = folderRowLabel(pathHash, fullPath);
     const fs = this.rowStatus(root);
     const progress = rootCoverage(root, this.enrichmentStages);
-    const unknown = !this.indexingActivity.confirmed || this.provisional || fs.state === 'unavailable';
+    const confirmed = this.indexingActivity.confirmed && !this.rootsUnconfirmed;
+    const unknown = !confirmed || this.provisional || fs.state === 'unavailable';
+    const files = formatFileCount(root.fileCount, root.fileCountCapped);
     const statusText = fs.state === 'ready' ? 'Up to date'
       : fs.state === 'empty' ? 'No files to read'
       : fs.state === 'enriching' ? `Meaning processing${progress?.percent != null ? ` · ${progress.percent}%` : ''}`
@@ -1147,21 +1156,21 @@ export class LibrarySurface extends JfElement {
     return {
       expanded: this.expandedFolders.has(pathHash),
       pathHash, displayPath: name.label, fullPath, pathTitle: name.title, walkError: undefined,
-      status: !this.indexingActivity.confirmed && fs.glyph === 'indexed' ? 'pending' : fs.glyph,
-      statusText: !this.indexingActivity.confirmed && fs.state === 'ready' ? this.indexingActivity.summary
+      status: !confirmed && fs.glyph === 'indexed' ? 'pending' : fs.glyph,
+      statusText: this.rootsUnconfirmed ? 'Reading status unconfirmed'
+        : !confirmed && fs.state === 'ready' ? this.indexingActivity.summary
         : statusText,
       metaText: this.removingHashes.has(pathHash) ? 'Removing folder…' : fs.metaText,
       removalBusy: this.removingHashes.has(pathHash),
       ...(this.removeConfirm?.origin === 'row' && this.removalPlan(pathHash) ? { removeConfirm: this.removalPlan(pathHash)! } : {}),
       failed: fs.failed, failedLastKnown: fs.failedIsLastKnown === true, apiBase: this.apiBase,
-      filesFound: (root.fileCount ?? -1) >= 0
-        ? `${unknown ? 'Last known ' : ''}${(root.fileCount ?? 0).toLocaleString()}${root.fileCountCapped ? '+' : ''} files` : '',
+      filesFound: files ? `${unknown ? 'Last known ' : ''}${files}` : '',
       developer: this.developer,
       meaningText: this.meaningText(root, fs),
-      reading: !this.indexProgress.pause && (fs.state === 'indexing' || fs.state === 'scanning' || fs.state === 'enriching'),
+      reading: confirmed && !this.indexProgress.pause && (fs.state === 'indexing' || fs.state === 'scanning' || fs.state === 'enriching'),
       collection: root.collection ?? 'default',
       wordsVerdict: fs.state === 'ready' || fs.state === 'enriching' || fs.state === 'keyword-only' || fs.state === 'unverified'
-        ? `${this.indexingActivity.confirmed ? 'Now' : 'Last known'}${fs.state === 'unverified' ? ' · deletions unverified' : ''}`
+        ? `${confirmed ? 'Now' : 'Last known'}${fs.state === 'unverified' ? ' · deletions unverified' : ''}`
         : 'Not yet confirmed; see status',
       processingPercent: progress?.percent,
       indexedAgo: root.lastIndexedIsoTime ? this.host_.utilities.formatRelativeTime(root.lastIndexedIsoTime) : '',
@@ -1798,10 +1807,11 @@ export class LibrarySurface extends JfElement {
         return;
       }
       const name = folderName(resolved);
-      const files = this.roots.find(root => root.pathHash === pathHash)?.fileCount ?? -1;
+      const row = this.roots.find(root => root.pathHash === pathHash);
+      const files = formatFileCount(row?.fileCount, row?.fileCountCapped);
       const consequence = enclosing
         ? `Its files stay searchable because the enclosing watched folder ${enclosing.path} covers them. Only this registration and its own watcher are removed.`
-        : `${files >= 0 ? `Its ${files.toLocaleString()} ${files === 1 ? 'file leaves' : 'files leave'}` : 'Its files leave'} search and any enrichment still running for it is stopped. Your files on disk stay where they are, and adding ${name} again reads it from scratch.`;
+        : `${files ? `Its ${files} ${files === '1 file' ? 'leaves' : 'leave'}` : 'Its files leave'} search and any enrichment still running for it is stopped. Your files on disk stay where they are, and adding ${name} again reads it from scratch.`;
       const inner = nested.length ? ` This also removes these watched folders: ${nested.map(other => other.path).join(', ')}.` : '';
       this.error = null;
       this.removeConfirm = { hash: pathHash, origin, resolved, enclosing: !!enclosing, nested: nested.map(other => other.hash),
@@ -2032,7 +2042,7 @@ export class LibrarySurface extends JfElement {
             <h3>Other sources</h3>
             <p>
               Documents added from outside your watched folders — by an agent or the ingest API.
-              Nothing re-indexes them, so removing a source is permanent.
+              Nothing reads them again, so removing a source is permanent.
             </p>
           </div>
         </div>
@@ -2045,7 +2055,7 @@ export class LibrarySurface extends JfElement {
           ? html`<div class="other-sources-note">
               ${icon({ name: 'alert-triangle', size: 12 })}
               <span
-                >The index was too large to scan completely — this list may be missing
+                >The search data was too large to scan completely — this list may be missing
                 sources.</span
               >
             </div>`
@@ -2165,7 +2175,7 @@ export class LibrarySurface extends JfElement {
     const documents = this.ownDocuments;
     const ownUnknown = this.indexProgress.phase === 'indexing' ? this.indexingActivity.summary : 'Checking your folders';
     const headline = this.loading ? 'Loading your Library…'
-      : !this.indexProgress.live || this.contactUnconfirmed ? 'Reading status unconfirmed'
+      : !this.indexProgress.live || this.contactUnconfirmed || this.rootsUnconfirmed ? 'Reading status unconfirmed'
         : count ? `${count} ${count === 1 ? 'thing needs' : 'things need'} your attention`
           : this.provisional ? this.provisionalHeadline
             : !this.indexingActivity.confirmed ? this.indexingActivity.summary
@@ -2179,14 +2189,15 @@ export class LibrarySurface extends JfElement {
   private meaningText(root: IndexedRootView, status: FolderStatus): string {
     const words = status.state === 'ready' || status.state === 'enriching' || status.state === 'keyword-only' || status.state === 'unverified';
     const fallback = words ? ' · word search is available' : ' · word search availability not known';
-    if (!this.indexingActivity.confirmed || this.provisional || status.state === 'unknown' || status.state === 'unavailable') return `Not known${words ? ' · word search was available at the last check' : fallback}`;
+    if (!this.indexingActivity.confirmed || this.rootsUnconfirmed || this.provisional || status.state === 'unknown' || status.state === 'unavailable') return `Not known${words ? ' · word search was available at the last check' : fallback}`;
     const stages = this.enrichmentStages;
     if (stages && Object.entries(root.failedStages ?? {}).some(([id, failed]) => failed && (id === 'chunkVectors' ? stages.embedding : stages[id as keyof EnrichmentApplicability]))) return `Some files failed${fallback}`;
-    if (this.enrichmentBlocked) return `${stages?.embedding ? 'Blocked' : 'Needs AI'}${fallback}`;
-    if (stages?.embedding && Object.entries(root.missingArtifactStages ?? {}).some(([id, missing]) => missing && ['embedding', 'chunkVectors'].includes(id))) return `In progress${fallback}`;
+    const missingArtifact = stages?.embedding && Object.entries(root.missingArtifactStages ?? {}).some(([id, missing]) => missing && ['embedding', 'chunkVectors'].includes(id));
     const coverage = rootCoverage(root, stages);
+    if (coverage?.complete && stages?.embedding && !missingArtifact) return 'On';
+    if (this.enrichmentBlocked) return `${stages?.embedding ? 'Blocked' : 'Needs AI'}${fallback}`;
+    if (missingArtifact) return `In progress${fallback}`;
     if (status.state === 'enriching' || coverage && !coverage.complete) return `In progress${fallback}`;
-    if (coverage?.complete && stages?.embedding) return 'On';
     if (stages && !stages.embedding) return `Needs AI${fallback}`;
     return `Not known${fallback}`;
   }
@@ -2309,7 +2320,7 @@ export class LibrarySurface extends JfElement {
       ${this.loading
         ? html`<div class="empty">Loading…</div>`
         : this.roots.length === 0
-          ? this.contactUnconfirmed || !this.indexProgress.live
+          ? this.contactUnconfirmed || !this.indexProgress.live || this.rootsUnconfirmed
             ? html`<div class="empty">Reading status unconfirmed. Folder details are last known; current status is unconfirmed.</div>`
             : this.provisional && !this.rebuilding
             ? html`<div class="empty">${this.provisionalHeadline} ${!this.indexingActivity.confirmed ? `${this.indexingActivity.summary}. ` : ''}Folder details are unconfirmed.</div>`
@@ -2447,8 +2458,8 @@ export class LibrarySurface extends JfElement {
     const confirmed = this.indexingActivity.confirmed;
     return html`<section class="gap-decision" aria-label=${waitingForGaps ? 'Migration gaps' : 'Rebuild control'}>
       <h3>${!confirmed ? 'Reading status unconfirmed — rebuild details last observed' : waitingForGaps && decision ? `The new search data is ready, but ${decision.gaps.length} document${decision.gaps.length === 1 ? '' : 's'} couldn't be included`
-        : waitingForGaps ? 'The new search data needs your decision' : 'New index is being built'}</h3>
-      ${!confirmed ? html`<p>Rebuild details are last observed; current progress and index availability are unconfirmed.</p>` : nothing}
+        : waitingForGaps ? 'The new search data needs your decision' : 'Reading everything again'}</h3>
+      ${!confirmed ? html`<p>Rebuild details are last observed; current progress and search data availability are unconfirmed.</p>` : nothing}
       ${waitingForGaps && decision ? html`
         ${confirmed ? html`<p>Your current search data stays available; activation requires your decision to accept this list.</p>` : nothing}
         <ul>${decision.gaps.map((gap) => html`<li title=${gap.reason}>${gap.unitId}: ${rebuildGapReason(gap.reason)}</li>`)}</ul>
