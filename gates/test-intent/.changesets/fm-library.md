@@ -308,6 +308,11 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "oldAssertion": "Prior presentation labels, collapsed facts or private component interaction path.",
           "newAssertion": "Keep transient, stale and recovery headline assertions; a current positive own-file observation with no watched folders now remains searchable rather than asking the user to start searching.",
           "reason": "The cited owner wording and supplied K/M decisions replace that presentation while preserving the remaining behavioural assertions."
+        },
+        {
+          "oldAssertion": "A fresh MIGRATING/SWITCHING rebuild control contains 'New index is being built'.",
+          "newAssertion": "A fresh MIGRATING/SWITCHING rebuild control contains 'Reading everything again'; retained observations stay qualified.",
+          "reason": "The cited owner wording renames indexing to reading; the rebuild headline follows it."
         }
       ]
     },
@@ -2063,6 +2068,33 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
         "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/handlers/ReindexHandlerTest.java"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/plugin-api/capabilities/platform-open-guard.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Slice 6a removed the hidden roots group in the Browse tree: watched folders are the top rows and their expansion key is the folder's own row id.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "Activating a Browse file row still routes through the local open command, makes no window.open call, and shows the visible refusal.",
+      "conflictSearch": "Decision records searched for Browse, desktop opening guard and open_file; none fixes the tree's row keys. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "The test expands the hidden '__BROWSE_ROOTS__' group and the '/docs' key to render a file row.",
+          "newAssertion": "The test expands the watched folder by its row id JSON.stringify(['/docs']); the same click, open_file call, no window.open and refusal assertions follow.",
+          "reason": "Setup only: the hidden roots group no longer exists, so the old setup rendered no file row; the guarded path is still exercised."
+        }
+      ]
     }
   ]
 }
