@@ -119,7 +119,7 @@ final class McpResourcesReadTest {
     when(adapter.status(any(EngineContext.class))).thenReturn(status);
     KnowledgeSearchResponse resp =
         new KnowledgeSearchResponse(
-            0L, 0L, 0L, List.of(), null, facets, null, null, null, null, null, null, null);
+            0L, 0L, 0L, List.of(), null, facets, null, null, null, null, null, null, null, null);
     when(adapter.search(any(), any(EngineContext.class))).thenReturn(resp);
     KnowledgeSearchController ctrl = mock(KnowledgeSearchController.class);
     when(ctrl.getAdapter()).thenReturn(adapter);

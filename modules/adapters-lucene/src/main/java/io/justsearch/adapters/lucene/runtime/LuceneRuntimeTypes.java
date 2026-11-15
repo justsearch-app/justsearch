@@ -150,7 +150,8 @@ public final class LuceneRuntimeTypes {
       // Tempdoc 585 §D Phase 4 (D4b) — scope to Lucene collection tag(s) (e.g. "agent-history").
       List<String> collection,
       Long sizeFromBytes,
-      Long sizeToBytes)
+      Long sizeToBytes,
+      List<String> excludedCollections)
       implements LuceneRuntimeTypesRuntimeSearchFiltersBuilder.With {}
 
   // ==========================================================================

@@ -83,6 +83,7 @@ export interface SearchState {
   /** Tempdoc 597: the TRUE matched-document count. The headline reads "Top N of M matches" off
    *  this (M), so it can't contradict the facet chips (which count the same matched population). */
   matchCount: number;
+  helpMatches?: { count: number; capped: boolean } | undefined;
   /** Advanced quick results await the refined population count. */
   countsPending?: boolean;
   /** Tempdoc 597 §16.2: true when the match scan hit its `maxDocsScanned` cap, so `matchCount` is a
@@ -261,6 +262,7 @@ interface SearchResponse {
   totalHits?: number;
   /** Tempdoc 597: the true matched-document count (additive wire field; cast-tolerant parse). */
   matchCount?: number;
+  helpMatches?: { count: number; capped: boolean };
   /** Tempdoc 597 §16.2: the facet match scan hit its cap, so `matchCount` is a lower bound ("M+"). */
   facetsTruncated?: boolean;
   searchTrace?: unknown;
@@ -353,6 +355,7 @@ export const FACET_FILTER_KEYS: Record<(typeof FACET_FIELDS)[number], string> = 
 export interface SearchRequestBody {
   query: string;
   querySyntax: 'search';
+  excludedCollections?: string[];
   limit: number;
   mode?: string;
   pipeline?: typeof QUICK_PIPELINE;
@@ -412,6 +415,9 @@ export function buildSearchIntent(
       filterObj.docIds = [...docIdSet];
     }
   }
+  if (!Array.isArray(filterObj.collection) || filterObj.collection.length === 0) {
+    body.excludedCollections = ['justsearch-help'];
+  }
   if (Object.keys(filterObj).length > 0) {
     body.filters = filterObj;
   }
@@ -466,7 +472,7 @@ function clearTimers(): void {
 export function setQuery(q: string): void {
   generation += 1;
   inflightAbort?.abort();
-  state = { ...state, query: q, totalHits: 0, matchCount: 0, countsPending: true,
+  state = { ...state, query: q, totalHits: 0, matchCount: 0, helpMatches: undefined, countsPending: true,
     facetsTruncated: false, passStage: null, searchTrace: null,
     error: null, errorInfo: null, isSearching: !!q.trim(), isRefining: false, slowSearch: false };
   emit();
@@ -602,7 +608,7 @@ export function invalidateSearchRestrictions(): void {
   clearTimers();
   inflightAbort?.abort();
   inflightAbort = null;
-  state = { ...state, results: [], totalHits: 0, matchCount: 0, facets: null,
+  state = { ...state, results: [], totalHits: 0, matchCount: 0, helpMatches: undefined, facets: null,
     facetsTruncated: false, isSearching: false, isRefining: false, error: null,
     errorInfo: null, searchTrace: null, passStage: null, restrictionsKey: '' };
   emit();
@@ -630,8 +636,11 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
   inflightAbort = new AbortController();
   // A refined pass behind displayed results refines quietly; everything else is a full search.
   const refiningBehindResults = stage === 'refined' && state.results.length > 0 && !state.error;
+  const refiningQuickResponse = stage === 'refined' && state.passStage === 'quick'
+    && state.restrictionsKey === restrictionsKey;
   state = {
     ...state,
+    helpMatches: stage === 'refined' ? state.helpMatches : undefined,
     isSearching: !refiningBehindResults,
     isRefining: refiningBehindResults,
     slowSearch: false,
@@ -668,9 +677,10 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
       if (gen !== generation || restrictionsKey !== JSON.stringify(restrictionWire(getFilters()))) return false; // also guard the asynchronous body read
       const syntaxInvalid = errorInfo.code === 'SEARCH_SYNTAX_INVALID';
       state = { ...state, isSearching: false, isRefining: false, slowSearch: false,
-        ...(syntaxInvalid ? { results: [], totalHits: 0, matchCount: 0, facets: null,
+        ...(syntaxInvalid ? { results: [], totalHits: 0, matchCount: 0, helpMatches: undefined, facets: null,
           facetsTruncated: false, passStage: null, searchTrace: null, countsPending: false } : {}),
-        error: syntaxInvalid && stage === 'quick' ? null : searchFailureMessage(errorInfo),
+        error: (syntaxInvalid && stage === 'quick') || (!syntaxInvalid && refiningQuickResponse)
+          ? null : searchFailureMessage(errorInfo),
         errorInfo };
       emit();
       return false;
@@ -723,6 +733,9 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
       // Tempdoc 597: the true matched total (M in "Top N of M matches"). Fall back to totalHits then
       // the hit count if an older worker omits matchCount.
       matchCount: data.matchCount ?? data.totalHits ?? hits.length,
+      helpMatches: data.helpMatches && Number.isSafeInteger(data.helpMatches.count)
+        && data.helpMatches.count >= 0 && typeof data.helpMatches.capped === 'boolean'
+        ? data.helpMatches : undefined,
       countsPending: data.advancedSyntax === true && stage === 'quick',
       // §16.2: the scan capped at `maxDocsScanned`, so the matched total above is a lower bound.
       facetsTruncated: data.facetsTruncated === true,
@@ -752,7 +765,8 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
       isSearching: false,
       isRefining: false,
       slowSearch: false,
-      error: 'Search could not be completed. Open Health to check the connection and service status before trying again.',
+      error: refiningQuickResponse ? null
+        : 'Search could not be completed. Open Health to check the connection and service status before trying again.',
     };
     emit();
     return false;

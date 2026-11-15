@@ -154,6 +154,25 @@ public final class QueryFilterBuilder {
     return false;
   }
 
+  /** Request-specific exclusions bind before every retrieval candidate budget. */
+  private static void addExcludedCollections(BooleanQuery.Builder qb, List<String> collections) {
+    if (!hasTermValues(collections)) return;
+    qb.add(new TermInSetQuery(SchemaFields.COLLECTION,
+        collections.stream().filter(v -> v != null && !v.isBlank()).map(BytesRef::new).toList()),
+        BooleanClause.Occur.MUST_NOT);
+    if (collections.contains(io.justsearch.configuration.InternalCollections.HELP)) {
+      var store = io.justsearch.configuration.resolved.ConfigStore.globalOrNull();
+      var help = store == null ? null : store.get().collections().bundledHelp();
+      if (help != null) {
+        // Help is not watched and a current ingestion marker skips re-ingestion. Old chunks
+        // can lack the collection tag, so guard their stored source identity before budgets.
+        var legacyHelp = new BooleanQuery.Builder();
+        addSourcePaths(legacyHelp, help.path());
+        qb.add(legacyHelp.build(), BooleanClause.Occur.MUST_NOT);
+      }
+    }
+  }
+
   /** Cacheable postings-only guard. Alias/parent ownership is checked on returned rows. */
   static Query privateSourceQuery(boolean includeAppData) {
     var excluded = new BooleanQuery.Builder();
@@ -163,13 +182,18 @@ public final class QueryFilterBuilder {
         io.justsearch.configuration.InternalCollections.HELP)), BooleanClause.Occur.SHOULD);
     java.nio.file.Path data = io.justsearch.configuration.InternalCollections.dataDirectory();
     java.nio.file.Path source = includeAppData ? data : data.resolve("agent-history");
+    addSourcePaths(excluded, source);
+    return excluded.build();
+  }
+
+  private static void addSourcePaths(BooleanQuery.Builder excluded, java.nio.file.Path source) {
+    source = source.toAbsolutePath().normalize();
     try { source = source.toRealPath(); }
     catch (java.io.IOException unavailable) { /* Configured identity remains useful offline. */ }
     String prefix = normalizePathPrefix(source.toString());
     for (String field : List.of(SchemaFields.PATH, SchemaFields.DOC_ID, SchemaFields.PARENT_DOC_ID)) {
       excluded.add(new PrefixQuery(new Term(field, prefix)), BooleanClause.Occur.SHOULD);
     }
-    return excluded.build();
   }
 
   /**
@@ -238,6 +262,7 @@ public final class QueryFilterBuilder {
     // collections; the default excludes the reserved agent-history collection so transcripts don't
     // pollute normal document search.
     addCollectionScope(qb, filters.collection());
+    addExcludedCollections(qb, filters.excludedCollections());
 
     // Entity filters (NER-extracted values)
     addTermOrFilter(qb, filters.entityPersons(), SchemaFields.ENTITY_PERSONS_RAW);
@@ -299,6 +324,7 @@ public final class QueryFilterBuilder {
 
     // Tempdoc 585 §D Phase 4 (D4b) — collection scope (default-excludes the reserved agent-history).
     hasFilters |= addCollectionScope(qb, filters.collection());
+    addExcludedCollections(qb, filters.excludedCollections());
 
     // Entity filters (NER-extracted values)
     hasFilters |= addTermOrFilter(qb, filters.entityPersons(), SchemaFields.ENTITY_PERSONS_RAW);
@@ -387,6 +413,7 @@ public final class QueryFilterBuilder {
 
     // Collection and source ownership apply to legacy chunks as well as current parents.
     hasClause |= addCollectionScope(qb, filters.collection());
+    addExcludedCollections(qb, filters.excludedCollections());
 
     if (filters.pathPrefix() != null && !filters.pathPrefix().isBlank()) {
       String normalized = normalizePathPrefix(filters.pathPrefix());

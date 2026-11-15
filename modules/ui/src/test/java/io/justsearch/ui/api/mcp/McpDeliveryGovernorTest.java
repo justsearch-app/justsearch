@@ -292,7 +292,7 @@ final class McpDeliveryGovernorTest {
     }
     KnowledgeSearchResponse canned =
         new KnowledgeSearchResponse(
-            30L, 30L, 12L, hits, null, null, null, null, null, null, null, null, null);
+            30L, 30L, 12L, hits, null, null, null, null, null, null, null, null, null, null);
 
     KnowledgeHttpApiAdapter adapter = mock(KnowledgeHttpApiAdapter.class);
     McpSearchSessionFixture.stub(adapter, canned);

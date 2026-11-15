@@ -177,6 +177,8 @@ public final class SearchInputCapture {
       runtimeFilters = LuceneRuntimeTypesRuntimeSearchFiltersBuilder.builder().build();
     }
 
+    runtimeFilters = runtimeFilters.withExcludedCollections(request.getExcludedCollectionsList());
+
     // 5. Encoder capture — BGE-M3 then individual encoders.
     boolean wantDense = pipeline.getDenseEnabled();
     boolean wantSplade = pipeline.getSpladeEnabled();

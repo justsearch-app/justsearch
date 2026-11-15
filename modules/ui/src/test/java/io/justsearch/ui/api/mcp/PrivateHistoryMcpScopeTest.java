@@ -39,7 +39,7 @@ final class PrivateHistoryMcpScopeTest {
     var adapter = mock(io.justsearch.app.services.worker.KnowledgeHttpApiAdapter.class);
     when(controller.getAdapter()).thenReturn(adapter);
     McpSearchSessionFixture.stub(adapter, new io.justsearch.app.api.knowledge.KnowledgeSearchResponse(
-        0L, 0L, 0L, List.of(), null, null, null, null, null, null, null, null, null));
+        0L, 0L, 0L, List.of(), null, null, null, null, null, null, null, null, null, null));
     var surface = new McpToolSurface(List.of(OperationCatalog.of("core", List.of())),
         mock(OperationDispatcher.class), () -> controller, () -> facade, Clock.systemUTC());
     for (String tool : List.of("justsearch_search", "justsearch_answer")) {

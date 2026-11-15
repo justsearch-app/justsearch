@@ -155,7 +155,7 @@ final class McpTierEquivalenceGoldenTest {
     facets.put("meta_source", sourceFacet);
     KnowledgeSearchResponse canned =
         new KnowledgeSearchResponse(
-            2L, 2L, 12L, List.of(hit1, hit2), null, facets, null, null, null, null, null, null, null);
+            2L, 2L, 12L, List.of(hit1, hit2), null, facets, null, null, null, null, null, null, null, null);
 
     assertEquals(
         golden("search-matched-terms-facets.txt"),
@@ -180,7 +180,7 @@ final class McpTierEquivalenceGoldenTest {
         new SearchTrace(SearchTrace.SCHEMA_VERSION, "HYBRID", null, null, degradation, List.of());
     KnowledgeSearchResponse canned =
         new KnowledgeSearchResponse(
-            1L, 1L, 9L, List.of(hit), null, null, null, null, null, null, null, trace, null);
+            1L, 1L, 9L, List.of(hit), null, null, null, null, null, null, null, trace, null, null);
 
     assertEquals(
         golden("search-degradation.txt"),
@@ -199,7 +199,7 @@ final class McpTierEquivalenceGoldenTest {
     }
     KnowledgeSearchResponse canned =
         new KnowledgeSearchResponse(
-            37L, 37L, 15L, tenHits, null, null, null, null, null, null, null, null, null);
+            37L, 37L, 15L, tenHits, null, null, null, null, null, null, null, null, null, null);
 
     assertEquals(
         golden("search-truncated.txt"), textOf(invokeSearch(canned, Map.of("query", "widget"))));
@@ -210,7 +210,7 @@ final class McpTierEquivalenceGoldenTest {
   void search_zeroResult() {
     KnowledgeSearchResponse canned =
         new KnowledgeSearchResponse(
-            0L, 0L, 3L, List.of(), null, null, null, null, null, null, null, null, null);
+            0L, 0L, 3L, List.of(), null, null, null, null, null, null, null, null, null, null);
 
     assertEquals(
         golden("search-zero-result.txt"),

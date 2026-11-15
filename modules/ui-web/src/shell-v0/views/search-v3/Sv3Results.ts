@@ -202,7 +202,7 @@ export class Sv3Results extends JfElement {
     return html`
       <section class="results" aria-label="Search results" data-testid="sv3-results"
         @card-preview=${this.onCardPreview} @keydown=${this.onPreviewKeydown}>
-        ${cache(view.status === 'ready' || (view.status === 'empty' && view.filters.length > 0) ? html`${this.filters(view.filters)} ${this.selection(view)} ${this.card(view)}` : html``)} ${this.body(view)}
+        ${cache(view.status === 'ready' || (view.status === 'empty' && view.filters.length > 0) ? html`${this.filters(view.filters)} ${this.selection(view)} ${this.card(view)}` : html``)} ${this.body(view)} ${this.helpMatches(view)}
       </section>
       ${this.preview()}
     `;
@@ -313,6 +313,17 @@ export class Sv3Results extends JfElement {
     return nothing;
   }
 
+  private helpMatches(view: Sv3ResultsView): TemplateResult | typeof nothing {
+    const matches = view.snapshot?.helpMatches;
+    if ((view.status !== 'ready' && view.status !== 'empty') || !matches || matches.count <= 0) return nothing;
+    const label = `${matches.count}${matches.capped ? '+' : ''} ${matches.count === 1 && !matches.capped ? 'page' : 'pages'}`;
+    return html`<div class="help-matches" data-testid="sv3-help-matches">
+      <span aria-hidden="true">${icon({ name: 'help-circle', size: 13 })}</span>
+      <span>Also in JustSearch help: <button type="button" aria-label=${`Open Help (${label})`}
+        @click=${() => requestSurfaceNavigation('core.help-surface')}>${label}</button></span>
+    </div>`;
+  }
+
   private card(view: Sv3ResultsView): TemplateResult {
     return html`<jf-results-card
       data-testid="sv3-results-card"
@@ -331,6 +342,12 @@ export class Sv3Results extends JfElement {
     sv3Shared,
     css`
       jf-results-card { --font-size-xs: var(--font-size-sv3-xs, var(--font-size-secondary)); }
+      jf-results-card[hidden] { display: none; }
+      .help-matches { display: flex; align-items: center; gap: var(--space-2); padding-block: var(--space-3); color: var(--text-secondary); font-size: var(--font-size-sv3-xs); }
+      .help-matches > span:first-child { display: flex; flex: none; }
+      .help-matches button { border: 0; border-radius: 4px; padding: var(--space-1) 0; background: transparent; color: var(--text-primary); font: inherit; font-weight: 500; cursor: pointer; }
+      .help-matches button:hover { text-decoration: underline; }
+      .help-matches button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
       .empty-results { padding: var(--space-6) 0; }
       .empty-results h2 { margin: 0; font-size: var(--font-size-lg); font-weight: 500; line-height: 1.3; }
       .empty-results p { margin: var(--space-1) 0 0; font-size: var(--font-size-sm); }

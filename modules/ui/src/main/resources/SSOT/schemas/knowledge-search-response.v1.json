@@ -211,6 +211,17 @@
         }
       }
     },
+    "helpMatches" : {
+      "type" : "object",
+      "properties" : {
+        "capped" : {
+          "type" : "boolean"
+        },
+        "count" : {
+          "type" : "integer"
+        }
+      }
+    },
     "indexCapabilities" : {
       "type" : [ "object", "null" ],
       "properties" : {

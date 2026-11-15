@@ -98,6 +98,10 @@ export interface KnowledgeSearchResponse {
     original?: Record<string, string[]>;
     source?: string;
   } | null;
+  helpMatches?: {
+    capped?: boolean;
+    count?: number;
+  };
   indexCapabilities?: {
     chunkEmbeddingCoverage?: number;
     crossEncoderAvailable?: boolean;
@@ -180,6 +184,10 @@ export const knowledgeSearchResponseSchema = z.strictObject({
     "original": z.record(z.string(), z.array(z.string())).optional(),
     "source": z.string().optional(),
   }).nullable().optional(),
+  "helpMatches": z.strictObject({
+    "capped": z.boolean().optional(),
+    "count": z.number().int().optional(),
+  }).optional(),
   "indexCapabilities": z.strictObject({
     "chunkEmbeddingCoverage": z.number().optional(),
     "crossEncoderAvailable": z.boolean().optional(),

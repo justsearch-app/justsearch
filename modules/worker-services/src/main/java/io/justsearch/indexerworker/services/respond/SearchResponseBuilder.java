@@ -181,6 +181,7 @@ public final class SearchResponseBuilder {
             ? facetsResult.matchedDocs()
             : computeMatchCount(decision, outcome, inputs);
     responseBuilder.setMatchCount(matchCount);
+    attachHelpMatches(decision, outcome, inputs, responseBuilder);
 
     // Tempdoc 549 Phase E3: ComponentTiming retired. Per-stage timing is projected onto the
     // trace's TraceStage.ms by SearchTraceProjector (retrievalMs → FUSION.ms, chunkMergeMs →
@@ -292,6 +293,41 @@ public final class SearchResponseBuilder {
     return facetsResult;
   }
 
+
+  /** Count Help with the same lexical syntax and hard predicates, independently of retrieval. */
+  private void attachHelpMatches(SearchDecision decision, SearchOutcome outcome,
+      SearchInputs inputs, SearchResponse.Builder response) {
+    String help = io.justsearch.configuration.InternalCollections.HELP;
+    if (!inputs.request().getCursor().isBlank()
+        || !inputs.request().getExcludedCollectionsList().contains(help)) return;
+    var filters = inputs.runtimeFilters();
+    // A positive collection scope is another predicate: disjoint scopes have no Help matches.
+    if (filters.collection() != null
+        && filters.collection().stream().anyMatch(collection -> collection != null && !collection.isBlank())
+        && !filters.collection().contains(help)) {
+      response.setHelpMatches(io.justsearch.ipc.HelpMatches.newBuilder().setCount(0));
+      return;
+    }
+    var helpFilters = filters.withCollection(List.of(help)).withIncludeChunks(false)
+        .withExcludedCollections(inputs.request().getExcludedCollectionsList().stream()
+            .filter(collection -> !help.equals(collection)).toList());
+    try {
+      var syntax = switch (decision) {
+        case SearchDecision.SparseShortcut sparse -> sparse.runtimeSyntax();
+        case SearchDecision.MultiLegDecision multiLeg -> multiLeg.runtimeSyntax();
+        default -> LuceneRuntimeTypes.QuerySyntax.SIMPLE;
+      };
+      String queryText = outcome.correctionApplied()
+          ? outcome.correctedQuery() : inputs.request().getQuery();
+      var query = textQueryOps.buildTextQuery(
+          queryText, helpFilters, syntax);
+      // countQueryOrThrow is exact, so capped stays false. A failed count is omitted, never totalHits.
+      int count = query == null ? 0 : indexCountOps.countQueryOrThrow(query);
+      response.setHelpMatches(io.justsearch.ipc.HelpMatches.newBuilder().setCount(count));
+    } catch (java.io.IOException | org.apache.lucene.queryparser.classic.ParseException | RuntimeException e) {
+      log.warn("Help match count unavailable", e);
+    }
+  }
 
   /**
    * Tempdoc 597: the true matched-document count, computed over the SAME chunk-excluded query the

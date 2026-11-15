@@ -197,6 +197,7 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
     long totalHits = 0;
     long matchCount = 0;
     long maxTookMs = 0;
+    io.justsearch.ipc.HelpMatches helpMatches = null;
     for (SearchResponse r : responses) {
       perSourceHits.add(new ArrayList<>(r.getResultsList()));
       totalHits += r.getTotalHits();
@@ -230,6 +231,7 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
         }
         totalHits = Math.max(totalHits, backfill.getTotalHits());
         matchCount = Math.max(matchCount, backfill.getMatchCount());
+        helpMatches = backfill.hasHelpMatches() ? backfill.getHelpMatches() : null;
         contributors.add(backfill);
       } catch (Exception failure) {
         EngineFutures.rethrowExecutorRefusal(failure);
@@ -277,10 +279,14 @@ public final class SearchPerSourceExecutor implements AutoCloseable {
     SearchResponse template = responses.getFirst();
     SearchResponse.Builder merged = template.toBuilder()
         .clearResults()
+        .clearHelpMatches()
         .setTotalHits(totalHits)
         .setMatchCount(matchCount)
         .setTookMs(maxTookMs)
         .clearFacets();
+    // Child counts include metaSource predicates; only the base-request backfill counts Help
+    // for the merged population. Without that count the line must be absent.
+    if (helpMatches != null) merged.setHelpMatches(helpMatches);
     if (contributors.stream().anyMatch(SearchResponse::hasSearchTrace)) {
       io.justsearch.ipc.SearchTrace.Builder mt = template.getSearchTrace().toBuilder();
       mt.setDegradation(

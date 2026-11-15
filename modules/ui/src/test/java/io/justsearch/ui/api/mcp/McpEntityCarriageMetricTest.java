@@ -335,7 +335,7 @@ final class McpEntityCarriageMetricTest {
     }
     Hit hit = new Hit(c.docId(), 0.71d, fields, List.of(), List.of(), regions, null);
     return new KnowledgeSearchResponse(
-        1L, 1L, 7L, List.of(hit), null, Map.of(), null, null, null, null, null, null, null);
+        1L, 1L, 7L, List.of(hit), null, Map.of(), null, null, null, null, null, null, null, null);
   }
 
   private static String render(KnowledgeSearchResponse resp, McpEntityCarriage.Settings carriage) {

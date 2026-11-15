@@ -988,6 +988,7 @@ final class KnowledgeSearchEngine {
       SearchRequest.Builder b =
           SearchRequest.newBuilder()
               .setQuery(queryText)
+              .addAllExcludedCollections(req.excludedCollections())
               .setLimit(searchLimit)
               // Tempdoc 549 Phase D2: the REST `debug` flag requests the numeric per-hit detail
               // tier — map it to include_detail (the deprecated gRPC debug field retires in E1).
@@ -1517,6 +1518,9 @@ final class KnowledgeSearchEngine {
         .totalHits(resp.getTotalHits())
         // Tempdoc 597: the true matched-document count (distinct from the union totalHits).
         .matchCount(resp.getMatchCount())
+        .helpMatches(resp.hasHelpMatches()
+            ? new KnowledgeSearchResponse.HelpMatches(
+                resp.getHelpMatches().getCount(), resp.getHelpMatches().getCapped()) : null)
         .tookMs(totalSearchMs)
         .results(hits)
         .nextCursor(nextCursor)

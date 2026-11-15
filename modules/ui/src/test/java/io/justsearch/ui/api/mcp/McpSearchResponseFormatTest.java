@@ -82,7 +82,7 @@ final class McpSearchResponseFormatTest {
             List.of(region),
             null);
     return new KnowledgeSearchResponse(
-        1L, 1L, 12L, List.of(hit), null, null, null, null, null, null, null, null, null);
+        1L, 1L, 12L, List.of(hit), null, null, null, null, null, null, null, null, null, null);
   }
 
   @Test
@@ -98,7 +98,7 @@ final class McpSearchResponseFormatTest {
     var selectedGeneration = new java.util.concurrent.atomic.AtomicReference<>("A");
     var countReads = new java.util.concurrent.atomic.AtomicInteger();
     var empty = new KnowledgeSearchResponse(
-        0L, 0L, 0L, List.of(), null, null, null, null, null, null, null, null, null);
+        0L, 0L, 0L, List.of(), null, null, null, null, null, null, null, null, null, null);
     when(adapter.openSearch(any(), any(EngineContext.class))).thenAnswer(ignored -> {
       selectedGeneration.set("B");
       return new KnowledgeHttpApiAdapter.SearchSession() {
@@ -136,7 +136,7 @@ final class McpSearchResponseFormatTest {
     when(config.search()).thenThrow(new IllegalStateException("render failure"));
     var closed = new AtomicBoolean();
     var empty = new KnowledgeSearchResponse(
-        0L, 0L, 0L, List.of(), null, null, null, null, null, null, null, null, null);
+        0L, 0L, 0L, List.of(), null, null, null, null, null, null, null, null, null, null);
     when(adapter.openSearch(any(), any(EngineContext.class))).thenReturn(
         new KnowledgeHttpApiAdapter.SearchSession() {
           @Override public KnowledgeSearchResponse response() { return empty; }

@@ -27,6 +27,7 @@ class KnowledgeSearchResponseContractTest {
           "totalHits",
           // Tempdoc 597: the true matched-document count (mapped in KnowledgeSearchController).
           "matchCount",
+          "helpMatches",
           "tookMs",
           "results",
           "nextCursor",
