@@ -2,7 +2,7 @@
 title: Manage local data
 type: how-to
 status: stable
-description: "Forget indexed files or folders, review unfinished removals, and understand which local copies remain."
+description: "Remove files or folders from search, review unfinished removals, and understand which local copies remain."
 ---
 
 # Manage local data
@@ -11,11 +11,11 @@ Use **Forget** in Search to remove a file or folder from search and the app's in
 Its confirmation names the exact path. It does not delete the original file or promise to erase
 every copy of its content.
 
-## Forget an indexed file or folder
+## Forget a file or folder from search
 
 1. Open a result's context menu with the pointer, the context-menu key, or **Shift+F10**.
 2. Choose **Forget this file** or **Forget its folder**.
-3. Check the exact path and the stated indexing consequence, then confirm. Cancel or Escape
+3. Check the exact path and the stated reading consequence, then confirm. Cancel or Escape
    leaves the request unapproved.
 
 An exact file rule applies only to that file. A folder rule includes its descendants, with a path
@@ -23,15 +23,15 @@ boundary: forgetting `b` does not include sibling `bc`. Glob characters in a for
 literal filename characters. Whitespace and control characters are shown explicitly where needed
 to distinguish otherwise similar paths.
 
-A completed forget removes the target's indexed document rows, its owned chunks and queued indexing
+A completed forget removes the target's indexed document rows, its owned chunks and queued reading
 work. Search results, current selection, Ask scope and an open document pane update after confirmed
 completion. Built-in help and agent-history sources are protected. To stop watching an entire
-watched root, or a folder containing one, use the folder's **Remove** control in Library instead.
+watched root, or a folder containing one, use the folder's **Remove from library** control in Library instead.
 
 Files inside watched roots and every permitted folder forget get an exact keep-out entry. It blocks
-later indexing while it remains effective. A file outside all watched roots is the exception: its
+later reading while it remains effective. A file outside all watched roots is the exception: its
 confirmation explains that no permanent keep-out is added. A new deliberate add, import or relevant
-file operation accepted after its completed forget can index that file again.
+file operation accepted after its completed forget can read that file again.
 
 ## Review an unfinished or uncertain result
 
@@ -52,18 +52,18 @@ If withdrawal cannot be confirmed, it remains incomplete and destructive Retry s
 cannot recreate that entry through Retry.
 
 If completion wins before withdrawal, the completed receipt stays completed. The app explains that
-withdrawal cannot reverse it. Remove an installed keep-out separately to permit later indexing.
+withdrawal cannot reverse it. Remove an installed keep-out separately to permit later reading.
 
-## Permit indexing again
+## Permit reading again
 
-In Library, review **Exact paths kept out** alongside **Exclude patterns**. Remove the intended
+In Library, review **Exact paths kept out** alongside **Skip these files**. Remove the intended
 exact-path row and use **Save patterns**. Exact rows are separate from the glob editor, so editing globs keeps
-their original path bytes. Removing a rule permits a later indexing pass; it does not create a new
-watcher or immediately restore removed rows. A separate remaining exclusion can still block indexing.
+their original path bytes. Removing a rule permits a later reading pass; it does not create a new
+watcher or immediately restore removed rows. A separate remaining exclusion can still block reading.
 
 ## What Forget leaves in place
 
-| Data | Effect of indexed-file or folder Forget |
+| Data | Effect of forgetting a file or folder from search |
 | --- | --- |
 | Original files and folders | Remain on disk. |
 | Learned Memory | Remains; inspect it separately in **Memory**. Forgetting a Memory item is a different action. |
@@ -72,6 +72,6 @@ watcher or immediately restore removed rows. A separate remaining exclusion can 
 | Logs, audit records and operational receipts | Remain under their existing handling and may still contain paths or earlier content. |
 | Older index generations or unreclaimed index bytes | No secure-erasure promise; removing searchable rows does not establish physical erasure of every copy. |
 
-This guide describes indexed Forget. It does not establish that uninstalling the application removes
+This guide describes forgetting files from search. It does not establish that uninstalling the application removes
 all local data. Packaged uninstall behavior is unverified here, including Windows package mechanics.
 See [Using the UI](use-ui.md) for the separate reset and backup controls.

@@ -728,7 +728,7 @@ describe('HealthSurface — Queue card status vocabulary (630 D1)', () => {
     const el = await mount();
     try {
       const subs = queueSubs(el);
-      expect(subs).toContain('Indexing');
+      expect(subs).toContain('Reading');
       expect(subs).not.toContain('Up to date');
     } finally {
       teardown(el);
@@ -824,10 +824,10 @@ describe('HealthSurface — Queue card status vocabulary (630 D1)', () => {
     const el = await mount();
     try {
       const subs = queueSubs(el);
-      expect(subs.some((s) => s.includes('Text indexing continues'))).toBe(true);
+      expect(subs.some((s) => s.includes('Text reading continues'))).toBe(true);
       expect(subs.some((s) => s.includes('Meaning search is waiting while the computer saves energy.'))).toBe(true);
       expect(subs).not.toContain('Paused — saving energy');
-      expect(subs).not.toContain('Indexing');
+      expect(subs).not.toContain('Reading');
     } finally {
       teardown(el);
     }

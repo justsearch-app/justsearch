@@ -36,7 +36,7 @@ it('shows retry waiting with the backlog and deadline then follows the worker li
   // A later observation replaces waiting; stale observations never claim live work.
   expect(selectIndexingProgress(status('WAITING', 7), false, 10, []).activity.confirmed).toBe(false);
   const ready = selectIndexingProgress(status('INDEXING', 7), true, 10, []);
-  expect(ready.activity.summary).toBe('Indexing');
+  expect(ready.activity.summary).toBe('Reading');
   expect(ready.activity.detail ?? '').not.toContain('retry');
 
   const noDeadline = status('WAITING', 7);
@@ -56,8 +56,8 @@ it('terminal job failures stay errors instead of becoming a completion claim', (
   const progress = selectIndexingProgress(failed, true, 10, []);
   expect(selectIndexingPhase(failed)).toBe('error');
   expect(progress.phase).toBe('error');
-  expect(progress.activity.summary).toBe('Indexing error');
-  expect(progress.activity.detail).toBe('2 files could not be indexed.');
+  expect(progress.activity.summary).toBe('Reading error');
+  expect(progress.activity.detail).toBe('2 files could not be read.');
   expect(progress.indexingPercent).toBeNull();
   expect(progress.etaSeconds).toBeNull();
 });

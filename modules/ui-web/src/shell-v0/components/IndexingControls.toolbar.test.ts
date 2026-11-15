@@ -33,7 +33,7 @@ it.each([[0, 'Until I resume'], [900000, '15 minutes'], [3600000, '1 hour']] as 
     operation.invokeWithConsent.mockImplementation(() => new Promise<void>(resolve => { complete = resolve; }));
     vi.spyOn(Date, 'now').mockReturnValue(1000000);
     const el = await mount(['schedule', 'on_battery']);
-    const toggle = button(el, 'Pause indexing'); toggle.click(); await settle(el);
+    const toggle = button(el, 'Pause reading'); toggle.click(); await settle(el);
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     const choice = button(el, label); choice.click(); choice.click(); await settle(el);
     expect(operation.invokeWithConsent).toHaveBeenCalledTimes(1);
@@ -42,24 +42,24 @@ it.each([[0, 'Until I resume'], [900000, '15 minutes'], [3600000, '1 hour']] as 
     expect(toggle.getAttribute('aria-disabled')).toBe('true');
     complete(); await settle(el);
     el.progress = progress(['user_paused', 'schedule', 'on_battery']); await settle(el);
-    expect(el.shadowRoot!.textContent).toContain('Resume indexing');
+    expect(el.shadowRoot!.textContent).toContain('Resume reading');
     expect(el.shadowRoot!.textContent).not.toContain('Change hours');
   });
 
 it('Resume clears manual pause and reports the remaining holds from confirmed status', async () => {
   operation.invokeWithConsent.mockResolvedValue(undefined);
   const el = await mount(['user_paused', 'schedule', 'on_battery']);
-  button(el, 'Resume indexing').click(); await settle(el);
+  button(el, 'Resume reading').click(); await settle(el);
   expect(operation.invokeWithConsent).toHaveBeenCalledWith('core.indexing-resume', { args: {} }, expect.anything());
   expect(el.shadowRoot!.textContent).toContain('Waiting for status');
   el.progress = progress(['schedule', 'on_battery']); await settle(el);
   expect(el.shadowRoot!.textContent).toContain('Manual pause cleared');
-  expect(el.shadowRoot!.textContent).toContain('indexing hours and battery power');
-  expect(el.shadowRoot!.textContent).toContain('Pause indexing');
+  expect(el.shadowRoot!.textContent).toContain('reading hours and battery power');
+  expect(el.shadowRoot!.textContent).toContain('Pause reading');
 });
 
 it('Escape closes the keyboard-operable pause menu and restores its trigger', async () => {
-  const el = await mount(); const toggle = button(el, 'Pause indexing');
+  const el = await mount(); const toggle = button(el, 'Pause reading');
   toggle.click(); await settle(el); button(el, '15 minutes').focus();
   el.shadowRoot!.querySelector('.pause-menu')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   await settle(el);

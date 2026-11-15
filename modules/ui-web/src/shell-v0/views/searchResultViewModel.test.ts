@@ -21,7 +21,7 @@ describe('searchResultViewModel (577 Phase 7)', () => {
   it('maps each kind to an icon glyph', () => {
     expect(projectResultView({ title: 't', path: 'p', kind: 'code' }).icon).toBe('code');
     expect(projectResultView({ title: 't', path: 'p', kind: 'image' }).icon).toBe('image');
-    expect(projectResultView({ title: 't', path: 'p', kind: 'markdown' }).icon).toBe('file-text');
+    expect(projectResultView({ title: 't', path: 'p', kind: 'markdown' }).icon).toBe('list');
   });
 
   it('prefers the worker excerpt over content_preview and carries its line anchor', () => {

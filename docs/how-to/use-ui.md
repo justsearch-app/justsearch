@@ -143,23 +143,24 @@ Note: `GET /api/debug/effective-config` exists for "effective config" debugging.
 
 ## 3. Common Tasks
 
-### Adding a Folder to Index
-1.  Navigate to the **Library** view (Folder icon).
-2.  **Browser Mode:** Click "Add Folder" and paste the path (native picker is unavailable).
-3.  **Tauri Mode:** Click "Add Folder" to open the OS dialog.
-4.  Monitor the **Health** view to see the document count rise.
+### Adding a folder
 
-### Forcing a Re-Index
-If the index seems out of sync:
-1.  Go to **Library** view.
-2.  Use the header's reindex action to incrementally check all watched roots. Unchanged files can be skipped.
-3.  An unverified folder row shows **Reindex** (tooltip **Reindex to verify**). This forces
-    extraction checks across all watched roots; it is not limited to that row's folder.
+1. Open **Library** from the top bar.
+2. Choose **Add a folder**. On desktop, select a folder in the system picker.
+   In a browser, enter its path in the form.
+3. The folder row shows its reading state and the last observed number of disk files.
 
-A full-generation rebuild for an embedding mismatch is a separate operation; an incremental reindex
-does not replace that recovery.
+### Reading files again
 
-### Forgetting an Indexed File or Folder
+In **Library → More Library actions**, choose **Read everything again** to read all watched
+folders again, including unchanged files. **Read again to verify** on an unverified row also
+checks all watched folders. Neither action is limited to that row's folder.
+**Read waiting files now** starts one pass through waiting AI work; another pass may be needed.
+Acceptance is reported separately from completion. A rebuild for an incompatible search format
+is a separate recovery: existing search data stays available until the replacement is ready,
+and any files it could not include require a decision before activation.
+
+### Forgetting a File or Folder from Search
 
 In Search, open a result's context menu and choose **Forget this file** or **Forget its folder**.
 Check the exact path before confirming. Review incomplete removals in Library's **Unfinished forgets**.
@@ -189,7 +190,7 @@ app and deletes the index, settings, logs, and chat history on next launch; AI m
 runtime are preserved. Export an encrypted backup of chat history, memories, and agent history first
 from **Security & Privacy** if you need to keep them.
 
-Inside that folder, `index` holds the search index and `jobs.db` holds the indexing queue.
+Inside that folder, `index` holds the search index and `jobs.db` holds the reading queue.
 A browser dev stack uses its own data folder instead: `dev:all` defaults to `modules/ui-web/.dev-data`, Gradle `runHeadless`
 defaults to `modules/ui/build/applauncher-data`, and jseval records its selected folder in its run output.
 Use that stack's data folder rather than the desktop folder.
@@ -227,7 +228,7 @@ for example `http://127.0.0.1:8085`. This must be a loopback HTTP URL with an ex
 it starts its own server and reports a healthy unowned server as `external_server_ignored`; it does
 not adopt it automatically. See ADR-0051.
 
-Tip: `GET /api/inference/status` is usually the fastest way to see if the app thinks it is Online/Indexing/Offline, plus any external-server diagnostics when an explicit endpoint is in use.
+Tip: `GET /api/inference/status` is usually the fastest way to see if the app thinks it is Online/Reading/Offline, plus any external-server diagnostics when an explicit endpoint is in use.
 
 ## 4. AI Agent Usage Notes
 

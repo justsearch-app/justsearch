@@ -48,9 +48,9 @@ function feedRebuilding(): void {
   __tickClockForTest();
 }
 
-async function mount(): Promise<LibrarySurface> {
+async function mount(host: PluginHostApi = stubHost): Promise<LibrarySurface> {
   const el = document.createElement('jf-library-surface') as LibrarySurface;
-  el.host_ = stubHost;
+  el.host_ = host;
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
@@ -69,7 +69,7 @@ describe('LibrarySurface — transition-aware empty state (595 §4.3)', () => {
     try {
       await el.updateComplete;
       const text = el.shadowRoot?.textContent ?? '';
-      expect(text).toContain('Rebuilding index');
+      expect(text).toContain('Reading your files again');
       expect(text).not.toContain('No watched folders');
     } finally {
       el.remove();
@@ -94,12 +94,16 @@ describe('LibrarySurface — transition-aware empty state (595 §4.3)', () => {
       } as unknown as StatusSnapshot,
     });
     __tickClockForTest();
-    const el = await mount();
+    // Genuinely no watched folders: the Engine answers an empty folder list. A failed read is not
+    // "no folders" (R3).
+    const el = await mount({ ...stubHost, data: { fetch: async (path: string) => path.startsWith('/api/indexing-roots/substrate')
+      ? Response.json({ items: [] }) : ({ ok: false, status: 503 }) as unknown as Response } } as unknown as PluginHostApi);
     try {
+      await vi.waitFor(() => expect(el.loading).toBe(false));
       await el.updateComplete;
       const text = el.shadowRoot?.textContent ?? '';
       expect(el.shadowRoot?.querySelector('h2')?.textContent).toBe('Add a folder to start searching');
-      expect(text).not.toContain('Rebuilding index');
+      expect(text).not.toContain('Reading your files again');
     } finally {
       el.remove();
     }
@@ -280,27 +284,28 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
   afterEach(() => __resetAiStateForTest());
 
   async function mountWithRow(): Promise<LibrarySurface> {
+    const row: IndexedRootView = {
+      pathHash: HASH,
+      collection: 'default',
+      fileCount: 400,
+      lastIndexedIsoTime: '2026-08-06T00:00:00Z',
+      status: 'indexed',
+      inFlightCount: 0,
+      failedCount: 0,
+      walkCompleted: true,
+    };
     const el = document.createElement('jf-library-surface') as LibrarySurface;
     el.host_ = {
       platform: { capabilities: new Set<string>() },
-      data: { fetch: async () => ({ ok: false, status: 503 }) as unknown as Response },
+      // The Engine reports the row under test; a failed folder-list read would make it unconfirmed (R3).
+      data: { fetch: async (path: string) => path.startsWith('/api/indexing-roots/substrate')
+        ? Response.json({ items: [row] }) : ({ ok: false, status: 503 }) as unknown as Response },
       utilities: { formatRelativeTime: () => 'just now' },
     } as unknown as PluginHostApi;
     document.body.appendChild(el);
     await el.updateComplete;
     await vi.waitFor(() => expect(el.loading).toBe(false));
-    el.roots = [
-      {
-        pathHash: HASH,
-        collection: 'default',
-        fileCount: 400,
-        lastIndexedIsoTime: '2026-08-06T00:00:00Z',
-        status: 'indexed',
-        inFlightCount: 0,
-        failedCount: 0,
-        walkCompleted: true,
-      },
-    ];
+    el.roots = [row];
     el.resolvedPaths = { [HASH]: '/home/me/Documents/seed-corpus' };
     el.requestUpdate();
     await el.updateComplete;
@@ -319,7 +324,7 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
     const el = await mountWithRow();
     try {
       const text = el.shadowRoot?.textContent ?? '';
-      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Searchable by words\s*Now/);
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Search by meaning\s*In progress.*word search is available/);
       expect(text).toContain('Meaning processing');
       expect(el.shadowRoot?.querySelector('.folder-state')?.textContent).not.toContain('Up to date');
     } finally {
@@ -333,7 +338,9 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
     try {
       const text = el.shadowRoot?.textContent ?? '';
       expect(el.shadowRoot?.querySelector('.folder-state')?.textContent).toContain('Up to date');
-      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Indexed\s*just now/);
+      // A settled folder claims no reading in progress; its open row has no read time (scans, not writes, set it).
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toContain('Search by meaning');
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).not.toMatch(/Reading now|Read\s*just now/);
       expect(text).not.toContain('semantic search still catching up');
     } finally {
       el.remove();
@@ -365,7 +372,9 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
     try {
       expect(el.enrichmentBlocked).toBe(true);
       const text = el.shadowRoot?.textContent ?? '';
-      expect(text).toContain('semantic search waiting for AI install');
+      // V1: the qualification is said once, in the open row's Search by meaning line, by that name.
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Search by meaning\s*Needs AI/);
+      expect(text).not.toMatch(/semantic search/i);
       expect(text).not.toContain('fully searchable');
     } finally {
       el.remove();
@@ -391,7 +400,9 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
       expect(el.enrichmentBlocked).toBe(false);
       const text = el.shadowRoot?.textContent ?? '';
       expect(el.shadowRoot?.querySelector('.folder-state')?.textContent).toContain('Up to date');
-      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Indexed\s*just now/);
+      // A settled folder claims no reading in progress; its open row has no read time (scans, not writes, set it).
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toContain('Search by meaning');
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).not.toMatch(/Reading now|Read\s*just now/);
       expect(text).not.toContain('semantic search waiting for AI install');
     } finally {
       el.remove();
@@ -408,14 +419,18 @@ it('L1 library retry waiting appears once outside folder rows', async () => {
     failure: { nextRetryAtMs: retry },
   } } as unknown as StatusSnapshot });
   __tickClockForTest();
+  const root = { pathHash: 'wait-root', collection: 'notes', fileCount: 37,
+    indexed: true, inFlightCount: 8, failedCount: 0 } as IndexedRootView;
   const el = document.createElement('jf-library-surface') as LibrarySurface;
-  el.host_ = { ...stubHost, utilities: { formatRelativeTime: () => 'just now' } } as unknown as PluginHostApi;
+  // The Engine reports the rows under test; a failed folder-list read would make them unconfirmed (R3).
+  el.host_ = { ...stubHost, data: { fetch: async (path: string) => path.startsWith('/api/indexing-roots/substrate')
+    ? Response.json({ items: [root, { ...root, pathHash: 'second-root' }].map(({ indexed: _wireless, ...row }: IndexedRootView & { indexed?: boolean }) => row) })
+    : ({ ok: false, status: 503 }) as unknown as Response },
+  utilities: { formatRelativeTime: () => 'just now' } } as unknown as PluginHostApi;
   document.body.appendChild(el);
   await el.updateComplete;
   await vi.waitFor(() => expect(el.loading).toBe(false));
   try {
-    const root = { pathHash: 'wait-root', collection: 'notes', fileCount: 37,
-      indexed: true, inFlightCount: 8, failedCount: 0 } as IndexedRootView;
     el.roots = [root, { ...root, pathHash: 'second-root' }];
     await el.updateComplete;
     const rows = el.shadowRoot!.querySelectorAll('.folder-state');
@@ -433,8 +448,8 @@ it('L1 library retry waiting appears once outside folder rows', async () => {
       expect(text).not.toContain('Next retry:');
     };
     once();
-    expect(el.shadowRoot!.querySelector('.subtitle')?.textContent).toContain('Next retry at');
-    el.reindexOutcome = 'Reindex accepted.';
+    expect(el.shadowRoot!.querySelector('.reading-detail')?.textContent).toContain('Next retry at');
+    el.reindexOutcome = 'Read again accepted.';
     await el.updateComplete;
     once();
   } finally {

@@ -31,6 +31,9 @@
     "fileCount" : {
       "type" : "integer"
     },
+    "fileCountCapped" : {
+      "type" : "boolean"
+    },
     "inFlightCount" : {
       "type" : [ "integer", "null" ]
     },

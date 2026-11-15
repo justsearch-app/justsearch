@@ -298,6 +298,18 @@ try {
     await click('Developer tools');
     await capture(page, theme, 'library', async () => { await click('Library'); await page.locator('jf-library-surface h2').first().waitFor(); });
     await visitTabs(page, theme, 'library', page.locator('jf-library-surface'));
+    // K5: moved disclosures are still audited through their explicit Activity/developer routes.
+    await page.locator('jf-library-surface [data-tab-id="folders"]').click();
+    await capture(page, theme, 'library-activity', async () => {
+      await page.locator('jf-library-surface').getByRole('button', { name: 'Activity', exact: true }).click();
+      await page.locator('jf-ingestion-summary').waitFor();
+    });
+    await expandSubviews(page, theme, 'library-activity', page.locator('jf-ingestion-summary'));
+    await page.locator('jf-library-surface').getByRole('button', { name: 'Activity', exact: true }).click();
+    await click('Developer tools');
+    await capture(page, theme, 'library-developer', async () => { await page.waitForFunction(() => document.querySelector('jf-library-surface')?.developer === true); });
+    await expandSubviews(page, theme, 'library-developer', page.locator('jf-library-surface'));
+    await click('Developer tools');
     await capture(page, theme, 'library-browse', async () => {
       await page.locator('jf-library-surface [data-tab-id="core.browse-surface"]').click();
       await page.locator('jf-browse-surface [role="treeitem"]').first().waitFor();

@@ -14,12 +14,14 @@
  * type-blind row has no constructor in this grammar.
  */
 
-export type ResultKind = 'markdown' | 'code' | 'image' | 'pdf' | 'document' | 'other';
+import { fileKindPresentation, type ResultKind } from '../display/fileKind.js';
+import type { IconName } from '../components/Icon.js';
+export type { ResultKind } from '../display/fileKind.js';
 
 export interface SearchResultView {
   kind: ResultKind;
   /** Icon-atom glyph name for the kind. */
-  icon: 'file-text' | 'code' | 'image';
+  icon: IconName;
   title: string;
   path: string;
   snippet: string;
@@ -126,35 +128,6 @@ function cleanSnippet(text: string, path: string): string {
   return clean.replace(/\s+/g, ' ').trim();
 }
 
-/** Closed file_kind → ResultKind mapping; mime_base disambiguates the rest. */
-function deriveKind(fileKind: string | undefined, mimeBase: string | undefined): ResultKind {
-  switch (fileKind) {
-    case 'markdown':
-      return 'markdown';
-    case 'code':
-      return 'code';
-    case 'image':
-      return 'image';
-    case 'pdf':
-      return 'pdf';
-    default:
-      break;
-  }
-  if (mimeBase?.startsWith('image')) return 'image';
-  if (mimeBase === 'application/pdf') return 'pdf';
-  if (mimeBase?.startsWith('text')) return 'document';
-  return fileKind ? 'document' : 'other';
-}
-
-const KIND_ICONS: Record<ResultKind, SearchResultView['icon']> = {
-  markdown: 'file-text',
-  code: 'code',
-  image: 'image',
-  pdf: 'file-text',
-  document: 'file-text',
-  other: 'file-text',
-};
-
 /** Word-boundary truncation: never cuts mid-word; appends an ellipsis when cut. */
 export function truncateAtWord(text: string, max: number = SNIPPET_MAX): string {
   const t = text.trim();
@@ -167,14 +140,14 @@ export function truncateAtWord(text: string, max: number = SNIPPET_MAX): string 
 }
 
 export function projectResultView(hit: ResultViewInput): SearchResultView {
-  const kind = deriveKind(hit.kind, hit.mimeBase);
+  const { kind, icon } = fileKindPresentation(hit.kind, hit.mimeBase, hit.path);
   const excerpt = hit.excerptRegions?.find((r) => (r.text ?? '').trim().length > 0);
   const snippetRaw = excerpt?.text ?? hit.snippet ?? '';
   const snippet = truncateAtWord(cleanSnippet(snippetRaw, hit.path));
   const collection = collectionBadgeFor(hit.collection);
   return {
     kind,
-    icon: KIND_ICONS[kind],
+    icon,
     title: hit.title,
     path: hit.path,
     snippet,

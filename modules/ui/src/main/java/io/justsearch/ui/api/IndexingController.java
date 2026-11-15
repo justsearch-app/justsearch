@@ -161,17 +161,23 @@ public class IndexingController {
    */
   private static final int MAX_COUNT_FILES = 50_000;
 
-  /** Result of a bounded file count: {@code count} regular files, {@code capped} if the limit hit. */
+  /**
+   * Result of a bounded file count: {@code count} regular files, {@code capped} when the count is a
+   * lower bound — the limit hit, or part of the tree could not be read.
+   */
   private record BoundedCount(long count, boolean capped) {}
 
   /**
    * Counts regular files under {@code root}, terminating early at {@link #MAX_COUNT_FILES}. Mirrors
    * the codebase's idiomatic bounded walk ({@code ExcludesServiceImpl}): a {@link SimpleFileVisitor}
-   * with an early {@code TERMINATE}. Returns {@code count = -1, capped = false} on walk error.
+   * with an early {@code TERMINATE}. An unreadable entry below the root keeps the readable count as a
+   * lower bound ({@code capped}); an unreadable root, or a walk error, is {@code count = -1}.
    */
   private static BoundedCount countFilesBounded(Path root, int cap) {
     final long[] count = {0L};
     final boolean[] capped = {false};
+    final boolean[] unreadable = {false};
+    final boolean[] rootUnreadable = {false};
     try {
       Files.walkFileTree(
           root,
@@ -190,7 +196,8 @@ public class IndexingController {
 
             @Override
             public FileVisitResult visitFileFailed(Path file, java.io.IOException exc) {
-              // Skip unreadable entries; a permission error on one file shouldn't abort the count.
+              unreadable[0] = true;
+              if (file.equals(root)) rootUnreadable[0] = true;
               return FileVisitResult.CONTINUE;
             }
           });
@@ -198,7 +205,8 @@ public class IndexingController {
       log.warn("Failed to count files under {}", root, e);
       return new BoundedCount(-1L, false);
     }
-    return new BoundedCount(count[0], capped[0]);
+    if (rootUnreadable[0]) return new BoundedCount(-1L, false);
+    return new BoundedCount(count[0], capped[0] || unreadable[0]);
   }
 
   public void handleListRoots(Context ctx) {
@@ -212,14 +220,18 @@ public class IndexingController {
               .map(
                   root -> {
                     long count = -1;
+                    boolean countCapped = false;
                     if (includeCounts) {
-                      count = countFilesBounded(root.path(), MAX_COUNT_FILES).count();
+                      BoundedCount bounded = countFilesBounded(root.path(), MAX_COUNT_FILES);
+                      count = bounded.count();
+                      countCapped = bounded.capped();
                     }
                     // Use HashMap since collection/lastIndexed may be null and Map.of() doesn't allow nulls
                     Map<String, Object> entry = new java.util.HashMap<>();
                     entry.put("collection", root.collection() != null ? root.collection() : "default");
                     entry.put("path", root.path().toString());
                     entry.put("fileCount", count);
+                    entry.put("fileCountCapped", countCapped);
                     if (root.lastIndexed() != null) {
                       entry.put("lastIndexed", root.lastIndexed().toString());
                     }
@@ -906,6 +918,7 @@ public class IndexingController {
                     // root) — kept behind ?counts=true so the live folder-status tick (tempdoc
                     // 599 §9.3) can refresh job counts without re-walking the disk.
                     long count = -1;
+                    boolean countCapped = false;
                     // Tempdoc 599 §16/A1 — "unavailable" derives from a PATH-MISSING walkError, NOT a
                     // Files stat on this (request) thread: U4 forbids a per-poll existence probe here
                     // (it blocks on dead UNC mounts). RootLifecycleOps re-checks existence on a
@@ -918,7 +931,9 @@ public class IndexingController {
                     if (includeCounts && !rootMissing) {
                       // The EXPENSIVE Files.walk count stays gated behind ?counts=true (U6); bounded
                       // (tempdoc 599 Fix 3) so a huge watched root can't stall the request.
-                      count = countFilesBounded(root.path(), MAX_COUNT_FILES).count();
+                      BoundedCount bounded = countFilesBounded(root.path(), MAX_COUNT_FILES);
+                      count = bounded.count();
+                      countCapped = bounded.capped();
                     }
                     // Per-folder job counts are CHEAP (a SQLite GROUP BY on the worker) — always
                     // returned so the row's truthful state derives from job drain (tempdoc 599 §9.2).
@@ -951,6 +966,7 @@ public class IndexingController {
                         "collection",
                         root.collection() != null ? root.collection() : "default");
                     m.put("fileCount", count);
+                    m.put("fileCountCapped", countCapped);
                     m.put("lastIndexedIsoTime", lastIndexedIsoTime);
                     m.put("status", status);
                     m.put("walkError", walkError);

@@ -73,7 +73,7 @@ describe('CommandPaletteProjection (§21.C)', () => {
     expect(results.find((r) => r.entry.id === 'core.action.contextual.copy')).toBeUndefined();
   });
 
-  it('WP3.8b opens indexing rules in Settings instead of invoking the operation without arguments', async () => {
+  it('WP3.8b opens reading rules in Library instead of invoking the operation without arguments', async () => {
     __seedResourceCatalog({ 'ops.set-indexing-rules.label': 'Set indexing rules' });
     registerShellActions({
       navigate: () => {}, toggleInspector: () => {}, togglePalette: () => {}, focusComposer: () => {},
@@ -86,11 +86,11 @@ describe('CommandPaletteProjection (§21.C)', () => {
     document.addEventListener(NAVIGATE_TO_SURFACE_EVENT, navigation);
     document.addEventListener('jf-invoke-operation', operation);
     try {
-      const entries = searchPaletteEntries('indexing rules').filter(r => r.entry.origin !== 'intent');
+      const entries = searchPaletteEntries('reading rules').filter(r => r.entry.origin !== 'intent');
       expect(entries).toHaveLength(1);
       expect((await invokeCommandWithResult(entries[0]!.entry.id)).ok).toBe(true);
       expect(operation).not.toHaveBeenCalled();
-      expect(entries[0]!.entry.label).toBe('Change indexing rules');
+      expect(entries[0]!.entry.label).toBe('Change reading rules');
       expect(navigation).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
         detail: { surfaceId: 'core.library-surface' },
       }));

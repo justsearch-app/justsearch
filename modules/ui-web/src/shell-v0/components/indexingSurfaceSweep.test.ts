@@ -39,7 +39,7 @@ type Harness = {
 };
 const CASES = ['energy', 'game', 'external GPU', 'chat', 'age', 'explicit stale', 'Engine gone'] as const;
 type Case = typeof CASES[number];
-const UNCONFIRMED = 'Indexing status unconfirmed';
+const UNCONFIRMED = 'Reading status unconfirmed';
 function observe(which: Case, jobs = 0, pending = 80, rebuilding = false): AiState {
   __resetAiStateForTest();
   const now = new Date('2026-10-20T18:00:00Z').getTime();
@@ -92,7 +92,7 @@ function expectedReason(which: Case): string {
   return which === 'energy' ? 'Meaning search is waiting while the computer saves energy.'
     : which === 'game' ? 'GPU-bound idle enrichment deferred while a game is running.'
       : which === 'external GPU' ? 'GPU-bound idle enrichment deferred while another app is using the GPU.'
-        : which === 'chat' ? 'Indexing shares time with chat.' : UNCONFIRMED;
+        : which === 'chat' ? 'Reading shares time with chat.' : UNCONFIRMED;
 }
 function unconfirmed(which: Case) { return ['age', 'explicit stale', 'Engine gone'].includes(which); }
 
@@ -152,7 +152,7 @@ describe('WP3.3 complete surface sweep', () => {
       Object.assign(el._unifiedAiState.aiEngine, { awaitingChatEnable });
       const panel = dom(el.renderSimplePanel());
       expect(panel.textContent, `${which}, ${jobs} files`).toContain(expectedReason(which));
-      expect(panel.textContent).not.toContain('Indexing embeddings');
+      expect(panel.textContent).not.toContain('Reading embeddings');
     }
   });
   it('S33.4 Library row cannot show a completion glyph from an unconfirmed index observation', () => {
@@ -254,7 +254,7 @@ describe('WP3.3 complete surface sweep', () => {
   it('S33.1 S33.4 status cannot assert indexing from the parked AI runtime alone', () => {
     for (const which of CASES) {
       const observed = observe(which);
-      const state = { ...observed, statusLabel: 'Indexing', aiEngine: { kind: 'indexing', stability: { kind: 'settled' }, installFailure: null } } as AiState;
+      const state = { ...observed, statusLabel: 'Reading', aiEngine: { kind: 'indexing', stability: { kind: 'settled' }, installFailure: null } } as AiState;
       const panel = framePanel(state);
       const fact = panel.model!.sections.running.find(r => r.id === 'indexing')!;
       expect(fact.title, which).toBe(unconfirmed(which) ? UNCONFIRMED
@@ -295,7 +295,7 @@ describe('WP3.3 complete surface sweep', () => {
     expect(result.kind).toBe('unavailable');
     if (result.kind === 'unavailable') {
       expect(result.transient).toBeFalsy();
-      expect(result.reason).not.toContain('Indexing in progress');
+      expect(result.reason).not.toContain('Reading in progress');
       expect(result.reason).toContain('documents');
     }
   });
@@ -311,7 +311,7 @@ describe('WP3.3 complete surface sweep', () => {
     for (const which of CASES) {
       const state = observe(which);
       const el = harness('jf-liveness-readout', state);
-      el.aiState = { ...state, statusLabel: 'Indexing', statusTone: 'success',
+      el.aiState = { ...state, statusLabel: 'Reading', statusTone: 'success',
         aiEngine: { kind: 'indexing', stability: { kind: 'settled' }, installFailure: null } };
       const readout = dom(el.render());
       expect(readout.textContent, which).toContain(expectedReason(which));

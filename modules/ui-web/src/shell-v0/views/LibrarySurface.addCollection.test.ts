@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 //
-// Tempdoc 914 D4 — Add Folder can name the COLLECTION the new root's documents are tagged with.
+// Tempdoc 914 D4 — Add a folder can name the COLLECTION the new root's documents are tagged with.
 //
 // Before this, the surface invoked `core.add-watched-root` with `{path}` only, so every folder a
 // user added landed in the untagged "default" bucket — even though the operation handler has always
@@ -61,17 +61,18 @@ async function mount(
   const el = document.createElement('jf-library-surface') as LibrarySurface;
   el.host_ = makeHost(recorded, picks);
   document.body.appendChild(el);
+  el.developer = true;
   await pump(el);
   return el;
 }
 
-/** Open the inline add form the way a user does — the header's Add Folder button. */
+/** Open the inline add form the way a user does — the header's Add a folder button. */
 async function openAddForm(el: LibrarySurface): Promise<void> {
   const buttons = Array.from(el.shadowRoot?.querySelectorAll('jf-button') ?? []);
-  const add = buttons.find((b) => b.getAttribute('label') === 'Add folder') as
+  const add = buttons.find((b) => b.getAttribute('label') === 'Add a folder') as
     | (Element & { onActivate?: () => void })
     | undefined;
-  expect(add, 'the header must offer Add Folder').toBeTruthy();
+  expect(add, 'the header must offer Add a folder').toBeTruthy();
   add?.onActivate?.();
   await pump(el);
 }
@@ -90,7 +91,7 @@ async function submit(el: LibrarySurface): Promise<void> {
   await pump(el);
 }
 
-describe('LibrarySurface — Add Folder carries the collection (914 D4)', () => {
+describe('LibrarySurface — Add a folder carries the collection (914 D4)', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     __resetAiStateForTest();

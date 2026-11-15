@@ -1,24 +1,24 @@
 # Getting Started with JustSearch
 
-JustSearch is a local-first knowledge engine that indexes your files and lets
+JustSearch is a local-first knowledge engine that reads your files and lets
 you search across them using natural language — and, with the optional AI
-models, ask questions and get answers backed by citations. Indexing, retrieval,
+models, ask questions and get answers backed by citations. Reading, retrieval,
 and built-in AI inference run on your machine. See AI Features for downloads,
 update checks, optional trace export, and external integrations.
 
 ## Adding files to search
 
 1. Open JustSearch
-2. Open the **Library** view from the sidebar
-3. Click "Add Folder" and select a folder containing your documents
-4. JustSearch will index the files automatically
+2. Open the **Library** view from the top bar
+3. Click "Add a folder" and select a folder containing your documents
+4. JustSearch will read the files automatically
 
 Supported formats include plain text, Markdown, PDF, Word documents (DOCX),
 HTML, and source code files.
 
 ## Searching
 
-Open the **Search** view from the sidebar and type your query in the search
+Open the **Search** view from the top bar and type your query in the search
 bar. JustSearch supports:
 
 - **Natural language queries**: "meeting notes from last week about budget"
@@ -32,7 +32,7 @@ combining keywords with semantic understanding.
 
 For better search quality, install the AI models:
 
-1. Open the **AI Brain** view from the sidebar
+1. Open the **AI Brain** view from the top bar
 2. Click "Install AI"
 3. Confirm the download. The dialog shows the exact size for your machine:
    about 10 GB on Windows and about 8 GB on Linux with a supported NVIDIA GPU,
@@ -44,14 +44,15 @@ model, which adds query expansion, questions answered with citations, and
 summarization (see AI Features). Connecting external AI tools over MCP works
 with or without the AI models. All inference runs locally on your machine.
 
-## Indexing restrictions
+## Reading restrictions
 
-In Settings → Indexing, choose the days, start and end times, then turn on Use indexing hours and
-Save indexing rules. Turning hours off keeps the configured days and times. The time fields follow
-your platform's clock format. Pause indexing on battery is available even when the power source is
+In **Library → Folders → When to read files**, choose **Only between**, set the start and end
+times, then choose **Save reading rules**. The weekday editor is available with
+**Settings → Advanced → Show developer tools**. A restricted set of days is shown beside the hours. Turning hours off keeps the configured days and times. The time fields follow
+your platform's clock format. Pause reading on battery is available even when the power source is
 unknown; it applies only while this computer is known to run on battery.
 
-Manual Pause keeps indexed files searchable. Resume clears the manual pause; saved indexing hours
+Manual Pause keeps files already read searchable. Resume clears the manual pause; saved reading hours
 and the pause-on-battery preference still apply. Outside the saved hours, processing waits for the
 schedule. Change hours opens the hours control; Change battery setting opens the battery preference.
 On a known battery reading, it waits for AC power or a change to the battery preference.
@@ -62,12 +63,12 @@ Hours use local wall-clock minutes: the start is included and the end excluded. 
 belong to the selected starting day, including Sunday into Monday. A repeated daylight-saving hour
 follows the same rule twice; a skipped hour never occurs. Windows follows current OS local time;
 if that read fails, the JVM zone is used until a later native read succeeds. That fallback can lag
-an OS zone change. Other systems use the JVM default zone: after an OS zone change, restart the Engine process (restarting indexing within
+an OS zone change. Other systems use the JVM default zone: after an OS zone change, restart the Engine process (restarting reading within
 the same process does not guarantee a zone refresh). An explicit JVM time-zone setting takes
 precedence over the OS zone.
 
 PAUSING means admitted work is finishing its publication. PAUSED means all processing lanes are
-quiet. Discovery, deletions and search remain available. With battery pause enabled, each indexing
+quiet. Discovery, deletions and search remain available. With battery pause enabled, each reading
 activation waits up to three seconds for a fresh power observation, then proceeds as UNKNOWN if
 it has none; a later battery observation still applies. Settings recovery remains authoritative:
-check exclusions and complete the existing settings-reset flow before indexing resumes.
+check exclusions and complete the existing settings-reset flow before reading resumes.

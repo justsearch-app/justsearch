@@ -35,7 +35,7 @@ describe('WP3.3 shared indexing activity', () => {
 
   it('S33.1 scopes energy deferral to idle enrichment while sparse work can continue between files', () => {
     expect(activity(snapshot(8, 80, ['energy_saver']))).toMatchObject({
-      summary: 'Text indexing continues',
+      summary: 'Text reading continues',
       detail: 'Meaning search is waiting while the computer saves energy. Some meaning processing can continue between files.',
       confirmed: true, enrichmentDeferred: true,
     });
@@ -49,7 +49,7 @@ describe('WP3.3 shared indexing activity', () => {
       for (const placement of [true, false, undefined]) {
         for (const jobs of [0, 4]) {
           expect(activity(snapshot(jobs, 80, [reason!], placement))).toMatchObject({
-            summary: jobs ? 'Text indexing continues' : 'Meaning processing is waiting for the GPU',
+            summary: jobs ? 'Text reading continues' : 'Meaning processing is waiting for the GPU',
             detail: `GPU-bound idle enrichment deferred while ${cause}. CPU-only idle enrichment can continue. Sparse enrichment between files also waits, including on CPU.`,
             enrichmentDeferred: true,
           });
@@ -60,7 +60,7 @@ describe('WP3.3 shared indexing activity', () => {
 
   it('S33.3 names only a present chat reason and S33.4 clears it on the next observation', () => {
     expect(activity(snapshot(0, 80, ['chat_generating'], true))).toMatchObject({
-      detail: 'Indexing shares time with chat.', enrichmentDeferred: false,
+      detail: 'Reading shares time with chat.', enrichmentDeferred: false,
     });
     expect(activity(snapshot(0, 80, [], true))).toMatchObject({ detail: null, enrichmentDeferred: false });
   });
@@ -68,17 +68,17 @@ describe('WP3.3 shared indexing activity', () => {
   it('S33.4 marks stale, unavailable and missing worker observations unconfirmed', () => {
     for (const status of [snapshot(8, 80, ['energy_saver']), snapshot(0, 0), null]) {
       expect(activity(status, false)).toMatchObject({
-        summary: 'Indexing status unconfirmed', detail: null, confirmed: false,
+        summary: 'Reading status unconfirmed', detail: null, confirmed: false,
       });
     }
     const stale = snapshot(0, 80, ['game_mode'], true);
     stale.operating!.freshness.staleSources = ['indexing'];
-    expect(activity(stale)).toMatchObject({ summary: 'Indexing status unconfirmed', confirmed: false });
-    expect(activity(null)).toMatchObject({ summary: 'Indexing status unconfirmed', confirmed: false });
+    expect(activity(stale)).toMatchObject({ summary: 'Reading status unconfirmed', confirmed: false });
+    expect(activity(null)).toMatchObject({ summary: 'Reading status unconfirmed', confirmed: false });
     for (const indexState of ['UNAVAILABLE', 'FAILED']) {
       const unavailable = snapshot(0, 0);
       unavailable.worker!.core!.indexState = indexState;
-      expect(activity(unavailable)).toMatchObject({ summary: 'Indexing status unconfirmed', confirmed: false });
+      expect(activity(unavailable)).toMatchObject({ summary: 'Reading status unconfirmed', confirmed: false });
     }
   });
 
@@ -105,7 +105,7 @@ describe('WP3.3 shared indexing activity', () => {
 
   it('S33.2 reports simultaneous reasons without losing the energy hold on CPU', () => {
     const projected = activity(snapshot(4, 80, ['game_mode', 'gpu_busy_external', 'energy_saver'], false));
-    expect(projected).toMatchObject({ summary: 'Text indexing continues', enrichmentDeferred: true });
+    expect(projected).toMatchObject({ summary: 'Text reading continues', enrichmentDeferred: true });
     expect((projected as { detail: string }).detail).toContain('saves energy');
     expect((projected as { detail: string }).detail).toContain('a game is running');
     expect((projected as { detail: string }).detail).toContain('another app is using the GPU');

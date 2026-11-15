@@ -83,7 +83,7 @@ function pool(query: string, settingsViewer: SettingsViewer): PaletteEntry[] {
   const settings = query ? searchRegister(query, SETTINGS_REGISTER, settingsViewer) : SETTINGS_REGISTER.flatMap(group =>
     group.categories.flatMap(category => [
       { label: categoryLabel(category), destination: { kind: 'settings' as const, section: category.id }, category, section: undefined },
-      ...shownEntries(category, settingsViewer).map(section => ({ label: section.destination === 'indexing-hours' ? 'Library › When to index'
+      ...shownEntries(category, settingsViewer).map(section => ({ label: section.destination === 'indexing-hours' ? 'Library › When to read files'
         : section.destination === 'reading-memory' ? 'AI Brain › Reading memory' : entryLabel(section), category, section,
       destination: section.destination ? { kind: section.destination } : { kind: 'settings' as const, section: category.id, anchor: section.key } })),
     ]));

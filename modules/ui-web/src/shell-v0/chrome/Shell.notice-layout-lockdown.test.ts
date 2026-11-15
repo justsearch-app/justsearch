@@ -155,7 +155,7 @@ async function noticeLayout(page: Page, words = NOTICE) {
     const library = shell.querySelector('jf-stage')!.shadowRoot!.querySelector('jf-library-surface')!.shadowRoot!;
     const controls = [...library.querySelectorAll<HTMLElement>('jf-button, button'),
       ...library.querySelector('jf-surface-tabs')!.shadowRoot!.querySelectorAll<HTMLElement>('[role="tab"]')]
-      .filter(el => el.getAttribute('role') === 'tab' || el.textContent?.includes('Add folder'))
+      .filter(el => el.getAttribute('role') === 'tab' || el.textContent?.includes('Add a folder'))
       .filter(el => el.getBoundingClientRect().height > 1);
     const overlap = (r: DOMRect) => box.left < r.right && box.right > r.left && box.top < r.bottom && box.bottom > r.top;
     const uncovered = painted.every(r => {
@@ -184,7 +184,7 @@ it.each(['light', 'dark'])('Library at 600 px keeps Skip rule added and Undo rea
   }, theme);
   await offer(page);
   const layout = await noticeLayout(page);
-  expect(layout.controls.some(text => text?.includes('Add folder')), JSON.stringify(layout)).toBe(true);
+  expect(layout.controls.some(text => text?.includes('Add a folder')), JSON.stringify(layout)).toBe(true);
   expect(layout.controls.length).toBeGreaterThanOrEqual(3);
   expect(layout.overlaps, JSON.stringify(layout)).toEqual([]);
   expect(layout.readable, JSON.stringify(layout)).toBe(true);

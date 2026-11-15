@@ -41,7 +41,7 @@ describe('frame status projection', () => {
     expect(derive({ conditions }).pill.kind).toBe('needs');
     expect(derive({ conditions: conditions.slice(1) }).pill.kind).toBe('problems');
     expect(derive({ conditions: conditions.slice(2) }).pill.kind).toBe('working');
-    expect(derive({ finished: { title: 'Finished indexing', at: now } }).pill.kind).toBe('finished');
+    expect(derive({ finished: { title: 'Finished reading', at: now } }).pill.kind).toBe('finished');
     expect(derive().pill).toEqual({ kind: 'calm', label: 'Up to date', stale: false });
   });
   it('ST2 separates contact from poll freshness and waits a full poll before unreachable', () => {
@@ -235,7 +235,7 @@ describe('concurrent source facts', () => {
     expect(m.sections.needs.map(f => f.id)).toEqual(['authorization:backend', 'consent:plugin1', 'indexing-hold', 'rebuild-gaps', 'app-update']);
     const pause = m.sections.needs.find(f => f.id === 'indexing-hold')!;
     expect(pause.title).toBe('Pausing — finishing current files');
-    for (const reason of ['Paused by you', 'Outside indexing hours', 'on battery', 'Settings recovery']) expect(pause.detail).toContain(reason);
+    for (const reason of ['Paused by you', 'Outside reading hours', 'on battery', 'Settings recovery']) expect(pause.detail).toContain(reason);
     expect(m.progress.pause!.reasons).toHaveLength(4);
   });
   it('ST5 active folder failures and AI failure leave Problems on recovery without turning acknowledgement into recovery', () => {

@@ -136,7 +136,7 @@ it('L12 L19 concurrent saves and tab changes retain one rule request and both ou
   el.activeTab = 'core.browse-surface'; await settle(el);
   expect(f.operations).toHaveBeenCalledTimes(1); expect(rules.indexingRulesSaving).toBe(true);
   f.releaseRules(); await settle(rules); el.activeTab = 'folders'; await settle(el);
-  expect(editor(el)).toBe(rules); expect(rules.shadowRoot!.textContent).toContain('Indexing rules saved');
+  expect(editor(el)).toBe(rules); expect(rules.shadowRoot!.textContent).toContain('Reading rules saved');
   expect(f.read()).toEqual({ excludePatterns: ['*.new'], indexingPause: { ...initialPolicy, pauseOnBattery: true } });
 });
 
@@ -160,9 +160,9 @@ it('L14 Settings links to the Library editor and recovery stays in Settings afte
   const settings = document.createElement('jf-settings-surface') as Mounted;
   Object.assign(settings, { host_: f.host, activeCategory: 'indexing' });
   document.body.append(settings); await settle(settings);
-  expect(settings.shadowRoot!.querySelector('form[aria-label="Indexing rules"]')).toBeNull();
+  expect(settings.shadowRoot!.querySelector('form[aria-label="Reading rules"]')).toBeNull();
   const navigate = vi.fn(); document.addEventListener('jf-navigate-to-surface', navigate);
-  try { action(settings, 'Change when to index').onActivate(); }
+  try { action(settings, 'Change when to read files').onActivate(); }
   finally { document.removeEventListener('jf-navigate-to-surface', navigate); }
   expect(navigate).toHaveBeenCalledWith(expect.objectContaining({ detail: { surfaceId: 'core.library-surface' } }));
   expect(takeIndexingRuleFocus()).toBe('hours');
@@ -220,7 +220,7 @@ it.each(['rules', 'exclusions'])('V3 genuine external change conflicts with %s a
   if (changed === 'rules') f.externalRules(); else f.externalChange();
   if (changed === 'rules') {
     await saveRules(rules);
-    expect(rules.indexingRulesError).toContain('Indexing times changed elsewhere');
+    expect(rules.indexingRulesError).toContain('Reading times changed elsewhere');
     expect(f.operations).not.toHaveBeenCalled();
   } else {
     action(el, 'Save patterns').onActivate(); await settle(el);
@@ -317,8 +317,8 @@ it.each(['Save my draft', 'Discard my draft'])('R2 another window changes saved 
   await editBattery(editor(other), true); await saveRules(editor(other));
   await saveRules(rules);
   expect(rules.indexingRules.start).toBe('21:00');
-  expect(rules.indexingRulesError).toContain('Indexing times changed elsewhere');
-  const conflict = rules.shadowRoot!.querySelector('[aria-label="Saved indexing rules"]');
+  expect(rules.indexingRulesError).toContain('Reading times changed elsewhere');
+  const conflict = rules.shadowRoot!.querySelector('[aria-label="Saved reading rules"]');
   expect(conflict?.textContent).toContain('Any time');
   expect(conflict?.textContent).toContain('Tuesday, Thursday');
   expect(conflict?.textContent).toContain('20:00'); expect(conflict?.textContent).toContain('06:00');
@@ -358,7 +358,7 @@ it.each(['Save my draft', 'Discard my draft'])('R2b %s uses the displayed confli
   await editStart(rules, '21:00');
   await editBattery(otherRules, true); await saveRules(otherRules); // B
   await saveRules(rules);
-  const review = () => rules.shadowRoot!.querySelector('[aria-label="Saved indexing rules"]')?.textContent;
+  const review = () => rules.shadowRoot!.querySelector('[aria-label="Saved reading rules"]')?.textContent;
   expect(review()).toContain('Pause while on battery: on');
   await editStart(otherRules, '23:00'); await saveRules(otherRules); // C, after B was displayed
   const before = f.read(); const writes = f.operations.mock.calls.length;
@@ -368,7 +368,7 @@ it.each(['Save my draft', 'Discard my draft'])('R2b %s uses the displayed confli
   if (choice === 'Save my draft') {
     expect(rules.indexingRules.start).toBe('21:00');
     expect(review()).toContain('23:00');
-    expect(rules.indexingRulesError).toContain('Indexing times changed elsewhere');
+    expect(rules.indexingRulesError).toContain('Reading times changed elsewhere');
     recoveryButton(rules, choice).click(); await settle(rules);
     expect(f.operations).toHaveBeenCalledTimes(writes + 1);
     expect(f.read().indexingPause).toEqual({ ...initialPolicy, schedule: {

@@ -20,7 +20,9 @@ function observe(indexState = 'IDLE', catchingUp = false, migrationState = 'IDLE
 async function mount(empty: boolean) {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('{}', { status: 503 }));
   const host = createMockHostApi();
-  host.data.fetch = vi.fn(async () => new Response('{}', { status: 503 }));
+  // The folder list is not answered: rows are placed by the test, and a failed read would make them unconfirmed (R3).
+  host.data.fetch = vi.fn((path: string) => path.startsWith('/api/indexing-roots/substrate')
+    ? new Promise<Response>(() => {}) : Promise.resolve(new Response('{}', { status: 503 })));
   const el = document.createElement('jf-library-surface') as LibrarySurface;
   el.host_ = host;
   document.body.append(el); await settle(el);
@@ -45,7 +47,7 @@ it.each([false, true])('L2 wake recovery uses the shared catching-up headline (e
   if (empty) expect(el.shadowRoot!.querySelector('.empty')!.textContent).toContain('Catching up…');
   observe(); await settle(el);
   expect(el.shadowRoot!.querySelector('h2')!.textContent)
-    .toBe(empty ? 'Add a folder to start searching' : 'Your files are searchable');
+    .toBe('Your files are searchable');
 });
 
 it.each([false, true])('L2 worker restart uses the shared restart headline (empty roots: %s)', async empty => {
@@ -57,7 +59,7 @@ it.each([false, true])('L2 worker restart uses the shared restart headline (empt
   if (empty) expect(el.shadowRoot!.querySelector('.empty')!.textContent).toContain('Restarting…');
   observe(); await settle(el);
   expect(el.shadowRoot!.querySelector('h2')!.textContent)
-    .toBe(empty ? 'Add a folder to start searching' : 'Your files are searchable');
+    .toBe('Your files are searchable');
 });
 
 it.each(['MIGRATING', 'SWITCHING'])('L2 real migration retains the Library rebuilding wording (%s)', async migration => {

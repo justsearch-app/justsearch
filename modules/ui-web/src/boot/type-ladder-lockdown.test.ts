@@ -21,13 +21,17 @@ it('text, corners and bundled variable Inter follow the type ladder under the de
       });
     const summary = JSON.parse(stdout.slice(stdout.lastIndexOf('\n{') + 1)) as { violations: number; surfaces: number };
     expect(summary.violations).toBe(0);
-    expect(summary.surfaces).toBe(158);
+    expect(summary.surfaces).toBe(164);
     const inventory = JSON.parse(await readFile(path.join(evidence, 'results.json'), 'utf8')) as {
       checks: { id: string; result: string; textElements?: number }[];
     };
     for (const theme of ['dark', 'light']) {
       expect(inventory.checks.find(check => check.id === `${theme}/search-results-filters`)).toMatchObject({ result: 'pass' });
       expect(inventory.checks.find(check => check.id === `${theme}/search-results-filters`)!.textElements).toBeGreaterThan(0);
+      for (const surface of ['library-activity', 'library-activity-expanded-1', 'library-developer', 'library-developer-expanded-1']) {
+        expect(inventory.checks.find(check => check.id === `${theme}/${surface}`)).toMatchObject({ result: 'pass' });
+        expect(inventory.checks.find(check => check.id === `${theme}/${surface}`)!.textElements).toBeGreaterThan(0);
+      }
     }
     passed = true;
   } finally {

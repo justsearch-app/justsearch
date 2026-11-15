@@ -317,7 +317,7 @@ export function searchRegister(
       ? { kind: section.destination }
       : { kind: 'settings', section: category.id, ...(section ? { anchor: section.key } : {}) };
     const label = section?.destination === 'indexing-hours'
-      ? 'Library › When to index'
+      ? 'Library › When to read files'
       : section?.destination === 'reading-memory'
         ? 'AI Brain › Reading memory'
         : section ? entryLabel(section) : categoryLabel(category);
@@ -329,7 +329,7 @@ export function searchRegister(
       for (const section of shownEntries(category, viewer)) {
         push(group, category, rank([entryLabel(section)], section.keywords, [
           ...(section.controlWords?.() ?? []),
-          ...(section.destination === 'indexing-hours' ? ['Library', 'When to index']
+          ...(section.destination === 'indexing-hours' ? ['Library', 'When to read files']
             : section.destination === 'reading-memory' ? ['AI Brain', 'Reading memory'] : []),
         ]), section);
       }

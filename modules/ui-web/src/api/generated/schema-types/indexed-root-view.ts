@@ -21,6 +21,7 @@ export interface IndexedRootView {
   failedCount?: number | null;
   failedStages?: MapStringBooleanNullable;
   fileCount?: number;
+  fileCountCapped?: boolean;
   inFlightCount?: number | null;
   lastIndexedIsoTime?: string;
   lastVerifiedIsoTime?: string;
@@ -44,6 +45,7 @@ export const indexedRootViewSchema = z.strictObject({
   "failedCount": z.number().int().nullable().optional(),
   "failedStages": mapStringBooleanNullableSchema.optional(),
   "fileCount": z.number().int().optional(),
+  "fileCountCapped": z.boolean().optional(),
   "inFlightCount": z.number().int().nullable().optional(),
   "lastIndexedIsoTime": z.string().optional(),
   "lastVerifiedIsoTime": z.string().optional(),

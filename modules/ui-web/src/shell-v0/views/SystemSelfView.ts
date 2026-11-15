@@ -221,7 +221,7 @@ export class SystemSelfView extends JfElement {
       !activity.confirmed
         ? activity.summary
         : progress.phase === 'unknown'
-        ? 'Indexing'
+        ? 'Reading'
         : `Indexing — ${progress.jobsRunning} running · ${progress.jobsQueued} queued`;
     const enriching = explainActivity ? null : enrichingLabel(progress);
     const indexQueueCount = visibleIndexQueueCount(progress);

@@ -214,7 +214,7 @@ Back never reopens Settings from there.
   its own Advanced settings disclosure, independent of the app-wide Detailed mode. It surfaces schema incompatibility and enrichment readiness
   rather than treating a drained job queue as complete semantic coverage.
 - **System** hosts diagnostic surfaces including Health, Logs and Activity, reached from
-  More › System. Health shows observed system and indexing facts and the recent inference
+  More › System. Health shows observed system and reading facts and the recent inference
   transition history. Activity also holds background runs and their launcher, what the agent
   did in the open run, and the effect journal with its undo.
 - **Settings** is a modal window opened from the top bar's Settings button, the command
@@ -279,12 +279,12 @@ anchored below the pill. Escape, an outside click, the close button or the pill 
 the panel and returns focus to the pill. Its sections appear in this order, omitting
 empty sections:
 
-- **Needs you:** approvals, proposed actions, plugin permission requests, indexing holds,
+- **Needs you:** approvals, proposed actions, plugin permission requests, reading holds,
   update or repair decisions, and rebuild decisions, with their available actions.
   Requests that require typed confirmation or permission consent use the protected dialog.
 - **Problems right now:** active problems such as unavailable folders, unreadable files,
   limited search, plugin load failures and failed AI installation.
-- **Running:** indexing and enrichment, rebuilds, AI downloads, operations and background
+- **Running:** reading and enrichment, rebuilds, AI downloads, operations and background
   tasks, with progress and controls where available.
 - **Earlier:** action feedback, advisories and completed work, with details, read/unread
   state and Mark all read. Reversal actions appear only where a real reversal exists and
@@ -434,7 +434,7 @@ words. Before the app has loaded, including while the start-up frame still cover
 recovery page keeps the root as before; the Linux update hold still replaces the loaded app and
 Windows keeps its installer hand-off.
 
-The treatment says that searching and indexing are on hold and that files and the index are
+The treatment says that searching and reading are on hold and that files and the index are
 safe, and offers **Restart the engine** (desktop) or **Try again** (browser), **Open Health** and
 **Copy report**, with when the engine was last connected and last tried. The top bar, the pill
 and its panel, Settings, More and the window controls stay usable; the window area beneath is
@@ -466,12 +466,12 @@ captures cover it in the measured-axe register.
 
 ### Progress vocabulary (status panel, Health, folder rows)
 
-Every surface that reports indexing progress uses one set of words, and derives its
+Every surface that reports reading progress uses one set of words, and derives its
 numbers from one place — the `selectIndexingProgress` projection over the `/api/status`
 snapshot (`shell-v0/state/indexingProgress.ts`). Numbers may differ between surfaces by
 **scope** (index-wide vs one folder), never by derivation.
 
-*   **Phases:** **Scanning** (walking a folder) → **Indexing**
+*   **Phases:** **Scanning** (walking a folder) → **Reading**
     (files becoming keyword-searchable; the job queue drains) → **Enriching** (the
     semantic layers — embeddings, SPLADE, entities, passage vectors — catching up on
     already-indexed documents) → **Ready**. Blocked or unconfirmed work must say so rather than imply readiness.
@@ -484,7 +484,7 @@ snapshot (`shell-v0/state/indexingProgress.ts`). Numbers may differ between surf
     faithful (at least one applicable stage with documents to enrich). With no
     denominator — or a stale snapshot — the surface says less rather than showing a
     placeholder, and time estimates are withdrawn when their observed basis is missing or stale.
-    Indexing uses recent ingest throughput; Enriching uses its own measured settle rate,
+    Reading uses recent ingest throughput; Enriching uses its own measured settle rate,
     not the ingest rate. Neither is a countdown.
 *   **"Offline" is not a progress word.** It describes the AI engine or a service being
     down, and nothing else; enrichment copy uses the phase nouns above.
@@ -547,7 +547,7 @@ fixed list of commands on every item.
 
 ### AI activity and enrichment
 
-Online and indexing activity are runtime states, not exclusive GPU ownership: a loaded
+Online and reading activity are runtime states, not exclusive GPU ownership: a loaded
 LLM and background encoders can share available GPU memory. AI Brain exposes the
 configuration and activity controls.
 

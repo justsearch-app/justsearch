@@ -152,14 +152,14 @@ export class FolderAddFlow {
       this.host.changed(); await this.host.focus('path');
     } finally { if (current()) { state.addBusy = false; this.host.changed(); } }
   }
-  renderForm() {
+  renderForm(developer = false) {
     const state = this.host.state;
     if (!state.showManualInput) return nothing;
     return html`<div class="add-row">
       <input type="text" aria-label="Folder path" ?disabled=${state.addBusy} placeholder="Folder path"
         .value=${state.pendingPath} @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') void this.submit(); }}
         @input=${(e: Event) => this.setPath((e.target as HTMLInputElement).value)} />
-      ${this.firstLaunch ? nothing : html`<input class="add-collection" type="text" aria-label="Collection (optional)" ?disabled=${state.addBusy}
+      ${this.firstLaunch || !developer ? nothing : html`<input class="add-collection" type="text" aria-label="Collection (optional)" ?disabled=${state.addBusy}
         data-testid="library-add-collection" placeholder="Collection (optional)" .value=${state.pendingCollection}
         @keydown=${(e: KeyboardEvent) => { if (e.key === 'Enter') void this.submit(); }}
         @input=${(e: Event) => { state.pendingCollection = (e.target as HTMLInputElement).value; this.host.changed(); }} />`}

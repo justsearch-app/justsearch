@@ -12,9 +12,9 @@ import { selectIndexingProgress } from '../state/indexingProgress.js';
 import { projectAvailability } from '../state/availability.js';
 import { known } from '../state/known.js';
 
-type Case = 'fresh' | 'age' | 'worker stale' | 'indexing stale' | 'unavailable' | 'Engine gone' | 'energy';
-const CASES: Case[] = ['fresh', 'age', 'worker stale', 'indexing stale', 'unavailable', 'Engine gone', 'fresh'];
-const UNKNOWN = 'Indexing status unconfirmed';
+type Case = 'fresh' | 'age' | 'worker stale' | 'reading stale' | 'unavailable' | 'Engine gone' | 'energy';
+const CASES: Case[] = ['fresh', 'age', 'worker stale', 'reading stale', 'unavailable', 'Engine gone', 'fresh'];
+const UNKNOWN = 'Reading status unconfirmed';
 function observe(which: Case, migrationState = 'IDLE'): AiState {
   __resetAiStateForTest();
   const now = Date.parse('2026-10-21T12:00:00Z');
@@ -27,7 +27,7 @@ function observe(which: Case, migrationState = 'IDLE'): AiState {
         migration: { migrationState, activeGenerationId: 'g1', buildingGenerationId: migrationState === 'IDLE' ? '' : 'g2' },
       },
       operating: { indexing: { state: which === 'energy' ? 'PAUSED' : 'ACTIVE', reasons: which === 'energy' ? ['energy_saver'] : [] },
-        freshness: { staleAfterMs: 30_000, staleSources: which === 'indexing stale' ? ['indexing'] : [] } },
+        freshness: { staleAfterMs: 30_000, staleSources: which === 'reading stale' ? ['indexing'] : [] } },
       readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] }, chat: { state: 'READY', reasonCodes: [] } } },
     } as unknown as StatusSnapshot,
     inference: { mode: 'online', available: true, activeModelId: 'test' } as AiState['inference'],
@@ -72,7 +72,7 @@ describe('WP3.3 sixth verifier regressions', () => {
       expect(text.includes('your watched folders will reappear when it finishes'), `${migration}: ${which}`).toBe(which === 'fresh');
       expect(text).not.toContain('No watched folders');
     }
-    expect(dom(library(observe('fresh')).render()).querySelector('h2')!.textContent).toBe('Add a folder to start searching');
+    expect(dom(library(observe('fresh')).render()).querySelector('h2')!.textContent).toBe('Reading');
   });
 
   it('S33.4 Library rebuild controls qualify retained build and activation observations', () => {
@@ -86,10 +86,10 @@ describe('WP3.3 sixth verifier regressions', () => {
       expect(title.includes(UNKNOWN), `${migration}: ${which}: headline`).toBe(which !== 'fresh');
       expect(control.textContent!.includes(UNKNOWN), `${migration}: ${which}`).toBe(which !== 'fresh');
       if (which !== 'fresh') {
-        expect(control.textContent).not.toContain('New index is being built');
-        expect(control.textContent).not.toContain('Your current index stays available');
+        expect(control.textContent).not.toContain('Reading everything again');
+        expect(control.textContent).not.toContain('Your current search data stays available');
         expect(control.textContent).not.toContain('activation requires your decision');
-      } else expect(control.textContent).toContain(migration === 'AWAITING_ACCEPTANCE' ? 'activation requires your decision' : 'New index is being built');
+      } else expect(control.textContent).toContain(migration === 'AWAITING_ACCEPTANCE' ? 'activation requires your decision' : 'Reading everything again');
       expect(control.querySelector('jf-button[label="Cancel rebuild"]')).not.toBeNull();
     }
   });
@@ -130,7 +130,7 @@ describe('WP3.3 sixth verifier regressions', () => {
     });
     observer.observe(document.body, { subtree: true, childList: true, characterData: true });
     try {
-      for (const which of ['indexing stale', 'fresh', 'energy', 'age', 'fresh'] as Case[]) {
+      for (const which of ['reading stale', 'fresh', 'energy', 'age', 'fresh'] as Case[]) {
         changed.clear();
         await update(which);
         expect(changed.size, which).toBe(1);

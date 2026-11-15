@@ -17,7 +17,7 @@ export class FolderCardRenderer extends JsonFormsRendererBase {
   override render(): TemplateResult {
     if (!this.visible) return html``;
     const folders = Array.isArray(this.data) ? this.data as FolderRow[] : [];
-    if (!folders.length) return html`<div class="empty">No folders indexed yet.</div>`;
+    if (!folders.length) return html`<div class="empty">No folders read yet.</div>`;
     return html`<div class="cards" role="list">${repeat(folders, f => f.pathHash, f => renderFolderRow(f, {
       expanded: f.expanded ?? this.expanded.has(f.pathHash ?? ''), enabled: this.enabled,
       toggle: () => {

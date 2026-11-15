@@ -41,7 +41,7 @@ async function fixture(route) {
   if (p === '/api/indexing/roots') return json(route, { roots: [{ path: '/csp-root', fileCount: 2 }] });
   if (p === '/api/knowledge/folders') {
     const parent = req.postDataJSON().parentPath;
-    return json(route, { folders: parent === '/csp-root' ? [{ path: '/csp-root/child', childFolderCount: 0, childFileCount: 1 }] : [] });
+    return json(route, { folders: parent === '/csp-root' ? [{ path: '/csp-root/child', name: 'child', fileCount: 1 }] : [] });
   }
   if (p === '/api/knowledge/folder-files') {
     const folder = req.postDataJSON().folderPath;
@@ -129,7 +129,7 @@ try {
         await parent.click();
         const child = browse.locator('[role="treeitem"]').filter({ has: page.locator('.name', { hasText: /^child$/ }) });
         await child.waitFor();
-        const padding = async el => el.evaluate(e => parseFloat(getComputedStyle(e).paddingLeft));
+        const padding = async el => el.evaluate(e => parseFloat(getComputedStyle(e.querySelector('.row-name')).paddingInlineStart));
         const result = { parent: await padding(parent), child: await padding(child) };
         assert.ok(result.child > result.parent, JSON.stringify(result));
         // Added case: collapse and reopen the same branch; the indentation must remain.
