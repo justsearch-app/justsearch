@@ -3049,3 +3049,14 @@ expected value is computed by production code: the locked-Memory words are today
   "note": "Test intent accepted after reviewing all 35 entries and validating committed D4 evidence; fresh local test execution unavailable because npm installation failed (EPERM/EAI_AGAIN)."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "s_ihs9ye",
+  "verdict": "reject",
+  "digest": "sha256:61e86a753f05af9814fc6164fe9bdafad74304d2fff7189d38fc2c7dfc1a4cba",
+  "note": "Entry 30: R1/R3 fail-before depends on absent .switch-state markup; cited intermediate repair failures have no attached D4 evidence. Entry 12 weakens the offline-picture unconfirmed assertion to an unlit step, dropping the uncertainty wording without a source retiring that fact. Supply semantic repair evidence and retain the uncertainty assertion."
+}
+```
