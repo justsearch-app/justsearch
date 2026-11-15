@@ -65,7 +65,7 @@ it('the browser tree has real roving focus, stable row geometry, reachable actio
     expect(await file.getAttribute('aria-setsize')).toBe('2');
     const bounds = await file.boundingBox(); expect(bounds).not.toBeNull(); const height = bounds!.height;
     await file.hover(); const hoveredBounds = await file.boundingBox(); expect(hoveredBounds).not.toBeNull();
-    expect(hoveredBounds!.height).toBe(height); expect(height).toBe(34);
+    expect(hoveredBounds!.height).toBe(height);
     await page.keyboard.press('Tab');
     const action = page.getByRole('button', { name: 'Open file', exact: true }).first();
     expect(await action.count()).toBeGreaterThan(0);

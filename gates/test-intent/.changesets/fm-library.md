@@ -1735,3 +1735,14 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
   "note": "The four exempt modules/ui-web/src/shell-v0/views/library-first-minutes/*.test.ts files are not isolated: scripts/governance/gates/test-intent/units.test.mjs:775 calls scanTestOnlyImports, whose recursive tracked-source scan reads all four. The supplied no-scanner/no-other-test exemption condition is unmet. Add explicit test-intent entries with sources and execution evidence for these files."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-j25sm91k",
+  "verdict": "reject",
+  "digest": "sha256:c8e9c4317ac2786418c056a7edc943f95a6bb1d0750ceea647a28b3339ed030a",
+  "note": "Entry 56: browse-lockdown.test.ts:68 asserts exactly 34px row height without a source; remove the exact-height assertion and keep the before/hover equality. Entries 1-55 acceptable."
+}
+```
