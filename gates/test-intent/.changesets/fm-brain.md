@@ -1396,7 +1396,7 @@ This builder wrote no acceptance record.
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "W6: an optional part declined at install shows the step state \"Not part of this install\" after install (its switch then offers the existing download consent, B14 of the earlier AI Brain work).",
+          "choice": "W6: a part that the current install mode does not include (state not-in-mode) shows the reason \"Not part of this install\".",
           "label": "agent choice"
         }
       ],
