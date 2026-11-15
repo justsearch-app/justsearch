@@ -98,7 +98,12 @@ beforeEach(() => {
     return json({});
   }));
 });
-afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals();
+  delete (navigator as unknown as Record<string, unknown>).platform;
+});
+// The reason for a part that cannot work here depends on the platform; these cases run as on Windows.
+const onWindows = () => Object.defineProperty(navigator, 'platform', { configurable: true, get: () => 'Win32' });
 
 describe('Brain running repair controls (B2/B8)', () => {
   it('Cancel says the download paused when it stopped, and shows the completed state when the install finished first', async () => {
@@ -226,6 +231,7 @@ describe('Brain running repair controls (B2/B8)', () => {
   });
 
   it.each(['declined', 'unavailable', 'not-in-mode'])('planning ignores retained downloading records for an excluded %s package', async state => {
+    onWindows();
     const fetch = globalThis.fetch;
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input).endsWith('/plan-preview')) return json({ totalDownloadBytes: 1024, components: [
@@ -244,6 +250,8 @@ describe('Brain running repair controls (B2/B8)', () => {
     // Slice 7a (D4): a part that cannot work here is drawn not reachable with its reason in ordinary words.
     if (state === 'declined') expect(reranker).toContain('Not downloaded');
     else expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.getAttribute('data-reach')).toBe('na');
+    if (state === 'unavailable') expect(reranker).toContain('Not available on this computer');
+    if (state === 'not-in-mode') expect(reranker).toContain('Not part of this install');
     expect(reranker).not.toContain('Not available here.');
   });
 
@@ -278,6 +286,7 @@ describe('Brain running repair controls (B2/B8)', () => {
   });
 
   it('while a Repair run is being planned, a package unavailable on this computer is not said to be preparing', async () => {
+    onWindows();
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const path = String(input);
       if (path.endsWith('/api/settings/v2')) return json({ ui: { chatEnabled: false } });
@@ -291,6 +300,8 @@ describe('Brain running repair controls (B2/B8)', () => {
     const chat = el.shadowRoot!.querySelector('[data-feature="chat"]')!.textContent!;
     expect(chat).not.toMatch(/Preparing download|Waiting to download|Downloading/);
     expect(el.shadowRoot!.querySelector('[data-feature="chat"]')!.getAttribute('data-reach')).toBe('na');
+    expect(chat).toContain('Not available on this computer');
+    expect(chat).not.toContain('Needs the answer runtime.');
   });
   it('planning an unavailable answer runtime with complete answer files keeps the observed step state', async () => {
     const fetch = globalThis.fetch;

@@ -22,18 +22,26 @@ the Engine's effective state for this computer, Off where the Engine keeps it of
 (its observation: inactive, reason cpu_default_off), and a click saves the opposite (R1); answers
 running on the compact model show the compact package's own size from the served manifest, never the
 standard one (R2); "its files are missing" stands only where the Engine does not contradict it, never
-on a lit picture step (R3); Advanced names the answer pause in read words (R4). R1 and R3 are
-regressions of slice 7a: on 2f670abba7 their checks fail on the behaviour (the unset switch reads "On";
-the lit picture step says "Not working — its files are missing"), while on 777b598043, which drew both
-correctly, they fail by assertion at the step's state word, which the base does not draw. R2 and R4
-fail on both on the behaviour (the answer step's 6.34 GB; "Pause answers while indexing").
+on a lit picture step (R3); Advanced names the answer pause in read words (R4).
 Repairing R2 found a fifth (R5): with answers on the compact model and picture reading Off, the
 picture switch decided "files present" from the standard answer package, so a click opened the
 install of the standard model instead of saving On. The decision now uses the observed model's
 package as R2 does (`chat-<profile>`; the Engine's file reports leave a dev-only package out, so the
-model it loaded under that profile shows the files are there). Its check fails by assertion on the
-behaviour (the install consent opens) on 2f670abba7 with R1-R4 and on 777b598043 alike: main has
-the same defect.
+model it loaded under that profile shows the files are there).
+
+The repair checks are in two new files of their own, BrainOverview.switch-repairs.test.ts (R1, R3,
+R5) and BrainOverview.step-repairs.test.ts (R2, R4), with their own entries and their own evidence,
+gates/test-intent/evidence/fm-brain-repairs.json, written by run-evidence with --before 2f670abba7
+(the candidate before the repairs), one --check per file. They observe states semantically, by what
+2f670abba7, 777b598043 and the candidate all draw (the switch's aria-checked under its step, found
+by role and accessible name; the step's visible text; lit from data-lit or data-active), never by
+slice 7a markup. On 2f670abba7 every repair case fails by assertion on its defect: the unset Best
+match first switch is checked (aria-checked "true", "Not working now"), the lit picture step says
+"Not working — its files are missing", the install consent opens, the answer step shows "6.34 GB
+download", Advanced says "indexing". On 777b598043 (a builder run, not in the evidence) R1 passes,
+main having drawn "Off — files kept" unchecked, so there it guards the preserved behaviour; R2 to R5
+fail for the same defects, R3 in main's words ("Unavailable — picture reading files are missing" on
+the lit step).
 
 After the review of 2026-11-15 the page repairs seven defects, each with its check: meaning counts
 as working only while the Worker accepts meaning queries (COMPATIBLE), and a rebuild in progress is
@@ -44,15 +52,16 @@ size is shown only for a model with a matching package value (X5); Advanced's le
 developer tools (X6); populated reindex causes and the rebuild action use read words, the action's
 served label being slice 6a's "Rebuild all search data" (X7).
 
-There is one entry per flagged file. The seven new files under brain-first-minutes/ are not isolated:
+There is one entry per flagged file. The nine new files under brain-first-minutes/ are not isolated:
 the same diff deletes brainPage.test.ts, and repository-wide scanners read them. Each has a New
 entry with its evidence. The new checks find elements by what the base page draws too (role,
 accessible name, visible text, test ids, the steps' data-feature, lit read from data-lit or the
 base's data-active), so on origin/main they fail on the behaviour they claim, not on missing slice
 7a markup (X8). The evidence for the six repaired files is gates/test-intent/evidence/fm-brain.json,
 written by run-evidence with --before origin/main (8a312d1484), one --check per file, and regenerated
-on 2026-11-15 after R1-R5 with --before 777b598043 (origin/main after slice 6a; BrainSurface.ts is the
-same file in both, and each file's first failing case and message are the same). Every case
+with --before 777b598043 (origin/main after slice 6a; BrainSurface.ts is the same file in both, and
+each file's first failing case and message are the same), last on 2026-11-16 after the repair checks
+moved out of the steps and switches files. Every case
 that fails on the before-state fails by assertion on its claimed behaviour; none by exception,
 timeout or absent markup. In the layout file the fm-13 and keyboard cases fail on the base; its
 fm-10 and fm-14 cases, the audit self-check, the developer-tools panel and the style= guard pass
@@ -356,7 +365,7 @@ expected value is computed by production code: the locked-Memory words are today
         {
           "oldAssertion": "The pause switch is found by aria-label \"Pause answers while indexing\"; its Advanced row contains \"indexing files (bulk import, reindex)\".",
           "newAssertion": "The pause switch is found by aria-label \"Pause answers while files are read\"; its Advanced row contains \"Wait while many files are being read (a large import, reading everything again)\". Default Off, the single pause-policy write, the witnessed save, convergence and the loaded answer model are unchanged.",
-          "reason": "R4: Brain > Advanced names the setting in the read words the page already uses for the same pause (\"Paused while files are read\", \"Answers paused while files are read\", W1) and the wording R4 gives (\"while many files are being read\"); owner words \"the app reads files (not \\\"indexes\\\")\". The meaning is kept: bulk import becomes \"a large import\", reindex becomes \"reading everything again\" (W1's \"Read everything again to restore full search.\"). The new words are asserted literally in BrainOverview.steps.test.ts (R4 case)."
+          "reason": "R4: Brain > Advanced names the setting in the read words the page already uses for the same pause (\"Paused while files are read\", \"Answers paused while files are read\", W1) and the wording R4 gives (\"while many files are being read\"); owner words \"the app reads files (not \\\"indexes\\\")\". The meaning is kept: bulk import becomes \"a large import\", reindex becomes \"reading everything again\" (W1's \"Read everything again to restore full search.\"). The new words are asserted literally in BrainOverview.step-repairs.test.ts (R4 case)."
         }
       ]
     },
@@ -900,7 +909,7 @@ expected value is computed by production code: the locked-Memory words are today
           "label": "agent choice"
         }
       ],
-      "behaviour": "Saved picture reading with an answer model that cannot read pictures: delayed reads cannot overturn newer receipts, interrupted changes reconcile, refusals keep the prior choice, unconfirmed projector reports never read as text-only. The one switch under the step shows the stored choice; the step's light and note show what works now; the sentence carries no per-feature part.",
+      "behaviour": "Saved picture reading with an answer model that cannot read pictures: delayed reads cannot overturn newer receipts, interrupted changes reconcile, refusals keep the prior choice, unconfirmed projector reports never read as text-only and the step says \"Not confirmed yet\". The one switch under the step shows the stored choice; the step's light and note show what works now; the sentence carries no per-feature part.",
       "conflictSearch": "Decision records searched for a conflict: all 54 records under docs/decisions/ grepped (2026-11-15) for AI Brain, BrainSurface, Memory, tab row, SurfaceTabs, developer tools, picture reading, reranker, chatEnabled, graphics card, type ladder and Overview: none; repeated (2026-11-15) for the X1-X8 terms rebuild-index, Rebuild search index, REBUILDING, compatState, reloadAllowed, pictureReadingEnabled, chatProfile and developer tools: no matches. Matches of the first search only concern runtime and storage (ADR-0001, 0019, 0024, 0047 models/VRAM; ADR-0008 amendment persists chatEnabled, consistent with unset answers staying unset); none states what AI Brain shows. No private records were read.",
       "assertionChanges": [
         {
@@ -930,8 +939,8 @@ expected value is computed by production code: the locked-Memory words are today
         },
         {
           "oldAssertion": "P3 null projector: path \"On\", sentence \"Reading text in scans and images is unconfirmed.\"; offline engine: sentence unconfirmed.",
-          "newAssertion": "P3 null projector: word \"On\", note \"Not confirmed yet\", lit false; offline engine: lit false and never the not-available words.",
-          "reason": "AM2: the switch keeps the stored On; the step's light and note show the unconfirmed runtime. The \"never text-only\" oracle is kept; \"Not confirmed yet\" (line 319) is adopted verbatim in W1."
+          "newAssertion": "P3 null projector: word \"On\", note \"Not confirmed yet\", one switch checked, lit false. Offline engine with a retained text-only report: word \"On\", note \"Not confirmed yet\", one switch checked, lit false, and never the not-available words.",
+          "reason": "AM2: the switch keeps the stored On; the step's light and note show the unconfirmed runtime. The uncertainty fact of both cases is kept: the sentence's \"Reading text in scans and images is unconfirmed.\" moves to the step's note (D2: the sentence has no per-feature parts), in W1's verbatim note \"Not confirmed yet\" (lines 321 and 328). The \"never text-only\" oracle is kept."
         },
         {
           "oldAssertion": "P4 table (path, sentence, both switches): explicit Off -> \"Off - files and read text kept\", unchecked; operator Off -> \"Off — operator controlled\", unchecked; operator On with inactive reader -> \"Unavailable — operator picture reader is not active\", unchecked; missing files -> \"Unavailable — picture reading files are missing\", checked; unknown settings -> \"Saved picture reading choice is not known. Refresh settings before changing it.\", unchecked; no saved choice -> \"Off - files and read text kept\", unchecked; saved Off with runtime On -> \"On — the saved Off choice is not applied\", checked. Never the not-available words; no posts.",
@@ -1419,8 +1428,8 @@ expected value is computed by production code: the locked-Memory words are today
         },
         {
           "oldAssertion": "Planning with an unavailable reranker or answer part: the step contains \"Unavailable on this computer\".",
-          "newAssertion": "The step is drawn not reachable (data-reach=\"na\"); never \"Not available here.\"; declined still \"Not downloaded\"; never Downloading/Waiting/Preparing (kept).",
-          "reason": "fm-10: \"What can't work here is said once, in ordinary words, and drawn as not reachable\"; D4 one fact once."
+          "newAssertion": "The step is drawn not reachable (data-reach=\"na\") and says why in ordinary words: \"Not available on this computer\" for the unavailable reranker and the unavailable answer part, \"Not part of this install\" for the part the install mode leaves out; never the planner's reason (\"Not available here.\", \"Needs the answer runtime.\"); declined still \"Not downloaded\"; never Downloading/Waiting/Preparing (kept). These cases run with navigator.platform \"Win32\" (removed after each case), so the reason does not depend on the computer running the check.",
+          "reason": "fm-10: \"What can't work here is said once, in ordinary words, and drawn as not reachable\"; D4 one fact once; the planner's reason is support detail. The old fact (the part is unavailable on this computer) keeps an explicit reason assertion in the page's current words: \"Not available on this computer\" is its general reason when no more specific one (no NVIDIA card, driver, memory, operator, Linux) is observed, and \"Not part of this install\" is W6 verbatim. On Linux the page says the platform exclusion instead (AM10 a), hence the pinned platform."
         },
         {
           "oldAssertion": "Unavailable answer runtime with complete files: the step contains \"Off — background work can continue\".",
@@ -2364,7 +2373,7 @@ expected value is computed by production code: the locked-Memory words are today
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "AI Brain's Overview as drawn in fm-10 and fm-13: the heading says what works, each fact stands once, only working steps are lit, sizes keep what they measure, Brain says read and answers words, and the heading agrees with the status panel. Expectations and their sources (picture words quoted in the sources): fm-10 heading, sentence, one filled action \"Install AI · 2.51 GB\", the licence line, lit steps (files, read only), \"8 files\", \"Built in\", \"Simple scans are read already\", sizes \"1.20 GB download\" and \"341.0 MB download\" (literal text: the fixture bytes in the app's existing size display, W4), the Included switch and its words \"Included\"/\"Not included\" (W1), the answer step drawn as not reachable with \"Needs an NVIDIA graphics card\" once and no CUDA words (fm-10, D4), the Linux exclusion said once without the planner's words (AM10 a); Included changes only the decline and the plan total (\"Install AI · 2.18 GB\"), across page return and restart (D2, existing handler); fm-13 heading \"Search understands meaning\" with its sentence, Off drawn as off, no tab row, no graphics meter, no filled action (fm-13, D3); a lost observation said once by the heading with an unknown choice \"Not known\" (W5, W1); no positive heading and meaning unlit for an inactive or unknown encoder, for embeddings being read again (REBUILDING: the heading says it in read words, the panel has no index/rebuild/semantic/embedding words) and for an unreported compatibility (X1, AM3); activation required keeps its heading, meaning unlit; incompatible embeddings keep the read-again remedy without index words; answers working while meaning does not makes no positive claim (AM3); package sizes labelled as downloads, never as disk use, no leading separators (AM8, D4); no answer size for a compact model without package data, a saved custom path, or an operator's model whose runtime names no profile (X5, AM8); R2: answers running on the compact model (runtime chatProfile \"compact\", models/status reporting the standard answer package incomplete as the Engine does, dev-only packages being dropped there) show the compact package's own size from the served manifest, \"3.18 GB download\" (literal: chat-compact's one model file 2740937888 bytes plus its projector 672423616 bytes, the registry's values, in the app's existing size display), and never the standard \"6.34 GB download\" (X5, R2); one kept-files wording at most and no CUDA words (D4); read and answers words for the waiting, off, paused and read-again states (AM9); R4: Advanced settings › Answers has no index words, and its pause switch is named \"Pause answers while files are read\" with \"Wait while many files are being read (a large import, reading everything again); keep the answer model loaded\" (R4, the page's read words for the same pause, W1); X7: for each populated reason code (index.embedding_mismatch, index.embedding_legacy, index.blocked_legacy, index.rebuild_brake_exhausted, index.rebuild_brake_unreadable, index.schema_mismatch) the callout has one heading in read words without index/rebuild/semantic/embedding words - exactly \"Read everything again to restore full search.\" (W1) for the three embedding causes - and its rebuild action, rendered through the real catalog button from the served registry-operation.en.properties, reads \"Rebuild all search data\" (X7, slice 6a's label); the words of the other three causes are an agent choice under X7, so only their meaning is asserted; the positive heading never stands beside a search problem and the install-failed heading equals the status row's title and reads the base words \"AI install failed\" (AM9 page/status coherence; D3 genuine failure headlines stay). The fixture status carries embedding.compatState COMPATIBLE where meaning works (X1); the size case's runtime names the \"standard\" profile (X5). Fail-before (origin/main 8a312d1484): every case fails by assertion on its claimed behaviour - the base headings \"AI Offline\", \"Rebuild search to use these models\", \"AI is ready\" beside a non-working meaning step, its \"Indexing …\" and canonical index/rebuild words, its sentence, its planner and CUDA words, its \"· 1.20 GB registry footprint · needed\" size and its 5.70 GB answer size for custom models, its per-step \"Unknown — checking AI status\", its missing state words (\"Included\"), and its lit meaning step while activation is required (data-active \"true\"). The repair heading while meaning's files are missing holds on the base; it is a preservation check in BrainOverview.preservation.test.ts (X8). R2 and R4 (2026-11-15) fail by assertion on their behaviour on 2f670abba7 (\"expected 'AI is ready Everything below runs on …' not to contain '6.34 GB download'\"; \"expected 'Answers Answer modelWrites the answer…' not to match /index/i\") and on 777b598043 (\"expected 'Answer questions Answer model · 6.34 …' to contain '3.18 GB download'\"; the same /index/i message). Elements are found by what the base page draws too: the steps by .path-step[data-feature] (.files-step, .read-step), switches by role \"switch\" and accessible name \"Use <step name>\", tabs by role \"tab\", headings by .brain-headline, buttons by their labels and panels by their test ids; lit is read from data-lit on the step or, before slice 7a, data-active on its symbol (X8). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "behaviour": "AI Brain's Overview as drawn in fm-10 and fm-13: the heading says what works, each fact stands once, only working steps are lit, sizes keep what they measure, Brain says read and answers words, and the heading agrees with the status panel. Expectations and their sources (picture words quoted in the sources): fm-10 heading, sentence, one filled action \"Install AI · 2.51 GB\", the licence line, lit steps (files, read only), \"8 files\", \"Built in\", \"Simple scans are read already\", sizes \"1.20 GB download\" and \"341.0 MB download\" (literal text: the fixture bytes in the app's existing size display, W4), the Included switch and its words \"Included\"/\"Not included\" (W1), the answer step drawn as not reachable with \"Needs an NVIDIA graphics card\" once and no CUDA words (fm-10, D4), the Linux exclusion said once without the planner's words (AM10 a); Included changes only the decline and the plan total (\"Install AI · 2.18 GB\"), across page return and restart (D2, existing handler); fm-13 heading \"Search understands meaning\" with its sentence, Off drawn as off, no tab row, no graphics meter, no filled action (fm-13, D3); a lost observation said once by the heading with an unknown choice \"Not known\" (W5, W1); no positive heading and meaning unlit for an inactive or unknown encoder, for embeddings being read again (REBUILDING: the heading says it in read words, the panel has no index/rebuild/semantic/embedding words) and for an unreported compatibility (X1, AM3); activation required keeps its heading, meaning unlit; incompatible embeddings keep the read-again remedy without index words; answers working while meaning does not makes no positive claim (AM3); package sizes labelled as downloads, never as disk use, no leading separators (AM8, D4); no answer size for a compact model without package data, a saved custom path, or an operator's model whose runtime names no profile (X5, AM8); one kept-files wording at most and no CUDA words (D4); read and answers words for the waiting, off, paused and read-again states (AM9); X7: for each populated reason code (index.embedding_mismatch, index.embedding_legacy, index.blocked_legacy, index.rebuild_brake_exhausted, index.rebuild_brake_unreadable, index.schema_mismatch) the callout has one heading in read words without index/rebuild/semantic/embedding words - exactly \"Read everything again to restore full search.\" (W1) for the three embedding causes - and its rebuild action, rendered through the real catalog button from the served registry-operation.en.properties, reads \"Rebuild all search data\" (X7, slice 6a's label); the words of the other three causes are an agent choice under X7, so only their meaning is asserted; the positive heading never stands beside a search problem and the install-failed heading equals the status row's title and reads the base words \"AI install failed\" (AM9 page/status coherence; D3 genuine failure headlines stay). The fixture status carries embedding.compatState COMPATIBLE where meaning works (X1); the size case's runtime names the \"standard\" profile (X5). Fail-before (origin/main 8a312d1484): every case fails by assertion on its claimed behaviour - the base headings \"AI Offline\", \"Rebuild search to use these models\", \"AI is ready\" beside a non-working meaning step, its \"Indexing …\" and canonical index/rebuild words, its sentence, its planner and CUDA words, its \"· 1.20 GB registry footprint · needed\" size and its 5.70 GB answer size for custom models, its per-step \"Unknown — checking AI status\", its missing state words (\"Included\"), and its lit meaning step while activation is required (data-active \"true\"). The repair heading while meaning's files are missing holds on the base; it is a preservation check in BrainOverview.preservation.test.ts (X8). The R2 and R4 checks are in BrainOverview.step-repairs.test.ts, with their own entry and fail-before evidence against 2f670abba7. Elements are found by what the base page draws too: the steps by .path-step[data-feature] (.files-step, .read-step), switches by role \"switch\" and accessible name \"Use <step name>\", tabs by role \"tab\", headings by .brain-headline, buttons by their labels and panels by their test ids; lit is read from data-lit on the step or, before slice 7a, data-active on its symbol (X8). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
       "sources": [
         {
           "kind": "owner-words",
@@ -2533,22 +2542,6 @@ expected value is computed by production code: the locked-Memory words are today
           "delegationScope": "implement the agreed first-minutes design set",
           "label": "agent choice",
           "choice": "Orchestrator decision X8 (2026-11-15): Tests: ladder audit uses the repository ladder rule exactly (no rounding beyond the check's own rule, all four corners); new checks' fail-before must come from the behaviour (query by role/name/text that exists on main, not new-only markup); literal expected wording instead of reasonFor; restore the cleared-after-recovery assertion."
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "You are supposed to be the implementation session",
-          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
-          "delegationScope": "implement the agreed first-minutes design set",
-          "label": "agent choice",
-          "choice": "Orchestrator decision R2 (2026-11-15, real-app test of 2f670abba7): Answer model size: with answers running on the compact model, the page shows the standard model's \"6.34 GB download\". Decision X5 (verbatim): \"Model size shown only with a trustworthy matching package value for the observed model; custom/unknown -> no size.\" Show the compact model's own package size if the package data has a trustworthy value for it, otherwise no size."
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "You are supposed to be the implementation session",
-          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
-          "delegationScope": "implement the agreed first-minutes design set",
-          "label": "agent choice",
-          "choice": "Orchestrator decision R4 (2026-11-15, real-app test of 2f670abba7): Brain > Advanced still says \"Pause answers while indexing\" and \"Wait while indexing files (bulk import, reindex)\". The app reads files (not \"indexes\"): use the read words already used elsewhere after slice 6a (search modules/ui-web for the reading wording of the same setting, e.g. \"while many files are being read\"), keeping the meaning."
         }
       ],
       "evidence": "gates/test-intent/evidence/fm-brain.json",
@@ -2564,7 +2557,7 @@ expected value is computed by production code: the locked-Memory words are today
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "Each switch sits under its step and shows the stored choice only; the step's light and words show what works now. Expectations and their sources: one switch per choice (Best match first, Answer questions, Text in scans and images) under its step, none in the sentence, each with its state in words \"On\" (D2, W1); saved Off while the runtime runs it: unchecked, \"Off\", lit; saved On while the runtime does not: checked, \"On\", unlit, note \"not working\" (AM2); unknown saved choices: no unchecked switch, \"Not known\", and the Refresh status route reads them again (AM2, AM6); unset answers read \"Automatic\" and nothing is written (AM2); X2: an unset picture choice with the answer model's files missing is checked, reads \"On\", says \"Not working — its files are missing\" and writes nothing (X2, W2, W1); R1: a fresh install with nothing saved on a computer without a usable card, where the Engine reports Best match first as it keeps it (inactive, reason cpu_default_off, session loaded; RuntimeActivationService), reads \"Off\", unchecked, unlit, with no not-working note, writes nothing, and a click saves On (R1); R3: answers running on the compact model with the vision files active (mmprojActive true) while models/status reports the standard answer package incomplete: the picture step is lit, reads \"On\" and carries neither \"Not working — its files are missing\" nor any not-working note (R3); R5: answers running on the compact model with picture reading saved Off, as the Engine reports it (chatProfile compact, its model loaded, mmprojActive false), while models/status and the plan report only the standard answer package, incomplete and to download (both leave the dev-only compact package out): the picture switch is unchecked, and a click opens no install consent and saves pictureReadingEnabled true once (R5; the really-missing install path stays guarded by BrainSurface.picture-switch.test.ts \"shows the whole download consent ...\"); an operator override locks the switch at the override, is described as an operator's, reads \"Off\" (AM2, W1); an interrupted change reads \"Not known\" until checked (W1); a pending change stays locked as \"Changing…\" across navigation (W1); another window's saved choice arrives and a delayed older read does not undo it, the switch showing the saved choice rather than the running feature (AM2). Fail-before (origin/main 8a312d1484): every case fails by assertion on its claimed behaviour - the base draws two switches per choice (sentence and path), draws the running feature rather than the saved choice (aria-checked \"true\" for a saved or overridden Off and after another window's Off), draws an unchecked switch for an unknown choice, draws an unset picture choice Off when the answer files are missing, and has no state words (\"\" for On, Automatic, Not known and Changing…). R1 and R3 (2026-11-15): on 2f670abba7 they fail by assertion on their behaviour (R1 \"expected 'On' to be 'Off'\"; R3 \"expected 'Text in scans and images Not working …' not to contain 'Not working — its files are missing'\"); on 777b598043 they fail by assertion at the state word (\"expected '' to be 'Off'\", \"expected '' to be 'On'\"): the base drew both behaviours correctly, so they are slice 7a regressions. R5 (2026-11-15): on 2f670abba7 with R1-R4 and on 777b598043 it fails by assertion on its behaviour (\"no install of the standard answer model: expected <dialog class=\\\"consent\\\" …> to be null\"): main has the same defect. Elements are found by what the base page draws too: the steps by .path-step[data-feature] (.files-step, .read-step), switches by role \"switch\" and accessible name \"Use <step name>\", tabs by role \"tab\", headings by .brain-headline, buttons by their labels and panels by their test ids; lit is read from data-lit on the step or, before slice 7a, data-active on its symbol (X8). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
+      "behaviour": "Each switch sits under its step and shows the stored choice only; the step's light and words show what works now. Expectations and their sources: one switch per choice (Best match first, Answer questions, Text in scans and images) under its step, none in the sentence, each with its state in words \"On\" (D2, W1); saved Off while the runtime runs it: unchecked, \"Off\", lit; saved On while the runtime does not: checked, \"On\", unlit, note \"not working\" (AM2); unknown saved choices: no unchecked switch, \"Not known\", and the Refresh status route reads them again (AM2, AM6); unset answers read \"Automatic\" and nothing is written (AM2); X2: an unset picture choice with the answer model's files missing is checked, reads \"On\", says \"Not working — its files are missing\" and writes nothing (X2, W2, W1); an operator override locks the switch at the override, is described as an operator's, reads \"Off\" (AM2, W1); an interrupted change reads \"Not known\" until checked (W1); a pending change stays locked as \"Changing…\" across navigation (W1); another window's saved choice arrives and a delayed older read does not undo it, the switch showing the saved choice rather than the running feature (AM2). Fail-before (origin/main 8a312d1484): every case fails by assertion on its claimed behaviour - the base draws two switches per choice (sentence and path), draws the running feature rather than the saved choice (aria-checked \"true\" for a saved or overridden Off and after another window's Off), draws an unchecked switch for an unknown choice, draws an unset picture choice Off when the answer files are missing, and has no state words (\"\" for On, Automatic, Not known and Changing…). The R1, R3 and R5 checks are in BrainOverview.switch-repairs.test.ts, with their own entry and fail-before evidence against 2f670abba7. Elements are found by what the base page draws too: the steps by .path-step[data-feature] (.files-step, .read-step), switches by role \"switch\" and accessible name \"Use <step name>\", tabs by role \"tab\", headings by .brain-headline, buttons by their labels and panels by their test ids; lit is read from data-lit on the step or, before slice 7a, data-active on its symbol (X8). Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform, stubbed fetch and seeded catalogs are reset in afterEach/beforeEach.",
       "sources": [
         {
           "kind": "owner-words",
@@ -2647,30 +2640,6 @@ expected value is computed by production code: the locked-Memory words are today
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decision W2 (2026-11-15): Unset picture-reading choice is drawn as the Engine's effective default (today On) with nothing written (like unset answers, AM2); its note says why it is not working when it is not.",
           "label": "agent choice"
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "You are supposed to be the implementation session",
-          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
-          "delegationScope": "implement the agreed first-minutes design set",
-          "label": "agent choice",
-          "choice": "Orchestrator decision R1 (2026-11-15, real-app test of 2f670abba7): Best match first (the reranker step), fresh install with nothing saved, on a computer without a usable card: the Engine keeps it off by default on the processor, but the page draws the switch \"On\" with \"Not working now\"; main showed \"Off — files kept\" and the agreed picture fm-13 shows \"Off\". A first click then saves Off. Required: an unset switch shows the Engine's effective state for this machine (here Off), never a default that differs from what the Engine does; a click saves the opposite of what is shown. Picture reading's unset default (drawn On) stays only where the Engine's effective default is also on; check how the effective default is observed and use it for both."
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "You are supposed to be the implementation session",
-          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
-          "delegationScope": "implement the agreed first-minutes design set",
-          "label": "agent choice",
-          "choice": "Orchestrator decision R3 (2026-11-15, real-app test of 2f670abba7): Text in scans and images: the step is lit but says \"Not working — its files are missing\" while the Engine reports the vision files active. Required: \"its files are missing\" only when the Engine reports this part's own files missing; a lit step never carries a not-working note that the Engine contradicts."
-        },
-        {
-          "kind": "delegated-choice",
-          "delegationQuote": "You are supposed to be the implementation session",
-          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
-          "delegationScope": "implement the agreed first-minutes design set",
-          "label": "agent choice",
-          "choice": "Orchestrator decision R5 (2026-11-15, found while repairing R2): with answers running on the compact model and picture reading switched Off, clicking the picture-reading switch starts an install of the standard answer model instead of saving On, because the switch checks the standard package's files rather than the files of the model actually observed. Required: the switch's \"files present\" decision uses the same observed-model package as R2 (compact running -> compact files); when the observed model's files are present, a click saves On and installs nothing; when they are really missing, today's install path stays."
         }
       ],
       "evidence": "gates/test-intent/evidence/fm-brain.json",
@@ -2890,6 +2859,162 @@ expected value is computed by production code: the locked-Memory words are today
         "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.preservation.test.ts"
       ],
       "repaired": false
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.switch-repairs.test.ts"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "Repairs R1, R3 and R5 (orchestrator decisions of 2026-11-15, after the real-app test of 2f670abba7): each switch shows the Engine's effective state for this computer, and a step's words never contradict what the Engine reports. Expectations and their sources: R1: a fresh install with nothing saved on a computer without a usable card, where the Engine reports Best match first as it keeps it (inactive, reason cpu_default_off, session loaded; RuntimeActivationService): its switch under the step is unchecked (aria-checked \"false\"), the step says \"Off\" and not \"On\", carries no not-working note, is unlit, nothing is written, and a click saves On (R1; fm-13 \"An off switch reads \\\"Off\\\"\"); R3: answers running on the compact model with the vision files active (mmprojActive true) while models/status reports the standard answer package incomplete: the picture step is lit and never says its files are missing (/files are missing/i) nor carries a not-working note, its switch is checked and the step says \"On\" (R3); R5: answers running on the compact model with picture reading saved Off, as the Engine reports it (chatProfile compact, its model loaded, mmprojActive false), while models/status and the plan report only the standard answer package, incomplete and to download (both leave the dev-only compact package out): the picture switch is unchecked, and a click opens no install consent and saves pictureReadingEnabled true once (R5; the really-missing install path stays guarded by BrainSurface.picture-switch.test.ts \"shows the whole download consent ...\"). Elements and states are observed by what both 777b598043 and the candidate draw: the step by .path-step[data-feature], its switch by role \"switch\" and accessible name \"Use <step name>\" under that step, the switch's state by aria-checked, the state in words and the note by the step's visible text, lit from data-lit or, before slice 7a, data-active on its symbol; no assertion needs slice 7a markup (.switch-state, .step-note). Fail-before (2f670abba7, the candidate before the repairs; evidence gates/test-intent/evidence/fm-brain-repairs.json): every case fails by assertion on its defect - R1 \"drawn as the Engine keeps it: off: expected 'true' to be 'false'\" (the unset switch drawn On, with \"Not working now\"), R3 \"expected 'Text in scans and images Not working …' not to match /files are missing/i\", R5 \"no install of the standard answer model: expected <dialog class=\\\"consent\\\" …(3)>…(1)</dialog> to be null\". On 777b598043 (origin/main after slice 6a; a builder run, not part of the evidence) R1 passes (main drew \"Off — files kept\", unchecked: the check preserves it), R3 fails for the same defect in main's words (\"expected 'Text in scans and images Unavailable …' not to match /files are missing/i\": main said \"Unavailable — picture reading files are missing\" on the lit step), and R5 fails by the same consent dialog. Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools and stubbed fetch are reset in beforeEach/afterEach.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Installed, no NVIDIA card. The headline says what now works, never \"AI Offline\" or \"Installed with limitations\". An off switch reads \"Off\" and is drawn off.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "D2 Sentence has no switches; each switch sits under its step with its state in words; existing handlers and meanings only (pre-install Included = package decline; Best match first = rerankerEnabled/intent; Answer questions = nullable chatEnabled, unset stays unset; Text in scans and images = pictureReadingEnabled). Switch shows stored selection; the step's lit/unlit and state words show what works now (selection never presented as activity).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM2 (D2) Switch projection from stored selection only (never runtime): saved Off/runtime On shows Off; saved On/runtime Off shows On with the step's words saying it is not working; unknown settings show \"Not known\" (not an unchecked switch) with the existing refresh route; unset answers show automatic without writing a default; operator overrides explained. Existing picture tests encoding the old drawing change (listed).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision W1 (2026-11-15): State words and notes adopted verbatim (mine): switch state words \"On\", \"Off\", \"Not known\", \"Included\", \"Not included\", \"Changing…\"; notes \"Checking after an interrupted change\", \"Not confirmed yet\", \"Set by an operator override\", \"Not working — its files are missing\", \"Not working now\", \"Not available with this answer model\", \"Off is not applied yet\"; exceptional headlines/sentences \"Answers paused while files are read\" + \"Answers resume when JustSearch finishes reading the files.\", \"Reading text in scans and images\" + \"Answers resume after the current document.\", \"Read everything again to restore full search.\"",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision W2 (2026-11-15): Unset picture-reading choice is drawn as the Engine's effective default (today On) with nothing written (like unset answers, AM2); its note says why it is not working when it is not.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision R1 (2026-11-15, real-app test of 2f670abba7): Best match first (the reranker step), fresh install with nothing saved, on a computer without a usable card: the Engine keeps it off by default on the processor, but the page draws the switch \"On\" with \"Not working now\"; main showed \"Off — files kept\" and the agreed picture fm-13 shows \"Off\". A first click then saves Off. Required: an unset switch shows the Engine's effective state for this machine (here Off), never a default that differs from what the Engine does; a click saves the opposite of what is shown. Picture reading's unset default (drawn On) stays only where the Engine's effective default is also on; check how the effective default is observed and use it for both."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision R3 (2026-11-15, real-app test of 2f670abba7): Text in scans and images: the step is lit but says \"Not working — its files are missing\" while the Engine reports the vision files active. Required: \"its files are missing\" only when the Engine reports this part's own files missing; a lit step never carries a not-working note that the Engine contradicts."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision R5 (2026-11-15, found while repairing R2): with answers running on the compact model and picture reading switched Off, clicking the picture-reading switch starts an install of the standard answer model instead of saving On, because the switch checks the standard package's files rather than the files of the model actually observed. Required: the switch's \"files present\" decision uses the same observed-model package as R2 (compact running -> compact files); when the observed model's files are present, a click saves On and installs nothing; when they are really missing, today's install path stays."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/fm-brain-repairs.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.switch-repairs.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.step-repairs.test.ts"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "behaviour": "Repairs R2 and R4 (orchestrator decisions of 2026-11-15, after the real-app test of 2f670abba7): the answer size measures the model answers run with, and Advanced names the answer pause in read words. Expectations and their sources: R2: answers running on the compact model (runtime chatProfile \"compact\", models/status reporting the standard answer package incomplete as the Engine does, dev-only packages being dropped there) show the compact package's own size from the served manifest, \"3.18 GB download\" (literal: chat-compact's one model file 2740937888 bytes plus its projector 672423616 bytes, the registry's values, in the app's existing size display), and never the standard \"6.34 GB download\" (X5, R2); R4: Advanced settings › Answers has no index words, and its pause switch is named \"Pause answers while files are read\" with \"Wait while many files are being read (a large import, reading everything again); keep the answer model loaded\" (R4, the page's read words for the same pause, W1). Elements are observed by what both 777b598043 and the candidate draw: the answer step by .path-step[data-feature=\"chat\"], the Advanced opener by its label, the answer settings by aria-label \"Answer settings\", the pause row by .advanced-row and its switch by role \"switch\". Fail-before (2f670abba7, the candidate before the repairs; evidence gates/test-intent/evidence/fm-brain-repairs.json): both cases fail by assertion on their defect - R2 \"expected 'AI is ready Everything below runs on …' not to contain '6.34 GB download'\", R4 \"expected 'Answers Answer modelWrites the answer…' not to match /index/i\". On 777b598043 (a builder run, not part of the evidence) both fail for the same defects (\"expected 'Answer questions Answer model · 6.34 …' to contain '3.18 GB download'\"; the same /index/i message): main has them too. Isolation: Not isolated (a test-owned file, brainPage.test.ts, is deleted in the same diff), and repository-wide scanners read it as a tracked source: scripts/governance/gates/test-intent/units.test.mjs:775 (scanTestOnlyImports, test-support.mjs:188, reads every tracked file under modules/ui-web); scripts/ci/check-liveness-constants-single-authority.mjs (reads every .ts under modules/ui-web/src, tests included); scripts/ci/check-runtime-manifest-closure.mjs (git ls-files, glob modules/ui-web/src/**/*.{ts,tsx,js,mjs}). scripts/ci/classify-changes.test.mjs lists it among tracked paths for folder expansion but reads only Java tests, build scripts and scripts as content. Other ui-web scanners under scripts/ci skip *.test.ts. It changes no global state: developer tools, navigator.platform and stubbed fetch are reset in beforeEach/afterEach.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Every fact has one home on a screen. ... The same thing has one name everywhere: the app reads files (not \"indexes\")",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM8 (D4) Sizes keep what they measure: package download size labelled as download, never as measured disk use; omitted for compact/custom models unless a matching trustworthy value exists (omission named). Graphics meter only with a current reading; never infer \"no card\" from a missing meter; installing/unsupported/insufficient-memory/unknown settled explicitly.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "AM9 Brain wording in 7a: \"indexing\", \"Resume Chat AI\", \"Rebuild the index\" and similar on Brain's default and exceptional states move to read/answers words; page/status coherence for Brain states (S7-25 subset); verdict ids unchanged.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision W1 (2026-11-15): State words and notes adopted verbatim (mine): switch state words \"On\", \"Off\", \"Not known\", \"Included\", \"Not included\", \"Changing…\"; notes \"Checking after an interrupted change\", \"Not confirmed yet\", \"Set by an operator override\", \"Not working — its files are missing\", \"Not working now\", \"Not available with this answer model\", \"Off is not applied yet\"; exceptional headlines/sentences \"Answers paused while files are read\" + \"Answers resume when JustSearch finishes reading the files.\", \"Reading text in scans and images\" + \"Answers resume after the current document.\", \"Read everything again to restore full search.\"",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decision W4 (2026-11-15): Expected sizes in tests are literal text, not computed with formatBytes; the two lost preservation checks come back (picture reading \"when last observed\" wording; Answer questions unlit when AI installed but answer model not downloaded).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision X5 (2026-11-15): Model size shown only with a trustworthy matching package value for the observed model; custom/unknown -> no size."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision R2 (2026-11-15, real-app test of 2f670abba7): Answer model size: with answers running on the compact model, the page shows the standard model's \"6.34 GB download\". Decision X5 (verbatim): \"Model size shown only with a trustworthy matching package value for the observed model; custom/unknown -> no size.\" Show the compact model's own package size if the package data has a trustworthy value for it, otherwise no size."
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "label": "agent choice",
+          "choice": "Orchestrator decision R4 (2026-11-15, real-app test of 2f670abba7): Brain > Advanced still says \"Pause answers while indexing\" and \"Wait while indexing files (bulk import, reindex)\". The app reads files (not \"indexes\"): use the read words already used elsewhere after slice 6a (search modules/ui-web for the reading wording of the same setting, e.g. \"while many files are being read\"), keeping the meaning."
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/fm-brain-repairs.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.step-repairs.test.ts"
+      ],
+      "repaired": true
     },
     {
       "change": "modified",

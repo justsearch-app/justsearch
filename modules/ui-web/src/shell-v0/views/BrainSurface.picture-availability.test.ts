@@ -325,7 +325,8 @@ describe('saved picture reading with an answer model that cannot read pictures',
       const el = await start();
       engineOnline = false; await poll(el); await poll(el);
       expect(el.shadowRoot!.textContent).not.toContain(NOT_AVAILABLE);
-      expect(view(el).lit).toBe('false');
+      // The uncertainty stays said: the step's note is W1's "Not confirmed yet", the switch keeps the saved On.
+      expect(view(el)).toMatchObject({ word: 'On', note: 'Not confirmed yet', switches: ['true'], lit: 'false' });
     });
 
     // AM2: the switch shows the saved choice (an operator override is the saved choice that wins);
