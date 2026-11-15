@@ -97,6 +97,13 @@ export class SurfaceTabs extends JfElement {
     /* The panel passes the host's height down to the member, so a member's own scroller (its
        surface body) holds its content; the panel itself never scrolls. */
     #surface-tabs-panel { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+    /* A short window: the tabs and their wrapped actions can fill it and leave the panel a sliver
+       shorter than one row, as at 600x400 with 200% text. There the panel keeps the window's full
+       height and the tab bar scrolls away above it; the member's scroll chains on to this host. */
+    @media (max-height: 30rem) {
+      :host { overflow-y: auto; }
+      #surface-tabs-panel { flex: none; height: 100%; }
+    }
     .tabs {
       flex-shrink: 0;
       display: flex;

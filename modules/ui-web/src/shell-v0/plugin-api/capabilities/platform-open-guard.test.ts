@@ -95,7 +95,8 @@ describe('desktop opening guard', () => {
     document.body.appendChild(browse);
     await browse.updateComplete;
     await new Promise((resolve) => setTimeout(resolve, 0));
-    browse.expanded = { __BROWSE_ROOTS__: true, '/docs': true };
+    // Watched folders are the top rows; a row's expansion key is its folder chain.
+    browse.expanded = { [JSON.stringify(['/docs'])]: true };
     browse.folderChildren = { '/docs': [] };
     browse.fileChildren = { '/docs': [{ path, name: 'crafted.desktop' }] };
     await browse.updateComplete;

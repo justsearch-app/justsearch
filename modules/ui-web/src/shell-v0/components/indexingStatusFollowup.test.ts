@@ -86,10 +86,10 @@ describe('WP3.3 sixth verifier regressions', () => {
       expect(title.includes(UNKNOWN), `${migration}: ${which}: headline`).toBe(which !== 'fresh');
       expect(control.textContent!.includes(UNKNOWN), `${migration}: ${which}`).toBe(which !== 'fresh');
       if (which !== 'fresh') {
-        expect(control.textContent).not.toContain('New index is being built');
+        expect(control.textContent).not.toContain('Reading everything again');
         expect(control.textContent).not.toContain('Your current search data stays available');
         expect(control.textContent).not.toContain('activation requires your decision');
-      } else expect(control.textContent).toContain(migration === 'AWAITING_ACCEPTANCE' ? 'activation requires your decision' : 'New index is being built');
+      } else expect(control.textContent).toContain(migration === 'AWAITING_ACCEPTANCE' ? 'activation requires your decision' : 'Reading everything again');
       expect(control.querySelector('jf-button[label="Cancel rebuild"]')).not.toBeNull();
     }
   });
