@@ -1914,3 +1914,13 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
   "note": "Entry 5 drops the no-AI-through-Pause assertion that word search remains available; M3 still requires that fact and V1 does not retire it. The exempt IndexingControllerCountPresentationTest.java is read by scripts/ci/classify-changes.test.mjs:113,156, so it is not isolated under the supplied no-scanner condition and needs an explicit entry. Other entries reviewed without an intent objection; independent runtime reruns were blocked by sandbox dependency/process/network restrictions."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1dfd4-3692-7002-a823-d1ea476c6159",
+  "verdict": "accept",
+  "digest": "sha256:fa417d1831eecd19128059fbf9da23ced3fa29131be85e403dcded6844b97e8d"
+}
+```
