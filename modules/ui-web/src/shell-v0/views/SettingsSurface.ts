@@ -3254,9 +3254,9 @@ export class SettingsSurface extends JfElement {
     return html`<section class="section" data-testid="settings-indexing">
       <h3>Indexing</h3>
       <p>${progress.activity.summary}${progress.activity.detail ? ` — ${progress.activity.detail}` : ''}</p>
-      ${progress.pause?.reason !== 'settings_recovery' ? html`<p>Pause processing while keeping indexed files searchable. Resume clears your manual pause; indexing hours and battery rules still apply.</p>` : nothing}
+      ${progress.pause?.reason !== 'settings_recovery' ? html`<p>Pause reading while keeping your files searchable. Resume clears your manual pause; reading hours and battery rules still apply.</p>` : nothing}
       <jf-indexing-controls allow-pause .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>
-      <p>Choose indexing hours and battery rules in Library.</p>
+      <p>Choose reading hours and battery rules in Library.</p>
       <jf-button variant="ghost" label=${SETTINGS_CONTROL_LABELS['indexing'].change}
         .onActivate=${() => requestIndexingRuleNavigation('hours')}>${SETTINGS_CONTROL_LABELS['indexing'].change}</jf-button>
     </section>`;

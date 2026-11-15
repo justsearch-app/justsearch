@@ -143,7 +143,7 @@ async function open(themed = false): Promise<Page> {
 const focusNow = (page: Page) => page.evaluate(() => window.focusNow());
 /** Open "Added by other apps" with the keyboard (no pointer press). */
 async function openSources(page: Page): Promise<void> {
-  await page.locator('.bottom-links summary').filter({ hasText: 'Added by other apps' }).focus();
+  await page.locator('.bottom-links summary').filter({ hasText: 'documents from other apps' }).focus();
   await page.keyboard.press('Enter');
 }
 /** Focus a control by its label with the keyboard's focus (no pointer press). */
@@ -291,5 +291,5 @@ it('L21 when a focused row leaves, focus moves to the next row\'s same control, 
   // The last row leaves: there is no next row, so "Add folder" takes it.
   await focusControl(page, 'Remove from library', 'folder-details-d');
   await page.evaluate(() => window.setRoots(['a', 'c']));
-  await expect.poll(() => focusNow(page)).toEqual({ page: false, control: 'Add folder', row: null });
+  await expect.poll(() => focusNow(page)).toEqual({ page: false, control: 'Add a folder', row: null });
 }, 30_000);

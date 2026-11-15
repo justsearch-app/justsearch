@@ -278,8 +278,8 @@ it.each(['cancel', 'accept-gaps'] as const)('Library %s keeps an immediate decis
   gapDecision = action === 'accept-gaps'; feed(gapDecision ? 'AWAITING_ACCEPTANCE' : 'MIGRATING');
   const el = document.createElement('jf-library-surface') as LibrarySurface;
   el.apiBase = base; el.host_ = host(); document.body.append(el);
-  await vi.waitFor(() => expect(el.shadowRoot!.querySelector(`jf-button[label="${gapDecision ? 'Use the new index without them' : 'Cancel rebuild'}"]`)).not.toBeNull());
-  const button = el.shadowRoot!.querySelector(`jf-button[label="${gapDecision ? 'Use the new index without them' : 'Cancel rebuild'}"]`) as JfButton;
+  await vi.waitFor(() => expect(el.shadowRoot!.querySelector(`jf-button[label="${gapDecision ? 'Use the new search data without them' : 'Cancel rebuild'}"]`)).not.toBeNull());
+  const button = el.shadowRoot!.querySelector(`jf-button[label="${gapDecision ? 'Use the new search data without them' : 'Cancel rebuild'}"]`) as JfButton;
   await clickButton(button);
   if (!gapDecision) { await pump(el); await confirmBand(el.shadowRoot!); }
   await vi.waitFor(() => expect(invocations).toBe(1));
@@ -295,13 +295,9 @@ it('Library shows the picture-off refusal from Process pending work in plain wor
   invokeRefusal = { code: 'PICTURE_READING_OFF', message: 'Picture reading is off. Turn it on to process pending work.' };
   const el = document.createElement('jf-library-surface') as LibrarySurface;
   el.apiBase = base; el.host_ = host(); document.body.append(el); await pump(el);
-  const aggregate = el.shadowRoot!.querySelector('jf-operation[operation-id="core.trigger-offline-processing"]') as JfOperation;
-  expect(aggregate).not.toBeNull(); await aggregate.updateComplete;
-  const op = aggregate.querySelector('jf-op-button') as OpButton;
-  await op.updateComplete;
-  const action = op.shadowRoot!.querySelector('jf-action-button') as ActionButton;
-  await action.updateComplete;
-  action.shadowRoot!.querySelector<HTMLButtonElement>('button.invoke')!.click();
+  el.shadowRoot!.querySelector<HTMLButtonElement>('.more-trigger')!.click(); await pump(el);
+  const waiting = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(item => item.textContent?.includes('Read waiting files now'))!;
+  expect(waiting).not.toBeNull(); waiting.click();
   await vi.waitFor(() => expect(el.shadowRoot!.textContent).toContain(invokeRefusal.message));
   expect(invocations).toBe(1);
   expect(el.shadowRoot!.textContent).not.toContain('Enrichment pass started');

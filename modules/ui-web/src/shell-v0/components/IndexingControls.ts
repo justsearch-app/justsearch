@@ -42,7 +42,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
   }
 
   private get remainingRules(): string {
-    return [this.reasons.includes('schedule') ? 'indexing hours' : '',
+    return [this.reasons.includes('schedule') ? 'reading hours' : '',
       this.reasons.includes('on_battery') ? 'battery power' : ''].filter(Boolean).join(' and ');
   }
 
@@ -106,22 +106,22 @@ class IndexingControls extends SignalWatcher(JfElement) {
       if (this.requestedResume && (this.reasons.includes('user_paused')
         || !this.progress.pause && !['indexing', 'enriching', 'ready'].includes(this.progress.phase))) return;
       this.message = this.action !== 'resume' && this.requestedResume && this.remainingRules
-        ? `Manual pause cleared. Indexing is still held by ${this.remainingRules}.` : '';
+        ? `Manual pause cleared. Reading is still held by ${this.remainingRules}.` : '';
       this.awaitingStatus = false;
     }
   }
 
   private get unavailableReason(): string {
     if (this.pending) return 'Request in progress. Waiting for the Engine.';
-    if (!this.progress.activity.confirmed) return this.toolbar && this.action === 'pause' ? 'Checking indexing status.' : '';
-    if (this.action === 'resume' && !this.progress.pause) return 'Indexing is already running.';
+    if (!this.progress.activity.confirmed) return this.toolbar && this.action === 'pause' ? 'Checking reading status.' : '';
+    if (this.action === 'resume' && !this.progress.pause) return 'Reading is already running.';
     if (this.action === 'resume' && this.progress.pause?.reason === 'settings_recovery') {
       return 'Settings recovery requires confirmation of the reset in Settings.';
     }
     if (this.action === 'resume' && !this.reasons.includes('user_paused')) {
-      return `Manual pause is cleared.${this.remainingRules ? ` Indexing is still held by ${this.remainingRules}.` : ''}`;
+      return `Manual pause is cleared.${this.remainingRules ? ` Reading is still held by ${this.remainingRules}.` : ''}`;
     }
-    if (!this.toolbar && this.action === 'pause' && this.progress.pause) return 'Indexing is already on hold.';
+    if (!this.toolbar && this.action === 'pause' && this.progress.pause) return 'Reading is already on hold.';
     return '';
   }
 
@@ -150,7 +150,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
       this.awaitingStatus = true;
       this.message = resume ? 'Resuming. Waiting for status to confirm the request.' : 'Waiting for status to confirm the request.';
     } catch (error: unknown) {
-      this.message = `Could not confirm the indexing request. Check the current status before trying again. ${error instanceof Error ? error.message : ''}`;
+      this.message = `Could not confirm the reading request. Check the current status before trying again. ${error instanceof Error ? error.message : ''}`;
     } finally {
       this.pending = false;
     }
@@ -179,7 +179,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
       @click=${() => {
         if (unavailable) return;
         if (resume) void this.invoke(); else this.menuOpen = !this.menuOpen;
-      }}>${icon({ name: resume ? 'play' : 'clock', size: 14 })}${resume ? 'Resume indexing' : 'Pause indexing'}
+      }}>${icon({ name: resume ? 'play' : 'clock', size: 14 })}${resume ? 'Resume reading' : 'Pause reading'}
       ${!resume ? icon({ name: 'chevron-down', size: 12 }) : nothing}</button>
       ${!resume && this.menuOpen ? html`<div id="pause-options" class="pause-options">
         ${[[0, 'Until I resume'], [900000, '15 minutes'], [3600000, '1 hour']].map(([duration, label]) => html`
@@ -203,13 +203,13 @@ class IndexingControls extends SignalWatcher(JfElement) {
           <option value="3600000">1 hour</option>
         </select></label>` : nothing}
       <button type="button" aria-disabled=${unavailable ? 'true' : 'false'} aria-describedby="control-state"
-        @click=${() => void this.invoke()}>${this.action === 'settings' ? 'Open Settings at Reset to defaults' : this.action === 'hours' ? this.compact ? 'Change when to index' : 'Change hours' : this.action === 'battery' ? this.compact ? 'Change when to index' : 'Change battery setting' : resume ? 'Resume indexing' : 'Pause indexing'}</button>
+        @click=${() => void this.invoke()}>${this.action === 'settings' ? 'Open Settings at Reset to defaults' : this.action === 'hours' ? this.compact ? 'Change when to read files' : 'Change hours' : this.action === 'battery' ? this.compact ? 'Change when to read files' : 'Change battery setting' : resume ? 'Resume reading' : 'Pause reading'}</button>
       ${!this.compact && this.action !== 'settings' && this.action !== 'hours' && this.reasons.includes('schedule')
         ? html`<button type="button" @click=${() => this.changeRule('hours')}>Change hours</button>` : nothing}
       ${!this.compact && this.action !== 'settings' && this.action !== 'battery' && this.reasons.includes('on_battery')
         ? html`<button type="button" @click=${() => this.changeRule('battery')}>Change battery setting</button>` : nothing}
       ${this.compact && resume && this.remainingRules ? html`<button type="button"
-        @click=${() => this.changeRule(this.reasons.includes('schedule') ? 'hours' : 'battery')}>Change when to index</button>` : nothing}
+        @click=${() => this.changeRule(this.reasons.includes('schedule') ? 'hours' : 'battery')}>Change when to read files</button>` : nothing}
     </div>
     <p id="control-state" role="status">${[unavailable, this.message].filter(Boolean).join(' ')}</p>`;
   }

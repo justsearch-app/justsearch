@@ -41,14 +41,14 @@ describe('WP3.7 status-owned pause projection', () => {
     for (const reason of ['future_reason', 'constructor']) {
       const unknown = select(status('PAUSED', reason));
       expect(unknown.phase).toBe('paused');
-      expect(unknown.activity.detail).toContain('Indexing is on hold');
+      expect(unknown.activity.detail).toContain('Reading is on hold');
     }
   });
 
   it('S37.6 keeps an empty paused queue visible instead of Ready', () => {
     const p = select(status('PAUSED', 'user_paused', 0));
     expect(p.phase).toBe('paused');
-    expect(p.activity.summary).toBe('Indexing paused');
+    expect(p.activity.summary).toBe('Reading paused');
     expect(p.activity.detail).toContain('Paused by you');
     expect(p.activity.summary).not.toContain('Ready');
   });
@@ -64,7 +64,7 @@ describe('WP3.7 status-owned pause projection', () => {
     for (const [reason, wording] of [['game_mode', 'game is running'], ['gpu_busy_external', 'another app'], ['energy_saver', 'saves energy']]) {
       const p = select(status('PAUSED', reason));
       expect(p.phase).toBe('indexing');
-      expect(p.activity.summary).toBe('Text indexing continues');
+      expect(p.activity.summary).toBe('Text reading continues');
       expect(p.activity.detail).toContain(wording);
     }
     const noPolicyReason = status('PAUSED');

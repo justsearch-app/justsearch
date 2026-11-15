@@ -204,7 +204,7 @@ it('DE1 folder, collection and theme bands share one window slot and Escape rest
   const page = await open();
   await page.evaluate(() => window.prepareOwnLibrary());
   const library = page.locator('jf-library-surface');
-  await library.locator('.bottom-links summary').filter({ hasText: 'Added by other apps' }).click();
+  await library.locator('.bottom-links summary').filter({ hasText: 'documents from other apps' }).click();
   const folder = library.locator('.card jf-button[label="Remove from library"]').first();
   const collection = library.locator('jf-button[label="Remove mcp-ingest"]');
   const theme = page.locator('jf-button[label="Delete custom theme Alpha"]');

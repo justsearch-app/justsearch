@@ -58,7 +58,7 @@ it('S33.4 the store timer expires the worker observation while SSE alone keeps t
     bumpOriginContact();
     await vi.advanceTimersByTimeAsync(5_000);
     expect(getAiState().snapshotLive).toBe(true);
-    expect(activity(getAiState())).toMatchObject({ confirmed: false, summary: 'Indexing status unconfirmed' });
+    expect(activity(getAiState())).toMatchObject({ confirmed: false, summary: 'Reading status unconfirmed' });
     expect(seen.at(-1), 'subscribers receive expiry without a new poll').toBe(false);
 
     __feedForTest({ status: observation(Date.now()) });

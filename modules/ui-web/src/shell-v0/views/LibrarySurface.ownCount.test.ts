@@ -31,41 +31,43 @@ async function header(): Promise<{ headline: string; count: string }> {
   el.host_ = host;
   document.body.append(el); await settle(el);
   el.roots = [root]; el.resolvedPaths = { a: '/notes' }; el.loading = false; await settle(el);
+  expect(el.shadowRoot!.querySelector('.files-found')!.textContent).toBe('10 files');
   return { headline: el.shadowRoot!.querySelector('h2')!.textContent!.trim(),
-    count: el.shadowRoot!.querySelector('.subtitle')!.textContent!.split('·')[0]!.replace(/\s+/g, ' ').trim() };
+    count: el.shadowRoot!.querySelector('.header .subtitle')?.textContent ?? '' };
 }
 afterEach(() => { document.body.replaceChildren(); __resetAiStateForTest(); vi.restoreAllMocks(); });
 
 it('FA4 counts the person\'s own files, not the bundled Help', async () => {
   observe(3);
-  expect(await header()).toEqual({ headline: 'Your files are searchable', count: '3 searchable documents' });
+  expect(await header()).toEqual({ headline: 'Your files are searchable', count: '' });
 });
 
 it('FA4 one own file reads in the singular', async () => {
   observe(1);
-  expect((await header()).count).toBe('1 searchable document');
+  expect((await header()).count).toBe('');
 });
 
 it('FA4 with no own files it says so in words, whatever Help holds', async () => {
   observe(0);
-  expect(await header()).toEqual({ headline: 'Indexing your files', count: 'None of your files are searchable yet' });
+  expect(await header()).toEqual({ headline: 'Reading your files', count: '' });
 });
 
 it('FA4 an Engine that does not report the own count: unknown in words, never a number', async () => {
   observe(undefined);
   const { count } = await header();
-  expect(count).toBe('Searchable document count not known');
+  expect(count).toBe('');
 });
 
 it('FA4a with the own count unknown (only Help and an indexed folder reported), no headline says the person\'s files are searchable', async () => {
   observe(undefined);
-  expect(await header()).toEqual({ headline: 'Your folders are indexed', count: 'Searchable document count not known' });
+  expect(await header()).toEqual({ headline: 'Checking your folders', count: '' });
 });
 
 it('FA4 the own count reported late replaces the unknown one', async () => {
   observe(undefined);
-  expect((await header()).count).toBe('Searchable document count not known');
+  expect((await header()).count).toBe('');
   observe(5); await new Promise(r => setTimeout(r, 0));
   const el = document.querySelector('jf-library-surface') as LibrarySurface; await settle(el);
-  expect(el.shadowRoot!.querySelector('.subtitle')!.textContent).toContain('5 searchable documents');
+  expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Your files are searchable');
+  expect(el.shadowRoot!.querySelector('.header .subtitle')).toBeNull();
 });

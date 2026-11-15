@@ -13,7 +13,7 @@ const messages = Object.fromEntries(properties.split('\n').filter(line => line.i
 }));
 afterEach(() => { document.body.innerHTML = ''; });
 it('L9 the served rebuild label is visible and names the catalog button; typed word stays rebuild', async () => {
-  expect(messages['ops.rebuild-index.label']).toBe('Rebuild search index');
+  expect(messages['ops.rebuild-index.label']).toBe('Rebuild all search data');
   expect(messages['ops.rebuild-index.confirm']).toBe('rebuild');
   __seedResourceCatalog(messages);
   __seedForTest({ schemaVersion:'1', catalogVersion:1, namespace:'core', primitive:'Operation', entries:[{
@@ -25,6 +25,6 @@ it('L9 the served rebuild label is visible and names the catalog button; typed w
   await el.updateComplete;
   const action=el.shadowRoot!.querySelector('jf-action-button') as ActionButton;await action.updateComplete;
   const button=action.shadowRoot!.querySelector('button')!;
-  expect(button.textContent!.trim()).toBe('Rebuild search index');
+  expect(button.textContent!.trim()).toBe('Rebuild all search data');
   expect(button.getAttribute('aria-label'),'the visible text is the accessible name').toBeNull();
 });

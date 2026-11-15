@@ -221,15 +221,15 @@ describe('FailedFilesList', () => {
       expect(indexedRow.getAttribute('data-state')).toBe('INDEXED_SOURCE_UNREADABLE');
 
       const line = indexedRow.querySelector('[data-testid="failed-job-source-unreadable"]');
-      expect(line, 'an unreadable indexed source must say so').toBeTruthy();
+      expect(line, 'an unreadable read source must say so').toBeTruthy();
       const text = (line!.textContent ?? '').replace(/\s+/g, ' ').trim();
-      expect(text).toContain('Indexed, source unreadable');
+      expect(text).toContain('Read, source unreadable');
       expect(text).toContain('stays searchable');
       expect(text).not.toMatch(/missing|deleted/i);
       expect(indexedRow.querySelector('[data-testid="failed-job-exhausted"]')).toBeNull();
 
       const other = notYetIndexedRow.querySelector('[data-testid="failed-job-source-unreadable"]');
-      expect(other, 'a never-indexed unreadable source is unreadable too').toBeTruthy();
+      expect(other, 'a never-read unreadable source is unreadable too').toBeTruthy();
       const otherText = (other!.textContent ?? '').replace(/\s+/g, ' ').trim();
       expect(otherText).toContain('Source unreadable');
       expect(otherText).not.toContain('stays searchable');

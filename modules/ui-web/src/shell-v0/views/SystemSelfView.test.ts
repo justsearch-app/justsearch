@@ -78,7 +78,7 @@ describe('jf-system-self-view — strip variant (578 Workstream A)', () => {
     const el = await mount('strip');
     // Absence of a status observation cannot establish idleness.
     expect(el.shadowRoot!.querySelector('.body')).not.toBeNull();
-    expect(el.shadowRoot!.textContent).toContain('Indexing status unconfirmed');
+    expect(el.shadowRoot!.textContent).toContain('Reading status unconfirmed');
     expect(el.shadowRoot!.querySelector('[data-testid="self-view-idle"]')).toBeNull();
   });
 });

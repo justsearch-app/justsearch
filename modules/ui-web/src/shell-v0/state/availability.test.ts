@@ -138,13 +138,13 @@ describe('projectAvailability (tempdoc 596)', () => {
     const a = projectAvailability('documents', aiState({ chat: true, docs: 0, mode: 'indexing' }));
     expect(a.kind).toBe('unavailable');
     expect(isUnavailable(a) && a.transient).toBe(true);
-    expect(isUnavailable(a) && /indexing|once/i.test(a.reason)).toBe(true);
+    expect(isUnavailable(a) && /reading|once/i.test(a.reason)).toBe(true);
   });
 
   it('zero docs WHILE jobs pending → transient forward-looking reason (§16.4 availableWhen)', () => {
     const a = projectAvailability('documents', aiState({ chat: true, docs: 0, pendingJobs: 3 }));
     expect(isUnavailable(a) && a.transient).toBe(true);
-    expect(isUnavailable(a) && /indexing|once/i.test(a.reason)).toBe(true);
+    expect(isUnavailable(a) && /reading|once/i.test(a.reason)).toBe(true);
   });
 
   it('documents with docs>0 and chat up → available', () => {

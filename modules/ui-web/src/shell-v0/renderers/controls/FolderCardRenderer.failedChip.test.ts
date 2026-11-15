@@ -21,6 +21,7 @@ interface Card {
   displayPath: string;
   status: string;
   metaText: string;
+  expanded?: boolean;
   failed: number;
   failedLastKnown?: boolean;
 }
@@ -35,10 +36,11 @@ async function mount(card: Card): Promise<Element> {
 }
 
 const base: Card = {
+  expanded: true,
   pathHash: 'h',
   displayPath: 'reports',
   status: 'pending',
-  metaText: 'default · Indexing · 2 remaining',
+  metaText: 'default · Reading · 2 remaining',
   failed: 2,
 };
 

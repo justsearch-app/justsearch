@@ -81,7 +81,7 @@ it('S32.2 Save is explicit and unsaved drafts disable Preview and Apply', async 
   document.body.appendChild(el); await el.updateComplete;
   const root = el.shadowRoot!;
   expect(root.querySelector('jf-button[label="Save patterns"]')).not.toBeNull();
-  expect(root.textContent).toContain('Save changes what future indexing skips');
+  expect(root.textContent).toContain('Save changes what future reading skips');
   for (const label of ['Preview', 'Apply']) {
     expect((root.querySelector(`jf-button[label="${label}"]`) as HTMLElement & { disabled: boolean }).disabled).toBe(true);
   }
@@ -127,7 +127,7 @@ it('WX2 explains buffered removals and keeps them out of the completed count', a
   expect(text).toContain('/docs/pending.log');
   expect(text).toContain('Removal completes when the index rebuild finishes');
   expect(el.shadowRoot?.querySelector('#excludes-help')?.textContent)
-    .toContain('During an index rebuild, removal may wait until the rebuild finishes.');
+    .toContain('During a rebuild of search data, removal may wait until the rebuild finishes.');
 });
 
 it('S32.6 invalid saves keep the draft editable with an inline announced error', async () => {

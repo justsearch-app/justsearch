@@ -74,9 +74,9 @@ export async function readIndexedRoots(
     // Overtaken by a newer answer: the caller receives that answer, never this older one.
     if (!current()) return valid() ? snapshot : null;
     accepted = read;
-    const previous = new Map(snapshot.roots.map(root => [root.pathHash, root.fileCount]));
-    const roots = body.items.map(root => !counts && (root.fileCount ?? -1) < 0 && (previous.get(root.pathHash) ?? -1) >= 0
-      ? { ...root, fileCount: previous.get(root.pathHash)! } : root);
+    const previous = new Map(snapshot.roots.map(root => [root.pathHash, root]));
+    const roots = body.items.map(root => !counts && (root.fileCount ?? -1) < 0 && (previous.get(root.pathHash)?.fileCount ?? -1) >= 0
+      ? { ...root, fileCount: previous.get(root.pathHash)!.fileCount, fileCountCapped: previous.get(root.pathHash)!.fileCountCapped } : root);
     const hashes = new Set(roots.map(root => root.pathHash));
     snapshot = { roots, paths: Object.fromEntries(Object.entries(snapshot.paths).filter(([hash]) => hashes.has(hash))), confirmed: true, error: null, receivedAtMs: Date.now(),
       lastKnownFailed: rememberFailedCounts(snapshot.lastKnownFailed ?? {}, roots, { provisional: getAiState().stability.kind === 'provisional' }) };

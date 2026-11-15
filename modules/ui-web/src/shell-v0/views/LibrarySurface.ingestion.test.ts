@@ -22,10 +22,13 @@ it('Library Folders mounts the real summary consumer and tears it down when Brow
   library.host_ = { platform: { capabilities: new Set<string>() }, data: { fetch } } as unknown as PluginHostApi;
   document.body.append(library);
   await library.updateComplete;
+  expect(library.shadowRoot!.querySelector('jf-ingestion-summary')).toBeNull();
+  const activity = library.shadowRoot!.querySelector<HTMLElement & { onActivate: () => void }>('[label="Activity"]')!;
+  activity.onActivate(); await library.updateComplete;
   const panel = library.shadowRoot!.querySelector<IngestionSummary>('jf-ingestion-summary');
   expect(panel).not.toBeNull();
   await panel!.updateComplete;
-  expect(panel!.shadowRoot!.textContent).toContain('Loading indexing activity');
+  expect(panel!.shadowRoot!.textContent).toContain('Loading reading activity');
   expect(summarySignal).toBeDefined();
   library.activeTab = 'core.browse-surface';
   await library.updateComplete;

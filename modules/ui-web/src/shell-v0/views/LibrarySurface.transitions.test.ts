@@ -45,7 +45,7 @@ it.each([false, true])('L2 wake recovery uses the shared catching-up headline (e
   if (empty) expect(el.shadowRoot!.querySelector('.empty')!.textContent).toContain('Catching up…');
   observe(); await settle(el);
   expect(el.shadowRoot!.querySelector('h2')!.textContent)
-    .toBe(empty ? 'Add a folder to start searching' : 'Your files are searchable');
+    .toBe('Your files are searchable');
 });
 
 it.each([false, true])('L2 worker restart uses the shared restart headline (empty roots: %s)', async empty => {
@@ -57,7 +57,7 @@ it.each([false, true])('L2 worker restart uses the shared restart headline (empt
   if (empty) expect(el.shadowRoot!.querySelector('.empty')!.textContent).toContain('Restarting…');
   observe(); await settle(el);
   expect(el.shadowRoot!.querySelector('h2')!.textContent)
-    .toBe(empty ? 'Add a folder to start searching' : 'Your files are searchable');
+    .toBe('Your files are searchable');
 });
 
 it.each(['MIGRATING', 'SWITCHING'])('L2 real migration retains the Library rebuilding wording (%s)', async migration => {

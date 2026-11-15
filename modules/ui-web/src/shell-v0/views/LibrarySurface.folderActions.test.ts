@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { afterEach, expect, it, vi } from 'vitest';
 import './LibrarySurface.js';
+import { getOperationClient } from '../operations/OperationClient.js';
 import * as paletteProjection from '../commands/CommandPaletteProjection.js';
 import './BrowseSurface.js';
 import type { LibrarySurface } from './LibrarySurface.js';
@@ -77,7 +78,7 @@ function button(el: LibrarySurface, label: string) {
   return found!;
 }
 async function draft(el: LibrarySurface) {
-  button(el, 'Add folder').onActivate(); await pump(el);
+  button(el, 'Add a folder').onActivate(); await pump(el);
   el.pendingPath = '/new'; el.pendingCollection = 'reports'; await pump(el);
 }
 afterEach(() => { document.body.replaceChildren(); __resetAiStateForTest(); resetSurfaces(); vi.restoreAllMocks(); });
@@ -146,7 +147,7 @@ it('submits Add once while waiting and announces its outcome', async () => {
   expect(el.shadowRoot!.textContent).toContain('Adding folder');
   request.resolve({ success: true }); await pump(el);
   expect(el.shadowRoot!.querySelector('.action-message[role="status"]')?.textContent).toContain('Folder added');
-  expect(el.shadowRoot!.activeElement?.getAttribute('label')).toBe('Add folder');
+  expect(el.shadowRoot!.activeElement?.getAttribute('label')).toBe('Add a folder');
 });
 
 it('switching member tabs during Add retains the pending outcome and draft until acceptance', async () => {
@@ -170,11 +171,11 @@ it('switching member tabs during Add retains the pending outcome and draft until
 
 it('a cancelled native picker leaves a closed form and an existing draft unchanged', async () => {
   const { el } = await mount({ picks: [null, '/picked', null] });
-  button(el, 'Add folder').onActivate(); await pump(el);
+  button(el, 'Add a folder').onActivate(); await pump(el);
   expect(el.showManualInput).toBe(false);
-  button(el, 'Add folder').onActivate(); await pump(el);
+  button(el, 'Add a folder').onActivate(); await pump(el);
   el.pendingCollection = 'keep'; const preview = el.pendingPreview;
-  button(el, 'Add folder').onActivate(); await pump(el);
+  button(el, 'Add a folder').onActivate(); await pump(el);
   expect(el.pendingPath).toBe('/picked'); expect(el.pendingCollection).toBe('keep');
   expect(el.pendingPreview).toBe(preview);
 });
@@ -190,7 +191,7 @@ it('exposes row removal progress, suppresses repeats and keeps the other row usa
   setRows([root('b')]); request.resolve({ success: true }); await pump(el);
   expect(el.roots.map(r => r.pathHash)).toEqual(['b']);
   expect(el.shadowRoot!.querySelector('.action-message[role="status"]')?.textContent).toContain('Folder removed');
-  expect(el.shadowRoot!.activeElement?.getAttribute('label')).toBe('Add folder');
+  expect(el.shadowRoot!.activeElement?.getAttribute('label')).toBe('Add a folder');
 });
 
 it('R3 a completed removal offers to add the same folder again, once, with its plain consequence', async () => {
@@ -312,26 +313,33 @@ it('names legacy inner folders and ancestor coverage in Remove confirmations', a
 
 it('distinguishes accepted reindex from the recorded completion and failure', async () => {
   const { el, setOutcome } = await mount();
-  const reindex = el.shadowRoot!.querySelector('jf-operation[operation-id="core.reindex"]')!;
-  reindex.dispatchEvent(new CustomEvent('op-success', { detail: { structuredData: { operationKey: key } } }));
+  vi.spyOn(getOperationClient(el.apiBase), 'invokeWithConsent').mockResolvedValue({ success: true, message: 'Reading accepted', structuredData: { operationKey: key } });
+  const reindex = async () => {
+    el.shadowRoot!.querySelector<HTMLButtonElement>('.more-trigger')!.click(); await pump(el);
+    [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(item => item.textContent?.includes('Read everything again'))!.click();
+    await pump(el);
+  };
+  await reindex();
+  expect(getOperationClient(el.apiBase).invokeWithConsent).toHaveBeenCalledWith('core.reindex', { args: { force: true } }, expect.anything());
   await pump(el);
-  expect(el.shadowRoot!.textContent).toContain('Reindex accepted');
-  expect(el.shadowRoot!.textContent).not.toContain('Reindex completed');
+  expect(el.shadowRoot!.textContent).toContain('Read again accepted');
+  expect(el.shadowRoot!.textContent).not.toContain('Read again completed');
   setOutcome({ state: 'complete', historySince: 0 });
-  button(el, 'Check reindex outcome').onActivate(); await pump(el);
-  expect(el.shadowRoot!.textContent).toContain('Reindex completed');
+  button(el, 'Check reading outcome').onActivate(); await pump(el);
+  expect(el.shadowRoot!.textContent).toContain('Read again completed');
   setOutcome({ state: 'failed', historySince: 0 });
-  reindex.dispatchEvent(new CustomEvent('op-success', { detail: { structuredData: { operationKey: key } } }));
+  await reindex();
   await pump(el);
-  expect(el.shadowRoot!.querySelector('[role="alert"]')?.textContent).toContain('Reindex did not complete');
+  expect(el.shadowRoot!.querySelector('[role="alert"]')?.textContent).toContain('Read again did not complete');
   expect(el.shadowRoot!.textContent).toContain('retry');
 });
 
 it('explains an empty reindex scope and offline folders without claiming a full reindex', async () => {
   const { el } = await mount();
   el.roots = []; await pump(el);
-  expect(el.shadowRoot!.textContent).toContain('No watched folders to reindex');
-  expect(el.shadowRoot!.querySelector('jf-operation[operation-id="core.reindex"]')).toBeNull();
+  el.shadowRoot!.querySelector<HTMLButtonElement>('.more-trigger')!.click(); await pump(el);
+  const action = el.shadowRoot!.querySelector<HTMLButtonElement>('[role="menuitem"]')!;
+  expect(action.textContent).toContain('No folders yet'); expect(action.disabled).toBe(true);
   el.roots = [{ ...root('a'), status: 'unavailable' }]; await pump(el);
   expect(el.shadowRoot!.textContent).toContain('offline');
 });
@@ -342,7 +350,7 @@ for (const mode of ['browser', 'desktop'] as const) {
     const { el } = await mount(mode === 'desktop' ? { picks: ['/picked'] } : {});
     const tabs = el.shadowRoot!.querySelector<SurfaceTabs>('jf-surface-tabs')!;
     el.activeTab = tab; await pump(el); await tabs.updateComplete;
-    button(el, 'Add folder').focus(); button(el, 'Add folder').onActivate();
+    button(el, 'Add a folder').focus(); button(el, 'Add a folder').onActivate();
     await pump(el); await tabs.updateComplete;
     expect(el.activeTab).toBe('folders');
     expect(tabs.shadowRoot!.querySelector('[data-tab-id="folders"]')?.getAttribute('aria-selected')).toBe('true');
@@ -352,7 +360,7 @@ for (const mode of ['browser', 'desktop'] as const) {
     expect(el.pendingPath).toBe(mode === 'desktop' ? '/picked' : '');
     button(el, 'Cancel').onActivate(); await pump(el);
     expect(el.showManualInput).toBe(false);
-    expect(el.shadowRoot!.activeElement).toBe(button(el, 'Add folder'));
+    expect(el.shadowRoot!.activeElement).toBe(button(el, 'Add a folder'));
   });
 }
 
@@ -361,13 +369,13 @@ it('R1 a late picker selects Folders, but a response from before reconnect canno
   const pick = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(obsolete.promise);
   const { el } = await mount({ picks: [], pick });
   el.activeTab = 'core.browse-surface'; await pump(el);
-  button(el, 'Add folder').onActivate(); await pump(el);
+  button(el, 'Add a folder').onActivate(); await pump(el);
   el.activeTab = 'folders'; await pump(el); el.activeTab = 'core.browse-surface'; await pump(el);
   first.resolve('/late'); await pump(el);
   expect(el.activeTab).toBe('folders'); expect(el.pendingPath).toBe('/late');
   expect(el.shadowRoot!.activeElement?.getAttribute('aria-label')).toBe('Folder path');
   button(el, 'Cancel').onActivate(); await pump(el);
-  button(el, 'Add folder').onActivate(); await pump(el);
+  button(el, 'Add a folder').onActivate(); await pump(el);
   el.remove(); document.body.append(el); await pump(el);
   obsolete.resolve('/obsolete'); await pump(el);
   expect(el.showManualInput).toBe(false); expect(el.pendingPath).not.toBe('/obsolete');

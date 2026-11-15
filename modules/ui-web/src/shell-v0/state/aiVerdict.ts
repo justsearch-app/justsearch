@@ -476,7 +476,7 @@ export function aiEngineHeadline(v: AiEngineVerdict): string {
       // Soft-off (tempdoc 737 §15 decision 1): engine up for background work, chat off.
       return 'Background processing';
     case 'indexing':
-      return 'Indexing';
+      return 'Reading';
   }
 }
 

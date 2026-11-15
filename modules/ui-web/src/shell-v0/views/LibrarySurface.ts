@@ -26,11 +26,13 @@ import { decideForget, forgetObservationText, parseForgetPage, publishForgetComp
 import { deepActiveElement } from '../utils/keyboardHandler.js';
 import type { ForgetPage, ForgetOutcome } from '../../api/generated/schema-types/index.js';
 import { confirmForget } from '../components/searchResults/forgetConsent.js';
+import { menuStyles } from '../components/Menu.js';
+import { getShowDeveloperTools, subscribeShowDeveloperTools } from '../state/developerToolsState.js';
 import { JfElement } from '../primitives/JfElement.js';
 import '../components/OpButton.js';
-import { OperationError, type OperationInvocationSuccess } from '../operations/OperationClient.js';
-import type { OpSuccessEventDetail, OpErrorEventDetail } from '../components/OpButton.js';
+import { getOperationClient, OperationError, type OperationInvocationSuccess } from '../operations/OperationClient.js';
 import '../components/Button.js';
+import { requestAuthorization } from '../operations/authorizationBroker.js';
 import '../components/IngestionSummary.js';
 import '../components/InterruptedImports.js';
 // Tempdoc 571 §11 / 578 — Library ⊇ Browse: Library hosts the Browse file-tree as a tab.
@@ -125,9 +127,9 @@ type ExcludesResult = z.infer<typeof excludesResultSchema>;
 /** Support codes stay on each exact gap; the decision itself uses plain language. */
 function rebuildGapReason(code: string): string {
   const reasons: Record<string, string> = {
-    CANDIDATE_PROJECTION_MISSING: 'The document was not added to the new index.',
-    PROJECTION_WITNESS_MISSING: 'The document could not be verified in the new index.',
-    DELETE_NOT_APPLIED: 'The document could not be removed from the new index.',
+    CANDIDATE_PROJECTION_MISSING: 'The document was not added to the new search data.',
+    PROJECTION_WITNESS_MISSING: 'The document could not be verified in the new search data.',
+    DELETE_NOT_APPLIED: 'The document could not be removed from the new search data.',
     PROJECTION_DELETE_NOT_APPLIED: 'The document removal could not be verified.',
     PROJECTION_SOURCE_INCOMPLETE: 'Documents from this source are not ready.',
     PROJECTION_SOURCE_MARKER_MISSING: 'This document source could not be verified.',
@@ -136,12 +138,12 @@ function rebuildGapReason(code: string): string {
     SANDBOX_FAILED: 'The file reader could not run safely.',
     UNREADABLE: 'The file could not be read.',
     SOURCE_UNREADABLE: 'The source file could not be read.',
-    INDEXED_SOURCE_UNREADABLE: 'The indexed source file could not be read again.',
+    INDEXED_SOURCE_UNREADABLE: 'The read source file could not be read again.',
     ROOT_UNAVAILABLE: 'The containing folder could not be found or read.',
     IO_ERROR: 'The file could not be accessed.',
     INPUT_TOO_LARGE: 'The file exceeds the size limit.',
     OFFICE_INPUT_TOO_LARGE: 'The Office document exceeds the size limit.',
-    WRITE_FAILED: 'The document could not be saved to the new index.',
+    WRITE_FAILED: 'The document could not be saved to the new search data.',
     WRITE_UNAVAILABLE_DRAINING: 'The index was unavailable while finishing other work.',
     MISSING_AT_PROCESSING: 'The source file was missing when processing started.',
     DELETED_OR_MISSING: 'The source file was deleted or could not be found.',
@@ -209,9 +211,10 @@ export class LibrarySurface extends JfElement {
   private expandedFolders = new Set<string>();
   private contactUnconfirmed = false;
   private rebuilding = false;
-  private provisionalHeadline = 'Indexing status unconfirmed';
+  private provisionalHeadline = 'Reading status unconfirmed';
   private indexProgress = selectIndexingProgress(null, false, 0, []);
   static properties = {
+    developer: { state: true }, menuOpen: { state: true }, menuBusy: { state: true }, activityOpen: { state: true },
     apiBase: { attribute: 'api-base', type: String },
     host_: { attribute: false },
     roots: { state: true },
@@ -267,6 +270,12 @@ export class LibrarySurface extends JfElement {
     reindexCancelRecorded: { state: true },
   };
 
+  private developerUnsub: (() => void) | undefined;
+  declare developer: boolean;
+  declare menuOpen: boolean;
+  declare menuBusy: boolean;
+  declare activityOpen: boolean;
+  private waitingWork: 'unknown' | 'waiting' | 'none' = 'unknown';
   declare apiBase: string;
   declare host_: PluginHostApi;
   declare roots: IndexedRootView[];
@@ -671,6 +680,7 @@ export class LibrarySurface extends JfElement {
     // two render sites cannot drift; see failedChipPresentation.ts.
     failedChipStyles,
     folderRowStyles,
+    menuStyles,
     css`
       .folders-scroll { padding: 1.8rem 2.5rem; min-width: 0; }
       .header-left h2 { font-size: var(--font-size-headline); font-variation-settings: "opsz" 32; font-weight: 400; }
@@ -682,10 +692,12 @@ export class LibrarySurface extends JfElement {
       .removal-history { margin-top: 1rem; font-size: var(--font-size-xs); color: var(--text-secondary); }
       .removal-history summary { cursor: pointer; }
       .window-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+      @media (max-width: 45rem) { .window-actions { gap: .25rem; } }
       .more-actions { position: relative; }
-      .more-actions summary { cursor: pointer; list-style: none; padding: .4rem; color: var(--text-secondary); }
-      .more-actions[open] > div { position: absolute; z-index: 1; right: 0; min-width: 15rem;
-        padding: .5rem; background: var(--surface-2); border: 1px solid var(--border-subtle); }
+      .more-trigger { display: inline-grid; place-items: center; width: 1.875rem; height: 1.875rem; padding: 0;
+        border: 0; border-radius: 8px; color: var(--text-primary); background: transparent; cursor: pointer; }
+      .more-trigger:hover, .more-trigger[aria-expanded=true] { background: var(--surface-2); }
+      .more-trigger:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
       .browser-banner { padding: 0; border: 0; background: transparent; color: var(--text-secondary); font-size: var(--font-size-xs); }
       .excludes-section, .gap-decision { background: transparent; border: 0; border-radius: 0;
         border-top: 1px solid var(--border-subtle); padding: 1rem 0; }
@@ -788,6 +800,8 @@ export class LibrarySurface extends JfElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
+    this.developer = getShowDeveloperTools();
+    this.developerUnsub = subscribeShowDeveloperTools(show => { this.developer = show; });
     this.rootsUnsub = subscribeIndexedRoots(() => {
       const observation = getIndexedRoots();
       if (observation.confirmed) this.roots = observation.roots;
@@ -830,6 +844,11 @@ export class LibrarySurface extends JfElement {
       this.contactUnconfirmed = s.stability.kind === 'provisional' &&
         ['initial-load', 'updating', 'channel-stale'].includes(s.stability.cause);
       this.observeGapDecision(s.status?.worker?.migration);
+      const core = s.status?.worker?.core, enrichment = s.status?.worker?.enrichment;
+      const pending = [core?.pendingVduCount, enrichment?.embeddingPendingCount,
+        enrichment?.spladePendingCount, enrichment?.pendingNerCount, enrichment?.chunk?.chunkEmbeddingPendingCount, enrichment?.chunk?.chunkSpladePendingCount];
+      this.waitingWork = !s.indexingStatusLive || this.provisional || s.status?.meta?.workerRpcStale === true || s.status?.operating?.freshness?.staleSources?.includes('indexing') ? 'unknown' : pending.some(value => typeof value === 'number' && value > 0)
+        ? 'waiting' : pending.every(value => typeof value === 'number' && value === 0) ? 'none' : 'unknown';
       // Tempdoc 813 §4 — the per-root second tier needs to know which stages apply; take it from the
       // ONE index-wide progress derivation rather than re-reading the enrichment wire flags here.
       const progress = selectIndexingProgress(
@@ -875,6 +894,8 @@ export class LibrarySurface extends JfElement {
    *  spinner / error would otherwise survive navigation). Folder/excludes drafts, the active tab, and the
    *  fetched roots are recoverable and KEPT. */
   protected override settleTransients(): void {
+    this.menuOpen = false;
+    this.menuBusy = false;
     this.excludesError = null;
     this.excludesNotice = '';
     this.excludesResult = null;
@@ -907,6 +928,7 @@ export class LibrarySurface extends JfElement {
   }
 
   override disconnectedCallback(): void {
+    this.developerUnsub?.();
     this.rootsUnsub?.();
     this.rootArrivalUnsub?.();
     this.rootArrivalSerial++;
@@ -1117,10 +1139,11 @@ export class LibrarySurface extends JfElement {
     const progress = rootCoverage(root, this.enrichmentStages);
     const unknown = !this.indexingActivity.confirmed || this.provisional || fs.state === 'unavailable';
     const statusText = fs.state === 'ready' ? 'Up to date'
-      : fs.state === 'empty' ? 'No indexable files'
+      : fs.state === 'empty' ? 'No files to read'
       : fs.state === 'enriching' ? `Meaning processing${progress?.percent != null ? ` · ${progress.percent}%` : ''}`
       : fs.state === 'failed' && !root.walkError ? 'Files need review'
-      : fs.metaText.split(' · ').slice(1).join(' · ');
+      : fs.state === 'unverified' ? "Couldn't verify deletions — read again to be sure"
+      : fs.metaText.split(' · ').slice(1).filter(part => !/^(last known )?[\d,]+[+]? files?$|^read |^indexed |^Verified /.test(part)).join(' · ');
     return {
       expanded: this.expandedFolders.has(pathHash),
       pathHash, displayPath: name.label, fullPath, pathTitle: name.title, walkError: undefined,
@@ -1132,19 +1155,21 @@ export class LibrarySurface extends JfElement {
       ...(this.removeConfirm?.origin === 'row' && this.removalPlan(pathHash) ? { removeConfirm: this.removalPlan(pathHash)! } : {}),
       failed: fs.failed, failedLastKnown: fs.failedIsLastKnown === true, apiBase: this.apiBase,
       filesFound: (root.fileCount ?? -1) >= 0
-        ? `${unknown ? 'Last known ' : ''}${(root.fileCount ?? 0).toLocaleString()} files found` : 'Files found: unknown',
+        ? `${unknown ? 'Last known ' : ''}${(root.fileCount ?? 0).toLocaleString()}${root.fileCountCapped ? '+' : ''} files` : '',
+      developer: this.developer,
+      meaningText: this.meaningText(root, fs),
+      reading: !this.indexProgress.pause && (fs.state === 'indexing' || fs.state === 'scanning' || fs.state === 'enriching'),
       collection: root.collection ?? 'default',
       wordsVerdict: fs.state === 'ready' || fs.state === 'enriching' || fs.state === 'keyword-only' || fs.state === 'unverified'
         ? `${this.indexingActivity.confirmed ? 'Now' : 'Last known'}${fs.state === 'unverified' ? ' · deletions unverified' : ''}`
         : 'Not yet confirmed; see status',
       processingPercent: progress?.percent,
-      showProgress: fs.state === 'enriching',
       indexedAgo: root.lastIndexedIsoTime ? this.host_.utilities.formatRelativeTime(root.lastIndexedIsoTime) : '',
       verifiedAgo: root.lastVerifiedIsoTime ? this.host_.utilities.formatRelativeTime(root.lastVerifiedIsoTime) : '',
       canReveal: this.isTauri,
       revealUnavailable: !fullPath ? 'The folder path could not be resolved.'
         : fs.state === 'unavailable' ? 'Folder not found. Reconnect the drive or check the folder path.' : '',
-      needsVerification: fs.state === 'unverified',
+      needsVerification: root.deleteDetectionUnverified === true || fs.state === 'unverified',
     };
   }
 
@@ -1170,14 +1195,14 @@ export class LibrarySurface extends JfElement {
     try {
       await this.host_.platform.revealInExplorer(path);
     } catch (error: unknown) {
-      if (serial === this.surfaceSerial) this.error = `Could not open the folder in Explorer. ${error instanceof Error ? error.message : String(error)}`;
+      if (serial === this.surfaceSerial) this.error = `Could not open the folder in Files. ${error instanceof Error ? error.message : String(error)}`;
     }
   }
 
   private renderCardsRegion(): TemplateResult {
     const body = activeBodyFor(LIBRARY_CARDS_REGION);
     const folders = this.roots.map(r => this.projectFolder(r));
-    if (!body) return html`<h3>Folders</h3><div class="cards" role="list">${repeat(folders, f => f.pathHash, f => renderFolderRow(f, {
+    if (!body) return html`<div class="cards" role="list">${repeat(folders, f => f.pathHash, f => renderFolderRow(f, {
       expanded: this.expandedFolders.has(f.pathHash ?? ''), enabled: true, host: this.host_,
       toggle: () => this.toggleFolder(f.pathHash ?? ''),
       invoke: intent => this.folderIntent(intent, f.pathHash ?? ''),
@@ -1588,9 +1613,9 @@ export class LibrarySurface extends JfElement {
         && schedule.enabled === saved.schedule.enabled
         && schedule.startMinute === saved.schedule.startMinute && schedule.endMinute === saved.schedule.endMinute
         && JSON.stringify(schedule.days) === JSON.stringify(saved.schedule.days);
-      if (this.excludesAttempt) throw new Error('Check the pending skip-rule save before saving indexing rules.');
+      if (this.excludesAttempt) throw new Error('Check the pending skip-rule save before saving reading rules.');
       if (!sameSchedule || (policy?.pauseOnBattery ?? false) !== saved.pauseOnBattery) {
-        throw new OperationError('Indexing times changed elsewhere. Review saved indexing rules before saving your draft.',
+        throw new OperationError('Reading times changed elsewhere. Review saved reading rules before saving your draft.',
           'CONFLICT', 409, 'VERSION_CONFLICT');
       }
       await this.invokeSettingsWrite(write);
@@ -1615,7 +1640,7 @@ export class LibrarySurface extends JfElement {
       await this.loadExcludesPolicy();
       this.excludesNotice = isOverride(this.excludesPolicy)
         ? 'Patterns saved. The saved list has no effect while the override is set; it takes effect after the override is removed. Existing search results have not been removed.'
-        : this.excludesPolicy ? 'Patterns saved. Future indexing skips these matches. Existing search results have not been removed.'
+        : this.excludesPolicy ? 'Patterns saved. Future reading skips these matches. Existing search results have not been removed.'
           : 'Patterns saved. Effective policy is unavailable; reload before Preview or Apply.';
       return true;
     } catch (err) {
@@ -1885,7 +1910,7 @@ export class LibrarySurface extends JfElement {
     this.reindexOutcomeBusy = false;
     this.reindexOutcomeKey = typeof key === 'string' && /^[0-9a-f-]{36}$/.test(key) ? key : null;
     this.reindexOutcomeError = false;
-    this.reindexOutcome = 'Reindex accepted. Completion has not yet been confirmed.';
+    this.reindexOutcome = 'Read again accepted. Completion has not yet been confirmed.';
     if (this.reindexOutcomeKey) await this.checkReindexOutcome();
   }
 
@@ -1898,20 +1923,20 @@ export class LibrarySurface extends JfElement {
     try {
       const response = await this.doFetch(`/api/operation-history/${encodeURIComponent(key)}`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const outcome = parseWireContract(operationOutcomeViewSchema, await response.json(), 'reindex outcome');
+      const outcome = parseWireContract(operationOutcomeViewSchema, await response.json(), 'read again outcome');
       if (serial !== this.reindexReadSerial) return;
       this.reindexOutcomeError = outcome.state === 'failed';
       if (outcome.state === 'complete') {
-        this.reindexOutcome = 'Reindex completed for the recorded request. Current indexing activity is shown below.';
+        this.reindexOutcome = 'Read again completed for the recorded request. Current reading activity is shown below.';
         this.reindexOutcomeKey = null;
       } else if (outcome.state === 'failed') {
-        this.reindexOutcome = `Reindex did not complete${outcome.result?.code ? ` (${outcome.result.code})` : ''}. Check folder availability and retry Reindex; failed files can also be retried below.`;
+        this.reindexOutcome = `Read again did not complete${outcome.result?.code ? ` (${outcome.result.code})` : ''}. Check folder availability and retry Read again; failed files can also be retried below.`;
         this.reindexOutcomeKey = null;
       } else {
-        this.reindexOutcome = `Reindex accepted. ${['accepted', 'running'].includes(outcome.state) ? 'Completion has not yet been confirmed.' : 'Its outcome is unavailable; check again before retrying.'}`;
+        this.reindexOutcome = `Read again accepted. ${['accepted', 'running'].includes(outcome.state) ? 'Completion has not yet been confirmed.' : 'Its outcome is unavailable; check again before retrying.'}`;
       }
     } catch {
-      if (serial === this.reindexReadSerial) this.reindexOutcome = 'Reindex accepted. Its outcome could not be read; check again before retrying.';
+      if (serial === this.reindexReadSerial) this.reindexOutcome = 'Read again accepted. Its outcome could not be read; check again before retrying.';
     } finally {
       if (serial === this.reindexReadSerial) this.reindexOutcomeBusy = false;
     }
@@ -1929,11 +1954,11 @@ export class LibrarySurface extends JfElement {
       this.error = null;
       const result = await this.host_.data.invokeOperation('core.reindex', { force: true });
       if (serial !== this.surfaceSerial) return;
-      if (!result.success) throw new Error(result.message || 'Reindex refused');
+      if (!result.success) throw new Error(result.message || 'Read again refused');
       await this.reindexAccepted(result);
     } catch (err) {
       if (serial !== this.surfaceSerial) return;
-      this.error = `Reindex was not confirmed. ${err instanceof Error ? err.message : String(err)} You can retry Reindex.`;
+      this.error = `Read again was not confirmed. ${err instanceof Error ? err.message : String(err)} You can retry Read again.`;
     }
   }
 
@@ -2078,10 +2103,10 @@ export class LibrarySurface extends JfElement {
             .onActivate=${() => this.handleRemoveRoot(hash, 'attention')}>Remove from library</jf-button>`
           : item.kind === 'walk' ? html`<jf-button variant="ghost" .disabled=${this.removingHashes.has(hash)}
           .onActivate=${() => root.walkError?.startsWith('Removal incomplete.') ? this.handleRemoveRoot(hash, 'attention') : this.handleReindexToVerify()}
-          >${root.walkError?.startsWith('Removal incomplete.') ? 'Retry removal' : 'Reindex'}</jf-button>`
+          >${root.walkError?.startsWith('Removal incomplete.') ? 'Retry removal' : 'Read again'}</jf-button>`
           : item.kind === 'files' ? html`<jf-button variant="ghost" .onActivate=${() => revealFailedFiles(hash)}>Show files</jf-button>`
-          : html`<jf-button variant="ghost" label="Reindex to verify"
-          .disabled=${this.removingHashes.has(hash)} .onActivate=${() => this.handleReindexToVerify()}>Reindex to verify</jf-button>` });
+          : html`<jf-button variant="ghost" label="Read again to verify"
+          .disabled=${this.removingHashes.has(hash)} .onActivate=${() => this.handleReindexToVerify()}>Read again to verify</jf-button>` });
     }
     const hold = this.indexingActivity.confirmed ? this.indexProgress : this.lastKnownHold;
     if (hold?.pause) items.push({ key: 'hold', title: hold.activity.summary,
@@ -2114,18 +2139,12 @@ export class LibrarySurface extends JfElement {
           <div class="attention-actions">${item.actions ?? nothing}</div>
           ${item.band ?? nothing}
         </section>`)}
+      ${this.indexingActivity.confirmed && this.indexingActivity.detail && !this.indexProgress.pause
+        && (['waiting', 'blocked'].includes(this.indexProgress.phase) || this.indexingActivity.enrichmentDeferred || this.indexingActivity.detail.includes('shares time'))
+        ? html`<p class="reading-detail">${this.indexingActivity.detail}</p>` : nothing}
       ${this.renderReindexDecision()}
-      ${(this.unfinishedForgets?.items.length ?? 0) > 0 ? this.renderUnfinishedForgets() : nothing}
+      ${(this.unfinishedForgets?.items.length ?? 0) > 0 || this.forgetReadStatus === 'unavailable' || this.forgetMessage ? this.renderUnfinishedForgets() : nothing}
     </div>`;
-  }
-
-  private get activitySentence(): string {
-    const activity = this.indexingActivity;
-    if (!activity.confirmed) return this.indexProgress.live && this.attentionItems().length ? 'Indexing status unconfirmed — details last known' : '';
-    // The detail already names this wait and its cause; announce it once.
-    if (['Meaning processing is waiting to save energy', 'Meaning processing is waiting for the GPU'].includes(activity.summary)
-      && activity.detail) return activity.detail;
-    return [activity.summary, activity.detail].filter(Boolean).join(' — ');
   }
 
   async focusIndexingRule(control: 'hours' | 'battery'): Promise<void> {
@@ -2144,60 +2163,75 @@ export class LibrarySurface extends JfElement {
     // The person's own files (Help excluded). Unknown own files are never said to be searchable: once
     // the Engine has answered without them (an older Engine), the headline says only what is known.
     const documents = this.ownDocuments;
-    const ownUnknown = !this.defaultScopeDocuments.known ? 'Checking your folders'
-      : this.indexProgress.phase === 'indexing' ? this.indexingActivity.summary : 'Your folders are indexed';
+    const ownUnknown = this.indexProgress.phase === 'indexing' ? this.indexingActivity.summary : 'Checking your folders';
     const headline = this.loading ? 'Loading your Library…'
-      : !this.indexProgress.live || this.contactUnconfirmed ? 'Indexing status unconfirmed'
+      : !this.indexProgress.live || this.contactUnconfirmed ? 'Reading status unconfirmed'
         : count ? `${count} ${count === 1 ? 'thing needs' : 'things need'} your attention`
           : this.provisional ? this.provisionalHeadline
             : !this.indexingActivity.confirmed ? this.indexingActivity.summary
-              : !this.roots.length ? 'Add a folder to start searching'
+              : ['indexing', 'waiting', 'blocked'].includes(this.indexProgress.phase) ? this.indexingActivity.summary
+              : !this.roots.length ? (documents.known && documents.value > 0 || this.otherSources.sources.some(source => source.docCount > 0) ? 'Your files are searchable' : 'Add a folder to start searching')
                 : !documents.known ? ownUnknown
-                  : documents.value === 0 ? 'Indexing your files' : 'Your files are searchable';
-    return html`<div class="header"><div class="header-left"><h2>${headline}</h2>
-      <p class="subtitle">${!this.ownDocuments.known ? 'Searchable document count not known'
-        : this.ownDocuments.value === 0 ? 'None of your files are searchable yet'
-          : `${this.ownDocuments.value.toLocaleString()} searchable ${this.ownDocuments.value === 1 ? 'document' : 'documents'}`}
-        · ${this.roots.length} ${this.roots.length === 1 ? 'folder' : 'folders'}${this.activitySentence ? ` · ${this.activitySentence}` : ''}</p>
-    </div></div>`;
+                  : documents.value === 0 ? 'Reading your files' : 'Your files are searchable';
+    return html`<div class="header"><div class="header-left"><h2>${headline}</h2></div></div>`;
+  }
+
+  private meaningText(root: IndexedRootView, status: FolderStatus): string {
+    const words = status.state === 'ready' || status.state === 'enriching' || status.state === 'keyword-only' || status.state === 'unverified';
+    const fallback = words ? ' · word search is available' : ' · word search availability not known';
+    if (!this.indexingActivity.confirmed || this.provisional || status.state === 'unknown' || status.state === 'unavailable') return `Not known${words ? ' · word search was available at the last check' : fallback}`;
+    const stages = this.enrichmentStages;
+    if (stages && Object.entries(root.failedStages ?? {}).some(([id, failed]) => failed && (id === 'chunkVectors' ? stages.embedding : stages[id as keyof EnrichmentApplicability]))) return `Some files failed${fallback}`;
+    if (this.enrichmentBlocked) return `${stages?.embedding ? 'Blocked' : 'Needs AI'}${fallback}`;
+    if (stages?.embedding && Object.entries(root.missingArtifactStages ?? {}).some(([id, missing]) => missing && ['embedding', 'chunkVectors'].includes(id))) return `In progress${fallback}`;
+    const coverage = rootCoverage(root, stages);
+    if (status.state === 'enriching' || coverage && !coverage.complete) return `In progress${fallback}`;
+    if (coverage?.complete && stages?.embedding) return 'On';
+    if (stages && !stages.embedding) return `Needs AI${fallback}`;
+    return `Not known${fallback}`;
+  }
+
+  private async runLibraryAction(operation: 'core.reindex' | 'core.trigger-offline-processing'): Promise<void> {
+    if (this.menuBusy) return;
+    this.shadowRoot?.querySelector<HTMLElement>('.more-trigger')?.focus();
+    this.menuOpen = false;
+    this.menuBusy = true;
+    const serial = this.surfaceSerial;
+    try {
+      const result = await getOperationClient(this.apiBase).invokeWithConsent(operation,
+        { args: operation === 'core.reindex' ? { force: true } : {} }, { requestConsent: requestAuthorization });
+      if (serial !== this.surfaceSerial) return;
+      if (operation === 'core.reindex') await this.reindexAccepted(result);
+      else this.actionMessage = `${result.message || 'Reading pass accepted.'} ${typeof result.structuredData?.remaining === 'number' && result.structuredData.remaining > 0
+        ? 'Some files are still waiting; another pass may be needed.' : 'Completion of all waiting work has not been confirmed. Check Activity; another pass may be needed.'}`;
+    } catch (error) {
+      if (serial === this.surfaceSerial) this.error = `Reading was not confirmed. ${error instanceof Error ? error.message : String(error)} Check Activity before retrying.`;
+    } finally { if (serial === this.surfaceSerial) this.menuBusy = false; }
   }
 
   private renderWindowActions(): TemplateResult {
-    return html`        <div slot="actions" class="window-actions">
-          <jf-indexing-controls data-testid="library-indexing-pause" compact toolbar allow-pause .progress=${this.indexProgress} api-base=${this.apiBase}
-            .saveWithSettings=${this.saveSettingsOperation}></jf-indexing-controls>
-          <details class="more-actions"><summary aria-label="More Library actions">${icon({ name: 'more-horizontal', size: 18 })}</summary><div>
-          <!-- Tempdoc 511 Phase 9: <jf-operation> aggregate component
-               supersedes the slice 509 <jf-op-button>. LibrarySurface
-               is user-tier; core.reindex's wire audience=USER passes
-               the gate. -->
-          ${this.rootsObserved && this.roots.length === 0 && !this.provisional
-            ? html`<span>No watched folders to reindex.</span>`
-            : html`<jf-operation context="button" operation-id="core.reindex" api-base=${this.apiBase}
-                @op-success=${(e: CustomEvent<OpSuccessEventDetail>) => void this.reindexAccepted(e.detail)}
-                @op-error=${(e: CustomEvent<OpErrorEventDetail>) => { this.error = `Reindex was not confirmed. ${e.detail.message} You can retry Reindex.`; }}
-              ></jf-operation>`}
-          <!-- Tempdoc 813 §6: the manual "Process pending enrichment" trigger — drains the pending
-               VDU + embedding work for already-indexed documents, same catalog-driven pattern as
-               core.reindex above. Its LABEL comes from the operation catalog (one string, both
-               render sites); the operation id keeps its historical name. -->
-          <jf-operation
-            context="button"
-            operation-id="core.trigger-offline-processing"
-            api-base=${this.apiBase}
-            @op-error=${(e: CustomEvent<OpErrorEventDetail>) => { this.error = e.detail.message; }}
-          ></jf-operation>
-          </div></details>
-          <jf-button
-            variant="primary"
-            data-add-folder
-            label="Add folder"
-            .disabled=${this.addBusy}
-            .onActivate=${() => this.handleAddFolderClick()}
-          >
-            ${icon({ name: 'folder-plus', size: 14 })} Add folder
-          </jf-button>
-        </div>`;
+    const noFolders = this.rootsObserved && this.roots.length === 0 && !this.provisional;
+    const totalKnown = this.rootsObserved && getIndexedRoots().confirmed && this.roots.length > 0 && !this.provisional && this.indexingActivity.confirmed
+      && this.roots.every(root => (root.fileCount ?? -1) >= 0 && root.fileCountCapped === false && root.walkCompleted === true && !root.walkError && root.status !== 'unavailable');
+    const total = this.roots.reduce((sum, root) => sum + (root.fileCount ?? 0), 0);
+    return html`<div slot="actions" class="window-actions">
+      <jf-indexing-controls data-testid="library-indexing-pause" compact toolbar allow-pause .progress=${this.indexProgress} api-base=${this.apiBase}
+        .saveWithSettings=${this.saveSettingsOperation}></jf-indexing-controls>
+      <span class="more-actions"><button class="more-trigger" type="button" aria-label="More Library actions" title="More Library actions"
+        aria-haspopup="menu" aria-expanded=${String(this.menuOpen)} @click=${() => { this.menuOpen = !this.menuOpen; }}>${icon({ name: 'more-horizontal', size: 18 })}</button>
+        ${this.menuOpen ? html`<jf-menu label="More Library actions" .trigger=${this.shadowRoot?.querySelector<HTMLElement>('.more-trigger') ?? null}
+          @menu-close=${() => { this.menuOpen = false; }} .content=${html`
+          <button type="button" role="menuitem" tabindex="-1" ?disabled=${noFolders || this.menuBusy}
+            @click=${() => void this.runLibraryAction('core.reindex')}>${icon({ name: 'refresh-cw', size: 16 })}
+            <span class="item-label">Read everything again${noFolders || totalKnown ? html`<span class="item-detail item-secondary">${noFolders ? 'No folders yet' : `All ${total.toLocaleString()} files`}</span>` : nothing}</span></button>
+          <button type="button" role="menuitem" tabindex="-1" ?disabled=${this.waitingWork === 'none' || this.menuBusy}
+            @click=${() => void this.runLibraryAction('core.trigger-offline-processing')}>${icon({ name: 'zap', size: 16 })}
+            <span class="item-label">Read waiting files now${this.waitingWork === 'none' ? html`<span class="item-detail item-secondary">Nothing is waiting</span>` : nothing}</span></button>
+        `}></jf-menu>` : nothing}
+      </span>
+      <jf-button variant="primary" data-add-folder label="Add a folder" .disabled=${this.addBusy}
+        .onActivate=${() => this.handleAddFolderClick()}>${icon({ name: 'folder-plus', size: 14 })} Add a folder</jf-button>
+    </div>`;
   }
 
   override render(): TemplateResult {
@@ -2240,13 +2274,13 @@ export class LibrarySurface extends JfElement {
       <div class="action-message" role="status" aria-live="polite">${this.actionMessage ?? ''}</div>
       ${this.reindexOutcome ? html`<div class="action-message" role=${this.reindexOutcomeError ? 'alert' : 'status'}>
         ${this.reindexOutcome}
-        ${this.reindexOutcomeKey ? html`<jf-button label="Check reindex outcome" .disabled=${this.reindexOutcomeBusy}
-          .onActivate=${() => this.checkReindexOutcome()}>Check reindex outcome</jf-button>` : nothing}
+        ${this.reindexOutcomeKey ? html`<jf-button label="Check reading outcome" .disabled=${this.reindexOutcomeBusy}
+          .onActivate=${() => this.checkReindexOutcome()}>Check reading outcome</jf-button>` : nothing}
         ${this.retryWaiting ? nothing : html`<p>${this.indexingActivity.summary}${this.indexingActivity.detail ? ` — ${this.indexingActivity.detail}` : ''}</p>`}
       </div>` : nothing}
 
 
-      ${!this.isTauri
+      ${this.developer && !this.isTauri
         ? html`<div class="browser-banner">
             ${icon({ name: 'alert-circle', size: 14 })}
             <span
@@ -2270,22 +2304,22 @@ export class LibrarySurface extends JfElement {
           </div>`
         : nothing}
 
-      ${this.addFlow.renderForm()}
+      ${this.addFlow.renderForm(this.developer)}
 
       ${this.loading
         ? html`<div class="empty">Loading…</div>`
         : this.roots.length === 0
           ? this.contactUnconfirmed || !this.indexProgress.live
-            ? html`<div class="empty">Indexing status unconfirmed. Folder details are last known; current status is unconfirmed.</div>`
+            ? html`<div class="empty">Reading status unconfirmed. Folder details are last known; current status is unconfirmed.</div>`
             : this.provisional && !this.rebuilding
             ? html`<div class="empty">${this.provisionalHeadline} ${!this.indexingActivity.confirmed ? `${this.indexingActivity.summary}. ` : ''}Folder details are unconfirmed.</div>`
             : !this.indexingActivity.confirmed
             ? html`<div class="empty">${this.indexingActivity.summary}. Folder details are last known; current status is unconfirmed.</div>`
             : this.rebuilding
             ? html`<div class="empty">
-                Rebuilding index… your watched folders will reappear when it finishes.
+                Reading your files again… your watched folders will reappear when it finishes.
               </div>`
-            : html`<p class="subtitle">Add a folder to make its files searchable.</p>`
+            : this.otherSources.sources.some(source => source.docCount > 0) || this.ownDocuments.known && this.ownDocuments.value > 0 ? nothing : html`<p class="subtitle">Add a folder to make its files searchable.</p>`
           : this.renderCardsRegion()}
 
 
@@ -2305,17 +2339,17 @@ export class LibrarySurface extends JfElement {
             </p>
             ${this.excludesLoaded && !this.excludesBusy && !this.excludesPolicy ? html`<p role="alert">Effective exclusion policy is unavailable. Reload saved patterns before Preview or Apply.</p>` : nothing}
             <p id="excludes-help">${isOverride(this.excludesPolicy) ? html`Preview counts matches on disk using the effective patterns above and removes nothing.
-              Apply uses those patterns to remove matches from search. During an index rebuild, removal may wait until the rebuild finishes.
-              Missing or offline files cannot be checked.` : html`Save changes what future indexing skips; it does not remove existing search results.
+              Apply uses those patterns to remove matches from search. During a rebuild of search data, removal may wait until the rebuild finishes.
+              Missing or offline files cannot be checked.` : html`Save changes what future reading skips; it does not remove existing search results.
               Preview counts matches on disk using the saved list and removes nothing.
-              Apply uses the saved list to remove matches from search. During an index rebuild, removal may wait until the rebuild finishes.
+              Apply uses the saved list to remove matches from search. During a rebuild of search data, removal may wait until the rebuild finishes.
               Missing or offline files cannot be checked.`}</p></details>
           </div>
 
         </div>
             ${isOverride(this.excludesPolicy) && this.excludesPolicy ? html`<div id="excludes-override" data-testid="excludes-override" role="note" tabindex="0"
               aria-label=${`Exclusion override: ${policySource(this.excludesPolicy)}. Effective patterns: ${this.excludesPolicy.patterns.join(', ') || '(none)'}. Save edits the saved list; it has no effect until the override is removed.`}>
-              <p>Exclusion override: ${policySource(this.excludesPolicy)} controls future indexing, Preview and Apply.
+              <p>Exclusion override: ${policySource(this.excludesPolicy)} controls future reading, Preview and Apply.
                 Save edits the saved list, which has no effect until the override is removed.</p>
               <p>Effective patterns:</p><pre>${this.excludesPolicy.patterns.join('\n') || '(none)'}</pre>
             </div>` : nothing}
@@ -2330,7 +2364,7 @@ export class LibrarySurface extends JfElement {
           : nothing}
         ${this.excludesLiterals.length ? html`<section aria-label="Exact paths kept out">
           <h4>Exact paths kept out</h4>
-          <p>These paths are kept out of future indexing. Removing an entry permits a later indexing pass; it does not add a watched folder or index anything automatically. Save patterns to apply your edits.</p>
+          <p>These paths are kept out of future reading. Removing an entry permits a later reading pass; it does not add a watched folder or read anything automatically. Save patterns to apply your edits.</p>
           <ul>${this.excludesLiterals.map((entry) => html`<li>
             <span>${entry.literal.scope === 'FOLDER' ? 'Folder' : 'File'}: </span><code class="literal-path">${describeExactPath(entry.literal.path)}</code>
             <jf-button variant="ghost" label=${`Remove keep-out for ${describeExactPath(entry.literal.path)}`}
@@ -2381,14 +2415,15 @@ export class LibrarySurface extends JfElement {
         </div>
       </section>
       <jf-indexing-rules-editor api-base=${this.apiBase} .host_=${this.host_}
-        .saveWithSettings=${this.saveIndexingRulesWithSettings}></jf-indexing-rules-editor>
+        .developer=${this.developer} .saveWithSettings=${this.saveIndexingRulesWithSettings}></jf-indexing-rules-editor>
       </div>
-      ${!(this.unfinishedForgets?.items.length ?? 0) ? html`<details class="removal-history"><summary>${this.forgetReadStatus === 'unavailable' ? 'Removal history unavailable — check again' : 'Removal history'}</summary>${this.renderUnfinishedForgets()}</details>` : nothing}
+      ${this.developer && !(this.unfinishedForgets?.items.length ?? 0) && this.forgetReadStatus !== 'unavailable' && !this.forgetMessage ? html`<details class="removal-history"><summary>Removal history</summary>${this.renderUnfinishedForgets()}</details>` : nothing}
       <div class="bottom-links">
         ${this.otherSources.sources.length || this.otherSources.truncated ? html`<details><summary>
-          Added by other apps · ${this.otherSources.sources.reduce((sum, source) => sum + source.docCount, 0).toLocaleString()} documents${this.otherSources.truncated ? ' · incomplete list' : ''}
+          ${this.otherSources.sources.reduce((sum, source) => sum + source.docCount, 0).toLocaleString()} documents from other apps${this.otherSources.truncated ? ' · incomplete list' : ''}
         </summary>${this.renderOtherSources()}</details>` : nothing}
-        ${this.activeTab === 'folders' ? html`<jf-ingestion-summary compact .host_=${this.host_}></jf-ingestion-summary>` : nothing}
+        <jf-button variant="ghost" label="Activity" .onActivate=${() => { this.activityOpen = !this.activityOpen; }}>Activity</jf-button>
+        ${this.activeTab === 'folders' && (this.developer || this.activityOpen) ? html`<jf-ingestion-summary compact .host_=${this.host_}></jf-ingestion-summary>` : nothing}
       </div>
     `;
   }
@@ -2396,8 +2431,8 @@ export class LibrarySurface extends JfElement {
   private renderExcludesResult(result: ExcludesResult): TemplateResult {
     const partial = result.capped || result.uncheckedScopes.length > 0;
     return html`<p>${result.dryRun ? (partial ? 'Partial Preview' : 'Preview complete') : (partial ? 'Partial Apply' : 'Apply complete')}.
-      ${result.dryRun ? `${result.matchedFiles} matching files found on disk. Files may not have been indexed. Nothing was removed.`
-        : `${result.confirmedRemovals} matching files or folders confirmed no longer searchable. This counts confirmed deletion requests, including matches that were never indexed.`}</p>
+      ${result.dryRun ? `${result.matchedFiles} matching files found on disk. Files may not have been read. Nothing was removed.`
+        : `${result.confirmedRemovals} matching files or folders confirmed no longer searchable. This counts confirmed deletion requests, including matches that were never read.`}</p>
       ${isOverride(result.effectivePolicy ?? null) && result.effectivePolicy ? html`<p>Effective patterns from ${policySource(result.effectivePolicy)}:</p><pre>${result.effectivePolicy.patterns.join('\n') || '(none)'}</pre>` : nothing}
       ${result.capped ? html`<p>Entry cap reached. Remaining disk scope was not checked.</p>` : nothing}
       ${result.uncheckedScopes.length ? html`<ul>${result.uncheckedScopes.map((scope) => html`<li>${scope.status === 'not_checked' ? 'Not checked' : 'Not removed'}: ${scope.path} — ${scope.reason}</li>`)}</ul>
@@ -2411,19 +2446,19 @@ export class LibrarySurface extends JfElement {
     const waitingForGaps = this.observedGapKey === this.reindexCancelKey;
     const confirmed = this.indexingActivity.confirmed;
     return html`<section class="gap-decision" aria-label=${waitingForGaps ? 'Migration gaps' : 'Rebuild control'}>
-      <h3>${!confirmed ? 'Indexing status unconfirmed — rebuild details last observed' : waitingForGaps && decision ? `The new index is ready, but ${decision.gaps.length} document${decision.gaps.length === 1 ? '' : 's'} couldn't be included`
-        : waitingForGaps ? 'The new index needs your decision' : 'New index is being built'}</h3>
+      <h3>${!confirmed ? 'Reading status unconfirmed — rebuild details last observed' : waitingForGaps && decision ? `The new search data is ready, but ${decision.gaps.length} document${decision.gaps.length === 1 ? '' : 's'} couldn't be included`
+        : waitingForGaps ? 'The new search data needs your decision' : 'New index is being built'}</h3>
       ${!confirmed ? html`<p>Rebuild details are last observed; current progress and index availability are unconfirmed.</p>` : nothing}
       ${waitingForGaps && decision ? html`
-        ${confirmed ? html`<p>Your current index stays available; activation requires your decision to accept this list.</p>` : nothing}
+        ${confirmed ? html`<p>Your current search data stays available; activation requires your decision to accept this list.</p>` : nothing}
         <ul>${decision.gaps.map((gap) => html`<li title=${gap.reason}>${gap.unitId}: ${rebuildGapReason(gap.reason)}</li>`)}</ul>
       ` : !confirmed ? nothing : waitingForGaps ? html`<p>Reading the migration gap list…</p>`
-        : html`<p>Your current index stays available during the rebuild.</p>`}
+        : html`<p>Your current search data stays available during the rebuild.</p>`}
       <div class="actions">
         ${waitingForGaps && decision ? html`
-        <jf-button label="Use the new index without them" variant="ghost"
+        <jf-button label="Use the new search data without them" variant="ghost"
           .disabled=${this.gapDecisionBusy || this.reindexCancelBusy || this.reindexCancelRecorded}
-          .onActivate=${() => void this.acceptCurrentGaps()}>Use the new index without them</jf-button>
+          .onActivate=${() => void this.acceptCurrentGaps()}>Use the new search data without them</jf-button>
         ` : nothing}
         <jf-button label="Cancel rebuild" variant="ghost"
           .disabled=${this.reindexCancelBusy || this.reindexCancelRecorded || this.gapDecisionBusy}
@@ -2431,7 +2466,7 @@ export class LibrarySurface extends JfElement {
       </div>
       ${this.cancelRebuildConfirm && this.cancelRebuildKey === this.reindexCancelKey ? html`<jf-confirm-band
         heading="Cancel this rebuild?" action-label="Cancel rebuild"
-        consequence="The unfinished new index is removed and your current index stays available; search keeps using it. The work done so far is lost, and starting again rebuilds from the beginning."
+        consequence="The unfinished new search data is removed and your current search data stays available; search keeps using it. The work done so far is lost, and starting again rebuilds from the beginning."
         @confirm-band-confirm=${() => void this.cancelCurrentReindex()}
         @confirm-band-cancel=${() => { this.cancelRebuildConfirm = false; this.cancelRebuildKey = null; }}></jf-confirm-band>` : nothing}
       ${this.gapDecisionError ? html`<p role="alert">${this.gapDecisionError}

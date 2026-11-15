@@ -51,7 +51,10 @@ async function mount(
   (el as unknown as { roots: IndexedRootView[] }).roots = rows;
   (el as unknown as { lastKnownFailed: Record<string, number> }).lastKnownFailed = lastKnownFailed;
   (el as unknown as { provisional: boolean }).provisional = provisional;
+  el.loading = false;
   el.requestUpdate();
+  await el.updateComplete;
+  el.shadowRoot!.querySelector<HTMLButtonElement>('.folder-toggle')!.click();
   await el.updateComplete;
   return el;
 }

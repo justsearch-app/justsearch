@@ -1173,6 +1173,75 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         assert await alert.get_attribute("role") == "alert"
         await alert.scroll_into_view_if_needed()
 
+    def setup_library_first_minutes(state, theme="dark"):
+        async def setup(page):
+            catalog = json.loads(ui_fixtures._surfaces_catalog_body())
+            catalog["entries"].extend([
+                ui_fixtures._surface_entry("core.library-surface", "jf-library-surface", "RAIL", members=["core.browse-surface"]),
+                ui_fixtures._surface_entry("core.browse-surface", "jf-browse-surface", "DEEPLINK"),
+            ])
+            async def respond(route, body):
+                await route.fulfill(status=200, content_type="application/json", body=json.dumps(body))
+            await page.route("**/api/registry/surfaces*", lambda route: respond(route, catalog))
+            await page.route("**/api/indexing/roots*", lambda route: respond(route, {"roots": [{"path": "/home/user/Documents", "fileCount": 8, "fileCountCapped": False}]}))
+            await page.route("**/api/indexing/forgets?*", lambda route: respond(route, {"items": [], "complete": True, "nextId": None}))
+            await page.route("**/api/library/path-label", lambda route: respond(route, {"found": True, "path": "/home/user/Documents"}))
+            resources = json.loads(ui_fixtures._empty_catalog("Resource"))
+            resources["entries"] = [{"id": "core.indexed-roots", "audience": "USER", "category": "TABULAR", "role": "PRODUCT",
+                "collectionOperations": [], "consumers": [], "emissionPolicy": None, "endpoint": "/api/indexing-roots/substrate", "history": None,
+                "itemOperations": [], "kind": "indexed-root", "type": "indexed-root", "primaryKey": "pathHash", "schema": "{}",
+                "subscriptionMode": "ONE_SHOT", "recovery": None,
+                "presentation": {"category": None, "descriptionKey": "", "iconHint": None, "labelKey": "Library"},
+                "privacy": {"loopbackOnly": True, "pathPolicy": "HASHED_REQUIRES_RESOLVER", "resolver": "core.resolve-path-hash"},
+                "provenance": {"tier": "CORE", "contributorId": "core", "version": "1.0", "identity": None}}]
+            await page.route("**/api/registry/resources*", lambda route: respond(route, resources))
+            roots = {"items": [{"pathHash": "fm-documents", "collection": "default", "fileCount": 8, "fileCountCapped": False,
+                "status": "indexed", "inFlightCount": 0, "failedCount": 0, "walkCompleted": True,
+                "lastIndexedIsoTime": ui_fixtures._minutes_ago_iso(4), "parentDocsTotalEmbedding": 8,
+                "parentDocsSettledEmbedding": 8}], "count": 1}
+            await page.route("**/api/indexing-roots/substrate*", lambda route: respond(route, roots))
+            async def healthy_status(route):
+                status = json.loads(ui_fixtures._status_body("enriching"))
+                status["operating"]["indexing"]["reasons"] = []
+                status["operating"]["indexing"]["state"] = "RUNNING"
+                status["worker"]["core"].update({"pendingJobs": 0, "pendingVduCount": 0, "ownSearchableDocuments": 8})
+                status["worker"]["enrichment"].update({"embeddingPendingCount": 0, "spladePendingCount": 0, "pendingNerCount": 0})
+                status["worker"]["enrichment"]["chunk"].update({"chunkEmbeddingPendingCount": 0, "chunkSpladePendingCount": 0})
+                await respond(route, status)
+            await page.route("**/api/status", healthy_status)
+            await page.route("**/api/knowledge/folders", lambda route: respond(route, {"folders": [], "truncated": False}))
+            kinds = [("long-manual.md", "markdown", 50176), ("orchid-open.txt", "text", 90),
+                     ("bulletin.html", "code", 142), ("inventory.csv", "text", 67),
+                     ("scanned-delivery.pdf", "pdf", 70656), ("schedule.docx", "office", 820),
+                     ("message.eml", "binary", 181), ("photo.png", "image", 4096)]
+            files = [{"docId": f"/home/user/Documents/{name}", "fields": {"path": f"/home/user/Documents/{name}",
+                "filename": name, "file_kind": kind, "size_bytes": str(size), "modified_at": "1762905600000"}}
+                for name, kind, size in kinds]
+            if state == "failure":
+                async def failure(route):
+                    await route.fulfill(status=503, content_type="application/json", body='{}')
+                await page.route("**/api/knowledge/folder-files", failure)
+            else:
+                await page.route("**/api/knowledge/folder-files", lambda route: respond(route, {"files": files, "totalCount": len(files)}))
+            await page.reload(wait_until="domcontentloaded")
+            await _await_app_ready(page)
+            await page.set_viewport_size({"width": 1024, "height": 700})
+            await _view_setup("library", theme)(page)
+            await _library_appearance(page)
+            if state == "menu":
+                await page.get_by_role("button", name="More Library actions", exact=True).click()
+                await page.get_by_role("menu", name="More Library actions", exact=True).wait_for()
+            else:
+                await page.get_by_role("tab", name="Browse", exact=True).click()
+                tree = page.locator('jf-browse-surface [role="tree"]')
+                await tree.get_by_role("treeitem").first.click()
+                if state == "failure":
+                    await page.get_by_role("button", name="Retry Documents", exact=True).wait_for()
+                else:
+                    await tree.get_by_role("treeitem").filter(has_text="bulletin.html").hover()
+                    await page.locator('jf-browse-surface .row.file').nth(7).wait_for()
+        return setup
+
     async def setup_library_ingestion(page):
         rollups = [
             ("SUCCESS_FULL", "SUCCESS", "NONE", 7),
@@ -1189,10 +1258,11 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         await page.route("**/api/diagnostics/ingestion/summary*", summary)
         await _goto_surface(page, S.RAIL_SURFACE_LIBRARY)
         await _library_appearance(page)
+        await page.get_by_role("button", name="Activity", exact=True).click()
         await page.locator("jf-ingestion-summary summary").click()
         panel = page.locator('[data-testid="ingestion-summary"]')
-        await panel.get_by_text("16 recorded indexing outcomes.", exact=True).wait_for(timeout=15_000)
-        for label in ("Content indexed", "File unchanged since its last index",
+        await panel.get_by_text("16 recorded reading outcomes.", exact=True).wait_for(timeout=15_000)
+        for label in ("Content read", "File unchanged since its last read",
                       "Content extraction failed", "Cloud-only file is not available locally"):
             await panel.get_by_text(label, exact=True).wait_for()
         assert "CLOUD_PLACEHOLDER" not in await panel.inner_text()
@@ -1509,7 +1579,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                 await page.locator('#indexing-hours').wait_for(state="visible")
                 await page.locator('#indexing-hours').focus()
             else:
-                await page.get_by_role("button", name="Change when to index", exact=True).first.wait_for(state="visible")
+                await page.get_by_role("button", name="Change when to read files", exact=True).first.wait_for(state="visible")
             await _settle_focus_marks(page)
         return setup
 
@@ -1543,17 +1613,17 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             if route == "palette":
                 await page.keyboard.press("ControlOrMeta+k")
                 # Filter first: an empty query shows only the first rows of each group.
-                await page.locator(S.CSS_PALETTE).get_by_role("combobox").fill("Change indexing rules")
-                await page.get_by_role("option").filter(has_text="Change indexing rules").first.click()
+                await page.locator(S.CSS_PALETTE).get_by_role("combobox").fill("Library › When to read files")
+                await page.get_by_role("option").filter(has_text="Library › When to read files").first.click()
             elif route in ("status", "browse", "tasks", "warm", "reduced"):
                 # Frame status S1: the status bar and the task tray retired into one status panel,
                 # opened from the title-bar pill; the indexing hold row keeps its "Change hours".
                 await page.locator("jf-status-pill .trigger").click()
                 await page.locator("jf-status-panel").get_by_role("button", name="Change hours", exact=True).click()
             elif route == "settings":
-                await page.locator('jf-settings-surface').get_by_role("button", name="Change when to index", exact=True).click()
+                await page.locator('jf-settings-surface').get_by_role("button", name="Change when to read files", exact=True).click()
             else:
-                await page.locator('jf-library-surface .attention').get_by_role("button", name="Change when to index", exact=True).first.click()
+                await page.locator('jf-library-surface .attention').get_by_role("button", name="Change when to read files", exact=True).first.click()
             target = page.locator(S.CSS_LIBRARY_INDEXING_HOURS)
             await target.wait_for(state="visible")
             # Let navigation, root loading and all finite layout transitions settle without
@@ -1646,9 +1716,9 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                 if mode != "expiry":
                     assert text == expected, samples
                     attention = await page.locator('jf-library-surface .attention').inner_text()
-                    assert "Indexing paused" in attention and "file needs review" in attention, attention
+                    assert "Reading paused" in attention and "file needs review" in attention, attention
                 elif second >= 31:
-                    assert text == "Indexing status unconfirmed", samples
+                    assert text == "Reading status unconfirmed", samples
                 await page.wait_for_timeout(1000)
             assert polls >= 4, f"Expected real status polling, observed {polls} reads"
             clear = True
@@ -1658,7 +1728,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                     break
                 await page.wait_for_timeout(100)
             assert await heading.inner_text() == "Your files are searchable"
-            assert "Indexing paused" not in await page.locator('jf-library-surface .attention').inner_text()
+            assert "Reading paused" not in await page.locator('jf-library-surface .attention').inner_text()
             print(f"Library liveness {mode}: {len(samples)} one-second samples; confirmed clear restored searchable")
         return setup
 
@@ -1709,9 +1779,9 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                 samples.append({"ageMs": int(time.time() * 1000) - sampled_at, "headline": text, "deck": deck})
                 assert "Rebuilding" not in text, samples
                 if mode == "fresh":
-                    assert text == expected and "Indexing status unconfirmed" not in deck, samples
+                    assert text == expected and "Reading status unconfirmed" not in deck, samples
                 elif samples[-1]["ageMs"] > 21000:
-                    assert text == "Indexing status unconfirmed" and "Indexing status unconfirmed" in deck, samples
+                    assert text == "Reading status unconfirmed" and "Reading status unconfirmed" in deck, samples
                 await page.wait_for_timeout(1000)
             assert polls >= (4 if mode == "fresh" else 3), polls
             print(f"Library poll cadence {mode}: {len(samples)} real one-second samples, {polls} reads; "
@@ -2328,6 +2398,10 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
              fixtures_variant="semantic-paused"),
         Step("search-semantic-paused-live", setup=setup_search_semantic_paused, isolated=True),
         Step("library-ingestion", setup=setup_library_ingestion, isolated=True),
+        *[Step(f"library-{name}{'-light' if theme == 'light' else ''}", setup=setup_library_first_minutes(state, theme),
+               isolated=True, fixtures_variant="enriching", color_scheme=theme)
+          for state, name in (("menu", "menu"), ("populated", "browse"), ("failure", "browse-failure"))
+          for theme in ("dark", "light")],
         Step("library-gap-decision", setup=setup_library_gap_decision, isolated=True,
              fixtures_variant="gap-decision"),
         # --- Shared-browser chain (demo flow) ---

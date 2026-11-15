@@ -103,7 +103,7 @@ describe('folderStatus', () => {
     const fs = folderStatus(row(), ctx({ relativeTime: '2 minutes ago' }));
     expect(fs.state).toBe('ready');
     expect(fs.glyph).toBe('indexed');
-    expect(fs.metaText).toContain('indexed 2 minutes ago');
+    expect(fs.metaText).toContain('read 2 minutes ago');
     // With no faithful denominator AND no index-wide pending evidence the row asserts neither tier,
     // it just stays as it was.
     expect(fs.metaText).not.toContain(CAVEAT);
@@ -130,7 +130,7 @@ describe('folderStatus', () => {
     expect(fs.state).toBe('unverified');
     expect(fs.glyph).toBe('unverified');
     expect(fs.glyph).not.toBe('indexed');
-    expect(fs.metaText).toContain('reindex to be sure');
+    expect(fs.metaText).toContain('read again to be sure');
   });
 
   it('unverified is a caveat on READY only — active states outrank it', () => {
@@ -289,7 +289,7 @@ describe('folderStatus — per-root enrichment tier (813 §4)', () => {
     expect(fs.state).toBe('ready');
     expect(fs.glyph).toBe('indexed');
     expect(fs.metaText).toBe(
-      'default · 312 files · fully searchable · indexed 2 minutes ago · Verified just now',
+      'default · 312 files · fully searchable · read 2 minutes ago · Verified just now',
     );
   });
 
@@ -500,11 +500,11 @@ describe('folderStatus — index-wide enrichment fallback (809 finding 1)', () =
   it('the claim says what IS true: indexed + keyword ready, semantic still catching up', () => {
     const fs = folderStatus(row(), ctx({ relativeTime: '2 minutes ago', enrichmentPending: true }));
     // It still reports the true half (the folder IS indexed and keyword-searchable) …
-    expect(fs.metaText).toContain('indexed 2 minutes ago');
+    expect(fs.metaText).toContain('read 2 minutes ago');
     expect(fs.metaText).toContain('keyword search ready');
     // … and does not claim the half that is not true yet.
     expect(fs.metaText).toContain('semantic search still catching up');
-    expect(fs.metaText).toBe(`default · 10 files · indexed 2 minutes ago · ${CAVEAT}`);
+    expect(fs.metaText).toBe(`default · 10 files · read 2 minutes ago · ${CAVEAT}`);
   });
 
   it('the fallback arm names NO percent — index-wide evidence cannot measure one root', () => {

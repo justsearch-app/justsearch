@@ -122,7 +122,7 @@ function labelFor(job: IndexingJobRow): string {
   // "Indexing · <file>" beside a failed pill is an active-voice claim about work that is no longer
   // happening. `statusFor` maps it to `failed` (the rail's point of view); the verb is what says
   // WHICH failure it is, matching the Activity ledger's own "Index gave up · …" (ActionLedgerClient).
-  const verb = job.state.toUpperCase() === JOB_STATE_RETRY_EXHAUSTED ? 'Index gave up' : 'Indexing';
+  const verb = job.state.toUpperCase() === JOB_STATE_RETRY_EXHAUSTED ? 'Reading stopped' : 'Reading';
   const friendly = resolvedLabel.get(job.pathHash);
   if (friendly) return `${verb} · ${friendly}`;
   // Fallback until the hash resolves (or if the worker has no path on record):

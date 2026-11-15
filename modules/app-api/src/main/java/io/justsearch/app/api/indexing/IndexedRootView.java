@@ -80,6 +80,7 @@ public record IndexedRootView(
     String pathHash,
     String collection,
     long fileCount,
+    boolean fileCountCapped,
     String lastIndexedIsoTime,
     String status,
     String walkError,

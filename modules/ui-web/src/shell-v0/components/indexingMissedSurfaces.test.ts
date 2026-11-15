@@ -16,9 +16,9 @@ import { readinessNotice, reasonFor } from '../state/readinessNotice.js';
 import { projectSv3Degradation } from '../views/search-v3/sv3-degradation.js';
 import { __resetPresentationForTest } from '../state/presentationRuntime.js';
 
-const CASES = ['energy', 'game', 'external GPU', 'chat', 'age', 'worker stale', 'indexing stale', 'unavailable', 'Engine gone'] as const;
+const CASES = ['energy', 'game', 'external GPU', 'chat', 'age', 'worker stale', 'reading stale', 'unavailable', 'Engine gone'] as const;
 type Case = typeof CASES[number];
-const UNKNOWN = 'Indexing status unconfirmed';
+const UNKNOWN = 'Reading status unconfirmed';
 const isUnconfirmed = (which: Case) => !['energy', 'game', 'external GPU', 'chat'].includes(which);
 const CODES = ['encoders.health.embedding_not_ready', 'encoders.health.embedding_probe_missing', 'encoders.health.semantic_stuck',
   'encoders.health.query_on_cpu', 'encoders.reloading', 'chunk_embedding.not_ready', 'chunk_embedding.in_progress'];
@@ -36,7 +36,7 @@ function observe(which: Case, jobs = 4, migrating = false): AiState {
       migration: { migrationState: migrating ? 'MIGRATING' : 'IDLE', activeIndexedDocuments: 100, buildingIndexedDocuments: 60 },
     },
     operating: { indexing: { state: reasons.length ? 'PAUSED' : 'ACTIVE', reasons },
-      freshness: { staleAfterMs: 30_000, staleSources: which === 'indexing stale' ? ['indexing'] : [] } },
+      freshness: { staleAfterMs: 30_000, staleSources: which === 'reading stale' ? ['indexing'] : [] } },
     readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] } } },
   } as unknown as StatusSnapshot;
   __feedForTest({ status, inference: { mode: 'indexing', starting: false, embeddingQueueSize: 220, vduQueueSize: 99 } });
@@ -92,7 +92,7 @@ describe('WP3.3 independent inventory regressions', () => {
   it('S33.4 S33.6 Browse empty roots never infer a current rebuild from unconfirmed migration', () => {
     for (const which of CASES) {
       const el = surface('jf-browse-surface', observe(which, 4, true)); el.roots = [];
-      const text = dom(el.renderTree()).textContent!;
+      const text = dom(el.render()).textContent!;
       expect(text.includes(UNKNOWN), which).toBe(isUnconfirmed(which));
       expect(text.includes('your watched folders will reappear when it finishes'), which).toBe(!isUnconfirmed(which));
       expect(text).not.toContain('No watched folders');
@@ -132,7 +132,7 @@ describe('WP3.3 independent inventory regressions', () => {
     expect(output.querySelectorAll('[data-testid="indexing-announcer"]')).toHaveLength(1);
     const notices = () => [...output.querySelectorAll('jf-system-notice')].filter(n => n.textContent?.includes('Rebuilding'));
     expect(notices().length).toBe(1);
-    pill.status.ai = observe('indexing stale', 4, true); pill.status.refresh(); render(pill.render(), output);
+    pill.status.ai = observe('reading stale', 4, true); pill.status.refresh(); render(pill.render(), output);
     await Promise.resolve();
     expect(output.querySelector('[data-testid="indexing-announcer"]')?.textContent).toContain(UNKNOWN);
     expect(notices().length).toBe(0);

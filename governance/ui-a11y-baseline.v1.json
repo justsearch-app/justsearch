@@ -564,6 +564,36 @@
       "surface": "fm-pane-narrow-light",
       "uiShotStep": "fm-pane-narrow-light",
       "knownRules": []
+    },
+    {
+      "surface": "library",
+      "uiShotStep": "library-menu",
+      "knownRules": []
+    },
+    {
+      "surface": "library",
+      "uiShotStep": "library-menu-light",
+      "knownRules": []
+    },
+    {
+      "surface": "library",
+      "uiShotStep": "library-browse",
+      "knownRules": []
+    },
+    {
+      "surface": "library",
+      "uiShotStep": "library-browse-light",
+      "knownRules": []
+    },
+    {
+      "surface": "library",
+      "uiShotStep": "library-browse-failure",
+      "knownRules": []
+    },
+    {
+      "surface": "library",
+      "uiShotStep": "library-browse-failure-light",
+      "knownRules": []
     }
   ]
 }

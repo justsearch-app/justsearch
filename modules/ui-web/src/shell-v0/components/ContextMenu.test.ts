@@ -78,12 +78,13 @@ describe('ContextMenu (slice 458)', () => {
   it('ArrowDown moves focus across enabled actions only', async () => {
     const el = make();
     await el.updateComplete;
-    expect(el.focusedIndex).toBe(0); // initial position; first item is enabled "open"
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
-    await el.updateComplete;
-    // open(0) -> reveal(1) (skipping no-disabled adjacent in this test)
-    // disabled "reindex" should be skipped if encountered.
-    expect([1, 2]).toContain(el.focusedIndex);
+    const buttons = [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('button.item')];
+    expect(el.shadowRoot!.activeElement).toBe(buttons[0]);
+    const menu = el.shadowRoot!.querySelector('[role="menu"]')!;
+    for (const expected of [buttons[1], buttons[2], buttons[0]]) {
+      menu.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+      expect(el.shadowRoot!.activeElement).toBe(expected);
+    }
   });
 
   it('openContextMenu resolves with the invoked action id', async () => {

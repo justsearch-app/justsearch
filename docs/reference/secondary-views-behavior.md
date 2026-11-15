@@ -48,80 +48,45 @@ Forward), layouts and addresses are described in
 
 **Source:** `shell-v0/views/LibrarySurface.ts`
 
-Manages indexed folder roots. The user adds folders, monitors indexing status, and removes folders from the index.
+Library has **Folders** and **Browse** tabs, with shared **Pause reading**, **More Library actions**
+and **Add a folder** controls. The headline states readiness, reading, pause, attention or uncertainty;
+it does not repeat the folder counts. Other-app-only content can also make files searchable.
 
-### Header
+Each folder row shows its name, full path, state and last observed disk-file count. A bounded count
+is shown as **50,000+ files**; an unavailable count is omitted. Expanding a folder shows
+**Search by meaning**, **Couldn't be read**, **Read**, and, when observed, **Checked for changes**.
+Meaning search distinguishes needs AI, on, in progress, failures, blocking and unknown status.
+Word search availability is retained when meaning search is unavailable. A timestamp is the last
+write, not proof that all files finished; work in progress says **Reading now**. Deletion-verification
+warnings and recovery actions remain visible even without a verification timestamp.
+**Open in Files** is available on desktop; **Remove from library** asks in place and leaves originals.
 
-- Title: "Library" / "Manage your indexed folders"
-- **Reindex All** button — visible only in Detailed mode (`isAdvanced`). Triggers full re-index of all roots. Shows a spinning RefreshCw icon during reindex.
-- **Add Folder** button (teal, `bg-teal-700`) — visible only when at least one root exists (empty state has its own CTA).
+The shared menu runs **Read everything again** with unchanged files included. Its optional
+**All N files** detail requires a current uncapped count for every root. **Read waiting files now**
+starts one enrichment pass, which may leave work waiting. Only a current zero observation says
+**Nothing is waiting**. Operation acceptance and completion are distinct.
 
-### Add folder flow
+**Skip these files** and **When to read files** retain explicit Save behaviour in this intermediate
+slice. Save patterns affects future reading; Preview examines the effective saved policy without
+removing anything; Apply asks for confirmation and can remove existing search entries. Their draft,
+conflict, uncertain-save and partial-removal feedback remains visible. Exact-path keep-outs stay
+reachable. An override note explains when the saved patterns have no effect. Hidden weekdays remain
+saved, with a concise days line beside restricted hours. Their editor, collection/diagnostic facts,
+and routine removal history are behind **Settings → Advanced → Show developer tools**.
 
-- **Tauri runtime:** Opens native OS folder picker via `@tauri-apps/plugin-dialog`. On success, calls `add(path, 'default')`.
-- **Browser mode:** A persistent amber warning bar is always visible: "Running in browser mode. Native folder picker not available — enter paths manually." When the user clicks "Add Folder", an inline text input appears below the warning (`showManualInput` state). The input has amber-themed styling (`border-amber-500/30`, `bg-amber-500` submit button) with a Cancel button to hide it again.
+Unfinished and unavailable removal outcomes, pending withdrawals, rebuild decisions, interrupted
+imports, missing folders and unreadable-folder recovery remain visible. A line for **N documents
+from other apps** reveals their management section. **Activity** reveals retained reading outcomes;
+event counts describe history, not current readiness. Errors and unknown observations remain stated.
 
-### Folder list
-
-Each root renders as a glass card (`bg-[var(--glass-surface)]`, hover upgrades border to `--glass-border-hover` but background stays the same) with:
-
-1. **Folder icon** (40×40 rounded box) with a status dot overlay at bottom-right.
-2. **Path** (truncated, primary text).
-3. **Metadata row:** file count + relative time ("2h ago", "Just now", date).
-4. **Remove button** (Trash2 icon) — visible on hover only (`opacity-0 group-hover:opacity-100`).
-
-Cards animate in with staggered `motion.div` (`delay: index * 0.03`).
-
-### Status icons
-
-Each root has a `status` field mapped to an icon with a colored blur glow behind it:
-
-| Status | Icon | Color | Glow |
-|--------|------|-------|------|
-| `indexed` | CheckCircle2 | `--accent-success` (green) | green 30% blur |
-| `indexing` | Loader2 (spinning) | `--accent-tint` (teal) | teal 30% blur + pulse |
-| `error` | AlertCircle | `--accent-danger` (red) | red 30% blur |
-| `pending` | Clock | `--accent-warning` (amber) | amber 20% blur |
-
-### Empty states
-
-When no roots exist, a centered glass card with a Folder icon displays:
-
-- **No files indexed yet:** "Start building your library" / "Add a folder to begin searching your files"
-- **Files indexed but no roots:** "Your library is ready to grow" / "{N} files indexed. Add a folder to keep your library fresh."
-
-Both show a teal "Add Folder" button with a glow shadow.
-
-### Remove folder
-
-Clicking the Trash2 button opens a `ConfirmDialog` (danger variant):
-- Title: "Remove Folder"
-- Message: `Remove "{path}" from the index? The files will not be deleted, but they will no longer be searchable.`
-- Buttons: "Remove" (confirm) / "Keep" (cancel)
-
-### Exclude patterns (Detailed only)
-
-Visible only in Detailed mode and only when at least one root exists. A glass card with:
-
-- Label: "Exclude patterns" with glob examples (`**/node_modules/**`, `**/.git/**`, `**/*.log`).
-- Textarea for one glob per line. Changes are saved to settings on each keystroke.
-- **Apply excludes** button — flushes settings to backend, then calls `applyExcludes()` API. Shows result summary: "Applied N patterns across M roots: deleted X files (by id) + Y jobs (by path prefix)."
-
-### Error handling
-
-The Folders view includes an **Indexing activity** summary of retained ingestion
-outcomes, grouped by reason and outcome class. Its total counts recorded events,
-not distinct files or current search readiness. Known reasons have readable labels;
-unknown reasons remain visible with neutral wording. The summary distinguishes
-loading, empty, fetch failure and last-loaded data, and offers an explicit refresh.
-It does not resolve filename hashes or retry ingestion jobs. Leaving Folders stops
-its refresh subscription and cancels an in-flight request.
-
-Errors display as a floating toast at `absolute top-16 right-6`, animated in from the right. Red styling (`bg-red-500/15 text-red-300`), with a dismiss × button that calls `clearError`. There is no auto-dismiss timer — the toast persists until the user clicks × or `clearError` is called as a side effect of another operation (e.g., a successful add/remove).
-
-### No-connection state
-
-When `apiBase` is null, shows a centered "No API Connection" message with HardDrive icon: "Start the backend to manage library."
+Browse shows search-backed folder contents, not every file on disk. Its columns are **Name**, **Size**,
+**Changed**; folders have no invented date. File-kind glyphs match Search. Indentation caps visually
+at eight levels while accessibility levels retain the full hierarchy. Sizes below 1 KB say bytes;
+other sizes and dates use the shared formatters. Row actions **Open file** and supported
+**Show in folder** appear on hover/focus without changing row height, and also use the shared menu.
+The tree has one tab stop, Up/Down movement, Right expand/first-child, Left collapse/parent and
+Enter open. Row actions are reachable by Tab; Shift+F10 or the Menu key opens a file's context menu.
+Loading, failed-with-Retry, partial, filtered-empty and confirmed-empty observations stay distinct.
 
 ---
 
@@ -191,7 +156,7 @@ Sections in render order:
 1. **Recommended next step** — A breadcrumb: "1) Install models → 2) Start inference → 3) Apply settings"
 
 2. **Compatibility warnings** (3 cards):
-   - `EmbeddingCompatibilityCard` — warns when the embedding model fingerprint has changed since indexing. Shows "BLOCKED_LEGACY" or "BLOCKED_MISMATCH" states with the catalog full-index rebuild action (`core.rebuild-index`).
+   - `EmbeddingCompatibilityCard` — warns when the embedding model fingerprint has changed since reading. Shows "BLOCKED_LEGACY" or "BLOCKED_MISMATCH" states with the catalog full-index rebuild action (`core.rebuild-index`).
    - `SchemaCompatibilityCard` — warns when the index schema format is incompatible. The Brain compatibility panel uses the same full-index rebuild action for blocking schema states.
    - `ChunkVectorStatusCard` — shows semantic search readiness: chunk doc count, vector coverage %, pending/failed embedding counts.
 
@@ -227,14 +192,14 @@ Sections in render order:
    - Export diagnostics button
 
 8. **Runtime** — Inference mode control:
-   - Compact mode badge (colored by state: emerald=online, amber=transitioning, gray=indexing)
+   - Compact mode badge (colored by state: emerald=online, amber=transitioning, gray=reading)
    - Primary action: "Start AI" (when offline) or "Shut Down AI" (when online)
    - Secondary text links: "Apply settings" (reloads inference config) and "Process queue" (triggers offline VDU + embeddings)
 
 9. **Models**:
    - **llama-server executable** — optional BYO path with Browse button (Tauri only)
    - **Generative Engine** (`ModelSlotCard`) — "Main Process (GPU Accelerated). Handles chat, summarization, and intent translation." Capabilities: Chat, Summarization, Intent, Streaming.
-   - **Embedding Engine** (`ModelSlotCard`) — "Worker Process (CPU Optimized). Handles semantic search and file indexing." Capabilities: Vector Search, Indexing, Similarity.
+   - **Embedding Engine** (`ModelSlotCard`) — "Worker Process (CPU Optimized). Handles semantic search and file reading." Capabilities: Vector Search, Reading, Similarity.
    - Browse buttons for each model (Tauri only)
    - "Restart worker to apply embedding model" button
 
@@ -247,7 +212,7 @@ Sections in render order:
     - Max tokens slider (64–16384 tokens, step 64)
     - GPU Layers: "Auto (CPU-only)" checkbox (default on, hides slider). When unchecked, slider appears (1–100 layers). Explanatory text above: v1 ships CPU-only runtime, manual offloading requires GPU-capable runtime.
     - llama library path (text input, optional)
-    - "Pause indexing while summarizing" checkbox
+    - "Pause reading while summarizing" checkbox
 
 ---
 
@@ -283,7 +248,7 @@ Four metric cards in a 2×2 (or 4-column on large screens) grid:
 - Endpoint URL (monospace)
 - Status: connected (green) / disconnected (ghost) / error (red)
 - Index State: 6 possible values mapped to display text:
-  - IDLE → "Ready" (green), INDEXING → "Indexing..." (amber), ERROR → "Error" (red), UNAVAILABLE → "Unavailable" (red), NOT_STARTED → "Not started" (ghost), UNKNOWN → "Not connected" (ghost)
+  - IDLE → "Ready" (green), INDEXING → "Reading..." (amber), ERROR → "Error" (red), UNAVAILABLE → "Unavailable" (red), NOT_STARTED → "Not started" (ghost), UNKNOWN → "Not connected" (ghost)
 - Uptime counter at bottom
 
 ### Queue DB card
@@ -383,13 +348,7 @@ User preferences panel with 6 glass sections that animate in with staggered entr
 
 #### 1. Interface (Layers icon)
 
-UI Mode toggle:
-- **Simple** (default) — "Standard view"
-- **Detailed** — "Reindex & excludes"
-
-Helper text: "Detailed mode shows Reindex All button and exclude patterns in Library."
-
-This toggle gates Detailed-only features across all views (Library exclude patterns, Brain runtime sections, Health is unaffected).
+**Advanced › Show developer tools** reveals diagnostic facts and controls. Library keeps its folder rules and reading-hours editors in the default view, with explicit Save, Reload, Preview and Apply behavior in this intermediate presentation slice.
 
 #### 2. Appearance (Palette icon)
 
@@ -470,17 +429,17 @@ Two-column layout on large screens (single column on small).
 
 **FAQ accordion** — 5 items, single-expand (clicking one closes the other):
 
-1. "How do I add files to search?" — Points to Library + Add Folder.
+1. "How do I add files to search?" — Points to Library + Add a folder.
 2. "What file types are supported?" — PDFs, Markdown, text, code, images (with OCR).
 3. "How does AI summarization work?" — Select file → Summarize → local AI, no external data.
-4. "Why is indexing slow?" — Initial indexing is slow, incremental is fast. Check Health.
+4. "Why is reading slow?" — Initial reading is slow, incremental is fast. Check Health.
 5. "How do I use the AI chat feature?" — `??` prefix in search bar.
 
 Expanded answers show below the question with a chevron rotation animation.
 
 **Quick troubleshooting** — Glass card with 3 bullet points:
-- Stale results → Reindex in Library (Detailed) or Health
-- Stuck indexing → Restart worker in Health
+- Stale results → Library’s more menu › Read everything again; this reads all files again, including unchanged files.
+- Stuck reading → Restart worker in Health
 - Bug report → Copy diagnostic summary, review it, then paste it into the optional issue field
 
 ### Right column
@@ -496,7 +455,7 @@ Expanded answers show below the question with a chevron rotation animation.
 | `Ctrl / ⌘ + Shift + Z` | Redo |
 | `J / K` | Step through a visible conversation transcript |
 
-**Local-first info** — Glass card with Shield icon: "Your files stay on this machine. Search and indexing run locally, and the UI only talks to the local backend over loopback."
+**Local-first info** — Glass card with Shield icon: "Your files stay on this machine. Search and reading run locally, and the UI only talks to the local backend over loopback."
 
 **Network activity** — Glass card with Wifi icon, 3 bullet points:
 - Local app traffic uses loopback (not a network service)
@@ -513,7 +472,7 @@ The `ui.mode` setting (`'simple'` default / `'advanced'`) gates features across 
 
 | View | Simple mode | Detailed mode adds |
 |------|-------------|-------------------|
-| Library | Add/remove folders, status display | Reindex All button, exclude patterns section |
+| Library | Folders and Browse; Add a folder; reading state; skip rules and reading hours; more menu › Read everything again | Diagnostic folder facts, removal history, weekday editor and activity summary |
 | Brain | BrainSimplePanel (state machine) | Full configuration: compatibility cards, policy, GPU booster, model slots, inference settings |
 | Settings | All 6 sections visible | _(no difference)_ |
 | Health | Full dashboard | _(no difference)_ |

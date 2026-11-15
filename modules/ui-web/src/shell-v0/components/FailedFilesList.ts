@@ -255,7 +255,7 @@ export class FailedFilesList extends JfElement {
      * Tempdoc 914 D2 — the row STACKS; it is not a two-column flex row.
      *
      * A list may be as narrow as a 26rem window: jf-row-actions renders one full-label button per declared
-     * item-operation ("Retry indexing job", "Cancel indexing job"). Those buttons do not shrink, so
+     * item-operation ("Retry reading job", "Cancel reading job"). Those buttons do not shrink, so
      * side-by-side they took 339px of the 373px row and squeezed .row-info to 22px — one
      * character per line, an 822px-tall row for a single path. The path IS the row's identity, so
      * it takes the full width and the actions sit under it.
@@ -371,8 +371,8 @@ export class FailedFilesList extends JfElement {
           ${unreadable
             ? html`<div class="row-unreadable" data-testid="failed-job-source-unreadable">
                 ${indexedUnreadable
-                  ? 'Indexed, source unreadable — the file is locked or access is denied. Its'
-                    + ' indexed content stays searchable; retrying automatically.'
+                  ? 'Read, source unreadable — the file is locked or access is denied. Its'
+                    + ' read content stays searchable; retrying automatically.'
                   : 'Source unreadable — the file is locked or access is denied. Retrying'
                     + ' automatically.'}
               </div>`

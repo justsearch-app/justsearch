@@ -813,9 +813,10 @@ describe('DP3 a folder\u2019s failed files', () => {
     expect(await lists(page).count()).toBe(0);
   }, 120_000);
 
-  it('the failed chip opens a closed folder and puts the keyboard on the list', async () => {
+  it('the expanded folder failure action puts the keyboard on its list', async () => {
     const page = await open(1280, 800);
     await area(page, LIBRARY);
+    await page.locator('.folder-toggle').first().click();
     await page.locator('jf-button.failed-chip').first().waitFor();
     await settle(page, 400);
     await page.locator('jf-button.failed-chip button').first().click();

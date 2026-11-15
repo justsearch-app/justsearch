@@ -341,10 +341,10 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
       metaText: `${collection} · ${ctx.indexingPaused ? ctx.indexingPauseReason === 'settings_recovery' ? 'Waiting for Settings reset'
         : (ctx.indexingPauseReasons ?? [ctx.indexingPauseReason]).some(r => r === 'schedule' || r === 'on_battery')
           ? `Waiting for ${[
-            (ctx.indexingPauseReasons ?? [ctx.indexingPauseReason]).includes('schedule') ? 'indexing hours' : '',
+            (ctx.indexingPauseReasons ?? [ctx.indexingPauseReason]).includes('schedule') ? 'reading hours' : '',
             (ctx.indexingPauseReasons ?? [ctx.indexingPauseReason]).includes('on_battery') ? 'the battery rule to clear' : '',
             (ctx.indexingPauseReasons ?? [ctx.indexingPauseReason]).includes('user_paused') ? 'Resume' : '',
-          ].filter(Boolean).join(' and ')}` : 'Waiting for Resume' : ctx.retryWaiting ? 'Waiting to retry' : 'Indexing'} · ${inFlight.toLocaleString()} remaining${ctx.indexingPaused && deleteDetectionUnverified ? " · couldn't verify deletions — reindex to be sure" : ''}`,
+          ].filter(Boolean).join(' and ')}` : 'Waiting for Resume' : ctx.retryWaiting ? 'Waiting to retry' : 'Reading'} · ${inFlight.toLocaleString()} remaining${ctx.indexingPaused && deleteDetectionUnverified ? " · couldn't verify deletions — read again to be sure" : ''}`,
       inFlight,
       failed: failedShown,
       failedIsLastKnown,
@@ -376,16 +376,16 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
     // green ✓ (the 599 false-"✓" class, generalized to reconciliation completeness). It is still
     // searchable, so render a calm "couldn't verify — reindex to be sure", never an alarm.
     if (deleteDetectionUnverified) {
-      const indexedSuffix = ctx.relativeTime ? ` · indexed ${ctx.relativeTime}` : '';
+      const indexedSuffix = ctx.relativeTime ? ` · read ${ctx.relativeTime}` : '';
       return {
         state: 'unverified',
         glyph: 'unverified',
-        metaText: `${collection} · ${fileCountText}${indexedSuffix} · couldn't verify deletions — reindex to be sure`,
+        metaText: `${collection} · ${fileCountText}${indexedSuffix} · couldn't verify deletions — read again to be sure`,
         inFlight,
         failed,
       };
     }
-    const indexedSuffix = ctx.relativeTime ? ` · indexed ${ctx.relativeTime}` : '';
+    const indexedSuffix = ctx.relativeTime ? ` · read ${ctx.relativeTime}` : '';
     // Tempdoc 626 §Recency — the freshness heartbeat. Showing WHEN the index↔disk correspondence was
     // last confirmed turns a bare "✓" into a checkable fact ("Verified 2m ago") and makes a folder the
     // round-robin reconcile hasn't reached lately read as mildly stale ("Verified 8m ago") rather than
@@ -573,8 +573,8 @@ export interface FolderAttention {
 }
 
 const WALK_ERROR_WORDS: Readonly<Record<string, string>> = {
-  INCOMPLETE_COVERAGE: "The last scan couldn't read every file or subfolder (for example, missing permission). Reindex after fixing access.",
-  CLIENT_CANCELLED: 'The last scan was cancelled before it finished. Reindex to cover the whole folder.',
+  INCOMPLETE_COVERAGE: "The last scan couldn't read every file or subfolder (for example, missing permission). Read again after fixing access.",
+  CLIENT_CANCELLED: 'The last scan was cancelled before it finished. Read again to cover the whole folder.',
 };
 
 /**
@@ -585,7 +585,7 @@ export function folderAttention(root: IndexedRootView, status: FolderStatus, nam
   const hash = root.pathHash ?? '';
   const items: FolderAttention[] = [];
   if (status.state === 'unavailable') items.push({ key: `missing:${hash}`, kind: 'missing', title: `${name} can't be found`,
-    detail: 'Reconnect the drive or remove it. Last-known indexed content may still be searchable; reindex cannot cover this folder while it is offline.' });
+    detail: 'Reconnect the drive or remove it. Last-known read content may still be searchable; read again cannot cover this folder while it is offline.' });
   else if (root.walkError) items.push({ key: `walk:${hash}`, kind: 'walk', title: `${name} needs attention`,
     detail: WALK_ERROR_WORDS[root.walkError] ?? root.walkError });
   if (status.failed > 0) items.push({ key: `files:${hash}`, kind: 'files',

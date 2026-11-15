@@ -96,6 +96,7 @@ describe('failed files sit under their folder', () => {
 
   it('the failed chip takes the reader to the list under its folder', async () => {
     const el = await mount([root('a', 1), root('b', 1)]);
+    rowOf(el, 'b').querySelector<HTMLButtonElement>('.folder-toggle')!.click(); await settle(el);
     const chip = rowOf(el, 'b').querySelector('jf-button.failed-chip') as HTMLElement & { onActivate(): void };
     chip.onActivate();
     await settle(el);

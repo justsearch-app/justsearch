@@ -69,7 +69,7 @@ describe('LibrarySurface — transition-aware empty state (595 §4.3)', () => {
     try {
       await el.updateComplete;
       const text = el.shadowRoot?.textContent ?? '';
-      expect(text).toContain('Rebuilding index');
+      expect(text).toContain('Reading your files again');
       expect(text).not.toContain('No watched folders');
     } finally {
       el.remove();
@@ -99,7 +99,7 @@ describe('LibrarySurface — transition-aware empty state (595 §4.3)', () => {
       await el.updateComplete;
       const text = el.shadowRoot?.textContent ?? '';
       expect(el.shadowRoot?.querySelector('h2')?.textContent).toBe('Add a folder to start searching');
-      expect(text).not.toContain('Rebuilding index');
+      expect(text).not.toContain('Reading your files again');
     } finally {
       el.remove();
     }
@@ -319,7 +319,7 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
     const el = await mountWithRow();
     try {
       const text = el.shadowRoot?.textContent ?? '';
-      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Searchable by words\s*Now/);
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Search by meaning\s*In progress.*word search is available/);
       expect(text).toContain('Meaning processing');
       expect(el.shadowRoot?.querySelector('.folder-state')?.textContent).not.toContain('Up to date');
     } finally {
@@ -333,7 +333,7 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
     try {
       const text = el.shadowRoot?.textContent ?? '';
       expect(el.shadowRoot?.querySelector('.folder-state')?.textContent).toContain('Up to date');
-      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Indexed\s*just now/);
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Read\s*just now/);
       expect(text).not.toContain('semantic search still catching up');
     } finally {
       el.remove();
@@ -391,7 +391,7 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
       expect(el.enrichmentBlocked).toBe(false);
       const text = el.shadowRoot?.textContent ?? '';
       expect(el.shadowRoot?.querySelector('.folder-state')?.textContent).toContain('Up to date');
-      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Indexed\s*just now/);
+      expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toMatch(/Read\s*just now/);
       expect(text).not.toContain('semantic search waiting for AI install');
     } finally {
       el.remove();
@@ -433,8 +433,8 @@ it('L1 library retry waiting appears once outside folder rows', async () => {
       expect(text).not.toContain('Next retry:');
     };
     once();
-    expect(el.shadowRoot!.querySelector('.subtitle')?.textContent).toContain('Next retry at');
-    el.reindexOutcome = 'Reindex accepted.';
+    expect(el.shadowRoot!.querySelector('.reading-detail')?.textContent).toContain('Next retry at');
+    el.reindexOutcome = 'Read again accepted.';
     await el.updateComplete;
     once();
   } finally {

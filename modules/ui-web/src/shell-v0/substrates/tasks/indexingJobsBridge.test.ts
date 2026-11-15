@@ -93,14 +93,14 @@ describe('§32 #1 — projectJobsToTasks (stateless reconcile)', () => {
     // The status alone says "failed"; the label is what distinguishes "this file is unreadable"
     // from "we stopped trying". Same words the Activity ledger uses for the same state, so the
     // tray and the timeline do not describe one event two ways.
-    expect(getTask('idxjob:h2x')?.label).toContain('Index gave up');
-    expect(getTask('idxjob:h2x')?.label).not.toContain('Indexing ·');
+    expect(getTask('idxjob:h2x')?.label).toContain('Reading stopped');
+    expect(getTask('idxjob:h2x')?.label).not.toContain('Reading ·');
   });
 
-  it('a plain FAILED job keeps the "Indexing ·" label — the verb only changes for the exhausted case', () => {
+  it('a plain FAILED job keeps the "Reading ·" label — the verb only changes for the exhausted case', () => {
     projectJobsToTasks(rows({ pathHash: 'h2y', state: 'FAILED', collection: 'docs' }));
-    expect(getTask('idxjob:h2y')?.label).toContain('Indexing ·');
-    expect(getTask('idxjob:h2y')?.label).not.toContain('gave up');
+    expect(getTask('idxjob:h2y')?.label).toContain('Reading ·');
+    expect(getTask('idxjob:h2y')?.label).not.toContain('Reading stopped');
   });
 
   it('a job that leaves the live set → REMOVED (not marked succeeded)', () => {
@@ -143,7 +143,7 @@ describe('§32 #1 — projectJobsToTasks (stateless reconcile)', () => {
   // instance before a remount), with no reliance on per-instance closure state.
   it('1B: reconciles against pre-existing substrate job-tasks (remount-safe)', () => {
     // Simulate a prior bridge instance having started a job-task.
-    startTask({ id: 'idxjob:h7', label: 'Indexing · docs (h7)' });
+    startTask({ id: 'idxjob:h7', label: 'Reading · docs (h7)' });
     expect(getTask('idxjob:h7')?.status).toBe('running');
     // A fresh projection (new "instance", no shared closure) where h7 is gone
     // must still remove it — proving truth is derived from the substrate.
@@ -181,7 +181,7 @@ describe('602 R5 — resolved file/folder labels (Tasks tray)', () => {
     // In production the resolve callback re-projects; here we re-project to assert
     // the cached friendly label is now used.
     projectJobsToTasks(rows({ pathHash: 'hh', state: 'PROCESSING', collection: 'docs' }));
-    expect(getTask('idxjob:hh')?.label).toBe('Indexing · Projects/report.pdf');
+    expect(getTask('idxjob:hh')?.label).toBe('Reading · Projects/report.pdf');
   });
 
   it('keeps the short-hash fallback when the hash cannot be resolved (found:false)', async () => {
@@ -189,7 +189,7 @@ describe('602 R5 — resolved file/folder labels (Tasks tray)', () => {
     projectJobsToTasks(rows({ pathHash: 'hx', state: 'PROCESSING', collection: 'docs' }));
     await flush();
     projectJobsToTasks(rows({ pathHash: 'hx', state: 'PROCESSING', collection: 'docs' }));
-    expect(getTask('idxjob:hx')?.label).toBe('Indexing · docs (hx)');
+    expect(getTask('idxjob:hx')?.label).toBe('Reading · docs (hx)');
   });
 
   it('a bare filename (no parent folder) resolves to just the file name', async () => {
@@ -197,7 +197,7 @@ describe('602 R5 — resolved file/folder labels (Tasks tray)', () => {
     projectJobsToTasks(rows({ pathHash: 'hf', state: 'PROCESSING', collection: 'docs' }));
     await flush();
     projectJobsToTasks(rows({ pathHash: 'hf', state: 'PROCESSING', collection: 'docs' }));
-    expect(getTask('idxjob:hf')?.label).toBe('Indexing · report.pdf');
+    expect(getTask('idxjob:hf')?.label).toBe('Reading · report.pdf');
   });
 });
 

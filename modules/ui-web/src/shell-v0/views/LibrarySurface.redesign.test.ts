@@ -46,7 +46,7 @@ afterEach(() => { document.body.replaceChildren(); clearPresentation(); __resetA
 it.each([undefined, 0, 20])('the headline uses observed searchable documents (%s)', async documents => {
   observe(documents); const { el } = await mount();
   expect(el.shadowRoot!.querySelector('h2')?.textContent).toBe(documents === undefined ? 'Checking your folders'
-    : documents === 0 ? 'Indexing your files' : 'Your files are searchable');
+    : documents === 0 ? 'Reading your files' : 'Your files are searchable');
 });
 
 it('counts a rebuild decision during recovery and counts a terminal outcome only once', async () => {
@@ -102,17 +102,18 @@ it.each(['fallback', 'themed'])('%s rows keep several disclosures open through s
   const toggles = [...rows().shadowRoot!.querySelectorAll('.folder-toggle')];
   expect(toggles.map(button => button.getAttribute('aria-expanded'))).toEqual(['true', 'true']);
   expect(rows().shadowRoot!.querySelector('.folder-name')?.getAttribute('title')).toBe('/one/Same name');
-  expect(rows().shadowRoot!.textContent).toContain('12 files found');
-  expect(rows().shadowRoot!.textContent).toContain('Searchable by words');
+  expect(rows().shadowRoot!.textContent).toContain('12 files');
+  expect(rows().shadowRoot!.textContent).toContain('Search by meaning');
+  expect(rows().shadowRoot!.textContent).not.toContain('Searchable by words');
 });
 
 it('Explorer actions are absent in browsers and use each resolved path on desktop', async () => {
   observe(20); const { el, host } = await mount();
-  expect(el.shadowRoot!.querySelector('jf-button[label="Open in Explorer"]')).toBeNull();
+  expect(el.shadowRoot!.querySelector('jf-button[label="Open in Files"]')).toBeNull();
   el.isTauri = true; await settle(el);
   for (const toggle of el.shadowRoot!.querySelectorAll<HTMLButtonElement>('.folder-toggle')) toggle.click();
   await settle(el);
-  const actions = [...el.shadowRoot!.querySelectorAll<HTMLElement & { onActivate: () => void }>('jf-button[label="Open in Explorer"]')];
+  const actions = [...el.shadowRoot!.querySelectorAll<HTMLElement & { onActivate: () => void }>('jf-button[label="Open in Files"]')];
   actions.forEach(action => action.onActivate()); await settle(el);
   expect(host.platform.revealInExplorer).toHaveBeenNthCalledWith(1, '/one/Same name');
   expect(host.platform.revealInExplorer).toHaveBeenNthCalledWith(2, '/two/文書, Same name');
@@ -122,7 +123,7 @@ it.each(['unresolved', 'removed', 'disconnected', 'native refusal'])('Explorer e
   observe(20); const { el, host } = await mount(); el.isTauri = true; await settle(el);
   for (const toggle of el.shadowRoot!.querySelectorAll<HTMLButtonElement>('.folder-toggle')) toggle.click();
   await settle(el);
-  const action = el.shadowRoot!.querySelector<HTMLElement & { onActivate: () => void }>('jf-button[label="Open in Explorer"]')!;
+  const action = el.shadowRoot!.querySelector<HTMLElement & { onActivate: () => void }>('jf-button[label="Open in Files"]')!;
   if (reason === 'unresolved') el.resolvedPaths = {};
   if (reason === 'removed') el.roots = [root('b')];
   if (reason === 'disconnected') el.roots = [{ ...root('a'), status: 'unavailable' }, root('b')];
@@ -141,7 +142,7 @@ it('uses the existing native reveal bridge and surfaces its network/device refus
   el.isTauri = true; await settle(el);
   for (const toggle of el.shadowRoot!.querySelectorAll<HTMLButtonElement>('.folder-toggle')) toggle.click();
   await settle(el);
-  const action = el.shadowRoot!.querySelector<HTMLElement & { onActivate: () => void }>('jf-button[label="Open in Explorer"]')!;
+  const action = el.shadowRoot!.querySelector<HTMLElement & { onActivate: () => void }>('jf-button[label="Open in Files"]')!;
   native.invoke.mockResolvedValue(undefined);
   action.onActivate();
   await vi.waitFor(() => expect(native.invoke).toHaveBeenCalledWith('reveal_in_explorer', { path: '/one/Same name' }));
@@ -157,7 +158,7 @@ it('a second window receives live folder holds without overwriting a skip-rules 
     worker: { core: { indexedDocuments: 20, indexState: 'IDLE', indexHealthy: true } } } as unknown as StatusSnapshot });
   await settle(first.el); await settle(second.el);
   for (const { el } of [first, second]) {
-    expect(el.shadowRoot!.querySelector('.attention')?.textContent).toContain('Outside indexing hours');
+    expect(el.shadowRoot!.querySelector('.attention')?.textContent).toContain('Outside reading hours');
     expect(el.shadowRoot!.querySelector('.attention')?.textContent).toContain('running on battery');
   }
   expect(first.el.excludesText).toBe('**/my-draft/**');
@@ -168,8 +169,9 @@ it('A2 expanded facts replace the old metadata line', async () => {
   observe(20); const { el } = await mount();
   el.shadowRoot!.querySelector<HTMLButtonElement>('.folder-toggle')!.click(); await settle(el);
   const details = el.shadowRoot!.querySelector('.folder-details')!;
-  expect(details.textContent).toContain('Collection');
-  expect(details.textContent).toContain('Searchable by words');
+  expect(details.textContent).not.toContain('Collection');
+  expect(details.textContent).toContain('Search by meaning');
+  expect(details.textContent).not.toContain('Searchable by words');
   expect(details.querySelector('.card-meta')).toBeNull();
 });
 
@@ -178,7 +180,7 @@ it('A3 unconfirmed status is stated once through the real projection', async () 
   __feedForTest({ status: { meta: { workerRpcStale: true }, worker: { core: { indexedDocuments: 20, indexState: 'IDLE' } } } as unknown as StatusSnapshot });
   await settle(el);
   expect(el.shadowRoot!.querySelector('h2')!.textContent).toContain('unconfirmed');
-  expect(el.shadowRoot!.querySelector('.subtitle')!.textContent).not.toContain('Indexing status unconfirmed');
+  expect(el.shadowRoot!.querySelector('.header .subtitle')).toBeNull();
 });
 
 it.each(['energy_saver', 'gpu_busy_external'])('A5 %s waits are stated once through the real projection', async reason => {
@@ -187,7 +189,7 @@ it.each(['energy_saver', 'gpu_busy_external'])('A5 %s waits are stated once thro
     worker: { core: { indexedDocuments: 20, indexState: 'IDLE', indexHealthy: true },
       enrichment: { embeddingEnabled: true, embeddingPendingCount: 2 } } } as unknown as StatusSnapshot });
   await settle(el);
-  const summary = el.shadowRoot!.querySelector('.subtitle')!.textContent!;
+  const summary = el.shadowRoot!.querySelector('.reading-detail')!.textContent!;
   expect(summary).toContain(reason === 'energy_saver' ? 'Meaning search is waiting while the computer saves energy.'
     : 'GPU-bound idle enrichment deferred while another app is using the GPU.');
   expect(summary).not.toContain('Meaning processing is waiting');
@@ -232,13 +234,13 @@ it('D1 keeps attention and retried files through 25 alternating unconfirmed poll
     if (second === 1) await folders([{ ...root('a'), inFlightCount: 1 }]);
     await settle(el);
     expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('2 things need your attention');
-    expect(el.shadowRoot!.querySelector('.attention')!.textContent).toContain('Indexing paused');
+    expect(el.shadowRoot!.querySelector('.attention')!.textContent).toContain('Reading paused');
     expect(el.shadowRoot!.querySelector('jf-failed-files-list')).not.toBeNull();
     if (second % 2) expect(el.shadowRoot!.querySelector('.attention')!.textContent).toContain('last known');
   }
   now.mockReturnValue(receivedAt + 41000); __tickClockForTest(); await settle(el);
-  expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Indexing status unconfirmed');
-  expect(el.shadowRoot!.querySelector('.attention')!.textContent).toContain('Indexing paused');
+  expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Reading status unconfirmed');
+  expect(el.shadowRoot!.querySelector('.attention')!.textContent).toContain('Reading paused');
   observe(20); await folders([root('a')]); await settle(el);
   expect(el.shadowRoot!.querySelector('.attention-item')).toBeNull();
   expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Your files are searchable');
@@ -255,7 +257,7 @@ it('D1 never claims searchable during unconfirmed polls, including 42 seconds pa
       worker: { core: { indexedDocuments: 20, indexState: 'IDLE', indexHealthy: true } }
     } as unknown as StatusSnapshot });
     await settle(el);
-    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Indexing status unconfirmed');
+    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Reading status unconfirmed');
   }
   observe(20); await settle(el);
   expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Your files are searchable');
@@ -269,13 +271,13 @@ it.each([false, true])('L2 lost status contact never describes a rebuild (empty 
     if (empty) el.roots = [];
     await vi.advanceTimersByTimeAsync(15_001);
     __tickClockForTest(); await settle(el);
-    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Indexing status unconfirmed');
+    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Reading status unconfirmed');
     expect(el.shadowRoot!.querySelector('.empty')?.textContent ?? '').not.toContain('Rebuilding');
     await vi.advanceTimersByTimeAsync(10_000);
     __tickClockForTest(); await settle(el);
-    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Indexing status unconfirmed');
+    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Reading status unconfirmed');
     observe(20); await settle(el);
-    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe(empty ? 'Add a folder to start searching' : 'Your files are searchable');
+    expect(el.shadowRoot!.querySelector('h2')!.textContent).toBe('Your files are searchable');
   } finally { vi.useRealTimers(); }
 });
 

@@ -119,7 +119,7 @@ async function open(name: Name, width: number, height: number, textScale: number
 const geometry = (page: Page, tag: string) => page.locator(tag).evaluate(host => {
   const root = host.shadowRoot!;
   const body = root.querySelector<HTMLElement>('.body')!;
-  const header = root.querySelector<HTMLElement>('.header')!;
+  const header = root.querySelector<HTMLElement>(host.localName === 'jf-browse-surface' ? '.column-heads' : '.header')!;
   // The last laid-out element the body holds, in document order.
   const last = [...body.querySelectorAll('*')].reverse().find(node => node.getBoundingClientRect().height > 0) ?? body;
   const r = (node: Element) => { const b = node.getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom), height: Math.round(b.height) }; };
@@ -153,6 +153,7 @@ describe('FC5 a short window with large text keeps every surface reachable', () 
     await settle(page);
     const top = await geometry(page, tag);
     await page.mouse.click(box.x + box.width - 4, Math.max(top.header.top, top.visible.top) + 4);
+    if (tag === 'jf-browse-surface') await page.locator(`${tag} [role=treeitem][tabindex="0"]`).focus();
     await page.keyboard.press('End');
     await settle(page, 300);
     const ended = await geometry(page, tag);

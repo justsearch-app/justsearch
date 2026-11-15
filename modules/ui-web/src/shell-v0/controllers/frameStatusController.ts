@@ -478,7 +478,7 @@ export class FrameStatusController implements ReactiveController {
         if (this.indexingAnnouncementKey !== p.pause.state) this.indexingAnnouncement = activityAnnouncement;
         this.indexingAnnouncementKey = p.pause.state;
       } else if (this.indexingWasPaused) {
-        this.indexingAnnouncement = 'Indexing resumed.';
+        this.indexingAnnouncement = 'Reading resumed.';
         this.indexingAnnouncementKey = resumedKey;
       } else if (this.indexingAnnouncementKey !== resumedKey) {
         this.indexingAnnouncement = activityAnnouncement;

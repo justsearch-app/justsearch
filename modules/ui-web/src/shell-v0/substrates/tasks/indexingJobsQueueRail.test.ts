@@ -72,7 +72,7 @@ for (const transport of ['standalone', 'multiplexed'] as const) {
       expect(await detail(rail, 'failed-files')).toContain(`${formatCount(1001)} failed`);
       expect(getTask('idxjob:active')?.status).toBe('running');
       expect(getTask('idxjob:retry')?.status).toBe('failed');
-      expect(getTask('idxjob:gaveup')?.label).toContain('gave up');
+      expect(getTask('idxjob:gaveup')?.label).toContain('Reading stopped');
       send('UPDATE', { kind: 'update', row: row('retry', 'PENDING') }); status(700001, 16, 1000);
       await Promise.resolve(); await Promise.resolve(); await rail.updateComplete; await panel(rail).updateComplete;
       expect(getTask('idxjob:retry')).toBeUndefined();

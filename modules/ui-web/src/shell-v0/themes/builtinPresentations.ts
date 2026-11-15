@@ -383,7 +383,6 @@ export const LIBRARY_CARDS_REGION = 'core.library.cards';
  * (the gated `core.remove-watched-root` operation + confirm stay team-owned — the §7 boundary).
  */
 const LIBRARY_CARDS_BODY: SurfaceBodyDeclaration = {
-  heading: 'Folders',
   placement: 'STAGE',
   schema: {
     type: 'object',

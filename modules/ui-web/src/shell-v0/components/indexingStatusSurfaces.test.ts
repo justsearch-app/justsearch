@@ -81,7 +81,7 @@ describe('WP3.3 shared status surfaces', () => {
     feed(status());
     await mountAll();
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).toContain('Text indexing continues');
+      expect(text, surfaces[i]!.localName).toContain('Text reading continues');
       expect(text, surfaces[i]!.localName).toContain('Meaning search is waiting while the computer saves energy. Some meaning processing can continue between files.');
       expect(text, surfaces[i]!.localName).not.toMatch(/queue[^.]*paused|Paused — saving energy|Batch Processing Active/);
     }
@@ -112,8 +112,8 @@ describe('WP3.3 shared status surfaces', () => {
     feed(stale);
     await flush();
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).toContain('Indexing status unconfirmed');
-      expect(text, surfaces[i]!.localName).not.toContain('Text indexing continues');
+      expect(text, surfaces[i]!.localName).toContain('Reading status unconfirmed');
+      expect(text, surfaces[i]!.localName).not.toContain('Text reading continues');
     }
   });
 
@@ -132,8 +132,8 @@ describe('WP3.3 shared status surfaces', () => {
     await flush();
     expect(getAiState().snapshotLive, 'inference still confirms Engine reachability').toBe(true);
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).toContain('Indexing status unconfirmed');
-      expect(text, surfaces[i]!.localName).not.toMatch(/Text indexing continues|Ready — fully searchable|saves energy/);
+      expect(text, surfaces[i]!.localName).toContain('Reading status unconfirmed');
+      expect(text, surfaces[i]!.localName).not.toMatch(/Text reading continues|Ready — fully searchable|saves energy/);
     }
 
     const recovered = status(jobs, []);
@@ -142,7 +142,7 @@ describe('WP3.3 shared status surfaces', () => {
     feed(recovered);
     await flush();
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).not.toContain('Indexing status unconfirmed');
+      expect(text, surfaces[i]!.localName).not.toContain('Reading status unconfirmed');
       expect(text, surfaces[i]!.localName).not.toContain('saves energy');
     }
   });
@@ -176,7 +176,7 @@ describe('WP3.3 shared status surfaces', () => {
     feed(status(0, ['chat_generating']));
     await mountAll();
     for (const [i, text] of texts().entries()) {
-      expect(text, surfaces[i]!.localName).toContain('Indexing shares time with chat.');
+      expect(text, surfaces[i]!.localName).toContain('Reading shares time with chat.');
     }
     feed(status(0, []));
     await flush();
