@@ -520,11 +520,11 @@ describe('WP3.7 verifier layout and focus repairs', () => {
     const meaning = () => card().querySelector('.folder-details')?.textContent ?? '';
     card().querySelector<HTMLButtonElement>('.folder-toggle')!.click(); await settle(library);
     expect(card().querySelector('.card-meta')?.textContent).toBe('Up to date');
-    expect(meaning()).toMatch(/Search by meaning\s*Needs AI/);
+    expect(meaning()).toMatch(/Search by meaning\s*Needs AI · word search is available/);
     expect(card().querySelector('.status-icon.pending')).not.toBeNull();
     observe('PAUSED'); await settle(library);
     expect(card().querySelector('.card-meta')?.textContent).toBe('Up to date');
-    expect(meaning()).toMatch(/Search by meaning\s*Needs AI/);
+    expect(meaning()).toMatch(/Search by meaning\s*Needs AI · word search is available/);
     expect(card().textContent).not.toMatch(/semantic search/i);
     expect(card().querySelector('.status-icon.pending')).not.toBeNull();
     expect(card().querySelector('.status-icon.indexed')).toBeNull();

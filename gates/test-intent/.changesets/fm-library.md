@@ -177,7 +177,7 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
         },
         {
           "oldAssertion": "Row text contains 'semantic search waiting for AI install' and 'keyword search ready' (paused and running).",
-          "newAssertion": "Row status is 'Up to date'; open row says 'Search by meaning Needs AI'; no 'semantic search'; pending/indexed icon assertions unchanged.",
+          "newAssertion": "Row status is 'Up to date'; open row says 'Search by meaning Needs AI · word search is available' (word search still stated available, M3) while running and paused; no 'semantic search'; pending/indexed icon assertions unchanged.",
           "reason": "Decisions V1/V2 (cited) after the packaged-app check; the remaining behavioural assertions are kept."
         }
       ]
@@ -1837,6 +1837,34 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
         "modules/ui-web/src/shell-v0/views/library-first-minutes/review-repairs-lockdown.test.ts"
       ],
       "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerCountPresentationTest.java"
+      ],
+      "class": "New",
+      "behaviour": "The roots response carries each folder's bounded file count with its cap flag: a count that reaches the 50,000 limit is marked capped; a folder whose disk observation is missing is unknown (-1), not an empty folder; a folder with an unreadable subfolder reports the readable count as capped (at least N), never as exact.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Library. The headline says the state, the folder row says how many and how current; nothing is said twice.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "M5 (counts keep scope and cap: capped -> '50,000+ files'; unknown -> no count; carry the cap flag through the roots response as a small additive field) and V3 (an unreadable subfolder never shown as an exact count).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/fm-library.json",
+      "newChecks": [
+        "modules/ui/src/test/java/io/justsearch/ui/api/IndexingControllerCountPresentationTest.java"
+      ],
+      "repaired": true
     }
   ]
 }
@@ -1873,5 +1901,16 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
   "session": "verifier-mp-ch9vx",
   "verdict": "accept",
   "digest": "sha256:fe65baf4db69786e219197d87c4b6146588c4b117475aeba4468d23a7d4a69f0"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-01a1dfcc-80d6-7d50-9372-e48e2b538148",
+  "verdict": "reject",
+  "digest": "sha256:0ec15a635ba43f3e9c6bdfd564ad9f5e45605abd01b3f6d5430677557b81f9cf",
+  "note": "Entry 5 drops the no-AI-through-Pause assertion that word search remains available; M3 still requires that fact and V1 does not retire it. The exempt IndexingControllerCountPresentationTest.java is read by scripts/ci/classify-changes.test.mjs:113,156, so it is not isolated under the supplied no-scanner condition and needs an explicit entry. Other entries reviewed without an intent objection; independent runtime reruns were blocked by sandbox dependency/process/network restrictions."
 }
 ```
