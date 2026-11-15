@@ -597,7 +597,7 @@ export function isWalkErrorCode(walkError: string): boolean {
 }
 
 /** A folder's walk problem in plain words: known codes by name, any other code generically. */
-export function walkErrorWords(walkError: string): string {
+function walkErrorWords(walkError: string): string {
   return WALK_ERROR_SHORT[walkError.trim()] ?? (isWalkErrorCode(walkError) ? "This folder couldn't be read completely" : walkError);
 }
 
@@ -619,4 +619,15 @@ export function folderAttention(root: IndexedRootView, status: FolderStatus, nam
   if (status.state === 'unverified') items.push({ key: `deletions:${hash}`, kind: 'deletions', title: `${name}: deletions not verified`,
     detail: 'Some stale entries may remain searchable.' });
   return items;
+}
+
+/** Meaning work for this folder that failed, lost its output or cannot be read, in folderStatus's order. */
+export function meaningProblem(root: IndexedRootView, stages: EnrichmentApplicability | null | undefined): 'failed' | 'incomplete' | 'unconfirmed' | null {
+  if (!stages) return null;
+  if ([root.parentDocsTotalEmbedding, root.parentDocsSettledEmbedding, root.parentDocsTotalSplade, root.parentDocsSettledSplade,
+    root.parentDocsTotalNer, root.parentDocsSettledNer, root.chunkDocsTotal, root.chunkDocsSettled]
+    .some(value => typeof value === 'number' && value < 0)) return 'unconfirmed';
+  if (stages.embedding && Object.entries(root.missingArtifactStages ?? {}).some(([id, missing]) => missing && ['embedding', 'chunkVectors'].includes(id))) return 'incomplete';
+  if (Object.entries(root.failedStages ?? {}).some(([id, failed]) => failed && (id === 'chunkVectors' ? stages.embedding : stages[id as keyof EnrichmentApplicability]))) return 'failed';
+  return null;
 }

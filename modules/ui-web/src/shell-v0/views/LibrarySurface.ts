@@ -78,6 +78,7 @@ import {
   isWalkErrorCode,
   rootCoverage,
   type FolderStatus,
+  meaningProblem,
 } from '../state/folderStatus.js';
 // Tempdoc 813 §4 — the index-wide progress authority supplies enrichment-stage applicability, which
 // the per-root wire row cannot carry (counts only, no enabled flags).
@@ -1155,10 +1156,10 @@ export class LibrarySurface extends JfElement {
     // Meaning state is said once, in the open row's "Search by meaning" line: a folder that word search
     // covers, and whose meaning work only waits for AI, is up to date. Failed or missing meaning work
     // is a problem with this folder, so the row says so.
-    const meaningProblem = fs.state === 'keyword-only' || fs.state === 'unknown' && fs.glyph === 'unverified' ? this.meaningProblem(root) : null;
-    const statusText = meaningProblem === 'failed' ? 'Reading for meaning failed for some files. Word search remains available.'
-      : meaningProblem === 'incomplete' ? 'Reading for meaning is incomplete for some files. Word search remains available.'
-      : meaningProblem === 'unconfirmed' ? 'Reading for meaning is unconfirmed. Word search remains available.'
+    const problem = fs.state === 'keyword-only' || fs.state === 'unknown' && fs.glyph === 'unverified' ? meaningProblem(root, this.enrichmentStages) : null;
+    const statusText = problem === 'failed' ? 'Reading for meaning failed for some files. Word search remains available.'
+      : problem === 'incomplete' ? 'Reading for meaning is incomplete for some files. Word search remains available.'
+      : problem === 'unconfirmed' ? 'Reading for meaning is unconfirmed. Word search remains available.'
       : fs.state === 'ready' || fs.state === 'keyword-only' || fs.state === 'enriching' && this.enrichmentBlocked ? 'Up to date'
       : fs.state === 'empty' ? 'No files to read'
       : fs.state === 'enriching' ? `Meaning processing${progress?.percent != null ? ` · ${progress.percent}%` : ''}`
@@ -2200,18 +2201,6 @@ export class LibrarySurface extends JfElement {
                 : !documents.known ? ownUnknown
                   : documents.value === 0 ? 'Reading your files' : 'Your files are searchable';
     return html`<div class="header"><div class="header-left"><h2>${headline}</h2></div></div>`;
-  }
-
-  /** Meaning work for this folder that failed, lost its output or cannot be read, in folderStatus's order. */
-  private meaningProblem(root: IndexedRootView): 'failed' | 'incomplete' | 'unconfirmed' | null {
-    const stages = this.enrichmentStages;
-    if (!stages) return null;
-    if ([root.parentDocsTotalEmbedding, root.parentDocsSettledEmbedding, root.parentDocsTotalSplade, root.parentDocsSettledSplade,
-      root.parentDocsTotalNer, root.parentDocsSettledNer, root.chunkDocsTotal, root.chunkDocsSettled]
-      .some(value => typeof value === 'number' && value < 0)) return 'unconfirmed';
-    if (stages.embedding && Object.entries(root.missingArtifactStages ?? {}).some(([id, missing]) => missing && ['embedding', 'chunkVectors'].includes(id))) return 'incomplete';
-    if (Object.entries(root.failedStages ?? {}).some(([id, failed]) => failed && (id === 'chunkVectors' ? stages.embedding : stages[id as keyof EnrichmentApplicability]))) return 'failed';
-    return null;
   }
 
   private meaningText(root: IndexedRootView, status: FolderStatus): string {
