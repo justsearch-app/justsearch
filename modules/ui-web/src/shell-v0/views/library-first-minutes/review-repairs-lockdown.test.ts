@@ -286,7 +286,5 @@ it.each(['light', 'dark'])('P2: a scrolled Browse tree shows no row above the bo
     expect(result.scrollable, JSON.stringify(result)).toBe(true);
     expect(result.scrolled).toBeGreaterThan(0);
     expect(result.rows, JSON.stringify(result)).toEqual([]);
-    expect(result.colours.heads, JSON.stringify(result.colours)).toBe(result.colours.behind);
-    expect(result.colours.band, JSON.stringify(result.colours)).toBe(result.colours.behind);
   } finally { await page.close(); }
 }, 120_000);

@@ -1938,7 +1938,7 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
         "modules/ui-web/src/shell-v0/views/library-first-minutes/review-repairs-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "Review and packaged-run repairs: a failed roots read shows as uncertainty, not 'Up to date'; one count formatter keeps cap and unknown (50,000+ with explicit digit grouping, no number when unknown, at-least when part of a tree was unreadable) in Library, Browse, removal text and status-panel rows, and Library and Browse agree; a path rendered twice keeps one tab stop and navigation follows the focused occurrence; Browse reloads roots when shown and children on expand; completed folder coverage is not reported blocked by another folder's work; no-AI headline and row words per V1, plain words for raw codes and Rebuilding only when observed per V2; Browse rows sorted by name with no blank band and singular '1 file'; read time refreshed after reading everything again; remaining index wording replaced; Shift+Tab out of a menu closes it.",
+      "behaviour": "Review and packaged-run repairs: a failed roots read shows as uncertainty, not 'Up to date'; one count formatter keeps cap and unknown (50,000+ with explicit digit grouping, no number when unknown, at-least when part of a tree was unreadable) in Library, Browse, removal text and status-panel rows, and Library and Browse agree; a path rendered twice keeps one tab stop and navigation follows the focused occurrence; Browse reloads roots when shown and children on expand; completed folder coverage is not reported blocked by another folder's work; no-AI headline and row words per V1, plain words for raw codes and Rebuilding only when observed per V2; Browse rows sorted by name with no blank band and singular '1 file'; file counts refreshed after reading everything again (the read-time line itself was withdrawn by P1); remaining index wording replaced; Shift+Tab out of a menu closes it.",
       "sources": [
         {
           "kind": "owner-words",
@@ -2112,5 +2112,16 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
   "session": "01a1dfd4-3692-7002-a823-d1ea476c6159",
   "verdict": "accept",
   "digest": "sha256:fa417d1831eecd19128059fbf9da23ced3fa29131be85e403dcded6844b97e8d"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1e018-64fa-7191-ae76-aaf837cac78a",
+  "verdict": "reject",
+  "digest": "sha256:af07fd0f67e3d0007947200f05af0583085f20cc97d144151c52d32a559a2f0b",
+  "note": "Entry 57: review-repairs-lockdown.test.ts:289-290 requires the column-head and ::before band background colors to equal the body background. P2 requires menus above the heads and no scrolled rows above them; it does not require exact color equality or a pseudo-element. Keep behavior assertions or cite an agreed source for these extra expectations. Other entries have no intent objection; local runtime reruns are unverified due sandbox restrictions."
 }
 ```
