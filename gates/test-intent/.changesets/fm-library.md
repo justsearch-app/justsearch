@@ -1746,3 +1746,13 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
   "note": "Entry 56: browse-lockdown.test.ts:68 asserts exactly 34px row height without a source; remove the exact-height assertion and keep the before/hover equality. Entries 1-55 acceptable."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-mp-ch9vx",
+  "verdict": "accept",
+  "digest": "sha256:fe65baf4db69786e219197d87c4b6146588c4b117475aeba4468d23a7d4a69f0"
+}
+```
