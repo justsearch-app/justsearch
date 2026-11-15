@@ -2143,3 +2143,13 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
   "digest": "sha256:dea84a5c306129df3a976b5d67e4efb2157677703892559744703eeecd715fb2"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "01a1e02f-8ae4-7783-a9bc-bccb70419ab3",
+  "verdict": "accept",
+  "digest": "sha256:92484657d471b538ff2714a1ec7a1bfd4c826f2b9d425dc7ef729c645a6f248b"
+}
+```
