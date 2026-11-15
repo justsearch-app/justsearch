@@ -11,7 +11,7 @@ This is the intermediate presentation slice. Save-on-change is deferred to 6b.
 The independent verifier must inspect the per-file diffs and accept this changeset;
 no acceptance records were written by this builder. New presentation and
 count tests (the four frontend files have a New entry because the test-only import scanner reads every tracked source) exercise the supplied decisions. Fail-before evidence for the five new files is
-gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a312d1484; each fails by assertion).
+gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a312d1484; each fails by assertion). The two review-repairs files (review and packaged-run repairs) have evidence gates/test-intent/evidence/fm-library-repairs.json (--before dd87dd0474, the candidate before those repairs).
 
 ```json
 {
@@ -151,6 +151,20 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "quote": "The same thing has one name everywhere: the app reads files (not \"indexes\"), the button is \"Add a folder\".",
           "location": "task t-20261113-fmimpl agreement, adopted rules quoted in supplied slice 6a builder brief",
           "label": "owner words quoted in the supplied brief"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Library. The headline says the state, the folder row says how many and how current; nothing is said twice.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Packaged-run repair decisions V1 (no-AI headline 'Your files are searchable', row 'Up to date', meaning state once in the open row's 'Search by meaning' line, no 'semantic search') and V2 ('Rebuilding' only when a rebuild is observed; raw codes in plain words).",
+          "label": "agent choice"
         }
       ],
       "behaviour": "Reading labels replace indexing labels; assertions about observation freshness, counts, holds, errors, destinations and state transitions remain.",
@@ -160,6 +174,11 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "oldAssertion": "Prior presentation labels, collapsed facts or private component interaction path.",
           "newAssertion": "Reading labels replace indexing labels; assertions about observation freshness, counts, holds, errors, destinations and state transitions remain.",
           "reason": "The cited owner wording and supplied K/M decisions replace that presentation while preserving the remaining behavioural assertions."
+        },
+        {
+          "oldAssertion": "Row text contains 'semantic search waiting for AI install' and 'keyword search ready' (paused and running).",
+          "newAssertion": "Row status is 'Up to date'; open row says 'Search by meaning Needs AI'; no 'semantic search'; pending/indexed icon assertions unchanged.",
+          "reason": "Decisions V1/V2 (cited) after the packaged-app check; the remaining behavioural assertions are kept."
         }
       ]
     },
@@ -935,6 +954,14 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "delegationScope": "implement the agreed first-minutes design; slice 6a Library and file-browser presentation only",
           "choice": "K2 expanded facts: \"Search by meaning\", \"Couldn't be read\", \"Read\", \"Checked for changes\", \"Open in Files\"; M3 preserves failure/last-known distinctions. M9 preserves keyboard access.",
           "label": "agent choice; K/M decisions supplied by the orchestrator"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Packaged-run repair decisions V1 (no-AI headline 'Your files are searchable', row 'Up to date', meaning state once in the open row's 'Search by meaning' line, no 'semantic search') and V2 ('Rebuilding' only when a rebuild is observed; raw codes in plain words).",
+          "label": "agent choice"
         }
       ],
       "behaviour": "Failure facts move from the collapsed summary chip to the expanded Couldn't be read line. Open that folder first, then retain failure drill-down, per-folder scope, last-known treatment, focus and list behaviour assertions.",
@@ -944,6 +971,11 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "oldAssertion": "Prior presentation labels, collapsed facts or private component interaction path.",
           "newAssertion": "Failure facts move from the collapsed summary chip to the expanded Couldn't be read line. Open that folder first, then retain failure drill-down, per-folder scope, last-known treatment, focus and list behaviour assertions.",
           "reason": "The cited owner wording and supplied K/M decisions replace that presentation while preserving the remaining behavioural assertions."
+        },
+        {
+          "oldAssertion": "Fixture set provisional only.",
+          "newAssertion": "Fixture sets provisional and the observed rebuild flag together, so the same 'Rebuilding' assertions apply to an observed rebuild; assertions unchanged.",
+          "reason": "Decisions V1/V2 (cited) after the packaged-app check; the remaining behavioural assertions are kept."
         }
       ]
     },
@@ -1197,6 +1229,20 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "delegationScope": "implement the agreed first-minutes design; slice 6a Library and file-browser presentation only",
           "choice": "K2 default Library facts and no count subtitle; M3 meaning distinctions and word-search availability remain; M4 active reading never shows a bare past Read time; M5 count scope/cap; M7 other-app-only headline is truthful.",
           "label": "agent choice; K/M decisions supplied by the orchestrator"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Library. The headline says the state, the folder row says how many and how current; nothing is said twice.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Packaged-run repair decisions V1 (no-AI headline 'Your files are searchable', row 'Up to date', meaning state once in the open row's 'Search by meaning' line, no 'semantic search') and V2 ('Rebuilding' only when a rebuild is observed; raw codes in plain words).",
+          "label": "agent choice"
         }
       ],
       "behaviour": "Default rows expose the agreed meaning/failure/read facts rather than Collection and redundant word-search facts. Remove subtitle assertions or move exceptional wait/retry detail assertions to the attention detail. Retain stale-state, disclosure, path, recovery and themed/fallback parity checks.",
@@ -1206,6 +1252,11 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
           "oldAssertion": "Prior presentation labels, collapsed facts or private component interaction path.",
           "newAssertion": "Default rows expose the agreed meaning/failure/read facts rather than Collection and redundant word-search facts. Remove subtitle assertions or move exceptional wait/retry detail assertions to the attention detail. Retain stale-state, disclosure, path, recovery and themed/fallback parity checks.",
           "reason": "The cited owner wording and supplied K/M decisions replace that presentation while preserving the remaining behavioural assertions."
+        },
+        {
+          "oldAssertion": "Text contains 'semantic search waiting for AI install'.",
+          "newAssertion": "Open row's details match 'Search by meaning Needs AI'; no 'semantic search'; 'fully searchable' still absent; enrichmentBlocked still true.",
+          "reason": "Decisions V1/V2 (cited) after the packaged-app check; the remaining behavioural assertions are kept."
         }
       ]
     },
@@ -1716,6 +1767,74 @@ gates/test-intent/evidence/fm-library.json (run-evidence --before origin/main 8a
         "modules/ui-web/src/shell-v0/views/library-first-minutes/operation-wording.test.ts",
         "modules/ui-web/src/shell-v0/views/library-first-minutes/palette-wording.test.ts",
         "modules/ui-web/src/shell-v0/views/library-first-minutes/presentation.test.ts"
+      ],
+      "repaired": true
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/review-repairs.test.ts",
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/review-repairs-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Review and packaged-run repairs: a failed roots read shows as uncertainty, not 'Up to date'; one count formatter keeps cap and unknown (50,000+ with explicit digit grouping, no number when unknown, at-least when part of a tree was unreadable) in Library, Browse, removal text and status-panel rows, and Library and Browse agree; a path rendered twice keeps one tab stop and navigation follows the focused occurrence; Browse reloads roots when shown and children on expand; completed folder coverage is not reported blocked by another folder's work; no-AI headline and row words per V1, plain words for raw codes and Rebuilding only when observed per V2; Browse rows sorted by name with no blank band and singular '1 file'; read time refreshed after reading everything again; remaining index wording replaced; Shift+Tab out of a menu closes it.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "The same thing has one name everywhere: the app reads files (not \"indexes\"), the button is \"Add a folder\".",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "What a picture does not show is not on that screen by default: it goes behind Settings › Advanced › Show developer tools, or away.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "Library. The headline says the state, the folder row says how many and how current; nothing is said twice.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "The Library \"more\" menu is the same menu as everywhere else: same surface, rows, hover. It closes on outside click, Escape, or opening another menu.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "File browser. An icon per kind of file, files indented under their folder, column heads, sizes in sensible units. The row under the pointer shows its actions without changing height.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "In the app, never set style= on an element: the desktop window drops it.",
+          "location": "task t-20261113-fmimpl agreement, adopted rules and picture notes",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Slice 6a decisions K1-K7 as amended by M1-M12 (Library presentation, shared menu, Browse; save-on-change deferred), as quoted in the acceptor brief.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Review repair decisions N1-N6 (N1 roots-observation availability joins visible uncertainty; N2 one cap-preserving count formatter, absent cap with count equal to the 50,000 limit is capped; N3 occurrence identity in Browse; N4 Refresh and filter stay behind developer tools, Browse refreshes roots on show and children on expand; N5 a root's completed coverage wins over a global block; N6 remaining index wording) and packaged-run decisions V1-V8 (V1 and V2 as above; V3 unreadable subfolder never shown as an exact count; V4 Browse sorted by name, no blank band, '1 file'; V5 explicit digit grouping and one shared root count for Library and Browse; V6 read times refreshed when Read everything again completes; V7 remaining index words; V8 moving focus out of a menu closes it).",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/fm-library-repairs.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/review-repairs.test.ts",
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/review-repairs-lockdown.test.ts"
       ],
       "repaired": true
     }
