@@ -25,7 +25,6 @@ let witness: Witness;
 let posts: Array<Record<string, unknown>>;
 let operations: Array<{ id: string; args: unknown }>;
 let settingsFails: boolean;
-let settingsGets: number;
 let heldPost: Promise<void> | null;
 let invalidReceipt: boolean;
 let heldGets: Array<(r: Response) => void> | null;
@@ -69,7 +68,7 @@ beforeEach(() => {
   setShowDeveloperTools(false);
   saved = { rerankerEnabled: true, pictureReadingEnabled: true, chatEnabled: true };
   witness = { acceptedRevision: 0, lastCommittedOperationKey: null };
-  posts = []; operations = []; answerFiles = true; presence = null; planned = null; settingsFails = false; settingsGets = 0; heldPost = null; invalidReceipt = false; heldGets = null;
+  posts = []; operations = []; answerFiles = true; presence = null; planned = null; settingsFails = false; heldPost = null; invalidReceipt = false; heldGets = null;
   store.current = ready();
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input);
@@ -82,7 +81,6 @@ beforeEach(() => {
         rerankerEnabled: saved.rerankerEnabled, pictureReadingEnabled: saved.pictureReadingEnabled });
     }
     if (path.endsWith('/api/settings/v2')) {
-      ++settingsGets;
       if (settingsFails) return json({ error: 'unavailable' }, 503);
       const body = json({ ui: { chatEnabled: saved.chatEnabled }, llm: {}, rerankerEnabled: saved.rerankerEnabled,
         pictureReadingEnabled: saved.pictureReadingEnabled, pictureReadingOverrideEnabled: saved.pictureReadingOverrideEnabled ?? null, witness });
