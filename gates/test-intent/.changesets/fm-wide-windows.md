@@ -74,3 +74,13 @@ split stage, remembered 360/450/600) pass on the base and on the candidate.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "72e21555-9705-4416-bd39-0f270c056e78",
+  "verdict": "accept",
+  "digest": "sha256:ea0b8f44b325310027b5b27bc31ecf07184103d87c50d9d1b7c7dfb8f21752f4"
+}
+```
