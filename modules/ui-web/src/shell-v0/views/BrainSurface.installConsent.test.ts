@@ -79,20 +79,22 @@ describe('composeInstallConsent', () => {
     expect(composeInstallConsent(manifest, preview).downloadTotal).toBe('10.14 GB');
   });
 
-  it('names the bytes a paused download left on disk, separately from what is still to fetch', () => {
-    const resuming = composeInstallConsent(manifest, {
+  it('with bytes an earlier download left staged, states the most it downloads, not that it resumes them (7b G2\')', () => {
+    const staged = composeInstallConsent(manifest, {
       ...preview,
       totalDownloadBytes: 9_750_000_000,
       resumableBytes: 1_140_000_000,
     });
-    expect(resuming.downloadTotal).toBe('9.08 GB');
-    expect(resuming.resumedTotal).toBe('1.06 GB');
+    // Reuse of the staged bytes is not guaranteed: "Up to" the whole 10_890_000_000 B.
+    expect(staged.upTo).toBe(true);
+    expect(staged.consentTotal).toBe('10.1 GB');
+    expect(staged).not.toHaveProperty('resumedTotal');
   });
 
-  it('claims no resumed bytes when the plan has none (the ordinary first-run case)', () => {
-    expect(composeInstallConsent(manifest, preview).resumedTotal).toBeNull();
-    expect(composeInstallConsent(manifest, { ...preview, resumableBytes: 0 }).resumedTotal).toBeNull();
-    expect(composeInstallConsent(manifest, null).resumedTotal).toBeNull();
+  it('says no "Up to" without staged bytes (the ordinary first-run case)', () => {
+    expect(composeInstallConsent(manifest, preview)).toMatchObject({ upTo: false, consentTotal: '10.1 GB' });
+    expect(composeInstallConsent(manifest, { ...preview, resumableBytes: 0 }).upTo).toBe(false);
+    expect(composeInstallConsent(manifest, null)).toMatchObject({ upTo: false, consentTotal: null });
   });
 
   it('tracks the preview instead of a fixed string (a different plan gives a different total)', () => {

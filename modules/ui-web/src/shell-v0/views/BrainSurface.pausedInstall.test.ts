@@ -98,9 +98,12 @@ describe('BrainSurface — idle panel over a paused download', () => {
     expect(text).not.toContain('Install AI models to get started');
   });
 
-  it('offers to resume rather than to start over', async () => {
+  // Slice 7b (G4') — a new install may or may not reuse the retained bytes, so the action promises
+  // no resuming: it is Install AI, and the bytes kept are said above it.
+  it('offers Install AI, never a promise to resume', async () => {
     const text = await renderFor(PAUSED);
-    expect(text).toContain('Resume Download');
+    expect(text).toContain('Install AI');
+    expect(text).not.toMatch(/Resume Download|resum/i);
   });
 
   it('a genuinely fresh install is untouched — still "AI isn\'t installed yet" / "Install AI"', async () => {

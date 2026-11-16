@@ -15,13 +15,9 @@
  * Two properties are load-bearing and are why the composition lives here rather than inline in a
  * template:
  *
- *  1. **`-1` is UNKNOWN, and an unknown segment is OMITTED.** `AiInstallStatus.bytesPerSecond` /
- *     `remainingSeconds` carry `-1` as an explicit sentinel and never `0` (see the field javadoc:
- *     "a fabricated `0 B/s` on a transfer that is merely young is the most confident lie the surface
- *     could tell"). {@link composeTransferLine} therefore builds its line the way `TaskList`'s
- *     counts-line does — every segment past the first is APPENDED and each is withdrawn ENTIRELY
- *     when there is no honest basis for it — reusing `humanizeSeconds`, the one duration formatter,
- *     rather than adding a second.
+ *  1. **`-1` is UNKNOWN.** `AiInstallStatus.bytesPerSecond` / `remainingSeconds` carry `-1` as an
+ *     explicit sentinel and never `0`; AI Brain's install flow (slice 7b, `installFlow.ts`) shows time
+ *     left only for a positive estimate.
  *
  *  2. **`unavailable` is not `declined`.** Hardware this machine lacks is not a choice the user
  *     made, so it gets the typed `unavailable{reason}` availability and NO control, while a
@@ -30,7 +26,6 @@
  */
 
 import { formatBytes } from '../display/format.js';
-import { humanizeSeconds } from './startupEstimate.js';
 import { AVAILABLE, unavailableBecause, type Availability } from './availability.js';
 import type { AiInstallStatus } from '../../api/generated/schema-types/ai-install-status.js';
 
@@ -280,30 +275,6 @@ export function composeComponentSummary(
   return bytes > 0 ? `${count} · ${formatBytes(bytes)} on disk` : count;
 }
 
-/**
- * The measured transfer line — rate and time remaining — or `null` when neither is known.
- *
- * Both inputs use `-1` as an explicit unknown sentinel and are reset to it on every non-running
- * state, so an ended run never leaves a rate describing a transfer that is no longer happening. A
- * `0` rate is treated as unknown too: it is not on the wire by contract, and rendering "0 B/s" over
- * a transfer that is merely young is exactly the lie the sentinel exists to prevent. `0` seconds
- * remaining IS a value (nothing left to move) and is rendered.
- */
-export function composeTransferLine(
-  status: Pick<AiInstallStatus, 'bytesPerSecond' | 'remainingSeconds'> | null | undefined,
-): string | null {
-  const segments: string[] = [];
-  const bps = status?.bytesPerSecond;
-  if (typeof bps === 'number' && bps > 0) {
-    segments.push(`${formatBytes(Math.round(bps))}/s`);
-  }
-  const remaining = status?.remainingSeconds;
-  if (typeof remaining === 'number' && remaining >= 0) {
-    segments.push(`~${humanizeSeconds(remaining)} left`);
-  }
-  return segments.length === 0 ? null : segments.join(' · ');
-}
-
 /** `AiInstallStatus.StageStatus.state` — the `StagedAcquisition.StageState` vocabulary plus `pending`. */
 type StageState =
   | 'pending'
@@ -377,30 +348,6 @@ export function composeStageRows(status: AiInstallStatus | null | undefined): St
       capabilities: s.capabilities ?? [],
     };
   });
-}
-
-/**
- * The capability id the retrieval core delivers (`CapabilityTier.RETRIEVAL_CORE.id()`), which the
- * CORE stage publishes on `StageStatus.capabilities` and `readyCapabilities` gains once that stage
- * has both ended in a configured state and landed every package it owns.
- */
-const RETRIEVAL_CORE_CAPABILITY = 'retrieval-core';
-
-/**
- * "You can search now, the rest is still downloading" — the entire point of the staged work, and
- * only sayable once the backend says the retrieval core is READY. Returns `null` while it is not, so
- * the surface stays silent rather than promising a capability that is not live.
- */
-export function searchReadyNotice(status: AiInstallStatus | null | undefined): string | null {
-  const ready = status?.readyCapabilities ?? [];
-  if (!ready.includes(RETRIEVAL_CORE_CAPABILITY)) return null;
-  const stages = composeStageRows(status);
-  const remaining = stages.filter((s) => s.state === 'pending' || s.state === 'running');
-  return remaining.length === 0
-    ? 'Search is ready.'
-    : `Search is ready — you can use it now while the rest downloads (${remaining
-        .map((s) => s.label)
-        .join(', ')}).`;
 }
 
 /**

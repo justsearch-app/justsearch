@@ -525,12 +525,12 @@ export function aiEngineBody(v: AiEngineVerdict): string {
     case 'not_installed':
       return 'Install AI models to get started.';
     case 'paused':
-      // The number is the whole point: the pause dialog promised the bytes would stay, so the idle
-      // surface has to be able to show that they did. Falls back to the unquantified claim only if
-      // the backend somehow reported a paused state without a byte count.
+      // The number is the whole point: the bytes stayed, and the idle surface shows that they did.
+      // G4' (slice 7b) — whether a later download reuses them is not guaranteed, so nothing here
+      // promises that it continues from them.
       return v.resumableBytes && v.resumableBytes > 0
-        ? `${formatBytes(v.resumableBytes)} already downloaded is kept on disk — resuming continues from there.`
-        : 'An earlier download is paused — resuming continues from where it stopped.';
+        ? `${formatBytes(v.resumableBytes)} already downloaded is kept on disk.`
+        : 'An earlier download is paused. What it downloaded is kept on disk.';
     case 'installing':
       return 'Downloading models.';
     case 'install_failed':

@@ -569,14 +569,13 @@ describe('presentAiEngineVerdict (Design pass 3 — the presentation projection)
       resumableBytes: 1_140_000_000,
     });
     expect(p.headline).toBe('Download Paused');
-    expect(p.body).toBe(
-      '1.06 GB already downloaded is kept on disk — resuming continues from there.',
-    );
+    // Slice 7b G4' — what is kept, without promising a later download continues from it.
+    expect(p.body).toBe('1.06 GB already downloaded is kept on disk.');
   });
 
   it('paused without a byte count still says the download is paused, never invents a number', () => {
     const p = presentAiEngineVerdict(verdictFor('paused'));
-    expect(p.body).toBe('An earlier download is paused — resuming continues from where it stopped.');
+    expect(p.body).toBe('An earlier download is paused. What it downloaded is kept on disk.');
   });
 
   it('install_failed says in words what went wrong and what to do; the service\'s own text is not the body (FC11)', () => {

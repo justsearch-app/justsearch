@@ -195,7 +195,7 @@ describe('Advanced settings - Downloaded files', () => {
     expect(el.installConsentOpen).toBe(true);
     expect(paths.some(p => p.endsWith('/api/ai/install/plan-preview?include=chat'))).toBe(true);
     const dialog = el.shadowRoot!.querySelector('[data-testid="install-consent-dialog"]')!;
-    expect(text(dialog)).toContain('1.0 KB');
+    expect(text(dialog)).toContain('1 KB');
     (dialog.querySelector('[label="Cancel"]') as unknown as { onActivate(): void }).onActivate(); await settle(el);
     expect(el.installConsentOpen).toBe(false);
     expect(declines).toEqual([]);

@@ -237,7 +237,7 @@ describe('AI Brain preservation: the page’s install flows (slice 7a)', () => {
     await press(el, 'Accept and download');
     expect(operations).toEqual(['core.start-ai-install']);
     el.remove(); store.current = firstInstallRunning(); el = await mount();
-    await press(el, 'Pause download');
+    await press(el, 'Pause'); // slice 7b fm-12 names it Pause
     expect(posts.filter(p => p.endsWith('/install/pause'))).toHaveLength(1);
     await press(el, 'Cancel');
     expect(operations).toEqual(['core.start-ai-install', 'core.cancel-ai-install']);

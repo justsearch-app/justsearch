@@ -27,7 +27,10 @@ it('text, corners and bundled variable Inter follow the type ladder under the de
     // (164 on main after slice 6a, minus 18 = 146 on main after 7a).
     // Slice 6b-1: the fixture's one watched folder adds its Library row disclosure and the Read
     // everything again ask, each in dark and light (+4): 150.
-    expect(summary.surfaces).toBe(150);
+    // Slice 7b (fm-12): the fixture's Brain is a first install that runs, and during it the install
+    // view is the page: no steps or Advanced settings to open, so Brain is 1 view per theme, not 5
+    // (−8): 142. The install view is audited on the same ladders in BrainInstall.focus-lockdown.
+    expect(summary.surfaces).toBe(142);
     const inventory = JSON.parse(await readFile(path.join(evidence, 'results.json'), 'utf8')) as {
       checks: { id: string; result: string; textElements?: number }[];
     };

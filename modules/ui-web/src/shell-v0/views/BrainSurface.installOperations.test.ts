@@ -25,6 +25,9 @@ async function click(el: Brain, label: string) {
   return native;
 }
 
+/** Slice 7b — the run's heading, and whether the page says the run is paused. */
+const progressWords = (el: HTMLElement) => `${el.shadowRoot!.querySelector('.brain-headline')!.textContent}${el.shadowRoot!.querySelector('.flow-paused') ? ' · Paused' : ''}`;
+
 describe('install operation observations through the real poller and store', () => {
   it.each(['Pause', 'Resume'])('%s waits for the requested store read and releases busy state while it hangs', async action => {
     vi.useFakeTimers(); __resetAiStateForTest();
@@ -53,15 +56,15 @@ describe('install operation observations through the real poller and store', () 
     }));
     startAiStateStore(''); const first = await mount(); const second = await mount();
     expect(installReads).toBe(1);
-    const native = await click(first, `${action} download`);
+    const native = await click(first, action);
     // A hung follow-up read must release the actual shared button's busy state.
     expect(native.disabled).toBe(false);
     expect(installReads).toBe(2);
-    for (const el of [first, second]) expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent)
-      .toBe(action === 'Pause' ? 'Installing… 25%' : 'Paused 25%');
+    for (const el of [first, second]) expect(progressWords(el))
+      .toBe(action === 'Pause' ? 'Installing AI · 25%' : 'Installing AI · 25% · Paused');
     release!(); await advance(0, first); await second.updateComplete;
-    for (const el of [first, second]) expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent)
-      .toBe(action === 'Pause' ? 'Paused 25%' : 'Installing… 25%');
+    for (const el of [first, second]) expect(progressWords(el))
+      .toBe(action === 'Pause' ? 'Installing AI · 25% · Paused' : 'Installing AI · 25%');
     const retained = getAiState().installStatus;
     fail = true; await advance(1000, first); await second.updateComplete;
     expect(getAiState().installStatus).toBe(retained);
@@ -71,8 +74,8 @@ describe('install operation observations through the real poller and store', () 
     for (const el of [first, second, reloaded]) {
       expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Checking AI status…');
       expect(el.shadowRoot!.querySelector('.progress-bar')).toBeNull();
-      expect(el.shadowRoot!.querySelector('[data-testid="install-staged-progress"]')).toBeNull();
-      expect(el.shadowRoot!.querySelector('[label="Pause download"], [label="Resume download"]')).toBeNull();
+      expect(el.shadowRoot!.querySelector('[data-testid="install-flow"] ul[aria-label="Parts"]')).toBeNull();
+      expect(el.shadowRoot!.querySelector('[label="Pause"], [label="Resume"]')).toBeNull();
       expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).toBeNull();
       expect(el.shadowRoot!.textContent).not.toMatch(/Downloading 25%|Preparing download|Download stalled/);
     }
@@ -80,7 +83,7 @@ describe('install operation observations through the real poller and store', () 
     await advance(3000, second); expect(getAiState().installObservationLive).toBe(false);
     fail = false; await advance(1000, second); await reloaded.updateComplete;
     for (const el of [second, reloaded]) {
-      expect(el.shadowRoot!.querySelector('[label="Pause download"], [label="Resume download"]')).not.toBeNull();
+      expect(el.shadowRoot!.querySelector('[label="Pause"], [label="Resume"]')).not.toBeNull();
       expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).not.toBeNull();
       expect(el.shadowRoot!.querySelector('.progress-bar')).not.toBeNull();
     }
@@ -113,7 +116,7 @@ describe('install operation observations through the real poller and store', () 
     startAiStateStore(''); const first = await mount(); const second = await mount();
     expect(installReads).toBe(1);
     fail = true;
-    await click(first, `${action} download`);
+    await click(first, action);
     await advance(1000, first); // Baseline reaches its ordinary poll; candidate already requested it.
     expect(release).toBeTypeOf('function');
     release!(); await advance(0, first);
@@ -126,8 +129,8 @@ describe('install operation observations through the real poller and store', () 
     for (const el of [first, second, reloaded]) {
       expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Checking AI status…');
       expect(el.shadowRoot!.querySelector('.progress-bar')).toBeNull();
-      expect(el.shadowRoot!.querySelector('[data-testid="install-staged-progress"]')).toBeNull();
-      expect(el.shadowRoot!.querySelector('[label="Pause download"], [label="Resume download"]')).toBeNull();
+      expect(el.shadowRoot!.querySelector('[data-testid="install-flow"] ul[aria-label="Parts"]')).toBeNull();
+      expect(el.shadowRoot!.querySelector('[label="Pause"], [label="Resume"]')).toBeNull();
       expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).toBeNull();
       expect(el.shadowRoot!.textContent).not.toMatch(/Downloading 25%|Preparing download|Download stalled/);
     }
@@ -135,7 +138,7 @@ describe('install operation observations through the real poller and store', () 
     await advance(3000, second); expect(getAiState().installObservationLive).toBe(false);
     fail = false; await advance(1000, second); await reloaded.updateComplete;
     for (const el of [second, reloaded]) {
-      expect(el.shadowRoot!.querySelector('[label="Pause download"], [label="Resume download"]')).not.toBeNull();
+      expect(el.shadowRoot!.querySelector('[label="Pause"], [label="Resume"]')).not.toBeNull();
       expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).not.toBeNull();
       expect(el.shadowRoot!.querySelector('.progress-bar')).not.toBeNull();
     }

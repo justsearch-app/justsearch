@@ -94,8 +94,8 @@ describe('BrainSurface — install progress reads the wire aggregate, not the pe
     expect(bar?.style.width).toBe('50%');
 
     const text = el.shadowRoot?.textContent ?? '';
-    expect(text).toContain('2.79 GB');
-    expect(text).toContain('5.59 GB');
+    // Slice 7b — amounts in the unit of the whole, one decimal for a total (fm-12 "1.3 of 2.6 GB").
+    expect(text).toContain('2.8 of 5.6 GB');
     document.body.removeChild(el);
   });
 });

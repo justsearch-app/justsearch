@@ -331,8 +331,9 @@ describe('Brain step 1 review repairs', () => {
     expect(el.shadowRoot!.querySelector('[data-testid="install-pending-registry-additions"]')!.textContent).toContain('run Install');
     await clickButton(el, 'Install additions · 1.0 KB');
     expect(el.installConsentOpen).toBe(true);
-    expect(el.shadowRoot!.querySelector('dialog')!.textContent).toContain('reranker');
-    expect(el.shadowRoot!.querySelector('dialog')!.textContent).not.toContain('splade');
+    // Slice 7b G2 — consent rows carry the page's part names.
+    expect(el.shadowRoot!.querySelector('dialog')!.textContent).toContain('Best match first');
+    expect(el.shadowRoot!.querySelector('dialog')!.textContent).not.toContain('Related words');
     expect(calls).toEqual([]);
     await clickButton(el, 'Accept and download');
     expect(calls).toContainEqual({ id: 'core.start-ai-install', args: { acceptTerms: true } });

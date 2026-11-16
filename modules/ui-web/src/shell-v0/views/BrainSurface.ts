@@ -66,12 +66,24 @@ import { unavailableBecause, AVAILABLE } from '../state/availability.js';
 import {
   composeComponentGroups,
   composeComponentSummary,
-  composeStageRows,
-  composeTransferLine,
-  friendlyInstallMessage,
-  searchReadyNotice,
   type ComponentRow,
 } from '../state/installComponents.js';
+// Slice 7b — the install flow's words (fm-11, fm-12, fm-12b): part names, sizes, part states.
+import {
+  composePartRows,
+  formatAmountOf,
+  formatPartSize,
+  formatTimeLeft,
+  formatTotalSize,
+  partName,
+  phaseWords,
+  stoppedRunId,
+  dismissStoppedRun,
+  dismissedStoppedRun,
+  reportPageStoppedRun,
+  subscribeStoppedRun,
+  type DoneEvidence,
+} from '../state/installFlow.js';
 import '../components/Control.js';
 // Tempdoc 613 — coherence: the compat callout words its cause from the ONE canonical reindex
 // vocabulary (the same `reasonFor`/CAUSE_ROWS the Chat degradation banner + 595 verdict use),
@@ -509,12 +521,12 @@ export interface InstallConsentContent {
    */
   downloadTotal: string | null;
   /**
-   * Sandbox round 8 — formatted bytes an interrupted earlier download left on disk, which this
-   * install resumes rather than re-fetches. `null` when there is no paused download (the common
-   * first-run case) or the preview has not resolved. `downloadTotal` already EXCLUDES these bytes,
-   * so the two numbers add up to the full model footprint rather than double-counting it.
+   * Slice 7b (G2') — the consent's own total, in its sizes (2.6 GB, 341 MB). With bytes an earlier
+   * download left staged, reuse is not guaranteed, so this is the most the install can download
+   * (the staged bytes included) and `upTo` is true.
    */
-  resumedTotal: string | null;
+  consentTotal: string | null;
+  upTo: boolean;
   packages: InstallConsentPackage[];
   /** True when the manifest has not resolved (or declares no packages) — nothing to show. */
   termsUnavailable: boolean;
@@ -547,12 +559,9 @@ export function composeInstallConsent(
   const downloadTotal =
     typeof totalBytes === 'number' && totalBytes > 0 ? formatBytes(totalBytes) : null;
 
-  // Sandbox round 8 — the pause dialog promises the already-downloaded bytes stay and the next
-  // install resumes from them; this dialog then quoted the FULL footprint as if they were gone.
-  // The planner now reports them (`InstallPlan.resumableBytes`), so the consent states them too.
-  const resumedBytes = preview?.resumableBytes;
-  const resumedTotal =
-    typeof resumedBytes === 'number' && resumedBytes > 0 ? formatBytes(resumedBytes) : null;
+  // G2' — staged bytes may be reused or not: the consent then states the most it downloads.
+  const staged = typeof preview?.resumableBytes === 'number' && preview.resumableBytes > 0 ? preview.resumableBytes : 0;
+  const consentTotal = typeof totalBytes === 'number' && totalBytes > 0 ? formatTotalSize(totalBytes + staged) : null;
 
   const excludedTiers = new Set(
     (preview?.tiers ?? [])
@@ -580,7 +589,7 @@ export function composeInstallConsent(
       termsUrl: p.termsUrl ?? null,
     }));
 
-  return { downloadTotal, resumedTotal, packages, termsUnavailable: !manifest?.packages?.length };
+  return { downloadTotal, consentTotal, upTo: staged > 0, packages, termsUnavailable: !manifest?.packages?.length };
 }
 
 /**
@@ -669,6 +678,8 @@ export class BrainSurface extends JfElement {
   private clientRef: OperationClient | null = null;
   private _unifiedAiState: UnifiedAiState | null = null;
   private unsubAi: (() => void) | null = null;
+  /** G5' — the window's "Cancel install" of a stopped run (installFlow.ts), shared with the top bar. */
+  private unsubStoppedRun: (() => void) | null = null;
   private uiModeUnsub: (() => void) | null = null;
   private rerankerSettings: SettingsV2 | null = null;
   private rerankerUncertain = false;
@@ -705,6 +716,21 @@ export class BrainSurface extends JfElement {
   /** Whether answers work here, as last observed; an unknown observation keeps it (AM1). */
   private answersShown = false;
   private focusHeadlinePending = false;
+  /** Slice 7b — when this page first saw each part of the current run reported installed (G3'). */
+  private readonly installedSeenAt = new Map<string, number>();
+  private installRunStart: number | null = null;
+  /** When the model-presence request behind `modelPresence` began; null while presence is unknown. */
+  private presenceRequestedAt: number | null = null;
+  private presenceInFlight = false;
+  private presenceAgain = false;
+  /** Whether this page saw an installed AI before a run ended without it (an existing installation). */
+  private installedEarlier = false;
+  private installFlowView: string | null = null;
+  private installFlowFocus: 'headline' | 'pause' | null = null;
+  /** The stopped run "Try again" left: focus waits for a run other than it. */
+  private retryFrom: string | null = null;
+  private installAnnouncementKey = '';
+  private installAnnouncement = '';
   private focusHeadlineVisit = 0;
   declare planLoading: boolean;
   declare planError: string | null;
@@ -1005,9 +1031,10 @@ export class BrainSurface extends JfElement {
       border-radius: 8px;
     }
     .consent-terms li {
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto auto;
       align-items: baseline;
-      gap: 0.5rem;
+      gap: 0.75rem;
       padding: 0.4rem 0.625rem;
       font-size: var(--font-size-sm);
       border-bottom: 1px solid var(--border-subtle);
@@ -1019,10 +1046,10 @@ export class BrainSurface extends JfElement {
       flex: 1;
       min-width: 0;
     }
-    .consent-license {
-      font-family: monospace;
-      font-size: var(--font-size-xs);
+    .consent-license, .consent-size {
+      font-size: var(--font-size-secondary);
       color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
     }
     .consent-terms a {
       color: var(--text-primary);
@@ -1175,33 +1202,6 @@ export class BrainSurface extends JfElement {
     .component-toggle[data-on='true'] .component-switch-thumb {
       background: var(--accent-on-tint);
     }
-    /* Staged acquisition — which stage is running, and what it is waiting on. */
-    .stage-block {
-      margin-top: 0.75rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-    .stage-transfer {
-      font-size: var(--font-size-xs);
-      color: var(--text-secondary);
-      font-family: monospace;
-    }
-    .stage-ready {
-      font-size: var(--font-size-xs);
-      color: var(--text-success);
-    }
-    .stage-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.5rem;
-      font-size: var(--font-size-xs);
-      color: var(--text-secondary);
-      margin-bottom: 0.25rem;
-    }
-    .stage-label {
-      color: var(--text-primary);
-    }
     /* fm-10 / fm-13 / fm-14 — one centred column; the heading, one sentence, the steps, then the links. */
     .body { padding: 1.625rem 2.75rem 2rem; gap: 0; min-width: 0; overflow-wrap: anywhere; box-sizing: border-box; width: 100%; max-width: 960px; margin-inline: auto; }
     .body > * + * { margin-top: 1rem; }
@@ -1210,6 +1210,27 @@ export class BrainSurface extends JfElement {
     .brain-status-detail, .step-meta { font-size: var(--font-size-secondary); color: var(--text-secondary); line-height: 1.4; }
     .brain-status-detail { margin-top: 0.5rem; }
     .install-row { margin-top: 1rem; gap: 0.875rem; }
+    /* Slice 7b — fm-12 / fm-12b: one bar, one line of amounts, one row per part, the actions together. */
+    .install-flow { margin-top: 1.5rem; }
+    .install-flow .flow-bar { height: 0.375rem; border-radius: 4px; }
+    .install-flow .flow-bar .progress-bar { border-radius: 4px; }
+    .install-flow.stopped .progress-bar { background: var(--text-tertiary, var(--text-secondary)); }
+    .flow-line { margin-top: 0.75rem; font-size: var(--font-size-secondary); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+    .flow-paused { margin: 0.5rem 0 0; font-size: var(--font-size-sm); color: var(--text-primary); }
+    .flow-parts { list-style: none; margin: 1rem 0 0; padding: 0; border-top: 1px solid var(--border-subtle); }
+    .flow-part { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.6fr); gap: 0.75rem; align-items: center;
+      padding: 0.75rem 0; border-bottom: 1px solid var(--border-subtle); font-size: var(--font-size-sm); }
+    .consent-pkg small { display: block; font-size: var(--font-size-secondary); color: var(--text-secondary); }
+    .flow-part-state { display: inline-flex; align-items: center; gap: 0.375rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+    .flow-part.done .flow-part-state jf-icon, .flow-part.done .flow-part-state svg { color: var(--text-success); }
+    .flow-part-bar { height: 0.25rem; border-radius: 4px; }
+    .flow-part-bar .progress-bar { border-radius: 4px; }
+    .install-flow.stopped .flow-part-bar .progress-bar { background: var(--text-secondary); }
+    .flow-actions { margin-top: 1rem; gap: 0.875rem; }
+    .flow-detail { margin-top: 1rem; font-size: var(--font-size-secondary); color: var(--text-secondary); }
+    .flow-detail summary { cursor: pointer; }
+    .flow-detail p { margin: 0.5rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
     .install-note { font-size: var(--font-size-sm); color: var(--text-secondary); }
     button.step-info, .brain-links button, .feature-panel button {
       border: 0; border-radius: 0; padding: 0; background: transparent; color: var(--text-primary); font: inherit; font-weight: 500;
@@ -1319,16 +1340,7 @@ export class BrainSurface extends JfElement {
       button.feature-switch span, .component-switch-thumb { background: CanvasText; }
       .component-toggle[data-on='true'] .component-switch-thumb { background: HighlightText; }
     }
-    .stage-blocked {
-      margin-top: 0.25rem;
-      font-size: var(--font-size-xs);
-      color: var(--text-warning);
-    }
     :host .error-code { display: block; }
-    :host .download-progress { margin-top: 1rem; }
-    :host .download-totals { margin-top: 0.5rem; display:flex; justify-content:space-between; font-size: var(--font-size-xs); color: var(--text-secondary); }
-    :host .download-detail { margin-top: 0.25rem; font-size: var(--font-size-xs); color: var(--text-secondary); }
-    :host .download-actions { margin-top: 0.75rem; }
     :host .warning-section { border-color: var(--accent-warning-45); background: var(--accent-warning-08); }
     :host .status-layout { display: flex; gap: 0.625rem; align-items: flex-start; }
     :host .status-content { flex: 1; }
@@ -1388,6 +1400,7 @@ export class BrainSurface extends JfElement {
     // Tempdoc 586 §3 — the shared aiStateStore is the single observed-state authority
     // for inference + system status (aiStateStore.ts §B7); mirror its snapshots here
     // instead of running a second poll for them.
+    this.unsubStoppedRun = subscribeStoppedRun(() => this.requestUpdate());
     this.unsubAi = subscribeAiState((s) => {
       this._unifiedAiState = s;
       // Adopt only non-null snapshots: the store retains its last-known snapshot when
@@ -1403,9 +1416,16 @@ export class BrainSurface extends JfElement {
       // conditionally-armed pollInstall/pollPack/pollRuntime timers (which only ever self-armed
       // AFTER a prior fetch had already succeeded — the structural cause of the "stuck on
       // Connecting… forever" bug, tempdoc 663 §O). Same non-null-adopt rule as inference/status.
+      // A running model exists only after an activated install, so it marks an existing installation too.
+      if (s.installStatus?.installedFully === true || s.runtime?.installed?.known === true && s.runtime.installed.value
+        || s.runtimeStatus?.onnxFeatures?.some(f => f.modelActive === true) === true
+        || ['online', 'background', 'indexing', 'starting', 'offline'].includes(s.aiEngine?.kind ?? '')) {
+        this.installedEarlier = true;
+      }
       if (s.installStatus) {
         const previous = this.installStatus;
         this.installStatus = s.installStatus;
+        this.observeInstallParts(s.installStatus);
         if ((previous?.state !== s.installStatus.state && previous != null)
           || (previous?.phase === 'activation_required' && s.installStatus.phase !== 'activation_required')) {
           void this.refreshInstallPlanPreview();
@@ -1460,6 +1480,7 @@ export class BrainSurface extends JfElement {
     super.willUpdate(changed);
     const answers = this.answersWorkNow();
     if (answers !== null) this.answersShown = answers;
+    this.followInstallFlow();
     // Back to Overview where there is no tab row: the tab or Memory that had focus is gone (AM7).
     const previousTab = changed.get('activeTab') as string | undefined;
     if (changed.has('activeTab') && previousTab !== undefined && previousTab !== 'runtime'
@@ -1481,9 +1502,72 @@ export class BrainSurface extends JfElement {
     }
   }
 
+  /**
+   * S7b-9 — when the install flow changes (a run ends, stops, or starts again) and focus was in it,
+   * focus moves to what now stands there: Pause for a run, otherwise the heading. Progress is
+   * announced politely, once per tenth and once per change of state.
+   */
+  private followInstallFlow(): void {
+    const flow = this.installFlow();
+    const view = flow ? `${flow.view}:${flow.id}` : null;
+    if (view !== this.installFlowView) {
+      if (this.installFlowFocus === null) {
+        const active = deepActiveElement();
+        const block = this.shadowRoot?.querySelector('.install-flow');
+        const lost = !active || active === this.ownerDocument.body || !active.isConnected;
+        // fm-12, fm-12b — the install view stands alone: the steps and the rest of the page leave
+        // with it, so focus anywhere on this page moves to what now stands there.
+        const shown = this.installFlowView === null && active != null && active !== this.ownerDocument.body
+          && composedWithin(active, this) && this.installViewAlone(flow);
+        if (this.installFlowView !== null ? lost || (block != null && composedWithin(active!, block)) : shown) {
+          this.installFlowFocus = flow?.view === 'running' ? 'pause' : 'headline';
+        }
+      }
+      this.installFlowView = view;
+    }
+    reportPageStoppedRun(flow?.view === 'stopped' ? flow.id : null);
+    let key = '';
+    let words = '';
+    if (flow?.view === 'stopped') {
+      key = `stopped:${flow.id}`;
+      words = 'The download stopped';
+    } else if (flow && this.installStatus?.paused === true) {
+      key = `paused:${flow.id}`;
+      words = 'Paused. The file being downloaded may still finish.';
+    } else if (flow) {
+      const pct = this.installPercent();
+      const tenth = pct === null ? -1 : Math.floor(pct / 10) * 10;
+      key = `running:${flow.id}:${tenth}`;
+      words = tenth < 0 ? 'Installing AI' : `Installing AI, ${tenth}%`;
+    }
+    if (key !== this.installAnnouncementKey) {
+      this.installAnnouncementKey = key;
+      this.installAnnouncement = words;
+    }
+  }
+
+  private installPercent(): number | null {
+    const done = this.installStatus?.downloadedBytes ?? 0;
+    const total = this.installStatus?.totalBytes ?? 0;
+    return !this.installPlanPending() && total > 0 ? Math.min(100, Math.floor((done / total) * 100)) : null;
+  }
+
   /** 574 §22.G — drive the modal contract from the declarative `installConsentOpen` state. */
   protected override updated(changed: Map<string, unknown>): void {
     super.updated(changed);
+    const flow = this.installFlowFocus === 'pause' ? this.installFlow() : null;
+    const waiting = this.installFlowFocus === 'pause' && this.retryFrom !== null
+      && !(flow?.view === 'running' && flow.id !== this.retryFrom);
+    if (this.installFlowFocus && !waiting) {
+      this.retryFrom = null;
+      const target = this.installFlowFocus === 'pause'
+        ? this.shadowRoot?.querySelector<HTMLElement & { updateComplete?: Promise<boolean> }>('jf-button.flow-pause')
+        : this.shadowRoot?.querySelector<HTMLElement & { updateComplete?: Promise<boolean> }>('.brain-headline');
+      if (target) {
+        this.installFlowFocus = null;
+        void Promise.resolve(target.updateComplete).then(() => target.focus({ preventScroll: true }));
+      }
+    }
     if (this.focusHeadlinePending) {
       this.focusHeadlinePending = false;
       // The heading is drawn through the tab host's slot: focus it only once the host has drawn the
@@ -1548,6 +1632,11 @@ export class BrainSurface extends JfElement {
     ++this.refreshRevision;
     ++this.planRevision;
     this.unsubAi?.();
+    this.unsubStoppedRun?.();
+    this.unsubStoppedRun = null;
+    // Without this page the top bar decides from the install status alone.
+    if (this.installFlowView?.startsWith('stopped:')) reportPageStoppedRun(null);
+    this.installFlowView = null;
     this.uiModeUnsub?.();
     this.uiModeUnsub = null;
     this.memberTabUnsub?.();
@@ -1673,7 +1762,7 @@ export class BrainSurface extends JfElement {
     // A first install that runs has files still to come, not an installed AI missing a file (AM4).
     const firstInstallRunning = this.installStatus?.state === 'running' && this.installStatus.installedFully !== true;
     return this.installStatus?.installedFully === true
-      || (!firstInstallRunning && this.installStatus?.repairNeeded === true && this.installBegan())
+      || (!firstInstallRunning && this.repairEvidence())
       || ['online', 'background', 'indexing', 'starting', 'offline'].includes(this._unifiedAiState?.aiEngine?.kind ?? '')
       || (this._unifiedAiState?.runtime?.installed?.known === true && this._unifiedAiState.runtime.installed.value);
   }
@@ -1697,7 +1786,105 @@ export class BrainSurface extends JfElement {
   /** The remedy this page owes: a missing file on a machine that never installed AI is Install AI's job. */
   private repairRemedy(): RepairRemedy {
     const remedy = deriveRepairRemedy(this.installStatus);
-    return remedy.kind === 'manual' || this.installBegan() ? remedy : { kind: 'none' };
+    return remedy.kind !== 'none' && this.repairEvidence() ? remedy : { kind: 'none' };
+  }
+
+  /**
+   * G6' — a repair is owed only to an installation: a final model file is on this computer (not a
+   * staged `.partial`, not supporting files alone). A run that just ended (failed or cancelled) counts
+   * its own missing files as needing repair; that says nothing of an installation unless this page
+   * saw one before, so a first install that stopped stays "not installed".
+   */
+  private repairEvidence(): boolean {
+    const status = this.installStatus;
+    if (status?.repairNeeded !== true && deriveRepairRemedy(status).kind !== 'manual') return false;
+    if (this.finalFilePresent() !== true) return false;
+    return !(status?.state === 'failed' || status?.state === 'cancelled') || this.installedEarlier;
+  }
+
+  /**
+   * A final model file on disk: the Engine's model presence lists one, the Engine's file-level
+   * completeness says an install completed (`installedFully`), or the runtime runs a model, which it
+   * loads only from a placed file (as the Engine verdicts of an installed AI say). Null while none of
+   * them is observed.
+   */
+  private finalFilePresent(): boolean | null {
+    if (this.installStatus?.installedFully === true
+      || this.runtimeStatus?.onnxFeatures?.some(f => f.modelActive === true)
+      || ['online', 'background', 'indexing', 'starting', 'offline'].includes(this._unifiedAiState?.aiEngine?.kind ?? '')) return true;
+    const packages = this.modelPresence?.packages;
+    if (!packages) return null;
+    return packages.some(p => p.complete || (p.presentVariantFiles?.length ?? 0) > 0);
+  }
+
+  private doneEvidence(): DoneEvidence {
+    return { installedSeenAt: this.installedSeenAt, presenceRequestedAt: this.presenceRequestedAt,
+      presence: this.modelPresence?.packages ?? null };
+  }
+
+  /**
+   * G3' — remembers when each part of the current run was first reported installed. A part newly
+   * reported so asks for model presence again: only an observation taken after that report may say
+   * the part's every file is placed.
+   */
+  private observeInstallParts(status: InstallStatus): void {
+    const start = status.startedAtEpochMs ?? 0;
+    if (start !== this.installRunStart) {
+      this.installRunStart = start;
+      this.installedSeenAt.clear();
+    }
+    let fresh = false;
+    for (const p of status.packages ?? []) {
+      const id = p.packageId ?? '';
+      if (!id) continue;
+      if (p.state !== 'installed') this.installedSeenAt.delete(id);
+      else if (!this.installedSeenAt.has(id)) {
+        this.installedSeenAt.set(id, Date.now());
+        fresh = true;
+      }
+    }
+    if (fresh) void this.refreshModelPresence();
+  }
+
+  private adoptPresence(presence: ModelPresence | null, requestedAt: number): void {
+    if (this.presenceRequestedAt !== null && requestedAt < this.presenceRequestedAt) return;
+    this.modelPresence = presence;
+    this.presenceRequestedAt = presence ? requestedAt : null;
+  }
+
+  private async refreshModelPresence(): Promise<void> {
+    if (this.presenceInFlight) {
+      this.presenceAgain = true;
+      return;
+    }
+    this.presenceInFlight = true;
+    try {
+      do {
+        this.presenceAgain = false;
+        const at = Date.now();
+        const presence = await this.fetchJson<ModelPresence>('/api/ai/models/status');
+        if (presence) this.adoptPresence(presence, at);
+      } while (this.presenceAgain && this.isConnected);
+    } finally { this.presenceInFlight = false; }
+  }
+
+  /**
+   * fm-12, fm-12b — the install view is the whole page for a first install and for a stopped
+   * download: the steps and the rest of the page return when it is gone. A repair or additions run
+   * over an existing installation keeps the steps, which say what still works.
+   */
+  private installViewAlone(flow = this.installFlow()): boolean {
+    if (flow?.view === 'stopped') return true;
+    return flow?.view === 'running' && this.installStatus?.installedFully !== true && !this.installedEarlier;
+  }
+
+  /** The install flow the page draws: a run (fm-12), a stopped download (fm-12b), or none. */
+  private installFlow(): { view: 'running' | 'stopped'; id: string } | null {
+    if (!this.pageKnown()) return null;
+    const kind = this.deriveAiEngineVerdict().kind;
+    if (kind === 'installing') return { view: 'running', id: `${this.installStatus?.startedAtEpochMs ?? 0}` };
+    const stopped = stoppedRunId(this.installStatus, this.doneEvidence());
+    return stopped !== null && stopped !== dismissedStoppedRun() ? { view: 'stopped', id: stopped } : null;
   }
 
   private packagePresent(id: string): boolean {
@@ -1858,6 +2045,8 @@ export class BrainSurface extends JfElement {
         : !live ? checkingSaid ? null : 'Unknown — checking AI status'
         : stopped && packageProgress != null && !present && (packageProgress.bytesDownloaded ?? 0) > 0 ? `Cancelled · ${formatBytes(packageProgress.bytesDownloaded ?? 0)} kept`
         : unavailable ? null
+        // S7b-6 — a part a stopped first install placed is on this computer before AI is installed.
+        : !installed && !running && this.packagePresent(packageId) ? 'Downloaded'
         : !component && !present ? 'Unknown — package status unavailable'
         : !installed || !runtimeControl && id !== 'meaning' ? null
         : !present ? 'Not downloaded'
@@ -1881,7 +2070,7 @@ export class BrainSurface extends JfElement {
       const bytes = unavailable ? null : id === 'chat' ? this.answerSize(component) : component?.totalBytes ?? null;
       features[id] = {
         id, label, selected, installed: present, active, availability: unavailable ? 'unavailable' : component ? 'available' : 'unknown',
-        note, size: bytes != null && bytes > 0 ? `${formatBytes(bytes)} download` : null,
+        note, size: bytes != null && bytes > 0 && !(!installed && !running && this.packagePresent(packageId)) ? `${formatBytes(bytes)} download` : null,
         switchable: !unavailable && (acquisitionControl || runtimeControl), switchWord, blockedReason,
         unreachable: unavailable ? this.unavailableWords(component) : null,
       };
@@ -2128,6 +2317,12 @@ export class BrainSurface extends JfElement {
   private packageDownloadSize(id: string): string {
     const bytes = this.planPreview?.components?.find(c => c.id === id)?.downloadBytes;
     return bytes != null && bytes >= 0 ? formatBytes(bytes) : 'size unknown';
+  }
+
+  /** A consent row's download, in the consent's sizes (G2'). */
+  private consentPartSize(id: string): string {
+    const bytes = this.planPreview?.components?.find(c => c.id === id)?.downloadBytes;
+    return bytes != null && bytes >= 0 ? formatPartSize(bytes) : 'size unknown';
   }
 
   private consentReady(): boolean {
@@ -2488,6 +2683,7 @@ export class BrainSurface extends JfElement {
       this.planLoading = true;
       this.planError = null;
       const include = this.installConsentOpen ? this.consentInclude : [];
+      const presenceAt = Date.now();
       const [preview, manifest, presence] = await Promise.all([
         this.fetchJson<InstallPlanPreview>(include.length > 0
           ? `/api/ai/install/plan-preview?include=${include.map(encodeURIComponent).join(',')}`
@@ -2497,7 +2693,7 @@ export class BrainSurface extends JfElement {
       ]);
       if (revision !== this.planRevision || choice !== this.choiceRevision) return;
       this.planPreview = preview;
-      this.modelPresence = presence;
+      this.adoptPresence(presence, presenceAt);
       this.manifest = manifest;
       this.planLoading = false;
       if (!preview || !manifest) this.planError = 'Download sizes and licences could not be loaded. Retry to review the download.';
@@ -2528,6 +2724,7 @@ export class BrainSurface extends JfElement {
    * ends the run — could never be.
    */
   private async setInstallPaused(paused: boolean): Promise<void> {
+    if (this.busy['install-pause'] || this.busy['install-resume']) return;
     await this.withBusy(paused ? 'install-pause' : 'install-resume', async () => {
       this.runtimeError = null;
       const data = await this.fetchJson<InstallStatus>(
@@ -2600,11 +2797,40 @@ export class BrainSurface extends JfElement {
       if (data) {
         void refreshAiInstallNow();
         // The install finished first: nothing stopped, so the refreshed status is the whole outcome.
+        // G4' — it says what is kept, never that a later install continues where this one stopped.
         if (data.alreadyCompleted !== true) {
-          emitEphemeralToast({ message: 'Download paused. Everything downloaded so far is kept, and installing again resumes where it stopped.' });
+          emitEphemeralToast({ message: 'Install cancelled. Completed parts stay on this computer.' });
         }
       }
     });
+  }
+
+  /**
+   * G5' — "Try again" starts a new run of the plan the person accepted; the Engine plans only what
+   * is still missing and reuses what it can, which the words do not promise.
+   */
+  private async retryInstall(): Promise<void> {
+    if (this.installStatus?.state === 'running' || this.pendingActions.size > 0 || this.removalRunning()) return;
+    this.installFlowFocus = 'pause';
+    this.retryFrom = `${this.installStatus?.startedAtEpochMs ?? 0}`;
+    await this.withBusy('install-start', async () => {
+      this.runtimeError = null;
+      const data = (await this.invokeOp('core.start-ai-install', { acceptTerms: true })) as InstallStatus;
+      if (data) void refreshAiInstallNow();
+      else {
+        this.installFlowFocus = null;
+        this.retryFrom = null;
+      }
+    });
+  }
+
+  /** G5' — closes this failed run's stopped view; the page then says what is on disk. */
+  private dismissStoppedInstall(): void {
+    const flow = this.installFlow();
+    if (flow?.view !== 'stopped') return;
+    dismissStoppedRun(flow.id);
+    this.installFlowFocus = 'headline';
+    void this.refreshInstallPlanPreview();
   }
 
   private async repairInstall(): Promise<void> {
@@ -2905,18 +3131,11 @@ export class BrainSurface extends JfElement {
         label: aiEngineHeadline(aiVerdict),
         sub: aiEngineBody(aiVerdict),
       },
+      // Slice 7b (fm-12) — the heading and sentence of a run; its parts are named in the install flow.
       installing: {
         dot: 'installing',
-        label: this.installStatus?.paused === true ? 'Paused' : 'Installing…',
-        // Tempdoc 840 Phase 5 (U5) — the backend's own message names the download's target PATH
-        // ("Downloading onnx/gte-multilingual-base/model.onnx..."), which reads as machine noise next
-        // to a component list of friendly labels. Map it onto the component's label; the raw phase
-        // remains the fallback when there is no in-flight package to name.
-        sub:
-          friendlyInstallMessage(this.installStatus?.message, this.installStatus?.packages) ||
-          (this.installStatus?.phase
-            ? `Phase: ${this.installStatus.phase.replace(/_/g, ' ')}`
-            : 'Downloading models'),
+        label: 'Installing AI',
+        sub: 'Search by exact words keeps working while this runs.',
       },
       // Tempdoc 663 §E — install failure was previously unrepresented as a lifecycle state (folded
       // silently into a generic 'offline'/'not_installed' render, with only a separate dismissable
@@ -2986,9 +3205,7 @@ export class BrainSurface extends JfElement {
         }
       : statusConfig[aiState] ?? statusConfig.offline!;
 
-    const bytesDone = this.installStatus?.downloadedBytes ?? 0;
-    const bytesTotal = this.installStatus?.totalBytes ?? 0;
-    const pct = !this.installPlanPending() && bytesTotal > 0 ? Math.min(100, Math.floor((bytesDone / bytesTotal) * 100)) : null;
+    const pct = this.installPercent();
 
     // Tempdoc 663 Stage 3 — the primary action's availability is now typed (596), not a bare boolean.
     // Only the two states with a genuine, showable reason (a policy gate) use `unavailableBecause`; the
@@ -3008,13 +3225,14 @@ export class BrainSurface extends JfElement {
         };
       }
       switch (aiState) {
-        // `paused` shares the install action but not its label: "Install AI" over a half-downloaded
-        // 10 GB reads as "start over", which is the very fear the pause dialog set out to remove.
+        // G4' (slice 7b) — over bytes an earlier download left, the action starts a new install that
+        // may or may not reuse them, so it is "Install AI" with the most it can download, never a
+        // promise to resume.
         case 'paused':
         case 'not_installed':
         case 'install_failed':
           return {
-            label: aiState === 'paused' ? 'Resume Download' : 'Install AI',
+            label: 'Install AI',
             iconName: 'hard-drive' as const,
             onClick: () => void this.startInstall(),
             availability: downloadsDisabled
@@ -3115,9 +3333,16 @@ export class BrainSurface extends JfElement {
     const processorOnly = this.runtimeStatus?.active?.gpuLayers === 0;
     const reindexRequired = this.systemStatus?.embedding?.compatState === 'BLOCKED_LEGACY'
       || this.systemStatus?.embedding?.compatState === 'BLOCKED_MISMATCH';
+    // G5' — a failed run with parts missing is a stopped download (fm-12b) until "Cancel install"
+    // closes it; after that the page says what is on disk.
+    const flow = this.installFlow();
+    const alone = this.installViewAlone(flow);
+    const stopped = flow?.view === 'stopped';
+    const dismissed = known && aiState === 'install_failed'
+      && dismissedStoppedRun() === `${this.installStatus?.startedAtEpochMs ?? 0}:failed`;
     // FC11a — a failed install is said as failed, whatever its files on disk would owe a repair: after
     // it, nothing usable is installed until it runs again, and the verdict's words say what to do.
-    const failed = known && aiState === 'install_failed';
+    const failed = known && aiState === 'install_failed' && !stopped && !dismissed;
     const meaning = features.meaning.active;
     const answers = this.answersWorkNow();
     // D3/AM3 — the heading says what works. Failure, repair, activation and policy headings stay; a
@@ -3127,7 +3352,13 @@ export class BrainSurface extends JfElement {
       if (!known) return ['Checking AI status…', (this.systemStatus ?? this._unifiedAiState?.status)?.inference?.procedure === 'VDU_BATCH'
         ? 'Pictures were being read when last observed; current answer availability is unconfirmed.'
         : 'Waiting for live install and AI observations.'];
-      if (aiState === 'installing' || failed || aiState === 'paused') return [sc.label, sc.sub];
+      if (stopped) return ['The download stopped', 'Completed parts stay on this computer, and search by exact words keeps working.'];
+      if (aiState === 'installing') return [pct !== null ? `${sc.label} · ${pct}%` : sc.label, sc.sub];
+      if (failed || aiState === 'paused') return [sc.label, sc.sub];
+      // G6' — a missing file is owed a repair only with a final file on disk; unobserved, nothing is said.
+      if (!installed && this.installStatus?.repairNeeded === true && this.finalFilePresent() === null && !dismissed) {
+        return ['Checking AI status…', 'Waiting for live install and AI observations.'];
+      }
       if (activationRequired) return ['Downloaded — activation required', sc.sub];
       if (reindexRequired) return ['Read your files again to use these models', 'Search still finds files by their words until then.'];
       const repairHeadline = repairRemedyHeadline(repairRemedy);
@@ -3154,7 +3385,9 @@ export class BrainSurface extends JfElement {
       if (meaning === false || features.meaning.note === 'Not downloaded') return ["Meaning search isn't working", 'Search still finds files by their words.'];
       return ['AI is installed', 'Checking which steps work now.'];
     })();
-    const installSize = this.planPreview?.totalDownloadBytes;
+    const staged = this.planPreview?.resumableBytes;
+    const installSize = typeof this.planPreview?.totalDownloadBytes === 'number' && this.planPreview.totalDownloadBytes >= 0
+      ? this.planPreview.totalDownloadBytes + (typeof staged === 'number' && staged > 0 ? staged : 0) : undefined;
     const actionLabel = primaryAction.label === 'Install AI' && typeof installSize === 'number' && installSize >= 0
       ? `Install AI · ${formatBytes(installSize)}` : primaryAction.label;
     const additionsLabel = `Install additions · ${typeof installSize === 'number' && installSize >= 0 ? formatBytes(installSize) : 'size unknown'}`;
@@ -3165,10 +3398,10 @@ export class BrainSurface extends JfElement {
     const showAdvanced = installed || this.installBegan() || downloadsDisabled || this.devTools || !!this.expanded.advanced;
     return html`
       <div data-testid="brain-simple-panel">
-        <h1 class="brain-headline" tabindex="-1">${headline}${aiState === 'installing' && pct !== null ? ` ${pct}%` : ''}</h1>
+        <h1 class="brain-headline" tabindex="-1">${headline}</h1>
         ${sentence ? html`<p class="brain-sentence">${sentence}</p>` : nothing}
         ${aiState === 'connecting' || this.installStalled() ? html`<div class="brain-status-detail">${aiState === 'connecting' ? html`<jf-pulse-dots></jf-pulse-dots>` : nothing}${this.installStalled() ? html`<span role="status">Download stalled — no recent progress.</span>` : nothing}</div>` : nothing}
-        ${known && (!installed || aiState === 'installing' || activationRequired || failed) ? html`<div class="status-row install-row">
+        ${known && !flow && aiState !== 'installing' && (!installed || activationRequired || failed) ? html`<div class="status-row install-row">
           <jf-button class=${filled ? 'install-action' : ''}
             variant=${filled ? 'primary' : 'ghost'}
             .availability=${primaryAction.availability}
@@ -3176,67 +3409,23 @@ export class BrainSurface extends JfElement {
             label=${actionLabel}
             data-testid="brain-simple-action"
           >${icon({ name: primaryAction.label.startsWith('Install') ? 'download' : primaryAction.iconName, size: 16 })} ${actionLabel}</jf-button>
-          ${!installed && aiState !== 'installing' ? html`<span class="install-note">You see each licence before anything downloads. Everything runs on this computer.</span>` : nothing}
+          ${!installed ? html`<span class="install-note">You see each licence before anything downloads. Everything runs on this computer.</span>` : nothing}
         </div>` : nothing}
         ${additions ? html`<div class="status-row">
           <jf-button variant="ghost" label=${additionsLabel}
             .availability=${downloadsDisabled ? unavailableBecause('Downloads are disabled by administrator policy.') : this.planLockReason() ? unavailableBecause(this.planLockReason()!) : AVAILABLE}
             .onActivate=${() => void this.startInstall()}>${icon({ name: 'download', size: 14 })} ${additionsLabel}</jf-button>
         </div>` : nothing}
-        ${aiState === 'installing'
-          ? html`
-              <div class="download-progress">
-                ${pct !== null
-                  ? html`
-                      <div class="progress">
-                        <div class="progress-bar" .style=${`width: ${pct}%`}></div>
-                      </div>
-                      <div
-                        class="download-totals"
-                      >
-                        <span>${this.installStatus?.phase?.replace(/_/g, ' ') ?? 'preparing'}</span>
-                        <span>${formatBytes(bytesDone)} / ${formatBytes(bytesTotal)}</span>
-                      </div>
-                    `
-                  : nothing}
-                ${this.renderStagedProgress()}
-                ${this.installStatus?.packages?.some((p) => p.resumed)
-                  ? html`<div
-                      class="download-detail"
-                    >
-                      Resumed from your earlier download — the bytes already on disk were kept.
-                    </div>`
-                  : nothing}
-                ${/* Tempdoc 840 Phase 5 — pause is NOT cancel: the run keeps its lease and its place,
-                      so "stop using my bandwidth for a minute" finally has an affordance that does not
-                      end the run. */ ''}
-                <div class="row download-actions">
-                  <jf-button
-                    variant="ghost"
-                    label=${this.installStatus?.paused === true
-                      ? 'Resume download'
-                      : 'Pause download'}
-                    data-testid="install-pause-toggle"
-                    .availability=${this.busy['install-pause'] || this.busy['install-resume']
-                      ? ({ kind: 'blocked' } as const)
-                      : AVAILABLE}
-                    .onActivate=${() =>
-                      void this.setInstallPaused(this.installStatus?.paused !== true)}
-                  >
-                    ${this.installStatus?.paused === true ? 'Resume download' : 'Pause download'}
-                  </jf-button>
-                </div>
-              </div>
-            `
-          : nothing}
+        ${flow ? this.renderInstallFlow(flow.view, pct) : nothing}
+        <div class="visually-hidden" role="status" data-testid="install-announcement">${this.installAnnouncement}</div>
         ${this.renderAlerts()}
         ${this.renderCompatibilityCallouts()}
-        ${known && aiState === 'install_failed' && this.deriveAiEngineVerdict().installFailure ? html`<jf-error-alert tone="error"
+        ${failed && this.deriveAiEngineVerdict().installFailure ? html`<jf-error-alert tone="error"
           data-testid="brain-install-failure-detail">Detail for support: ${this.deriveAiEngineVerdict().installFailure}</jf-error-alert>` : nothing}
-        ${known && !(failed && repairRemedy.kind !== 'manual') ? this.renderRepairAlert() : nothing}
-        ${this.renderFeaturePath()}
-        ${this.renderGraphicsCard()}
-        ${!(showAdvanced || this.devTools || this.answersShown || choiceUnknown) ? nothing : html`<div class="row brain-links">
+        ${known && !stopped && !(failed && repairRemedy.kind !== 'manual') ? this.renderRepairAlert() : nothing}
+        ${alone ? nothing : this.renderFeaturePath()}
+        ${alone ? nothing : this.renderGraphicsCard()}
+        ${alone || !(showAdvanced || this.devTools || this.answersShown || choiceUnknown) ? nothing : html`<div class="row brain-links">
           ${showAdvanced ? html`<button type="button" aria-expanded=${!!this.expanded.advanced} @click=${() => this.toggleSection('advanced')}>${icon({ name: 'settings', size: 16 })} Advanced settings</button>` : nothing}
           ${this.devTools && installed && aiState !== 'installing' && !activationRequired ? html`<jf-button variant="ghost" data-testid="brain-answers-action"
             label=${features.chat.selected ? 'Stop answers' : 'Start answers'}
@@ -3662,52 +3851,50 @@ export class BrainSurface extends JfElement {
   }
 
   /**
-   * Tempdoc 840 Phase 5 (Task 2) — honest progress: the measured rate and horizon, the staged plan,
-   * and the moment search becomes usable while the rest is still downloading.
-   *
-   * Every segment appears only when there is an honest basis for it — `-1` on the wire means UNKNOWN
-   * and the segment is WITHDRAWN, never rendered as "0 B/s" or "0s left" (`composeTransferLine`).
+   * Slice 7b — the install flow under the heading: one bar, one line of amounts (and time left only
+   * when the Engine estimates it), one row per part in the consent's names (fm-12); a stopped
+   * download keeps the same list with what each part reached (fm-12b). The Pause/Resume button is the
+   * same element in both states, so focus stays on it.
    */
-  private renderStagedProgress(): TemplateResult | typeof nothing {
+  private renderInstallFlow(view: 'running' | 'stopped', pct: number | null): TemplateResult {
     const status = this.installStatus;
-    // Stage records are also retained until the new plan is published after runtime restore.
-    if (this.installPlanPending() || (status?.state === 'running' && status.phase === 'restore_runtime')) return nothing;
-    const stages = composeStageRows(status);
-    const transfer = composeTransferLine(status);
-    const ready = searchReadyNotice(status);
-    if (stages.length === 0 && transfer === null && ready === null) return nothing;
-    return html`
-      <div class="stage-block" data-testid="install-staged-progress">
-        ${transfer
-          ? html`<div class="stage-transfer" data-testid="install-transfer-line">${transfer}</div>`
-          : nothing}
-        ${ready
-          ? html`<div class="stage-ready" data-testid="install-search-ready">${ready}</div>`
-          : nothing}
-        ${stages.map(
-          (s) => html`
-            <div class="stage-row" data-testid="install-stage-${s.id}">
-              <div class="stage-head">
-                <span class="stage-label">${s.current ? '▶ ' : ''}${s.label}</span>
-                <span class="stage-state"
-                  >${s.stateText}${s.bytesText ? html` · ${s.bytesText}` : nothing}</span
-                >
-              </div>
-              ${s.percent === null
-                ? nothing
-                : html`<div class="progress">
-                    <div class="progress-bar" .style=${`width: ${s.percent}%`}></div>
-                  </div>`}
-              ${s.blockedReason
-                ? html`<div class="stage-blocked" data-testid="install-stage-blocked-${s.id}">
-                    ${s.blockedReason}
-                  </div>`
-                : nothing}
-            </div>
-          `,
-        )}
+    const stopped = view === 'stopped';
+    const paused = !stopped && status?.paused === true;
+    const pending = this.installPlanPending() || (status?.state === 'running' && status.phase === 'restore_runtime');
+    const rows = pending ? [] : composePartRows(status, this.doneEvidence(), view);
+    const done = status?.downloadedBytes ?? 0;
+    const total = status?.totalBytes ?? 0;
+    const amounts = total > 0 && !pending ? formatAmountOf(done, total, 'total') : null;
+    const doing = stopped ? null : phaseWords(status?.state === 'running' ? status.phase : null);
+    const left = stopped || paused || doing ? null : formatTimeLeft(status?.remainingSeconds);
+    const line = doing ?? (amounts ? `${amounts}${left ? ` · ${left}` : ''}` : null);
+    const failure = stopped ? (status?.lastError || status?.message || '').trim() : '';
+    return html`<section class="install-flow ${stopped ? 'stopped' : ''}" data-testid="install-flow"
+      aria-label=${stopped ? 'Stopped download' : 'Install progress'}>
+      ${pct !== null && !pending ? html`<div class="progress flow-bar" role="progressbar" aria-label="Downloaded"
+        aria-valuemin="0" aria-valuemax="100" aria-valuenow=${pct} aria-valuetext=${amounts ?? `${pct}%`}>
+        <div class="progress-bar" .style=${`width: ${pct}%`}></div></div>` : nothing}
+      ${line ? html`<div class="flow-line">${line}</div>` : nothing}
+      ${paused ? html`<p class="flow-paused">Paused. The file being downloaded may still finish.</p>` : nothing}
+      ${rows.length > 0 ? html`<ul class="flow-parts" aria-label="Parts">${rows.map(row => html`<li class="flow-part ${row.done ? 'done' : ''}" data-part=${row.id}>
+        <span class="flow-part-name">${row.name}</span>
+        <span class="flow-part-state">${row.done ? icon({ name: 'check-circle-2', size: 14 }) : nothing}${row.words}</span>
+        ${row.percent !== null ? html`<div class="progress flow-part-bar" aria-hidden="true"><div class="progress-bar" .style=${`width: ${row.percent}%`}></div></div>` : html`<span></span>`}
+      </li>`)}</ul>` : nothing}
+      <div class="row flow-actions">
+        ${stopped ? html`<jf-button class="install-action" variant="primary" label="Try again" data-testid="install-try-again"
+            .availability=${this.policy?.downloadsEnabled === false ? unavailableBecause('Downloads are disabled by administrator policy.') : AVAILABLE}
+            .onActivate=${() => this.retryInstall()}>${icon({ name: 'refresh-cw', size: 14 })} Try again</jf-button>
+          <jf-button variant="ghost" label="Cancel install" data-testid="install-dismiss"
+            .onActivate=${() => this.dismissStoppedInstall()}>Cancel install</jf-button>`
+        : html`<jf-button variant="ghost" class="flow-pause" label=${paused ? 'Resume' : 'Pause'} data-testid="install-pause-toggle"
+            .onActivate=${() => this.setInstallPaused(!paused)}>${icon({ name: paused ? 'play' : 'pause', size: 14 })} ${paused ? 'Resume' : 'Pause'}</jf-button>
+          <jf-button variant="ghost" label="Cancel" data-testid="brain-simple-action"
+            .availability=${this.busy['install-cancel'] ? ({ kind: 'blocked' } as const) : AVAILABLE}
+            .onActivate=${() => void this.cancelInstall()}>Cancel</jf-button>`}
       </div>
-    `;
+      ${failure ? html`<details class="flow-detail" data-testid="brain-install-failure-detail"><summary>Detail for support</summary><p>${failure}</p></details>` : nothing}
+    </section>`;
   }
 
   private renderPackageHistory(): TemplateResult {
@@ -3782,40 +3969,28 @@ export class BrainSurface extends JfElement {
         <div class="consent-card">
           <h3 id="install-consent-title" class="consent-title">Download AI models?</h3>
           <p class="consent-lede">
-            ${consent.downloadTotal
-              ? html`This downloads <strong>${consent.downloadTotal}</strong> of model files into AI
-                  Home.`
-              : html`The download size is not known yet. Wait for the preview before accepting.`}
-          </p>
-          ${consent.resumedTotal
-            ? html`<p class="consent-lede">
-                <strong>${consent.resumedTotal}</strong> from your earlier paused download is still on
-                disk and will be resumed, not downloaded again.
-              </p>`
-            : nothing}
-          <p class="consent-lede">
-            ${consent.termsUnavailable
-              ? 'The upstream model terms could not be listed right now. Retry to review them before downloading.'
-              : 'Each package below is published by its upstream author under the licence shown. Downloading accepts those terms.'}
+            ${consent.consentTotal
+              ? `${consent.upTo ? 'Up to ' : ''}${consent.consentTotal} will be downloaded to this computer.${consent.termsUnavailable ? '' : ' Each part comes from its own author, under the licence shown.'}`
+              : 'The download size is not known yet. Wait for the preview before accepting.'}
           </p>
           ${consent.termsUnavailable
-            ? nothing
+            ? html`<p class="consent-lede">The upstream model terms could not be listed right now. Retry to review them before downloading.</p>`
             : html`
                 <ul class="consent-terms">
-                  ${consent.packages.map(
-                    (p) => html`
+                  ${consent.packages.map((p) => {
+                    const part = partName(p.id, p.label);
+                    return html`
                       <li>
-                        <span class="consent-pkg">${p.label}</span>
-                        <span>${this.packageDownloadSize(p.id)}</span>
+                        <span class="consent-pkg">${part.name}${part.note ? html`<small>${part.note}</small>` : nothing}</span>
+                        <span class="consent-size">${this.consentPartSize(p.id)}</span>
                         <span class="consent-license">${p.license ?? 'licence not declared'}</span>
                         ${p.termsUrl
                           ? html`<a href=${p.termsUrl} target="_blank" rel="noopener noreferrer"
-                              >Terms ↗</a
-                            >`
-                          : nothing}
+                              aria-label=${`Terms for ${part.name}`}>Terms</a>`
+                          : html`<span></span>`}
                       </li>
-                    `,
-                  )}
+                    `;
+                  })}
                 </ul>
               `}
           <div class="consent-actions">
@@ -4100,13 +4275,15 @@ export class BrainSurface extends JfElement {
     if (!this.apiBase && this.apiBase !== '') {
       return html`<div class="empty-state">No API connection. Start the JustSearch backend to configure AI.</div>`;
     }
+    // fm-12, fm-12b — while a first install or a stopped download is shown, the install view is the page.
+    const alone = this.installViewAlone();
     return html`
       <div class="body" @pointerdown=${(event: Event) => {
         if (this.featureInfo && !event.composedPath().some(node => node instanceof HTMLElement && (node.classList.contains('feature-panel') || node.getAttribute('aria-controls')?.startsWith('brain-feature-panel-')))) this.closeFeatureInfo();
       }}>
         ${this.renderSimplePanel()}
-        ${this.renderEnrichmentProgress()}
-        ${this.renderAdvanced()}
+        ${alone ? nothing : this.renderEnrichmentProgress()}
+        ${alone ? nothing : this.renderAdvanced()}
         ${this.renderInstallConsent()}
       </div>
     `;

@@ -1,8 +1,7 @@
 /**
  * Tempdoc 840 Phase 5 — the composers behind the user-facing install.
  *
- * These pin the two properties the phase exists for and that a render test cannot state as sharply:
- * an UNKNOWN rate/horizon is OMITTED rather than zeroed, and `unavailable` is not `declined`.
+ * These pin what a render test cannot state as sharply: `unavailable` is not `declined`.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -12,9 +11,7 @@ import {
   composeComponentRow,
   composeComponentSummary,
   composeStageRows,
-  composeTransferLine,
   friendlyInstallMessage,
-  searchReadyNotice,
   toNecessity,
   type InstallComponentEstimate,
 } from './installComponents.js';
@@ -72,39 +69,6 @@ const CHAT: InstallComponentEstimate = {
   downloadBytes: 0,
   state: 'declined',
 };
-
-describe('composeTransferLine — an unknown segment is omitted, never zeroed', () => {
-  it('omits BOTH segments when the wire says unknown (-1), rather than reading "0 B/s · 0s left"', () => {
-    expect(composeTransferLine({ bytesPerSecond: -1, remainingSeconds: -1 })).toBeNull();
-  });
-
-  it('omits the rate but keeps a known horizon (each segment stands or falls alone)', () => {
-    expect(composeTransferLine({ bytesPerSecond: -1, remainingSeconds: 125 })).toBe('~2m 5s left');
-  });
-
-  it('omits the horizon but keeps a known rate', () => {
-    expect(composeTransferLine({ bytesPerSecond: 2_097_152, remainingSeconds: -1 })).toBe('2.0 MB/s');
-  });
-
-  it('renders both when both are measured', () => {
-    expect(composeTransferLine({ bytesPerSecond: 1_048_576, remainingSeconds: 90 })).toBe(
-      '1.0 MB/s · ~1m 30s left',
-    );
-  });
-
-  it('treats a 0 rate as unknown — a young transfer must not be described as stopped', () => {
-    expect(composeTransferLine({ bytesPerSecond: 0, remainingSeconds: -1 })).toBeNull();
-  });
-
-  it('keeps a 0 HORIZON — "nothing left to move" is a value, unlike a 0 rate', () => {
-    expect(composeTransferLine({ bytesPerSecond: -1, remainingSeconds: 0 })).toBe('~0s left');
-  });
-
-  it('omits everything for an absent status (no run, no fabricated numbers)', () => {
-    expect(composeTransferLine(null)).toBeNull();
-    expect(composeTransferLine({})).toBeNull();
-  });
-});
 
 describe('composeComponentRow — opt-out, and unavailable is not declined', () => {
   it('starts every supported component SELECTED (opt-out, not opt-in)', () => {
@@ -332,7 +296,7 @@ const RUNNING: AiInstallStatus = {
   ],
 };
 
-describe('composeStageRows / searchReadyNotice — staged progress', () => {
+describe('composeStageRows — staged progress', () => {
   it('marks the stage the run is actually in', () => {
     const rows = composeStageRows(RUNNING);
     expect(rows.map((r) => r.current)).toEqual([false, true, false]);
@@ -351,16 +315,6 @@ describe('composeStageRows / searchReadyNotice — staged progress', () => {
     expect(blocked.blockedReason).toBe('Not enough disk space: 6.0 GB needed, 2.1 GB free.');
   });
 
-  it('says search is usable once the retrieval core is READY, and names what is still coming', () => {
-    const notice = searchReadyNotice(RUNNING);
-    expect(notice).toContain('Search is ready');
-    expect(notice).toContain('Retrieval enrichment');
-  });
-
-  it('stays SILENT until the backend says the retrieval core is ready', () => {
-    expect(searchReadyNotice({ ...RUNNING, readyCapabilities: [] })).toBeNull();
-    expect(searchReadyNotice(null)).toBeNull();
-  });
 });
 
 describe('friendlyInstallMessage — U5: a path is not a name', () => {

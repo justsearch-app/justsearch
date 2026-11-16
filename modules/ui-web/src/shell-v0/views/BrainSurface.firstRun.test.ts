@@ -4,7 +4,7 @@
  * First run (ADR-0024; docs/how-to/cut-a-release.md section 4): a machine that never installed AI
  * installs through Install AI. `repairNeeded` means "a required file is missing", which is true on
  * that machine too, so it alone must not turn AI Brain into a repair page. Only evidence that AI
- * was installed or an install began does (F2/F3, unchanged).
+ * was installed does: a final model file on disk (F2/F3; slice 7b G6').
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AiState, InstallStatus } from '../state/aiStateStore.js';
@@ -100,11 +100,21 @@ describe('AI Brain on first run', () => {
     expect(operations).toEqual([{ id: 'core.repair-ai-install', args: { acceptTerms: true } }]);
   });
 
+  // Slice 7b G6' — a repair is owed only with a final model file on disk: staged bytes or a run
+  // record alone are a first install that stopped, which is not installed.
   it.each([
     ['partial bytes from an interrupted download', { resumableBytes: 4096 }],
     ['a run record from this session', { state: 'cancelled', startedAtEpochMs: 100, packages: [{ packageId: 'embedding', state: 'failed' }] }],
-  ] as const)('F3 an interrupted install with files missing offers Repair: %s', async (_name, patch) => {
+  ] as const)('F3 an interrupted install with no final file placed is not installed: %s', async (_name, patch) => {
     const el = await mount({ ...fresh, ...patch } as InstallStatus);
+    expect(headline(el)).toBe("AI isn't installed yet");
+    expect(el.shadowRoot!.querySelector('[role="alert"] [label="Repair"]')).toBeNull();
+    expect(buttons(el).some(b => b.label.startsWith('Install AI'))).toBe(true);
+  });
+
+  it('F3 an interrupted install with a final file placed offers Repair', async () => {
+    presence.packages = presence.packages.map(p => p.id === 'embedding' ? { ...p, presentVariantFiles: ['model.onnx'] } : p);
+    const el = await mount({ ...fresh, resumableBytes: 4096 } as InstallStatus);
     expect(headline(el)).toBe('Installed — repair available');
     expect(el.shadowRoot!.querySelector('[role="alert"] [label="Repair"]')).not.toBeNull();
   });

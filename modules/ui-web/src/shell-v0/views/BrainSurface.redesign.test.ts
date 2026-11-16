@@ -185,7 +185,7 @@ describe('AI Brain redesign behaviour', () => {
     preview.components = preview.components!.map(c => c.id === 'chat' ? component('chat', 'declined', true) : c);
     emit({ capabilities: { chat: false } as AiState['capabilities'], runtime: { mode: 'offline', modelId: null, installed: { known: true, value: true } } as AiState['runtime'] });
     const el = await mount(); switches(el, 'Answer questions')[0]!.click(); await settle(el); await settle(el);
-    expect(el.shadowRoot!.querySelector('dialog')!.textContent).toContain('1.0 KB');
+    expect(el.shadowRoot!.querySelector('dialog')!.textContent).toContain('1 KB');
     expect(el.shadowRoot!.querySelector('dialog')!.textContent).toContain('Apache-2.0');
     expect(calls).toEqual([]);
     expect(switches(el, 'Answer questions')[0]!.getAttribute('aria-disabled')).toBe('true');

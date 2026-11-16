@@ -447,7 +447,9 @@ export class StatusPill extends JfElement {
         ? html`<svg class="ring ${reading ? 'indeterminate' : ''}" viewBox="0 0 20 20" aria-hidden="true" data-percent=${reading ? nothing : pill.percent}><circle class="track" cx="10" cy="10" r="8"></circle>
           <circle class="arc" cx="10" cy="10" r="8" pathLength="100" stroke-dasharray="${reading ? 25 : pill.percent} 100" transform="rotate(-90 10 10)"></circle></svg>`
         : html`<span class="symbol" aria-hidden="true">${calm ? nothing : symbols[pill.kind]}</span>`;
-    const text = transient?.toast?.message ?? (pill.kind === 'needs' && pill.count != null ? (pill.count === 1 ? 'Needs you' : 'Need you')
+    // fm-12b — one item that names itself shows its own words beside the count ("1 Download stopped").
+    const text = transient?.toast?.message ?? (pill.kind === 'needs' && pill.named ? pill.words ?? pill.label
+      : pill.kind === 'needs' && pill.count != null ? (pill.count === 1 ? 'Needs you' : 'Need you')
       : pill.kind === 'problems' && pill.count != null ? 'Problems right now' : label);
     const shown = transient ?? beside;
     // DE6 — the notice's action shows while it can still run; a real reversal carries the Ctrl+Z hint.
