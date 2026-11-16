@@ -622,3 +622,16 @@ patterns, never answers Keep them and never authors reading hours); with the cha
 J4 now also authors reading hours (Only between, then Any time, kept turned off) and requires them
 after restart; `test_redesign.py` and `test_windows.py` restart fixtures carry that authored state.
 The scripts are out of the gate's scope by design.
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "eb38ce8d-ddd2-417d-83c3-cc73b3b3fb79",
+  "verdict": "reject",
+  "digest": "sha256:310482dd7188f4ad6df15dd8756df302d7294fa4d0feac888ceb7ee356b9dc32",
+  "note": "Two Obsolete entries drop checks no quoted source contradicts: LibrarySurface.excludes.test.ts S32.7 (polite progress status while a removal runs; fm-07/B2'/B4' do not remove it) and LibrarySurface.refresh-lockdown.test.ts L3 exact-path variant (stale second window's exact-path change refused, no overwrite; RF55 has one window and no conflict). Restore both or cite a source."
+}
+```
