@@ -194,19 +194,17 @@ export class IndexingRulesEditor extends JfElement {
       const operationKey = same?.key ?? createOperationKey();
       let sent = false;
       const request = { idempotencyKey: operationKey, args: { ...next, witness } };
+      const invoke = (signal?: AbortSignal) => getOperationClient(this.apiBase).invokeWithConsent('core.set-indexing-rules', request,
+        { requestConsent: requestAuthorization, ...(signal ? { signal } : {}) });
+      // R14 — a replay of an attempt not finished yet (ACCEPTED, RUNNING) carries no witness and is not a save.
+      const finished = (result: OperationInvocationSuccess) => {
+        const state = result.structuredData?.['state'];
+        return typeof state !== 'string' || state === 'COMPLETE';
+      };
       const write = async (): Promise<OperationInvocationSuccess> => {
         sent = true;
-        const deadline = Date.now() + FOLLOW_MS;
-        for (;;) {
-          const result = await getOperationClient(this.apiBase).invokeWithConsent('core.set-indexing-rules', request,
-            { requestConsent: requestAuthorization });
-          // R14 — a replay of an attempt not finished yet (ACCEPTED, RUNNING) carries no witness and is not
-          // a save: the same key and bytes are sent again until it completes or is refused.
-          const state = result.structuredData?.['state'];
-          if (typeof state !== 'string' || state === 'COMPLETE') return result;
-          if (Date.now() >= deadline) throw new OperationError('The reading rules were not confirmed saved yet.', 'UNKNOWN');
-          await new Promise(resolve => setTimeout(resolve, 250));
-        }
+        const first = await invoke();
+        return finished(first) ? first : this.followRunning(invoke, finished);
       };
       try {
         let receipt: unknown;
@@ -252,6 +250,30 @@ export class IndexingRulesEditor extends JfElement {
     }
     this.indexingRulesError = 'Could not save reading rules: settings kept changing. Try the change again.';
     return 'stopped';
+  }
+
+  /**
+   * R14/R18 — the same key and bytes are sent again until the attempt completes or is refused, bounded
+   * as a whole: a stalled call or an admission wait is abandoned at the bound, and the write's outcome is
+   * then unknown (its queue head keeps key and bytes). An answer arriving after the bound is ignored.
+   */
+  private async followRunning(invoke: (signal: AbortSignal) => Promise<OperationInvocationSuccess>,
+      finished: (result: OperationInvocationSuccess) => boolean): Promise<OperationInvocationSuccess> {
+    const follow = new AbortController();
+    const timer = setTimeout(() => follow.abort(), FOLLOW_MS);
+    const bound = new Promise<never>((_, reject) => follow.signal.addEventListener('abort',
+      () => reject(new OperationError('The reading rules were not confirmed saved yet.', 'UNKNOWN')), { once: true }));
+    bound.catch(() => {});
+    try {
+      for (;;) {
+        await Promise.race([new Promise(resolve => setTimeout(resolve, 250)), bound]);
+        const result = await Promise.race([invoke(follow.signal), bound]);
+        if (finished(result)) return result;
+      }
+    } finally {
+      clearTimeout(timer);
+      follow.abort();
+    }
   }
 
   /**
@@ -324,6 +346,8 @@ export class IndexingRulesEditor extends JfElement {
   private async loadSettings(mode: 'preserve' | 'discard' = 'preserve'): Promise<boolean> {
     const serial = ++this.loadSerial;
     const shown = JSON.stringify(this.indexingRules);
+    // R17 — a revision taken up meanwhile (Library's own successor write) is newer than this read.
+    const witnessAtStart = this.savedWitness;
     try {
       const res = this.host_ ? await this.host_.data.fetch('/api/settings/v2')
         : await authorizedFetch(`${this.apiBase}/api/settings/v2`);
@@ -345,7 +369,7 @@ export class IndexingRulesEditor extends JfElement {
       // R13 — the draft is replaced only while it is still what it was when this read began; after
       // "Use the saved rules", a change made meanwhile stays as a draft over the saved rules.
       const unchanged = JSON.stringify(this.indexingRules) === shown;
-      const adopt = mode === 'discard' || !dirty && !queued && unchanged;
+      const adopt = mode === 'discard' || !dirty && !queued && unchanged && this.savedWitness === witnessAtStart;
       if (adopt) { this.savedRules = saved; this.savedWitness = data.witness ?? null; }
       if (adopt && unchanged) {
         this.indexingScheduleConfigured = schedule != null;

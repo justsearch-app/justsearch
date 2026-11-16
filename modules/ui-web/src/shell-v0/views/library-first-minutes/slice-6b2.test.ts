@@ -36,6 +36,8 @@ function backend(initial: { patterns?: unknown[]; pause?: Partial<Pause>; overri
   let hold: Promise<void> | null = null, release = () => {};
   let hang = false, workerDown = false, loseNextOpAnswer = false;
   let onRead: (() => void) | null = null;
+  /** The next settings read answers what it found when asked, but only once released (a slow read). */
+  let readHold: Promise<void> | null = null, releaseRead = () => {};
   /** Answers given instead of running the operation, in order; 'lost' commits nothing and loses the answer. */
   const scripted: unknown[] = [];
   const opReceipts = new Map<string, unknown>();
@@ -52,6 +54,8 @@ function backend(initial: { patterns?: unknown[]; pause?: Partial<Pause>; overri
     if (init?.method !== 'POST') {
       const observed = Response.json({ settingsMode: 'persistent', ui: wire(), witness: witness() });
       const hook = onRead; onRead = null; hook?.();
+      const held = readHold; readHold = null;
+      if (held) await held;
       return observed;
     }
     const body = String(init.body);
@@ -91,6 +95,7 @@ function backend(initial: { patterns?: unknown[]; pause?: Partial<Pause>; overri
     if (scripted.length) {
       const answer = scripted.shift();
       if (answer === 'lost') throw new TypeError('Failed to fetch');
+      if (typeof answer === 'function') return (answer as (init?: RequestInit) => Promise<Response>)(init);
       return Response.json(answer);
     }
     const replayed = idempotencyKey ? opReceipts.get(idempotencyKey) : undefined;
@@ -131,7 +136,12 @@ function backend(initial: { patterns?: unknown[]; pause?: Partial<Pause>; overri
     s, host, posts, ops, invoke, fetchSettings, removedFor,
     /** Runs once, right after the next settings read is answered (another window acting in between). */
     afterNextRead(hook: () => void) { onRead = hook; },
-    /** The next operations are answered with these, in order, without running ('lost': no answer). */
+    /** The next settings read is answered (with what it found when asked) only after the returned release. */
+    holdNextRead() { readHold = new Promise(resolve => { releaseRead = () => resolve(); }); return () => releaseRead(); },
+    /**
+     * The next operations are answered with these, in order, without running ('lost': no answer; a function
+     * answers with the Response it returns for the request's init).
+     */
     scriptOpAnswers(...answers: unknown[]) { scripted.push(...answers); },
     /** The next operation commits, but its answer is lost on the way back. */
     loseNextOpAnswer() { loseNextOpAnswer = true; },
@@ -1053,4 +1063,161 @@ it('R14 (review 5): a newer reading-rule change waits while a RUNNING write is f
   expect(f.ops[3]!.args.pauseOnBattery).toBe(false);
   expect(f.s.ui.indexingPause.pauseOnBattery).toBe(false);
   expect(battery.checked).toBe(false);
+});
+
+it('R17 (review 6): a read begun before a save completed never replaces the saved rules or their revision', async () => {
+  const f = backend(); const el = await mount(f);
+  // The read a withdrawn unfinished forget starts (decideUnfinishedForget -> loadExcludes), answered late.
+  const releaseRead = f.holdNextRead();
+  const reading = (el as unknown as { loadExcludes(): Promise<void> }).loadExcludes(); await settle(el);
+  await addRule(el, '*.tmp');
+  expect(f.s.ui.excludePatterns, 'the newer rule saved while the read was pending').toEqual(['*.log', '*.tmp']);
+  releaseRead(); await reading; await settle(el);
+  expect(rule(el, 2).value, 'the older read does not replace the saved rules').toBe('*.tmp');
+  // The next edit is based on this window's own save: no conflict with itself.
+  await type(el, rule(el, 2), '*.bak'); await leave(el, rule(el, 2));
+  expect(text(el.shadowRoot)).not.toContain('Changed elsewhere');
+  expect(f.s.ui.excludePatterns).toEqual(['*.log', '*.bak']);
+  expect(f.posts.at(-1)!.parsed.witness, 'sent on the revision of its own save').toEqual({ acceptedRevision: 4, lastCommittedOperationKey: f.posts[0]!.parsed.operationKey });
+});
+
+/** A reading-rule write answered RUNNING on Try again, then whose next follow-up is answered by `stall`. */
+async function runningThen(f: Backend, el: LibrarySurface, stall: (init?: RequestInit) => Promise<Response>) {
+  const rules = editor(el);
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  f.scriptOpAnswers('lost');
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules); await settle(el);
+  expect(f.ops, 'the change was sent once').toHaveLength(1);
+  const sentKey = f.ops[0]!.key!;
+  f.scriptOpAnswers(running(sentKey), stall);
+  await press(rules, control(rules.shadowRoot, 'Try again')); await settle(el);
+  return { rules, battery, sentKey };
+}
+
+it('R18 (review 6): a stalled follow-up is abandoned at the bound: Not sure this saved, same key kept, other writes go on, a late answer settles nothing', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const f = backend(); const el = await mount(f);
+  let abandoned: AbortSignal | null | undefined;
+  let answerLate!: (response: Response) => void;
+  const { rules, battery, sentKey } = await runningThen(f, el, init => {
+    abandoned = init?.signal;
+    return new Promise<Response>(resolve => { answerLate = resolve; });
+  });
+  await vi.advanceTimersByTimeAsync(1_000); await settle(rules); await settle(el);
+  expect(f.ops.map(o => o.key), 'the stalled follow-up is the same write').toEqual([sentKey, sentKey, sentKey]);
+  expect(rules.shadowRoot!.querySelector('[role="status"]')?.textContent?.trim()).toBe('Saving…');
+  await vi.advanceTimersByTimeAsync(10_000); await settle(rules); await settle(el);
+  expect(text(rules.shadowRoot), 'the bound ends the follow').toContain('Not sure this saved');
+  expect(named(rules.shadowRoot, 'Try again'), 'with Try again').toBeDefined();
+  expect(rules.shadowRoot!.querySelector('[role="status"]')?.textContent?.trim()).not.toBe('Saving…');
+  expect(abandoned?.aborted, 'the stalled request is cancelled').toBe(true);
+  // Library's other settings writes are not held behind it.
+  await addRule(el, '*.tmp');
+  expect(f.s.ui.excludePatterns).toEqual(['*.log', '*.tmp']);
+  // An answer arriving after the bound does not settle (dequeue) the write.
+  answerLate(Response.json({ success: true, message: 'Committed', structuredData: { witness: { acceptedRevision: 99, lastCommittedOperationKey: sentKey } } }));
+  await settle(rules); await settle(el);
+  expect(text(rules.shadowRoot)).toContain('Not sure this saved');
+  expect(text(rules.shadowRoot)).not.toContain('Reading rules saved');
+  // Try again settles it with the same key and bytes first; refused on the revision the skip-rule save
+  // moved, it is then rebased (B11) and saved.
+  await press(rules, control(rules.shadowRoot, 'Try again')); await settle(el);
+  expect(f.ops[3]!.key).toBe(sentKey);
+  expect(f.ops[3]!.args).toEqual(f.ops[0]!.args);
+  expect(f.ops).toHaveLength(5);
+  expect(f.ops[4]!.args.pauseOnBattery).toBe(true);
+  expect(text(rules.shadowRoot)).toContain('Reading rules saved');
+  expect(f.s.ui.indexingPause.pauseOnBattery).toBe(true);
+  expect(battery.checked).toBe(true);
+});
+
+it('R18 (review 6): a follow-up held in admission retries is abandoned at the bound as well', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const f = backend(); const el = await mount(f);
+  const busy = () => Promise.resolve(Response.json({ success: false, errorCode: 'ADMISSION_ENGINE_LIMIT', retrySafe: true },
+    { status: 429, headers: { 'Retry-After': '60' } }));
+  const { rules, sentKey } = await runningThen(f, el, busy);
+  await vi.advanceTimersByTimeAsync(10_500); await settle(rules); await settle(el);
+  expect(text(rules.shadowRoot)).toContain('Not sure this saved');
+  expect(named(rules.shadowRoot, 'Try again')).toBeDefined();
+  await vi.advanceTimersByTimeAsync(60_000); await settle(rules); await settle(el);
+  expect(f.ops.map(o => o.key), 'the abandoned admission wait sends nothing more').toEqual([sentKey, sentKey, sentKey]);
+  expect(text(rules.shadowRoot)).toContain('Not sure this saved');
+  expect(f.s.ui.indexingPause.pauseOnBattery).toBe(false);
+});
+
+it('R19 (review 6): Try again after a partial removal and a rule removed since asks for the list saved now', async () => {
+  const f = backend(); const el = await mount(f);
+  f.invoke.mockResolvedValueOnce({ success: true, structuredData: { ...doneResult, uncheckedScopes: [
+    { path: '/offline', status: 'not_checked', reason: 'Watched folder is offline or missing' }] } } as never);
+  await addRule(el, '*.tmp');
+  await press(el, control(askRegion(el)[0], 'Remove from search'));
+  expect(text(el.shadowRoot)).toContain('Partly done');
+  await press(el, control(el.shadowRoot, 'Remove skip rule 2'));
+  expect(f.s.ui.excludePatterns).toEqual(['*.log']);
+  expect(askRegion(el)).toHaveLength(0);
+  const calls = f.invoke.mock.calls.length;
+  await press(el, control(el.shadowRoot!.querySelector('.removal-slot'), 'Try again'));
+  expect(f.invoke.mock.calls.length, 'nothing runs over a list not asked about').toBe(calls);
+  const asks = askRegion(el);
+  expect(asks, 'the ask opens for the list saved now').toHaveLength(1);
+  await press(el, control(asks[0], 'Remove from search'));
+  expect(f.removedFor.at(-1)).toEqual(['*.log']);
+  expect(text(el.shadowRoot!.querySelector('.removal-slot'))).toContain('match your skip rules are no longer in search');
+});
+
+it('R19 (review 6): Try again for a list changed since keeps a newer ask open and does not run', async () => {
+  const f = backend(); const el = await mount(f);
+  const engine = f.invoke.getMockImplementation()!;
+  let finish!: () => void;
+  const gate = new Promise<void>(resolve => { finish = resolve; });
+  f.invoke.mockImplementationOnce(async (id, args, options) => {
+    await engine(id, args, options); await gate;
+    return { success: true, structuredData: { ...doneResult, uncheckedScopes: [
+      { path: '/offline', status: 'not_checked', reason: 'Watched folder is offline or missing' }] } } as never;
+  });
+  await addRule(el, '*.tmp');
+  await press(el, control(askRegion(el)[0], 'Remove from search'));
+  // A rule saved while that removal's answer is pending raises a newer ask; the partial outcome then arrives.
+  await addRule(el, '*.bak');
+  finish(); await settle(el); await settle(el);
+  const newer = askRegion(el); expect(newer).toHaveLength(1);
+  expect(text(el.shadowRoot!.querySelector('.removal-slot'))).toContain('Partly done');
+  const calls = f.invoke.mock.calls.length;
+  await press(el, control(el.shadowRoot!.querySelector('.removal-slot'), 'Try again'));
+  expect(f.invoke.mock.calls.length).toBe(calls);
+  expect(askRegion(el), 'the newer ask stays, alone').toHaveLength(1);
+  expect(text(el.shadowRoot!.querySelector('.removal-slot'))).not.toContain('Partly done');
+});
+
+it('R19 (review 6): Try again with no skip rules left says there is nothing to remove', async () => {
+  const f = backend(); const el = await mount(f);
+  f.invoke.mockResolvedValueOnce({ success: true, structuredData: { ...doneResult, uncheckedScopes: [
+    { path: '/offline', status: 'not_checked', reason: 'Watched folder is offline or missing' }] } } as never);
+  await addRule(el, '*.tmp');
+  await press(el, control(askRegion(el)[0], 'Remove from search'));
+  await press(el, control(el.shadowRoot, 'Remove skip rule 2'));
+  await press(el, control(el.shadowRoot, 'Remove skip rule 1'));
+  expect(f.s.ui.excludePatterns).toEqual([]);
+  const calls = f.invoke.mock.calls.length;
+  await press(el, control(el.shadowRoot!.querySelector('.removal-slot'), 'Try again'));
+  expect(f.invoke.mock.calls.length).toBe(calls);
+  expect(text(el.shadowRoot!.querySelector('.removal-slot'))).toContain('nothing to remove');
+});
+
+it('R20 (acceptor): Count matching files is unavailable while a removal runs and starts nothing', async () => {
+  const f = backend(); const el = await mount(f);
+  setShowDeveloperTools(true); await settle(el);
+  const engine = f.invoke.getMockImplementation()!;
+  let finish!: () => void;
+  const gate = new Promise<void>(resolve => { finish = resolve; });
+  f.invoke.mockImplementationOnce(async (id, args, options) => { const answer = engine(id, args, options); await gate; return answer; });
+  await addRule(el, '*.tmp');
+  await press(el, control(askRegion(el)[0], 'Remove from search'));
+  const count = control(el.shadowRoot, 'Count matching files') as HTMLElement & { disabled: boolean };
+  expect(count.disabled, 'unavailable during the removal').toBe(true);
+  await (el as unknown as { handlePreviewExcludes(): Promise<void> }).handlePreviewExcludes(); await settle(el);
+  expect(f.invoke.mock.calls.map(c => c[0])).toEqual(['core.apply-excludes']);
+  finish(); await settle(el); await settle(el);
+  expect(count.disabled).toBe(false);
 });

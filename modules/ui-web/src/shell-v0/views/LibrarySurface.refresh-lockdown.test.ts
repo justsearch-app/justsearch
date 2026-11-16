@@ -142,8 +142,11 @@ it('L2 a second clean window observes add, remove and undo on focus and on retur
   await draft(first, '*.bak'); await save(first);
   await first.evaluate(() => window.windowfix.undo());
   await expect.poll(() => saved).toEqual(['*.tmp']);
+  // The second window's text was '*.tmp' before the Undo too: it is the revision that shows it observed it.
+  const undone = { ...witness };
   await activate(second);
-  await expect.poll(async () => (await state(second)).text).toBe('*.tmp');
+  await expect.poll(async () => (await state(second)).witness).toEqual(undone);
+  expect((await state(second)).text).toBe('*.tmp');
 }, 30_000);
 
 it('L3 a second window keeps its text draft and original conflict witness', async () => {

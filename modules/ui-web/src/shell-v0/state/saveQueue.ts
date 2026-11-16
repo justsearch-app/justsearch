@@ -18,6 +18,7 @@ export class SaveQueue<S> {
   private running: Promise<void> | null = null;
   private active = false;
   private lastOutcome: SendOutcome | null = null;
+  private changes = 0;
 
   constructor(private readonly send: (snapshot: S) => Promise<SendOutcome>, private readonly changed: () => void) {}
 
@@ -26,9 +27,12 @@ export class SaveQueue<S> {
   get sending(): boolean { return this.active; }
   /** The head was sent and its answer was lost. */
   get uncertain(): boolean { return this.lastOutcome === 'uncertain' && this.items.length > 0; }
+  /** Moves on every snapshot captured, settled or dropped: a read begun before can tell it is stale (R17). */
+  get version(): number { return this.changes; }
 
   push(snapshot: S): Promise<void> {
     this.items.push(snapshot);
+    this.changes++;
     return this.resume();
   }
 
@@ -41,6 +45,7 @@ export class SaveQueue<S> {
   /** Drops every snapshot not sent yet (the person chose the saved state instead). */
   clear(): S[] {
     this.lastOutcome = null;
+    this.changes++;
     return this.items.splice(0);
   }
 
@@ -52,7 +57,7 @@ export class SaveQueue<S> {
         this.changed();
         this.lastOutcome = await this.send(head);
         if (this.lastOutcome === 'uncertain' || this.lastOutcome === 'stopped') return;
-        if (this.items[0] === head) this.items.shift();
+        if (this.items[0] === head) { this.items.shift(); this.changes++; }
       }
     } finally { this.active = false; }
   }

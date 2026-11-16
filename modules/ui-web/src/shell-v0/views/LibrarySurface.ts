@@ -153,8 +153,9 @@ type RemovalAsk = { readonly serial: number; readonly list: string; readonly bas
  * What one answer did, for the ask (serial) and list it answered (R12). The result counts deletion
  * requests, not documents, so the outcome holds no number (R10).
  */
-type RemovalOutcome = { readonly kind: 'done' | 'partly' | 'unsure' | 'unavailable' | 'kept'; readonly serial: number;
+type RemovalOutcome = { readonly kind: 'done' | 'partly' | 'unsure' | 'unavailable' | 'kept' | 'nothing'; readonly serial: number;
   readonly capped: boolean; readonly scopes: ExcludesResult['uncheckedScopes']; readonly list: string; readonly detail: string };
+const OVERRIDE_NO_REMOVAL = 'Skip rules set by an override are in effect, so files can\'t be removed from here.';
 /** A skip-rule draft: its glob rules as one text, and the exact-path entries kept with them. */
 type SkipDraft = { readonly text: string; readonly literals: readonly ExactPathExclusion[] };
 /**
@@ -1623,14 +1624,24 @@ export class LibrarySurface extends JfElement {
     }
   }
 
+  /**
+   * R17 — what a read that would replace the shown rules and their witness began with: the draft, the
+   * queue and the witness. A read is applied only if all three are still what they were.
+   */
+  private skipEditorMark(): string {
+    return JSON.stringify([this.excludesText, this.excludesLiterals, this.skipQueue.version, this.excludesWitness]);
+  }
+
   private async loadExcludes(): Promise<void> {
     if (this.excludesBusy || this.skipQueue.snapshots.length) return;
     this.excludesLoadStarted = true;
     this.excludesReading = true;
+    const mark = this.skipEditorMark();
     try {
       const body = await readSettingsObservation((path, init) => this.doFetch(path, init));
-      // A change captured meanwhile, or text typed meanwhile, is not replaced by the list read before it (R13).
-      if (this.skipQueue.snapshots.length || (this.excludesLoaded && this.excludesDirty)) return;
+      // A change captured or saved meanwhile, or text typed meanwhile, is not replaced by the list read
+      // before it (R13, R17).
+      if (this.skipQueue.snapshots.length || (this.excludesLoaded && this.excludesDirty) || this.skipEditorMark() !== mark) return;
       const entries = body.ui?.excludePatterns ?? [];
       this.excludesSavedText = entries.filter((entry) => typeof entry === 'string').join('\n');
       this.excludesSavedLiterals = entries.filter((entry): entry is ExactPathExclusion => typeof entry !== 'string');
@@ -1683,13 +1694,13 @@ export class LibrarySurface extends JfElement {
   private async refreshExcludes(): Promise<void> {
     if (this.excludesRefreshRead || !this.excludesClean) return;
     const read = (this.excludesRefreshRead = {});
-    const witness = this.excludesWitness;
+    const mark = this.skipEditorMark();
     try {
       const [body, policy] = await Promise.all([
         readSettingsObservation((path, init) => this.doFetch(path, init)),
         this.readExcludesPolicy(),
       ]);
-      if (this.excludesRefreshRead !== read || !this.excludesClean || this.excludesWitness !== witness) return;
+      if (this.excludesRefreshRead !== read || !this.excludesClean || this.skipEditorMark() !== mark) return;
       this.adoptObservedList(body.ui?.excludePatterns ?? [], body.witness, body.ui?.invalidExcludePatterns ?? []);
       if (JSON.stringify(policy) !== JSON.stringify(this.excludesPolicy)) { this.excludesResult = null; this.excludesNotice = ''; }
       this.excludesPolicy = policy;
@@ -2277,7 +2288,9 @@ export class LibrarySurface extends JfElement {
 
   /** Developer tools only: per-rule match counts on disk; removes nothing. */
   private async handlePreviewExcludes(): Promise<void> {
-    if (this.excludesBusy || !this.excludesLoaded || !this.excludesPolicy || this.skipQueue.snapshots.length || this.excludesDirty) return;
+    // R20 — counting waits until a running removal has finished (main's overlap guard).
+    if (this.excludesBusy || this.removalBusy || !this.excludesLoaded || !this.excludesPolicy || this.skipQueue.snapshots.length
+        || this.excludesDirty) return;
     this.excludesReading = true;
     this.excludesError = null;
     this.excludesNotice = '';
@@ -2309,26 +2322,33 @@ export class LibrarySurface extends JfElement {
   private async handleApplyExcludes(
       asked: { readonly serial: number; readonly list: string; readonly kind?: RemovalOutcome['kind'] } | null
         = this.removalAsk ?? this.removalOutcome): Promise<void> {
-    if (!asked || asked.kind === 'kept') return;
+    if (!asked || asked.kind === 'kept' || asked.kind === 'nothing') return;
     const { serial: askSerial, list } = asked;
+    if (asked.kind !== undefined && !this.removalBusy && isOverride(this.excludesPolicy)) {
+      // R19 — Try again under an override says why nothing runs.
+      this.removalOutcome = { kind: 'nothing', serial: askSerial, capped: false, scopes: [], list, detail: OVERRIDE_NO_REMOVAL };
+      return;
+    }
     if (!list || this.removalBusy || !this.excludesPolicy || isOverride(this.excludesPolicy)) return;
     const returnFocus = this.focusInRemoval();
     this.removalBusy = true;
     const serial = this.surfaceSerial;
     try {
       let observed: Awaited<ReturnType<typeof readSettingsObservation>>;
+      let mark = this.skipEditorMark();
       try { observed = await readSettingsObservation((path, init) => this.doFetch(path, init)); }
       catch (err) { this.removalFailed(asked, err); return; }
       const entries = observed.ui?.excludePatterns ?? [];
-      if (this.observedListKey(entries) !== list) { this.askAgain(entries, observed, askSerial); return; }
+      if (this.observedListKey(entries) !== list) { this.askAgain(entries, observed, asked, mark); return; }
       let result: Awaited<ReturnType<PluginHostApi['data']['invokeOperation']>>;
       try { result = await this.host_.data.invokeOperation(OP_APPLY, { rules: entries }, { consented: true }); }
       catch (err) {
         if (err instanceof OperationError && err.errorCode === 'EXCLUDES_CHANGED') {
           // Nothing was removed: the rules in effect are no longer the list asked about.
+          mark = this.skipEditorMark();
           try { [observed] = await Promise.all([readSettingsObservation((path, init) => this.doFetch(path, init)), this.loadExcludesPolicy()]); }
           catch (readErr) { this.removalFailed(asked, readErr); return; }
-          this.askAgain(observed.ui?.excludePatterns ?? [], observed, askSerial);
+          this.askAgain(observed.ui?.excludePatterns ?? [], observed, asked, mark);
           return;
         }
         this.removalFailed(asked, err); return;
@@ -2361,14 +2381,35 @@ export class LibrarySurface extends JfElement {
    * for it. An override set meanwhile withdraws it (the saved list does not take effect). An ask raised
    * meanwhile for a newer list is its own and stays, as does the outcome a Try again was for (R12).
    */
-  private askAgain(entries: readonly unknown[], observed: Awaited<ReturnType<typeof readSettingsObservation>>, askSerial: number): void {
-    if (this.excludesClean) this.adoptObservedList(entries, observed.witness, observed.ui?.invalidExcludePatterns ?? []);
+  private askAgain(entries: readonly unknown[], observed: Awaited<ReturnType<typeof readSettingsObservation>>,
+      asked: { readonly serial: number; readonly kind?: RemovalOutcome['kind'] }, mark: string): void {
+    if (this.excludesClean && this.skipEditorMark() === mark) {
+      this.adoptObservedList(entries, observed.witness, observed.ui?.invalidExcludePatterns ?? []);
+    }
+    const askSerial = asked.serial;
+    if (asked.kind !== undefined) { this.retryForChangedList(entries, asked.serial); return; }
     if (this.removalAsk?.serial !== askSerial) return;
     const base = this.removalAsk.base;
     const added = entries.filter((entry): entry is string => typeof entry === 'string' && !base.includes(entry));
     this.removalOutcome = null;
     this.removalAsk = added.length && !isOverride(this.excludesPolicy)
       ? { serial: ++this.removalAskSerial, list: this.observedListKey(entries), base } : null;
+  }
+
+  /**
+   * R19 — Try again on an outcome whose list is no longer the saved one always answers visibly: an ask
+   * open for a newer list stays and the old outcome goes; otherwise the removal is asked for the list
+   * saved now; with nothing to remove, or an override in effect, it says so.
+   */
+  private retryForChangedList(entries: readonly unknown[], outcomeSerial: number): void {
+    if (this.removalOutcome?.serial === outcomeSerial) this.removalOutcome = null;
+    if (this.removalAsk) return;
+    if (entries.length && !isOverride(this.excludesPolicy)) {
+      this.removalAsk = { serial: ++this.removalAskSerial, list: this.observedListKey(entries), base: [] };
+      return;
+    }
+    this.removalOutcome = { kind: 'nothing', serial: outcomeSerial, capped: false, scopes: [], list: this.observedListKey(entries),
+      detail: isOverride(this.excludesPolicy) ? OVERRIDE_NO_REMOVAL : 'No skip rules are saved now, so there is nothing to remove from search.' };
   }
 
   private removalFailed(asked: { readonly serial: number; readonly list: string }, err: unknown): void {
@@ -2817,7 +2858,8 @@ export class LibrarySurface extends JfElement {
             }}><span aria-hidden="true">+</span> Add a rule</jf-button>
         </div>
         ${this.developer ? html`<div class="actions">
-            <jf-button variant="ghost" .disabled=${!this.excludesLoaded || !this.excludesPolicy || this.excludesBusy || this.skipQueue.snapshots.length > 0 || this.excludesDirty}
+            <jf-button variant="ghost" .disabled=${!this.excludesLoaded || !this.excludesPolicy || this.excludesBusy || this.removalBusy
+              || this.skipQueue.snapshots.length > 0 || this.excludesDirty}
               .onActivate=${() => void this.handlePreviewExcludes()}>Count matching files</jf-button>
           </div>` : nothing}
         ${this.excludesError && !this.skipQueue.uncertain ? html`<p id="excludes-error" role="alert">${this.excludesError}</p>` : nothing}
@@ -2890,6 +2932,7 @@ export class LibrarySurface extends JfElement {
 
   private renderRemovalOutcome(outcome: RemovalOutcome): TemplateResult {
     if (outcome.kind === 'kept') return html`<p role="status" aria-atomic="true">Files already read stay searchable.</p>`;
+    if (outcome.kind === 'nothing') return html`<p role="status" aria-atomic="true">${outcome.detail}</p>`;
     const current = outcome.list === this.savedListKey();
     const rules = current ? 'your skip rules' : (JSON.parse(outcome.list) as unknown[])
       .map(entry => typeof entry === 'string' ? entry : describeExactPath((entry as ExactPathExclusion).literal.path)).join(', ');

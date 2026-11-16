@@ -198,6 +198,8 @@ it('S32.7 announces busy and the final outcome once while a removal in flight ig
     expect(busy?.[0]?.closest('[aria-live]')?.getAttribute('aria-live')).toBe('polite');
     expect(control(ask, 'Remove from search').getAttribute('aria-disabled')).toBe('true');
     control(ask, 'Remove from search').click(); control(ask, 'Keep them').click(); await settle(el);
+    // As on main: a removal or a count started while the removal runs does nothing (R20).
+    await el.handleApplyExcludes(); await el.handlePreviewExcludes(); await settle(el);
     expect(invoke).toHaveBeenCalledTimes(1);
     expect(confirm).not.toHaveBeenCalled();
   } finally {
