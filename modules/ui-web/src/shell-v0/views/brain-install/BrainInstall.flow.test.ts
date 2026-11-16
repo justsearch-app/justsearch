@@ -217,7 +217,7 @@ describe('S7b-2 progress (fm-12)', () => {
     show('runningRetrying');
     const el = await mount();
     expect(headline(el)).toBe('Installing AI');
-    expect(await topBar()).toBe('Installing AI models · 24%');
+    expect(await topBar()).toBe('Installing AI · 24%');
     expect(words(panel(el))).not.toContain('24%');
     expect(words(panel(el))).toContain('Search by exact words keeps working while this runs.');
     expect(words(el.shadowRoot!.querySelector('[role="progressbar"]')?.parentElement)).toContain('226 of 927 KB · about 2 min left');
@@ -403,7 +403,7 @@ describe('S7b-5 Try again', () => {
     expect(operations[0]!.args).toMatchObject({ acceptTerms: true });
     publish('retryRunning'); await settle(el);
     expect(headline(el)).toBe('Installing AI');
-    expect(await topBar()).toBe('Installing AI models · 33%');
+    expect(await topBar()).toBe('Installing AI · 33%');
     expect(words(panel(el))).toContain('56 of 168 KB');
     expect(partRows(el)).toEqual([
       ['Understand meaning', 'Done'],

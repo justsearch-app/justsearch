@@ -222,12 +222,12 @@ it('progress is spoken once per tenth, not on every poll; the share shows in the
   const { page, engine: state } = await open('running', {});
   await page.evaluate(() => window.mountTopBar());
   const topBar = page.locator('jf-status-pill .label');
-  await expect.poll(() => topBar.textContent()).toBe('Installing AI models · 18%');
+  await expect.poll(() => topBar.textContent()).toBe('Installing AI · 18%');
   expect(await heading(page).textContent()).toBe('Installing AI');
   await page.evaluate(() => { window.spoken.length = 0; });
   for (const done of [200_000, 210_000, 230_000, 260_000, 290_000]) {
     await publish(page, state, 'running', { downloadedBytes: done });
-    await expect.poll(() => topBar.textContent()).toBe(`Installing AI models · ${Math.round(done / 949_616 * 100)}%`);
+    await expect.poll(() => topBar.textContent()).toBe(`Installing AI · ${Math.round(done / 949_616 * 100)}%`);
     expect(await heading(page).textContent()).toBe('Installing AI');
   }
   expect(await page.evaluate(() => window.spoken)).toEqual(['Installing AI, 20%', 'Installing AI, 30%']);

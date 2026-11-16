@@ -150,8 +150,8 @@ carried the share that fm-12 shows once, in the top-bar status) under the orches
 "Installing AI", with no share and no "· Paused"; the paused state is said by G4's body words; the
 polite announcement may still carry the share ("Installing AI, N%", once per tenth). The checks that
 pinned the heading now assert the plain heading and read the share where it stands, the top bar's
-status entry (the real status pill over the same AI state; its words "Installing AI models · N%" and
-"AI download paused · N%" are unchanged by this slice): flow, focus-lockdown, installOperations and
+status entry (the real status pill over the same AI state; its words were then "Installing AI models
+· N%" and "AI download paused · N%", which the sixth session changed under G3'''): flow, focus-lockdown, installOperations and
 repairRun. BrainSurface.redesign's remount case, which found "50%" anywhere in the page text, reads the
 page's progress bar instead. On the previous candidate (9e4a0cadba, a shared clone with the new check
 files copied in) the updated checks fail by assertion where the heading carried the share: 5 flow
@@ -163,6 +163,28 @@ sizes are now cited to the orchestrator's accepted deviation "KB under 1 MB" in 
 them. Outside the gate's items, e2e/csp-chromium.mjs (run by src/boot/csp-styles-lockdown.test.ts)
 waited for "45%" in the heading; it now waits for the run's bar at 45 and measures it as before.
 
+A sixth builder session (builder-fm-s7b-20261116f) answered a finding of the verification in the packaged
+app (during a first install with no folder added the percentage showed nowhere: first use hides the top
+bar's working status, StatusPill.ts, as on main, and G3'' had taken it out of the heading) under the
+orchestrator's decision G3''' (delegated choice, cited verbatim in the affected entries): while an AI
+install run is active or stopped the top-bar status shows it also in first use, "Installing AI · N%"
+while running and "Installing AI · N% · Paused" while paused (fm-12's words, replacing "Installing AI
+models · N%" and "AI download paused · N%"), "Download stopped" for the stopped view as before; the rest
+of first use's hiding stays. BrainInstall.topBar.test.ts gains four cases over a first use the real
+roots observation confirms (no folders, 0 searchable): on the previous candidate (9b69b764b5, a shared
+clone with the new check files copied in) the running and paused cases fail by assertion (the bar is
+hidden, null), and the stopped case and the preservation case (calm and "Starting AI models" stay hidden
+without a run) hold there and guard the change. The words follow in the checks that pin them: flow,
+focus-lockdown, installOperations, repairRun, and two older checks outside the install pages,
+StatusPill.design.test.ts and frameStatus.optionalAi.test.ts (entries below); each fails on the previous
+candidate by assertion on the old words. Named for the acceptor: (m) the interrupted download after a
+restart (no run) keeps its Needs-you row "AI download paused" (unrequestedAi FA3c, unchanged), because
+G3''' names the run's status; (n) "Paused" also follows the title in the status panel's row and in the
+spoken status ("Installing AI · Paused"), so the panel and speech say what the bar says; (o) in first use
+with no folder the bar prefers the install run over other work, which first use would hide, and an
+install run's pill is never replaced by first use's "Reading files". The page evidence was re-run with
+--before origin/main and the same two overlays, adding the two older checks.
+
 ```json
 {
   "entries": [
@@ -173,7 +195,7 @@ waited for "45%" in the heading; it now waits for the run's bar at 45 and measur
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "AI Brain's install flow rendered from the Engine's recorded statuses: the consent's five parts with page names, sizes, licences and Terms, Cancel starting nothing and Accept starting the install, \"Up to\" with staged bytes (S7b-1); unknown sizes and a missing manifest block Accept with a reason, a missing licence says so (S7b-10); progress under the plain heading \"Installing AI\" with the share only in the top-bar status entry (G3''), amounts, time left only when estimated, Done only after model presence observed after the part's last file, Waiting or a stage's refusal reason (S7b-2); Pause/Resume words and Cancel's toast without a promise of continuing (S7b-3); the stopped view with Done/Stopped/Waiting, Try again, Cancel install and Detail for support, no red, no connection claim (S7b-4); Try again's run covering only what is missing (S7b-5); Cancel install bound to the failed run (S7b-6); not installed after a first install that stopped with nothing placed, partial-only, supporting-only, unknown presence (S7b-7, G6'); restart reconstruction (S7b-8). Bytes an earlier download left: the action is \"Install AI\" with the most it can download, named so in its accessible name, never \"Resume Download\" or a promise to continue (G4', gap 2); a first install that runs, a paused run and a stopped download show only the install view, without steps, graphics card or Advanced settings, and the steps return after completion and after Cancel install (gap 3). Review repairs: Try again after a failed Best match first download asks the Engine to switch it on when done, as the consent accepted, and not when that choice was saved differently since (RS1); after a restart a complete GPU runtime package with no model file is not an installation (RS2); a damaged installation found on disk after a restart offers Repair, its repair run keeps the steps, and a failed (after Cancel install) or cancelled repair run keeps the repair classification (RS3); after Cancel install with model presence unreadable the page says it is checking, not \"AI isn't installed yet\", until presence resolves (RS4); a part the Engine reports verifying, in the download phase, reads \"Checking the downloaded files\" with no time left (RS5, W7). Second review repairs: a completed status left from the earlier run does not clear the accepted consent's completion intent, which follows Try again to its new run and is cleared only when its own run completes (RS7); a model file on disk before a repair run, whose tokenizer that run downloads, keeps the steps during the run and the repair classification after it was cancelled or failed (and Cancel install), while a model file the first install itself placed is still not an installation (RS8).",
+      "behaviour": "AI Brain's install flow rendered from the Engine's recorded statuses: the consent's five parts with page names, sizes, licences and Terms, Cancel starting nothing and Accept starting the install, \"Up to\" with staged bytes (S7b-1); unknown sizes and a missing manifest block Accept with a reason, a missing licence says so (S7b-10); progress under the plain heading \"Installing AI\" with the share only in the top-bar status entry (G3''), amounts, time left only when estimated, Done only after model presence observed after the part's last file, Waiting or a stage's refusal reason (S7b-2); Pause/Resume words and Cancel's toast without a promise of continuing (S7b-3); the stopped view with Done/Stopped/Waiting, Try again, Cancel install and Detail for support, no red, no connection claim (S7b-4); Try again's run covering only what is missing (S7b-5); Cancel install bound to the failed run (S7b-6); not installed after a first install that stopped with nothing placed, partial-only, supporting-only, unknown presence (S7b-7, G6'); restart reconstruction (S7b-8). Bytes an earlier download left: the action is \"Install AI\" with the most it can download, named so in its accessible name, never \"Resume Download\" or a promise to continue (G4', gap 2); a first install that runs, a paused run and a stopped download show only the install view, without steps, graphics card or Advanced settings, and the steps return after completion and after Cancel install (gap 3). Review repairs: Try again after a failed Best match first download asks the Engine to switch it on when done, as the consent accepted, and not when that choice was saved differently since (RS1); after a restart a complete GPU runtime package with no model file is not an installation (RS2); a damaged installation found on disk after a restart offers Repair, its repair run keeps the steps, and a failed (after Cancel install) or cancelled repair run keeps the repair classification (RS3); after Cancel install with model presence unreadable the page says it is checking, not \"AI isn't installed yet\", until presence resolves (RS4); a part the Engine reports verifying, in the download phase, reads \"Checking the downloaded files\" with no time left (RS5, W7). Second review repairs: a completed status left from the earlier run does not clear the accepted consent's completion intent, which follows Try again to its new run and is cleared only when its own run completes (RS7); a model file on disk before a repair run, whose tokenizer that run downloads, keeps the steps during the run and the repair classification after it was cancelled or failed (and Cancel install), while a model file the first install itself placed is still not an installation (RS8). The share in the top bar reads \"Installing AI · N%\" (G3''').",
       "sources": [
         {
           "kind": "owner-words",
@@ -340,7 +362,7 @@ waited for "45%" in the heading; it now waits for the run's bar at 45 and measur
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the top-bar status entry's existing words (\"Installing AI models · N%\", \"AI download paused · N%\"), which this slice does not change, and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
+          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the share in the top-bar status entry, whose words G3''' sets (\"Installing AI · N%\", \"Installing AI · N% · Paused\"), and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
           "label": "agent choice"
         },
         {
@@ -349,6 +371,14 @@ waited for "45%" in the heading; it now waits for the run's bar at 45 and measur
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator, 2026-11-16, accepted builder deviations (verbatim): \"7b builder deviations accepted (mine): KB under 1 MB; repair owed also on Engine-reported existing installation; \\\"Downloaded\\\" for on-disk step before install; consent first focus on Terms as before.\" Under it, sizes below 1 MB in the consent and the progress show whole KB (\"1 KB\", \"3 KB\", \"56 of 177 KB\"); MB and GB follow G2'.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "G3''' (orchestrator, 2026-11-16, verbatim): \"while an AI install run is active or stopped, the top-bar status shows it whether or not any folder has been added (first use included): \\\"Installing AI · N%\\\" while running (fm-12's words; replaces \\\"Installing AI models · N%\\\"), \\\"Installing AI · N% · Paused\\\" while paused (replaces \\\"AI download paused · N%\\\"), and \\\"Download stopped\\\" (amber) for the stopped view as now. The rest of first use's top-bar hiding stays as on main.\"",
           "label": "agent choice"
         }
       ],
@@ -365,7 +395,7 @@ waited for "45%" in the heading; it now waits for the run's bar at 45 and measur
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "In headless Chromium with the real AI state store: Escape and Cancel return focus to Install AI and Accept is reachable by Tab; Pause keeps focus as it becomes Resume and the paused words are announced politely; progress is announced once per tenth (\"Installing AI, N%\"), while the heading stays \"Installing AI\" and the share shows in the top bar's status entry (G3''); focus moves to the heading on failure, to Pause after Try again, to the heading on completion and after Cancel install; light and dark at 600 px nothing overflows or leaves the size and corner ladders, the stopped view has no error alert, no teal bar and Try again as its only filled action; the consent stays on the ladders at 600 px. When the install view takes the page focus is not lost: after Accept and download, and from a focused step when a run starts, focus moves to Pause (gap 3). After Try again, focus is never lost: a run that completes or fails again before any poll sees it running, and a refused start, put focus on the heading (RS6).",
+      "behaviour": "In headless Chromium with the real AI state store: Escape and Cancel return focus to Install AI and Accept is reachable by Tab; Pause keeps focus as it becomes Resume and the paused words are announced politely; progress is announced once per tenth (\"Installing AI, N%\"), while the heading stays \"Installing AI\" and the share shows in the top bar's status entry (G3''); focus moves to the heading on failure, to Pause after Try again, to the heading on completion and after Cancel install; light and dark at 600 px nothing overflows or leaves the size and corner ladders, the stopped view has no error alert, no teal bar and Try again as its only filled action; the consent stays on the ladders at 600 px. When the install view takes the page focus is not lost: after Accept and download, and from a focused step when a run starts, focus moves to Pause (gap 3). After Try again, focus is never lost: a run that completes or fails again before any poll sees it running, and a refused start, put focus on the heading (RS6). The spoken share follows the top bar's \"Installing AI · N%\" (G3''').",
       "sources": [
         {
           "kind": "owner-words",
@@ -458,7 +488,15 @@ waited for "45%" in the heading; it now waits for the run's bar at 45 and measur
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the top-bar status entry's existing words (\"Installing AI models · N%\", \"AI download paused · N%\"), which this slice does not change, and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
+          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the share in the top-bar status entry, whose words G3''' sets (\"Installing AI · N%\", \"Installing AI · N% · Paused\"), and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "G3''' (orchestrator, 2026-11-16, verbatim): \"while an AI install run is active or stopped, the top-bar status shows it whether or not any folder has been added (first use included): \\\"Installing AI · N%\\\" while running (fm-12's words; replaces \\\"Installing AI models · N%\\\"), \\\"Installing AI · N% · Paused\\\" while paused (replaces \\\"AI download paused · N%\\\"), and \\\"Download stopped\\\" (amber) for the stopped view as now. The rest of first use's top-bar hiding stays as on main.\"",
           "label": "agent choice"
         }
       ],
@@ -475,7 +513,7 @@ waited for "45%" in the heading; it now waits for the run's bar at 45 and measur
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "The real status pill beside the AI Brain page, both reading one AI state built from the Engine's recorded statuses: a failed run with a part missing, and a failed first install with nothing placed, show in the top bar as \"1 Download stopped\" in amber (warning tone, count 1), the status panel row says \"Download stopped\" with \"Completed parts stay on this computer, and search by exact words keeps working.\" and not \"AI install failed\"; after Cancel install the entry returns to normal (no Download stopped, no Needs you, no count), the identical failed poll stays closed, a later run's failure shows \"Download stopped\" again; without the AI Brain page the bar decides from the install status alone.",
+      "behaviour": "The real status pill beside the AI Brain page, both reading one AI state built from the Engine's recorded statuses: a failed run with a part missing, and a failed first install with nothing placed, show in the top bar as \"1 Download stopped\" in amber (warning tone, count 1), the status panel row says \"Download stopped\" with \"Completed parts stay on this computer, and search by exact words keeps working.\" and not \"AI install failed\"; after Cancel install the entry returns to normal (no Download stopped, no Needs you, no count), the identical failed poll stays closed, a later run's failure shows \"Download stopped\" again; without the AI Brain page the bar decides from the install status alone. G3''': in first use, with no folder added (the Engine's roots answer empty, 0 searchable), the bar shows the install run: \"Installing AI · 18%\" with its ring while it runs, \"Installing AI · 18% · Paused\" while paused (between files and while a file finishes) and \"Installing AI · 18%\" again after Resume, \"Download stopped\" in amber for a stopped first install; preserved: without a run (AI not installed after a restart) the calm status stays hidden, and so does other work (\"Starting AI models\").",
       "sources": [
         {
           "kind": "owner-words",
@@ -497,6 +535,14 @@ waited for "45%" in the heading; it now waits for the run's bar at 45 and measur
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator, 2026-11-16, gap 1 (G5'): \"fm-12b shows in the top bar an amber status badge \\\"Download stopped\\\" (picture text: \\\"1 Download stopped\\\") while a failed run with parts missing is shown; today the bar says \\\"AI install failed\\\" in red. Make the top bar's status entry follow the stopped view (amber, \\\"Download stopped\\\"), and return to normal after \\\"Cancel install\\\" / a later run, consistent with G5'.\"",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "G3''' (orchestrator, 2026-11-16, verbatim): \"while an AI install run is active or stopped, the top-bar status shows it whether or not any folder has been added (first use included): \\\"Installing AI · N%\\\" while running (fm-12's words; replaces \\\"Installing AI models · N%\\\"), \\\"Installing AI · N% · Paused\\\" while paused (replaces \\\"AI download paused · N%\\\"), and \\\"Download stopped\\\" (amber) for the stopped view as now. The rest of first use's top-bar hiding stays as on main.\"",
           "label": "agent choice"
         }
       ],
@@ -784,12 +830,20 @@ waited for "45%" in the heading; it now waits for the run's bar at 45 and measur
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the top-bar status entry's existing words (\"Installing AI models · N%\", \"AI download paused · N%\"), which this slice does not change, and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
+          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the share in the top-bar status entry, whose words G3''' sets (\"Installing AI · N%\", \"Installing AI · N% · Paused\"), and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "G3''' (orchestrator, 2026-11-16, verbatim): \"while an AI install run is active or stopped, the top-bar status shows it whether or not any folder has been added (first use included): \\\"Installing AI · N%\\\" while running (fm-12's words; replaces \\\"Installing AI models · N%\\\"), \\\"Installing AI · N% · Paused\\\" while paused (replaces \\\"AI download paused · N%\\\"), and \\\"Download stopped\\\" (amber) for the stopped view as now. The rest of first use's top-bar hiding stays as on main.\"",
           "label": "agent choice"
         }
       ],
       "conflictSearch": "decision records searched for a conflict (docs/decisions: resume, pause, consent, repair, first run): none",
-      "whatChanged": "Heading \"Installing AI\" (G3'': no share, no \"· Paused\") and the paused line instead of \"Installing… 25%\" / \"Paused 25%\"; the share is read from the top bar's status entry, mounted over the same store (\"Installing AI models · 25%\", \"AI download paused · 25%\"); buttons \"Pause\" / \"Resume\"; the parts list replaces the staged-progress block in the hidden-while-unobserved checks."
+      "whatChanged": "Heading \"Installing AI\" (G3'': no share, no \"· Paused\") and the paused line instead of \"Installing… 25%\" / \"Paused 25%\"; the share is read from the top bar's status entry, mounted over the same store (\"Installing AI · 25%\", \"Installing AI · 25% · Paused\", G3'''); buttons \"Pause\" / \"Resume\"; the parts list replaces the staged-progress block in the hidden-while-unobserved checks."
     },
     {
       "items": [
@@ -878,7 +932,7 @@ waited for "45%" in the heading; it now waits for the run's bar at 45 and measur
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the top-bar status entry's existing words (\"Installing AI models · N%\", \"AI download paused · N%\"), which this slice does not change, and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
+          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the share in the top-bar status entry, whose words G3''' sets (\"Installing AI · N%\", \"Installing AI · N% · Paused\"), and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
           "label": "agent choice"
         },
         {
@@ -1050,12 +1104,20 @@ waited for "45%" in the heading; it now waits for the run's bar at 45 and measur
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the top-bar status entry's existing words (\"Installing AI models · N%\", \"AI download paused · N%\"), which this slice does not change, and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
+          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the share in the top-bar status entry, whose words G3''' sets (\"Installing AI · N%\", \"Installing AI · N% · Paused\"), and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "G3''' (orchestrator, 2026-11-16, verbatim): \"while an AI install run is active or stopped, the top-bar status shows it whether or not any folder has been added (first use included): \\\"Installing AI · N%\\\" while running (fm-12's words; replaces \\\"Installing AI models · N%\\\"), \\\"Installing AI · N% · Paused\\\" while paused (replaces \\\"AI download paused · N%\\\"), and \\\"Download stopped\\\" (amber) for the stopped view as now. The rest of first use's top-bar hiding stays as on main.\"",
           "label": "agent choice"
         }
       ],
       "conflictSearch": "decision records searched for a conflict (docs/decisions: resume, pause, consent, repair, first run): none",
-      "whatChanged": "Heading \"Installing AI\" during the run and while planning (G3'': no share) and the paused line; which observation the run follows is read from the share in the top bar's status entry, a real status pill over the same store state (now with the connection, verdict and activity the bar reads); \"Pause\" / \"Resume\"; Cancel's toast says what is kept without continuing; the refused stage's reason on its part's row; no search-ready line."
+      "whatChanged": "Heading \"Installing AI\" during the run and while planning (G3'': no share) and the paused line; which observation the run follows is read from the share in the top bar's status entry, a real status pill over the same store state, in G3''''s words (\"Installing AI · 25%\", \"Installing AI · 25% · Paused\") (now with the connection, verdict and activity the bar reads); \"Pause\" / \"Resume\"; Cancel's toast says what is kept without continuing; the refused stage's reason on its part's row; no search-ready line."
     },
     {
       "items": [
@@ -1180,6 +1242,58 @@ waited for "45%" in the heading; it now waits for the run's bar at 45 and measur
       ],
       "conflictSearch": "decision records searched for a conflict (docs/decisions: resume, pause, consent, repair, first run): none",
       "whatChanged": "The type ladder census is 142 views, not 150: the fixture's AI Brain is a first install that runs, and its page is then the install view with no steps or Advanced settings to open (Brain 1 view per theme instead of 5). The ladder rules themselves are unchanged; the install view is audited on them in BrainInstall.focus-lockdown."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "fm-12 top-bar status \"Installing AI · 50%\"; page lead \"Installing AI\"; \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
+          "location": "task t-20261113-fmimpl agreement, picture notes fm-11, fm-12, fm-12b",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "G3''' (orchestrator, 2026-11-16, verbatim): \"while an AI install run is active or stopped, the top-bar status shows it whether or not any folder has been added (first use included): \\\"Installing AI · N%\\\" while running (fm-12's words; replaces \\\"Installing AI models · N%\\\"), \\\"Installing AI · N% · Paused\\\" while paused (replaces \\\"AI download paused · N%\\\"), and \\\"Download stopped\\\" (amber) for the stopped view as now. The rest of first use's top-bar hiding stays as on main.\"",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict (docs/decisions: resume, pause, consent, repair, first run, status pill): none",
+      "whatChanged": "The status pill's words for a known install fraction are \"Installing AI · 40%\" (and \"Installing AI\" without one) instead of \"Installing AI models · 40%\" / \"Installing AI models\" (G3''', fm-12's top-bar words). The ring, its 40 data-percent and 40 100 arc, the visible share and the unknown-fraction no-ring assertions stay."
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "fm-12 top-bar status \"Installing AI · 50%\"; page lead \"Installing AI\"; \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
+          "location": "task t-20261113-fmimpl agreement, picture notes fm-11, fm-12, fm-12b",
+          "label": "owner words"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "G3''' (orchestrator, 2026-11-16, verbatim): \"while an AI install run is active or stopped, the top-bar status shows it whether or not any folder has been added (first use included): \\\"Installing AI · N%\\\" while running (fm-12's words; replaces \\\"Installing AI models · N%\\\"), \\\"Installing AI · N% · Paused\\\" while paused (replaces \\\"AI download paused · N%\\\"), and \\\"Download stopped\\\" (amber) for the stopped view as now. The rest of first use's top-bar hiding stays as on main.\"",
+          "label": "agent choice"
+        }
+      ],
+      "conflictSearch": "decision records searched for a conflict (docs/decisions: resume, pause, consent, repair, first run, status pill): none",
+      "whatChanged": "An AI install the person started shows its progress as the working pill \"Installing AI\" instead of \"Installing AI models\" (G3''', fm-12's top-bar words); nothing needs the person while it runs, as before."
     }
   ]
 }

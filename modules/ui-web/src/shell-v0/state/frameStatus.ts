@@ -79,6 +79,8 @@ export interface StatusFact {
   readonly unread?: boolean;
   readonly stale?: boolean;
   readonly percent?: number | null;
+  /** G3''' — words after the share: the top bar reads "title · N% · after", the panel and speech "title · after". */
+  readonly after?: string;
   readonly actions?: readonly StatusAction[];
   readonly indexing?: boolean;
   readonly indeterminate?: boolean;
@@ -112,7 +114,7 @@ export interface DurableStatusOperation {
   readonly observedAtMs?: number;
 }
 interface FrameStatusInput {
-  readonly gettingStarted?: { readonly visible: boolean; readonly known: boolean; readonly currentStep: number };
+  readonly gettingStarted?: { readonly visible: boolean; readonly known: boolean; readonly currentStep: number; readonly empty?: boolean };
   readonly ai: AiState | null;
   readonly now: number;
   readonly contactLostAt: number | null;
@@ -146,6 +148,10 @@ interface StatusPillState {
   readonly words?: string;
   readonly stale: boolean;
   readonly percent?: number | null;
+  /** G3''' — words after the share ("Installing AI · 40% · Paused"). */
+  readonly after?: string;
+  /** G3''' — it shows an AI install run, which first use does not hide. */
+  readonly installRun?: boolean;
   /** Needs-you or problems count, shown as the pill's badge. */
   readonly count?: number;
   /** fm-12b — Needs you holding one item that names itself ("1 Download stopped") instead of "Needs you". */
@@ -350,7 +356,7 @@ export interface Spoken { readonly text: string; readonly politeness: 'status' |
  * shows ("Up to date", "Keyword search ready", "1 needs you", "Search limited"), without the age a
  * stale pill adds, so a verdict the pill does not show ("Catching up…", "Service degraded") is never
  * spoken. While work runs, indexing is said by the indexing announcer; the first other work that runs
- * now is said by its row's title ("Rebuilding search", "Installing AI models") — by the indexing
+ * now is said by its row's title ("Rebuilding search", "Installing AI", "Installing AI · Paused") — by the indexing
  * announcer while it is an indexing transition — and nothing for work whose state is unconfirmed. A
  * passing completion is said by its own notice, not twice. Indexing work the panel leaves
  * out because it only waits for AI (semantic work waiting for AI nobody asked for, or for the AI
@@ -368,7 +374,7 @@ export function spokenStatus(model: FrameStatus, ai: AiState | null): {
   if (pill.kind === 'working') {
     const work = model.sections.running.find(row => !row.stale && row.id !== 'indexing' && row.id !== FILE_ACTIVITY_ID
       && row.id !== 'file-window' && !row.id.startsWith('folder-work:'));
-    return { verdict: work ? { text: work.title, politeness: 'status' } : null, indexing };
+    return { verdict: work ? { text: work.after ? `${work.title} · ${work.after}` : work.title, politeness: 'status' } : null, indexing };
   }
   const text = pill.kind === 'unknown' || (pill.stale && pill.kind === 'calm') ? CHECKING : pill.words ?? pill.label;
   const urgent = pill.kind === 'unreachable' || (pill.kind === 'limited' && ai?.verdict.severity === 'error');
@@ -595,8 +601,11 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     id: 'search-reduced', section: aiGap ? 'needs' : 'problems', title: reduced.headline.replace(/\.$/, ''), detail: reduced.body,
     stale: ai.phase !== 'connected', actions: [aiGap ? go('Open AI Brain', 'core.brain-surface') : go('Health', 'core.health-surface')] });
   const install = ai?.installStatus;
+  // G3''' (fm-12) — a run reads "Installing AI", and "Installing AI · N% · Paused" while paused.
+  const installRun = !!ai && (install?.state === 'running' || ai.aiEngine.kind === 'installing');
   if (ai && (install?.state === 'running' || ['installing', 'starting'].includes(ai.aiEngine.kind))) add({ id: 'ai-install', section: 'running',
-    title: install?.paused ? 'AI download paused' : ai.aiEngine.kind === 'starting' ? 'Starting AI models' : 'Installing AI models',
+    title: !install?.paused && ai.aiEngine.kind === 'starting' ? 'Starting AI models' : 'Installing AI',
+    ...(install?.paused ? { after: 'Paused' } : {}),
     stale: !ai.installObservationLive,
     percent: ai.installObservationLive && (install?.totalBytes ?? 0) > 0 && (install?.downloadedBytes ?? -1) >= 0
       ? Math.min(100, Math.round(install!.downloadedBytes! / install!.totalBytes! * 100)) : null,
@@ -666,8 +675,11 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   } else if (sections.needs.length) pill = { kind: 'needs', label: `${sections.needs.length} ${sections.needs.length === 1 ? 'needs' : 'need'} you`, count: sections.needs.length, stale: sections.needs.every(row => row.stale === true) };
   else if (sections.problems.length) pill = { kind: 'problems', label: `Problems right now (${sections.problems.length})`, count: sections.problems.length, stale };
   else if (sections.running.some(row => row.id !== FILE_ACTIVITY_ID)) {
-    const row = sections.running.find(r => r.id !== FILE_ACTIVITY_ID)!;
-    pill = { kind: 'working', label: row.title, stale: row.stale ?? stale, ...(row.percent != null ? { percent: row.percent } : {}) };
+    // G3''' — first use before any folder hides other work, so there the install run is what shows.
+    const installRow = installRun ? sections.running.find(r => r.id === 'ai-install') : undefined;
+    const row = (input.gettingStarted?.empty ? installRow : undefined) ?? sections.running.find(r => r.id !== FILE_ACTIVITY_ID)!;
+    pill = { kind: 'working', label: row.title, stale: row.stale ?? stale, ...(row.percent != null ? { percent: row.percent } : {}),
+      ...(row.after ? { after: row.after } : {}), ...(installRun && row.id === 'ai-install' ? { installRun: true } : {}) };
   // A completion is a ready claim: it needs a fresh observation like calm does (ST2).
   } else if (!stale && input.finished && now - input.finished.at < FINISHED_DWELL_MS) pill = { kind: 'finished', label: input.finished.title, stale: false };
   else if (!stale && searchServesFully && progress.phase === 'ready') pill = { kind: 'calm', label: 'Up to date', stale: false };
@@ -679,7 +691,9 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     const age = ai?.connection.lastSuccessMs == null ? null : Math.max(0, Math.floor((now - ai.connection.lastSuccessMs) / 60_000));
     // No retained calm claim while an observation is stale. The contact signal determines ONLY
     // "reconnecting"; a reachable origin with a stale poll says "checking".
-    pill = { ...pill, words: pill.label, label: `${pill.kind === 'calm' ? 'Search status' : pill.label} · ${age === null ? 'not yet observed' : `last seen ${age < 1 ? 'just now' : `${age} min ago`}`} · ${ai?.connection.reachable || !pastGrace ? 'checking' : 'reconnecting'}` };
+    const { after, ...shown } = pill;
+    const said = after ? `${pill.label} · ${after}` : pill.label;
+    pill = { ...shown, words: said, label: `${pill.kind === 'calm' ? 'Search status' : said} · ${age === null ? 'not yet observed' : `last seen ${age < 1 ? 'just now' : `${age} min ago`}`} · ${ai?.connection.reachable || !pastGrace ? 'checking' : 'reconnecting'}` };
   }
   return { pill, sections, progress };
 }

@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-16T05:20:37.879Z",
-  "revision": "9e4a0cadba9c7e621ab6b4b5a73144df9dd5d8a4",
-  "tree": "602d1c53003d0e797b309e0062bbf90ec7f30250",
+  "createdAt": "2026-11-16T06:17:21.180Z",
+  "revision": "9b69b764b54a59947a7f2651d1f5380324d42d3a",
+  "tree": "a8b96a42bcde34acf05ef8f221ab0535b1338eeb",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-install/BrainInstall.flow.test.ts\" \"src/shell-v0/views/brain-install/BrainInstall.topBar.test.ts\" \"src/shell-v0/state/aiVerdict.test.ts\" \"src/shell-v0/views/BrainSurface.componentList.test.ts\" \"src/shell-v0/views/BrainSurface.firstRun.test.ts\" \"src/shell-v0/views/BrainSurface.installConsent.test.ts\" \"src/shell-v0/views/BrainSurface.installOperations.test.ts\" \"src/shell-v0/views/BrainSurface.installProgressAggregate.test.ts\" \"src/shell-v0/views/BrainSurface.picture-switch.test.ts\" \"src/shell-v0/views/BrainSurface.redesign.test.ts\" \"src/shell-v0/views/BrainSurface.remove-files.test.ts\" \"src/shell-v0/views/BrainSurface.reranker-switch.test.ts\" \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.preservation.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/066magl7/tmp/test-intent-vitest-16728-1794806273902.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-install/BrainInstall.flow.test.ts\" \"src/shell-v0/views/brain-install/BrainInstall.topBar.test.ts\" \"src/shell-v0/state/aiVerdict.test.ts\" \"src/shell-v0/views/BrainSurface.componentList.test.ts\" \"src/shell-v0/views/BrainSurface.firstRun.test.ts\" \"src/shell-v0/views/BrainSurface.installConsent.test.ts\" \"src/shell-v0/views/BrainSurface.installOperations.test.ts\" \"src/shell-v0/views/BrainSurface.installProgressAggregate.test.ts\" \"src/shell-v0/views/BrainSurface.picture-switch.test.ts\" \"src/shell-v0/views/BrainSurface.redesign.test.ts\" \"src/shell-v0/views/BrainSurface.remove-files.test.ts\" \"src/shell-v0/views/BrainSurface.reranker-switch.test.ts\" \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.preservation.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" \"src/shell-v0/components/StatusPill.design.test.ts\" \"src/shell-v0/state/frameStatus.optionalAi.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1onq46j2/tmp/test-intent-vitest-12118-1794809675225.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 4910
+      "durationMs": 5090
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts\" \"src/boot/type-ladder-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/066magl7/tmp/test-intent-vitest-16728-1794806278813.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts\" \"src/boot/type-ladder-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/1onq46j2/tmp/test-intent-vitest-12118-1794809680317.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 74872
+      "durationMs": 75702
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:24afff5f17729fa8c670c2a545ce2efb10205f4b3adce8517e8a5a10fe4b1119",
+      "contentDigest": "sha256:b6b193037d1e7928822c365d5bff1e2527f23626eed863c183ce645921f5ff8d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -226,7 +226,7 @@
       "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:7b3c49aceb9d81b84c5810780bd475d513170afa8764b91ec61cae02fc471ef5",
+      "contentDigest": "sha256:d383cf1029974e4965b2c92a1eac5c1afa701b53c5d974641fa64cde28233c42",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -277,7 +277,7 @@
       "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.topBar.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.topBar.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:63cb921f12d7e3d09967bba6484dcfc642d23b5dce1612e329452205e600fda7",
+      "contentDigest": "sha256:bbd9c87b79a29b2efdf0470b2a2194ce62b31af095a57264d984bcf422e74b82",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -296,6 +296,22 @@
         },
         {
           "name": "fm-12b the top bar follows the stopped view without the AI Brain page the bar decides from the install status alone",
+          "status": "passed"
+        },
+        {
+          "name": "G3''' the bar shows an install run in first use, before any folder was added while the first install runs: \"Installing AI · 18%\" (fm-12), with its ring",
+          "status": "passed"
+        },
+        {
+          "name": "G3''' the bar shows an install run in first use, before any folder was added while it is paused: \"Installing AI · 18% · Paused\"; Resume shows the running words again",
+          "status": "passed"
+        },
+        {
+          "name": "G3''' the bar shows an install run in first use, before any folder was added a stopped download still says \"Download stopped\" in amber",
+          "status": "passed"
+        },
+        {
+          "name": "G3''' the bar shows an install run in first use, before any folder was added preserved: without an install run first use still hides the calm status and other work",
           "status": "passed"
         }
       ]
@@ -740,7 +756,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.installOperations.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.installOperations.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5a43bd5312f9ad2dbff059825815ae49f858a4175754a52a550e82dcd10d098c",
+      "contentDigest": "sha256:ee4be5974e5067ff275349168a73fa545c6bceaff2d8d5f012b98ea123cdab26",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1113,7 +1129,7 @@
       "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:e7bae852cd3fbaa8c3e96118cacc3fc199a60ac8aabc164a3d9a589b94c1e53c",
+      "contentDigest": "sha256:8ea8d490c5b539a642d8ff57b03c03e690faefef7e25f8f4751ec4019af508fd",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -1438,6 +1454,76 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0e8675dab1fedfe6b87300b22e7a29d5dc96b3d449ff10509bf0678b8cdff2c7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "status pill drawing ref-09 needs you shows its count in a badge followed by the words, and names both",
+          "status": "passed"
+        },
+        {
+          "name": "status pill drawing working with a known fraction draws a ring and \"· N%\" text; unknown fractions draw none",
+          "status": "passed"
+        },
+        {
+          "name": "status pill drawing below 1000 px the pill is an icon (badge or dot) with the same accessible name, without truncated text",
+          "status": "passed"
+        },
+        {
+          "name": "status pill drawing ref-07 the undo notice names Ctrl+Z, and the shell undo command reverses that notice once",
+          "status": "passed"
+        },
+        {
+          "name": "status pill drawing a notice whose action is not an undo neither claims Ctrl+Z nor takes the undo command",
+          "status": "passed"
+        },
+        {
+          "name": "status pill drawing at 600 px the panel arrow points at the pill where the panel had to shift to fit",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:fcb9f46679491a6bfaf216b5c47a9572bda009d3ed9a5726a7800b2403f294c7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "FA3 optional AI and the status pill fresh install, no AI models, nothing asked of AI: the pill shows keyword readiness, nothing needs the person",
+          "status": "passed"
+        },
+        {
+          "name": "FA3 optional AI and the status pill after first use, keyword search reads as ready, never \"Up to date\" over missing semantic coverage",
+          "status": "passed"
+        },
+        {
+          "name": "FA3 optional AI and the status pill an AI install the person started shows its progress, not \"Needs you\", while it runs",
+          "status": "passed"
+        },
+        {
+          "name": "FA3 what still needs the person installed AI models that are not running shows as needing them",
+          "status": "passed"
+        },
+        {
+          "name": "FA3 what still needs the person semantic search turned on that cannot run shows as needing them",
+          "status": "passed"
+        },
+        {
+          "name": "FA3 what still needs the person another enabled producer that cannot run shows as needing them",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": {
@@ -1450,122 +1536,132 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-install/BrainInstall.flow.test.ts\" \"src/shell-v0/views/brain-install/BrainInstall.topBar.test.ts\" \"src/shell-v0/state/aiVerdict.test.ts\" \"src/shell-v0/views/BrainSurface.componentList.test.ts\" \"src/shell-v0/views/BrainSurface.firstRun.test.ts\" \"src/shell-v0/views/BrainSurface.installConsent.test.ts\" \"src/shell-v0/views/BrainSurface.installOperations.test.ts\" \"src/shell-v0/views/BrainSurface.installProgressAggregate.test.ts\" \"src/shell-v0/views/BrainSurface.picture-switch.test.ts\" \"src/shell-v0/views/BrainSurface.redesign.test.ts\" \"src/shell-v0/views/BrainSurface.remove-files.test.ts\" \"src/shell-v0/views/BrainSurface.reranker-switch.test.ts\" \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.preservation.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/066magl7/tmp/test-intent-vitest-16728-1794806355413.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-install/BrainInstall.flow.test.ts\" \"src/shell-v0/views/brain-install/BrainInstall.topBar.test.ts\" \"src/shell-v0/state/aiVerdict.test.ts\" \"src/shell-v0/views/BrainSurface.componentList.test.ts\" \"src/shell-v0/views/BrainSurface.firstRun.test.ts\" \"src/shell-v0/views/BrainSurface.installConsent.test.ts\" \"src/shell-v0/views/BrainSurface.installOperations.test.ts\" \"src/shell-v0/views/BrainSurface.installProgressAggregate.test.ts\" \"src/shell-v0/views/BrainSurface.picture-switch.test.ts\" \"src/shell-v0/views/BrainSurface.redesign.test.ts\" \"src/shell-v0/views/BrainSurface.remove-files.test.ts\" \"src/shell-v0/views/BrainSurface.reranker-switch.test.ts\" \"src/shell-v0/views/BrainSurface.sliceB.test.ts\" \"src/shell-v0/views/BrainSurface.repairRun.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.preservation.test.ts\" \"src/shell-v0/views/BrainSurface.pausedInstall.test.ts\" \"src/shell-v0/views/BrainSurface.liveRepairs.test.ts\" \"src/shell-v0/components/StatusPill.design.test.ts\" \"src/shell-v0/state/frameStatus.optionalAi.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/1onq46j2/tmp/test-intent-vitest-12118-1794809757397.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 5507,
-        "output": "JSON report written to /home/elias/.cache/am/066magl7/tmp/test-intent-vitest-16728-1794806355413.json\n\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\n"
+        "durationMs": 5144,
+        "output": "JSON report written to /home/elias/.cache/am/1onq46j2/tmp/test-intent-vitest-12118-1794809757397.json\n\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\nAggregateError: \n    at internalConnectMultiple (node:net:1492:18)\n    at afterConnectMultiple (node:net:2161:7) {\n  code: 'ECONNREFUSED',\n  [errors]: [\n    Error: connect ECONNREFUSED ::1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '::1',\n      port: 3000\n    },\n    Error: connect ECONNREFUSED 127.0.0.1:3000\n        at createConnectionError (node:net:2124:14)\n        at afterConnectMultiple (node:net:2154:16) {\n      errno: -111,\n      code: 'ECONNREFUSED',\n      syscall: 'connect',\n      address: '127.0.0.1',\n      port: 3000\n    }\n  ]\n}\n"
       },
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts\" \"src/boot/type-ladder-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/066magl7/tmp/test-intent-vitest-16728-1794806360921.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts\" \"src/boot/type-ladder-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/1onq46j2/tmp/test-intent-vitest-12118-1794809762542.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 76637,
-        "output": "JSON report written to /home/elias/.cache/am/066magl7/tmp/test-intent-vitest-16728-1794806360921.json\n\n"
+        "durationMs": 78394,
+        "output": "JSON report written to /home/elias/.cache/am/1onq46j2/tmp/test-intent-vitest-12118-1794809762542.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts",
         "classification": "assertion",
-        "detail": "S7b-1 consent (fm-11) names the five parts as the page does, with sizes, licences and Terms, under the pictured words:  AssertionError: expected 'Download AI models? This downloads 2.…' to contain '2.6 GB will be downloaded to this com…'\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts:154:28\n    at file:///home/elias/dev/jus | S7b-1 consent (fm-11) with bytes an earlier download left, says \"Up to\" the w"
+        "detail": "S7b-1 consent (fm-11) names the five parts as the page does, with sizes, licences and Terms, under the pictured words:  AssertionError: expected 'Download AI models? This downloads 2.…' to contain '2.6 GB will be downloaded to this com…'\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts:154:28\n    at file:///home/elias/dev/jus | S7b-1 consent (fm-11) with bytes an earlier download left, says \"Up to\" the w"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts",
         "classification": "assertion",
-        "detail": "the install view takes the page without losing focus: after Accept, and from a step, focus moves to Pause:  Error: focus after Accept: expected 'Cancel' to be 'Pause' // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/066magl7/tmp/test-inte | Pause keeps focus on its button as it becomes Resume; the pause is said once, politely:  "
+        "detail": "the install view takes the page without losing focus: after Accept, and from a step, focus moves to Pause:  Error: focus after Accept: expected 'Cancel' to be 'Pause' // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/1onq46j2/tmp/test-inte | Pause keeps focus on its button as it becomes Resume; the pause is said once, politely:  "
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.topBar.test.ts",
         "classification": "assertion",
-        "detail": "fm-12b the top bar follows the stopped view a failed run with a part missing: \"1 Download stopped\" in amber, never the red failure:  AssertionError: expected 'AI install failed' to be 'The download stopped' // Object.is equality\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.topBar.test.ts:108:24\n    at file:///home/elias/dev/justsearch/.claude/work | fm-12b the top bar follows the stopped view a failed first insta"
+        "detail": "fm-12b the top bar follows the stopped view a failed run with a part missing: \"1 Download stopped\" in amber, never the red failure:  AssertionError: expected 'AI install failed' to be 'The download stopped' // Object.is equality\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.topBar.test.ts:118:24\n    at file:///home/elias/dev/justsearch/.claude/work | fm-12b the top bar follows the stopped view a failed first insta"
       },
       {
         "id": "modules/ui-web/src/shell-v0/state/aiVerdict.test.ts",
         "classification": "assertion",
-        "detail": "presentAiEngineVerdict (Design pass 3 — the presentation projection) paused states the retained amount in the body — the pause promise made checkable:  AssertionError: expected '1.06 GB already downloaded is kept on…' to be '1.06 GB already downloaded is kept on…' // Object.is equality\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/state/aiVerdict.test.ts:573:20\n    at file:///home/elias/dev/justsear | presentAiEngineVerdict (Design pass 3 — the p"
+        "detail": "presentAiEngineVerdict (Design pass 3 — the presentation projection) paused states the retained amount in the body — the pause promise made checkable:  AssertionError: expected '1.06 GB already downloaded is kept on…' to be '1.06 GB already downloaded is kept on…' // Object.is equality\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/state/aiVerdict.test.ts:573:20\n    at file:///home/elias/dev/justsear | presentAiEngineVerdict (Design pass 3 — the p"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.componentList.test.ts",
         "classification": "assertion",
-        "detail": "BrainSurface — honest install progress shows the time remaining the Engine estimates, and no rate (slice 7b fm-12):  AssertionError: expected '\\n      \\n        \\n      \\n        \\…' to contain 'about 2 min left'\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/BrainSurface.componentList.test.ts:387:18\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f | BrainSurface — honest install progress shows a blocked stage as an actionable re"
+        "detail": "BrainSurface — honest install progress shows the time remaining the Engine estimates, and no rate (slice 7b fm-12):  AssertionError: expected '\\n      \\n        \\n      \\n        \\…' to contain 'about 2 min left'\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/BrainSurface.componentList.test.ts:387:18\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f | BrainSurface — honest install progress shows a blocked stage as an actionable re"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.firstRun.test.ts",
         "classification": "assertion",
-        "detail": "AI Brain on first run F3 an interrupted install with no final file placed is not installed: partial bytes from an interrupted download:  AssertionError: expected 'Installed — repair available' to be 'AI isn\\'t installed yet' // Object.is equality\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/BrainSurface.firstRun.test.ts:110:26\n    at file:///home/elias/dev/justsearch/.claude/wo | AI Brain on first run F3 an interrupted install with no fina"
+        "detail": "AI Brain on first run F3 an interrupted install with no final file placed is not installed: partial bytes from an interrupted download:  AssertionError: expected 'Installed — repair available' to be 'AI isn\\'t installed yet' // Object.is equality\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/BrainSurface.firstRun.test.ts:110:26\n    at file:///home/elias/dev/justsearch/.claude/wo | AI Brain on first run F3 an interrupted install with no fina"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.installConsent.test.ts",
         "classification": "assertion",
-        "detail": "composeInstallConsent with bytes an earlier download left staged, states the most it downloads, not that it resumes them (7b G2'):  AssertionError: expected undefined to be true // Object.is equality\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/BrainSurface.installConsent.test.ts:89:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/modules/ui-web/node_mo | composeInstallConsent says no \"Up to\" without staged bytes (the o"
+        "detail": "composeInstallConsent with bytes an earlier download left staged, states the most it downloads, not that it resumes them (7b G2'):  AssertionError: expected undefined to be true // Object.is equality\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/BrainSurface.installConsent.test.ts:89:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/modules/ui-web/node_mo | composeInstallConsent says no \"Up to\" without staged bytes (the o"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.installOperations.test.ts",
         "classification": "assertion",
-        "detail": "install operation observations through the real poller and store Pause waits for the requested store read and releases busy state while it hangs:  AssertionError: expected null not to be null\n    at click (/home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/BrainSurface.installOperations.test.ts:22:22)\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/view | install operation observations through the real po"
+        "detail": "install operation observations through the real poller and store Pause waits for the requested store read and releases busy state while it hangs:  AssertionError: expected null not to be null\n    at click (/home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/BrainSurface.installOperations.test.ts:22:22)\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/view | install operation observations through the real po"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.installProgressAggregate.test.ts",
         "classification": "assertion",
-        "detail": "BrainSurface — install progress reads the wire aggregate, not the per-package sum renders the percentage and byte counts from downloadedBytes/totalBytes even when no package has byte fields:  AssertionError: expected '\\n      \\n        \\n      \\n        \\…' to contain '2.8 of 5.6 GB'\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/BrainSurface.installProgressAggregate.test.ts:98:18\n    at processTicksAndRejections (node:internal/proce"
+        "detail": "BrainSurface — install progress reads the wire aggregate, not the per-package sum renders the percentage and byte counts from downloadedBytes/totalBytes even when no package has byte fields:  AssertionError: expected '\\n      \\n        \\n      \\n        \\…' to contain '2.8 of 5.6 GB'\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/BrainSurface.installProgressAggregate.test.ts:98:18\n    at processTicksAndRejections (node:internal/proce"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts",
         "classification": "assertion",
-        "detail": "picture reading live switch shows the whole download consent and cancel leaves Off without transferring:  AssertionError: expected '\\n        \\n          Download AI mod…' to contain 'Answer questions'\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts:259:33\n    at file:///home/elias/dev/justsearch/.claude/worktrees/"
+        "detail": "picture reading live switch shows the whole download consent and cancel leaves Off without transferring:  AssertionError: expected '\\n        \\n          Download AI mod…' to contain 'Answer questions'\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/BrainSurface.picture-switch.test.ts:259:33\n    at file:///home/elias/dev/justsearch/.claude/worktrees/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts",
         "classification": "assertion",
-        "detail": "AI Brain redesign behaviour a missing declined answer package asks for its real size and licence and downloads after consent:  AssertionError: expected '\\n        \\n          Download AI mod…' to contain '1 KB'\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts:188:65\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/modules/ui- | AI Brain redesign behaviour retains progress across a tab switch and r"
+        "detail": "AI Brain redesign behaviour a missing declined answer package asks for its real size and licence and downloads after consent:  AssertionError: expected '\\n        \\n          Download AI mod…' to contain '1 KB'\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/BrainSurface.redesign.test.ts:188:65\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/modules/ui- | AI Brain redesign behaviour retains progress across a tab switch and r"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts",
         "classification": "assertion",
-        "detail": "Advanced settings - Downloaded files Download again asks first; closing the consent saves nothing and accepting starts the included download:  AssertionError: expected 'Download AI models? This downloads 1.…' to contain '1 KB'\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts:198:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/modules"
+        "detail": "Advanced settings - Downloaded files Download again asks first; closing the consent saves nothing and accepting starts the included download:  AssertionError: expected 'Download AI models? This downloads 1.…' to contain '1 KB'\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/BrainSurface.remove-files.test.ts:198:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/modules"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.reranker-switch.test.ts",
         "classification": "assertion",
-        "detail": "Best match first live switch consents to every missing selected part and cancellation leaves Off without a transfer:  AssertionError: expected '\\n        \\n          Download AI mod…' to contain '3 KB'\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/BrainSurface.reranker-switch.test.ts:184:33\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/modu"
+        "detail": "Best match first live switch consents to every missing selected part and cancellation leaves Off without a transfer:  AssertionError: expected '\\n        \\n          Download AI mod…' to contain '3 KB'\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/BrainSurface.reranker-switch.test.ts:184:33\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/modu"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts",
         "classification": "assertion",
-        "detail": "Brain step 1 review repairs S4 installed systems retain an additions Install action with selected size and exact consent:  AssertionError: expected '\\n        \\n          Download AI mod…' to contain 'Best match first'\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:335:65\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at"
+        "detail": "Brain step 1 review repairs S4 installed systems retain an additions Install action with selected size and exact consent:  AssertionError: expected '\\n        \\n          Download AI mod…' to contain 'Best match first'\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/BrainSurface.sliceB.test.ts:335:65\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts",
         "classification": "assertion",
-        "detail": "Brain running repair controls (B2/B8) Cancel says the download paused when it stopped, and shows the completed state when the install finished first:  AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:135:22\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/modules/ui-web/node_modules | Brain running repair controls (B2/B8) Repair r"
+        "detail": "Brain running repair controls (B2/B8) Cancel says the download paused when it stopped, and shows the completed state when the install finished first:  AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/BrainSurface.repairRun.test.ts:135:22\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/modules/ui-web/node_modules | Brain running repair controls (B2/B8) Repair r"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts",
         "classification": "assertion",
-        "detail": "S7a-7 a first install that runs shows no Repair and no installed wording, and is not projected as installed:  AssertionError: Best match first part: expected '' to contain 'Best match first'\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts:92:100\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f"
+        "detail": "S7a-7 a first install that runs shows no Repair and no installed wording, and is not projected as installed:  AssertionError: Best match first part: expected '' to contain 'Best match first'\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.install.test.ts:92:100\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.preservation.test.ts",
         "classification": "assertion",
-        "detail": "AI Brain preservation: the page’s install flows (slice 7a) Install opens the licences, then installs; pause and cancel act on the run:  AssertionError: Pause; shown: Cancel, Pause download, Cancel, Accept and download: expected undefined to be truthy\n    at press (/home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.preservation.test.ts:118:80)\n    at /home/"
+        "detail": "AI Brain preservation: the page’s install flows (slice 7a) Install opens the licences, then installs; pause and cancel act on the run:  AssertionError: Pause; shown: Cancel, Pause download, Cancel, Accept and download: expected undefined to be truthy\n    at press (/home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.preservation.test.ts:118:80)\n    at /home/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.pausedInstall.test.ts",
         "classification": "assertion",
-        "detail": "BrainSurface — idle panel over a paused download offers Install AI, never a promise to resume:  AssertionError: expected '\\n      \\n        \\n      \\n        \\…' to contain 'Install AI'\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/BrainSurface.pausedInstall.test.ts:105:18\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/"
+        "detail": "BrainSurface — idle panel over a paused download offers Install AI, never a promise to resume:  AssertionError: expected '\\n      \\n        \\n      \\n        \\…' to contain 'Install AI'\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/BrainSurface.pausedInstall.test.ts:105:18\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts",
         "classification": "assertion",
-        "detail": "Brain live redesign repairs D4 a failed run with a package record left downloading shows no step as Downloading:  AssertionError: expected <div class=\"path-step\" …(4)>…(2)</div> to be null\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:234:72\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout ("
+        "detail": "Brain live redesign repairs D4 a failed run with a package record left downloading shows no step as Downloading:  AssertionError: expected <div class=\"path-step\" …(4)>…(2)</div> to be null\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/views/BrainSurface.liveRepairs.test.ts:234:72\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout ("
       },
       {
         "id": "modules/ui-web/src/boot/type-ladder-lockdown.test.ts",
         "classification": "assertion",
-        "detail": "text, corners and bundled variable Inter follow the type ladder under the desktop policy:  AssertionError: expected 150 to be 142 // Object.is equality\n    at /home/elias/.cache/am/066magl7/tmp/test-intent-before-l4x8L2/modules/ui-web/src/boot/type-ladder-lockdown.test.ts:33:30\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///home/elias/dev/justsea"
+        "detail": "text, corners and bundled variable Inter follow the type ladder under the desktop policy:  AssertionError: expected 150 to be 142 // Object.is equality\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/boot/type-ladder-lockdown.test.ts:33:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/modules/ui-web/node_modules/@vitest/runner/dis"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts",
+        "classification": "assertion",
+        "detail": "status pill drawing working with a known fraction draws a ring and \"· N%\" text; unknown fractions draw none:  AssertionError: expected 'Installing AI models · 40%' to be 'Installing AI · 40%' // Object.is equality\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/components/StatusPill.design.test.ts:67:60\n    at file:///home/elias/dev/justsearch/.claude/worktree"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts",
+        "classification": "assertion",
+        "detail": "FA3 optional AI and the status pill an AI install the person started shows its progress, not \"Needs you\", while it runs:  AssertionError: expected 'Installing AI models' to be 'Installing AI' // Object.is equality\n    at /home/elias/.cache/am/1onq46j2/tmp/test-intent-before-CQ2J3S/modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts:52:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s7b/mod"
       }
     ]
   },
-  "digest": "sha256:b6fc8eccb34d5bba41b5d38635b8720cb1eb5b3466de53dd01bddb0160a44991"
+  "digest": "sha256:e3fe259c5bbbdaa0d4243ae9cb4176fcabaf086dfa883bbcb5da0f1e6c135659"
 }

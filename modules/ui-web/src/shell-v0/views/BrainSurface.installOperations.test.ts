@@ -68,11 +68,11 @@ describe('install operation observations through the real poller and store', () 
     expect(installReads).toBe(2);
     for (const el of [first, second]) expect(progressWords(el))
       .toBe(action === 'Pause' ? 'Installing AI' : 'Installing AI · Paused');
-    expect(await topBar()).toBe(action === 'Pause' ? 'Installing AI models · 25%' : 'AI download paused · 25%');
+    expect(await topBar()).toBe(action === 'Pause' ? 'Installing AI · 25%' : 'Installing AI · 25% · Paused');
     release!(); await advance(0, first); await second.updateComplete;
     for (const el of [first, second]) expect(progressWords(el))
       .toBe(action === 'Pause' ? 'Installing AI · Paused' : 'Installing AI');
-    expect(await topBar()).toBe(action === 'Pause' ? 'AI download paused · 25%' : 'Installing AI models · 25%');
+    expect(await topBar()).toBe(action === 'Pause' ? 'Installing AI · 25% · Paused' : 'Installing AI · 25%');
     const retained = getAiState().installStatus;
     fail = true; await advance(1000, first); await second.updateComplete;
     expect(getAiState().installStatus).toBe(retained);
