@@ -261,11 +261,24 @@ public final class ExcludesServiceImpl implements ExcludesService {
 
   @Override
   public ExcludesResult applyExcludes(boolean dryRun, EngineContext engineContext) throws Exception {
+    return run(dryRun, null, engineContext);
+  }
+
+  @Override
+  public ExcludesResult applyConsentedExcludes(List<?> consentedRules, EngineContext engineContext) throws Exception {
+    return run(false, java.util.Objects.requireNonNull(consentedRules, "consentedRules"), engineContext);
+  }
+
+  private ExcludesResult run(boolean dryRun, List<?> consentedRules, EngineContext engineContext) throws Exception {
     IndexingService indexing = indexingServiceSupplier.get();
     // Read patterns and winning-source trace from the same resolved snapshot.
     PolicySnapshot snapshot = capturePolicy();
     ExcludesPolicy policy = snapshot.projection();
     ExcludeGlobs excludes = snapshot.matcher();
+    // The consent covers one list: the snapshot that is applied below must be exactly that list.
+    if (consentedRules != null && !ExcludeGlobs.fromPatterns(consentedRules).entries().equals(excludes.entries())) {
+      throw new RulesChangedException();
+    }
     List<String> effectivePatterns = excludes.patterns();
     if (excludes.isEmpty()) {
       return new ExcludesResult(dryRun, 0, 0, 0, 0, 0, List.of(), false,

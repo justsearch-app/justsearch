@@ -644,7 +644,10 @@ qualification. Explicit `--journeys` subsets likewise never qualify a release.
   and Dark theme, restart, retained settings, watched folder, indexed fixture and
   model file hashes. The rule is added in Library's Folders tab with **Add a rule**;
   leaving the field (Tab) saves it, and the in-place removal ask is answered **Keep them**.
-  It cannot match the corpus fixtures. After restart, the
+  It cannot match the corpus fixtures. **When to read files** is then set to **Only between**
+  (saved on change with the default 09:00–17:00 hours) and back to **Any time**, which keeps the
+  days and times; the Engine's `ui.indexingPause.schedule` must retain them, turned off, after
+  restart, so reading is never held for the rest of the run. After restart, the
   harness's own WebDriver session must show the exact rule in a visible, enabled
   input; the Engine's `ui.excludePatterns` must also retain it. J6 checks the same
   settings and model hashes across install-over and uninstall/reinstall.
@@ -1090,7 +1093,7 @@ observations.
 | J2 system picker | `views/LibrarySurface.ts`, `controllers/FolderAddFlow.ts` | Add folder is lowercase; retain Add Folder for v0.3.2. Folder path and Add are unchanged. |
 | J2 search and open | `views/search-v3/Sv3Composer.ts`, `components/searchResults/ResultsCard.ts`, `commands/searchResultActions.ts` | Use the mode trigger's stable `sv3-composer-tier` test ID regardless of current mode. Search tier, composer input, results-card snapshot, result-row identity, row Actions and Open file remain valid. |
 | J3 install, consent, activation, GPU chat | `views/BrainSurface.ts`, `components/AuthorizationHost.ts`, `components/OperationOutcomeDetail.ts` | Match Install AI by label prefix; Start answers replaces Start AI. Accept and download, Activate downloaded models, typed authorization, Approve and operationKey remain valid. |
-| J4 authored state | `views/LibrarySurface.ts`, `components/SurfaceTabs.ts`, `views/settingsRegister.ts`, `components/SettingsNav.ts`, `renderers/controls/OptionButtonGroupRenderer.ts` | Folders tab, Add a rule, last skip-rule input left with Tab (saves), and the in-place ask's Keep them; Appearance and Dark are unchanged. Retire bookmark UI and savedViews checks. J5 predecessor state is Dark plus downloaded models. |
+| J4 authored state | `views/LibrarySurface.ts`, `components/SurfaceTabs.ts`, `components/IndexingRulesEditor.ts`, `views/settingsRegister.ts`, `components/SettingsNav.ts`, `renderers/controls/OptionButtonGroupRenderer.ts` | Folders tab, Add a rule, last skip-rule input left with Tab (saves), and the in-place ask's Keep them; reading hours `#indexing-hours` (Only between) then the other `indexing-hours` radio (Any time); Appearance and Dark are unchanged. Retire bookmark UI and savedViews checks. J5 predecessor state is Dark plus downloaded models. |
 | J5 update offer and install | `components/StatusPill.ts`, `components/StatusPanel.ts`, `state/frameStatus.ts`, `views/SettingsSurface.ts`, `views/settingsControlLabels.ts` | Status trigger, app-update row, Review and install, General and Install update remain valid. |
 | J7 warm link and shortcut | `chrome/TopBar.ts`, `views/SettingsSurface.ts`, `views/search-v3/Sv3Composer.ts` | Replace the removed Library heading with its visible current top-bar segment; keep shell activeId. General, settings-search-shortcut and the focused composer input remain valid. |
 

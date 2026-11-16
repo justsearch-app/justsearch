@@ -54,7 +54,8 @@ with or without the AI models. All inference runs locally on your machine.
 ## Reading restrictions
 
 In **Library → Folders → When to read files**, choose **Only between** and set the start and end
-times. Changes save as you make them (a time when you leave its field). The weekday editor is available with
+times. Changes save as you make them (a time when you leave its field); if a save's answer is lost,
+**Not sure this saved** offers **Try again**, which checks that same change before a newer one is sent. The weekday editor is available with
 **Settings → Advanced → Show developer tools**. A restricted set of days is shown beside the hours. Turning hours off keeps the configured days and times. The time fields follow
 your platform's clock format. Pause reading on battery is available even when the power source is
 unknown; it applies only while this computer is known to run on battery.

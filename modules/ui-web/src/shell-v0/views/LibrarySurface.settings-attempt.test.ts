@@ -153,7 +153,8 @@ describe('Library retained-base exclusions', () => {
     await library.handleSaveExcludes();
     expect(JSON.parse(String(send.mock.calls[1]?.[1]?.body)).ui.excludePatterns).toEqual(['[legacy', 'private', 'more']);
     await library.handleApplyExcludes();
-    expect(invoke).toHaveBeenCalledWith('core.apply-excludes', {}, { consented: true });
+    // R6: the removal carries the saved list unchanged, legacy literal-name rule included.
+    expect(invoke).toHaveBeenCalledWith('core.apply-excludes', { rules: ['[legacy', 'private', 'more'] }, { consented: true });
     expect(send.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
     expect(library.excludesText).toBe('[legacy\nprivate\nmore');
     expect(vi.getTimerCount()).toBe(0);

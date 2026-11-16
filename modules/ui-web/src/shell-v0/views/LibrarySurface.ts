@@ -148,8 +148,11 @@ function halfPattern(rule: string): string | null {
 /** The ask after a rule is added is about the whole saved list (core.apply-excludes applies all rules). */
 const REMOVAL_ASK = 'Remove files already read that match your skip rules from search? Files on disk are not touched.';
 type RemovalAsk = { readonly serial: number; readonly list: string; readonly base: readonly string[] };
-type RemovalOutcome = { readonly kind: 'done' | 'partly' | 'unsure' | 'unavailable' | 'kept'; readonly removed: number;
+/** The result counts deletion requests, not documents, so the outcome holds no number (R10). */
+type RemovalOutcome = { readonly kind: 'done' | 'partly' | 'unsure' | 'unavailable' | 'kept';
   readonly capped: boolean; readonly scopes: ExcludesResult['uncheckedScopes']; readonly list: string; readonly detail: string };
+/** A skip-rule draft: its glob rules as one text, and the exact-path entries kept with them. */
+type SkipDraft = { readonly text: string; readonly literals: readonly ExactPathExclusion[] };
 
 /** Support codes stay on each exact gap; the decision itself uses plain language. */
 function rebuildGapReason(code: string): string {
@@ -343,8 +346,11 @@ export class LibrarySurface extends JfElement {
   declare private removalBusy: boolean;
   private removalAskSerial = 0;
   private lastEditedRule = 0;
-  /** A field was left while a save was in flight: the draft is saved again when it settles. */
-  private excludesSaveAgain = false;
+  /**
+   * R7 — the draft as it was when its field was last left, waiting to be saved. Only these bytes are
+   * ever sent: text typed after returning to a field stays a draft until that field is left again.
+   */
+  private excludesLeftDraft: SkipDraft | null = null;
   /** Only the latest glob change can be undone. */
   private skipUndoSerial = 0;
   declare private excludesPolicy: ExcludesPolicy | null;
@@ -1697,8 +1703,8 @@ export class LibrarySurface extends JfElement {
     return pending;
   }
 
-  private async invokeSettingsWrite(write: (operationKey: string) => Promise<OperationInvocationSuccess>): Promise<void> {
-    const operationKey = createOperationKey();
+  private async invokeSettingsWrite(write: (operationKey: string) => Promise<OperationInvocationSuccess>,
+      operationKey: string = createOperationKey()): Promise<void> {
     const result = await write(operationKey);
     const receipt = settingsV2Schema.pick({ witness: true }).safeParse({ witness: result.structuredData?.witness });
     const witness = receipt.success ? receipt.data.witness : null;
@@ -1720,33 +1726,39 @@ export class LibrarySurface extends JfElement {
   private readonly saveSettingsOperation = (write: (operationKey: string) => Promise<OperationInvocationSuccess>): Promise<void> =>
     this.queueSettingsWrite(() => this.invokeSettingsWrite(write));
 
-  /** Reading-hours writes carry their own base revision (B6'); the queue keeps them in order with ours. */
-  private readonly saveIndexingRulesWithSettings = (write: (operationKey: string) => Promise<OperationInvocationSuccess>): Promise<void> =>
+  /**
+   * Reading-hours writes carry their own base revision (B6') and their own key, so an uncertain one is
+   * sent again unchanged (R8); the queue keeps them in order with ours.
+   */
+  private readonly saveIndexingRulesWithSettings = (write: (operationKey: string) => Promise<OperationInvocationSuccess>,
+      operationKey: string): Promise<void> =>
     this.queueSettingsWrite(async () => {
       if (this.excludesAttempt) throw new Error('Check the pending skip-rule save before saving reading rules.');
-      await this.invokeSettingsWrite(write);
+      await this.invokeSettingsWrite(write, operationKey);
     });
 
   /**
-   * Save the skip-rule draft as it is now. A retained attempt whose outcome is unknown is checked first
-   * with its same key and bytes, and only then is a newer draft sent. A refusal because the revision
-   * moved is resolved by reading the saved list: unchanged since this draft's base means another
-   * setting was saved, so the draft is sent again on the new revision; changed means "Changed elsewhere".
+   * Save the draft captured when its field was left (R7), never the live text. A retained attempt
+   * whose outcome is unknown is checked first with its same key and bytes, and only then is the left
+   * draft sent. A refusal because the revision moved is resolved by reading the saved list: unchanged
+   * since this draft's base means another setting was saved, so the same captured draft is sent again
+   * on the new revision; changed means "Changed elsewhere".
    */
-  private async persistExcludes(): Promise<boolean> {
+  private async persistExcludes(left: SkipDraft | null): Promise<boolean> {
     if (!this.excludesLoaded || !this.excludesWitness || this.excludesConflict) return false;
+    const pending = (draft: SkipDraft | null) => !!draft && this.savedListKey(draft.text, [...draft.literals]) !== this.savedListKey();
     for (let rebase = 0; rebase < 3; rebase++) {
       const retained = this.excludesAttempt !== null;
       if (!retained) {
-        if (!this.excludesDirty) { this.excludesRuleProblem = null; return true; }
+        if (!left || !pending(left)) { this.excludesRuleProblem = null; return true; }
         const saved = globRules(this.excludesSavedText);
-        const rules = this.excludesText.split('\n');
+        const rules = left.text.split('\n');
         const index = rules.findIndex(rule => { const trimmed = rule.trim(); return trimmed && !saved.includes(trimmed) && halfPattern(trimmed); });
         this.excludesRuleProblem = index < 0 ? null : { index, reason: `“${rules[index]!.trim()}” isn't a complete rule yet: ${halfPattern(rules[index]!.trim())}. It is not saved.` };
         if (this.excludesRuleProblem) return false;
-        const patterns = globRules(this.excludesText);
-        this.excludesAttemptDraft = { text: patterns.join('\n'), literals: [...this.excludesLiterals] };
-        this.excludesAttempt = createSettingsAttempt({ ui: { excludePatterns: [...patterns, ...this.excludesLiterals] } }, this.excludesWitness);
+        const patterns = globRules(left.text);
+        this.excludesAttemptDraft = { text: patterns.join('\n'), literals: [...left.literals] };
+        this.excludesAttempt = createSettingsAttempt({ ui: { excludePatterns: [...patterns, ...left.literals] } }, this.excludesWitness);
       }
       const draft = this.excludesAttemptDraft!;
       const before = { text: this.excludesSavedText ?? '', literals: [...this.excludesSavedLiterals] };
@@ -1758,8 +1770,8 @@ export class LibrarySurface extends JfElement {
         this.excludesAttemptDraft = null;
         this.excludesError = null;
         this.savedSkipRules(before, draft, result.witness);
-        // A checked retained attempt was not the latest draft: send that one too.
-        if (retained && this.excludesDirty) continue;
+        // A checked retained attempt was not the left draft: send that one too.
+        if (retained && pending(left)) continue;
         return true;
       } catch (err) {
         const code = err instanceof SettingsAttemptError ? err.code : '';
@@ -1780,7 +1792,13 @@ export class LibrarySurface extends JfElement {
             this.excludesError = null;
             return true;
           }
-          if (observed.key === this.savedListKey()) { this.excludesWitness = observed.witness; this.excludesError = null; continue; }
+          if (observed.key === this.savedListKey()) {
+            // Only other settings moved: the same captured draft is sent again on the new revision.
+            this.excludesWitness = observed.witness;
+            this.excludesError = null;
+            left = draft;
+            continue;
+          }
           this.excludesConflict = true;
           this.excludesConflictSaved = { text: observed.text, literals: observed.literals, witness: observed.witness };
           this.excludesError = null;
@@ -1851,6 +1869,7 @@ export class LibrarySurface extends JfElement {
     }
     this.adoptObservedList([...globRules(saved.text), ...saved.literals], saved.witness, []);
     this.excludesRuleProblem = null;
+    this.excludesLeftDraft = null;
   }
 
   /**
@@ -2158,18 +2177,28 @@ export class LibrarySurface extends JfElement {
     }
   }
 
-  /** Leaving a skip-rule field saves the draft; leaving again while a save is in flight saves once it settles. */
+  /**
+   * Leaving a skip-rule field captures the draft as it is now and saves it (R7). Leaving again while a
+   * save is in flight replaces the captured draft, which is saved once that save settles; typing after
+   * returning to a field changes nothing already captured.
+   */
   private async handleSaveExcludes(): Promise<void> {
     if (!this.excludesLoaded) return;
-    if (this.excludesBusy) { this.excludesSaveAgain = true; return; }
+    this.excludesLeftDraft = { text: this.excludesText, literals: [...this.excludesLiterals] };
+    if (this.excludesBusy) return;
     this.excludesBusy = true;
     this.excludesNotice = '';
     this.excludesResult = null;
     try {
-      do {
-        this.excludesSaveAgain = false;
-        if (!await this.queueSettingsWrite(() => this.persistExcludes())) break;
-      } while (this.excludesSaveAgain && this.excludesDirty);
+      while (this.excludesLeftDraft || this.excludesAttempt) {
+        const left = this.excludesLeftDraft;
+        this.excludesLeftDraft = null;
+        if (!await this.queueSettingsWrite(() => this.persistExcludes(left))) {
+          // Kept for the next leave or Try again, unless a newer one was captured meanwhile.
+          this.excludesLeftDraft ??= left;
+          break;
+        }
+      }
     } finally { this.excludesBusy = false; }
   }
 
@@ -2198,8 +2227,10 @@ export class LibrarySurface extends JfElement {
 
   /**
    * The answer "Remove from search" (and its Try again). The saved list is read first: if it is no
-   * longer the list asked about, the ask is withdrawn and asked again (B2'). The outcome is said in
-   * plain words and never claims complete removal from a success receipt alone (B4').
+   * longer the list asked about, the ask is withdrawn and asked again (B2'). The removal carries the
+   * list it was consented for, and the engine refuses before removing anything when the rules in
+   * effect differ from it (R6); the ask is then asked again for the list now saved. The outcome is said
+   * in plain words and never claims complete removal from a success receipt alone (B4').
    */
   private async handleApplyExcludes(): Promise<void> {
     const list = this.removalAsk?.list ?? this.removalOutcome?.list;
@@ -2212,28 +2243,27 @@ export class LibrarySurface extends JfElement {
       try { observed = await readSettingsObservation((path, init) => this.doFetch(path, init)); }
       catch (err) { this.removalFailed(list, err); return; }
       const entries = observed.ui?.excludePatterns ?? [];
-      const observedList = this.savedListKey(entries.filter((entry): entry is string => typeof entry === 'string').join('\n'),
-        entries.filter(entry => typeof entry !== 'string'));
-      if (observedList !== list) {
-        // The list changed since it was asked about: nothing runs over an unasked list.
-        const base = this.removalAsk?.base ?? [];
-        if (this.excludesClean) this.adoptObservedList(entries, observed.witness, observed.ui?.invalidExcludePatterns ?? []);
-        const added = entries.filter((entry): entry is string => typeof entry === 'string' && !base.includes(entry));
-        this.removalOutcome = null;
-        this.removalAsk = added.length ? { serial: ++this.removalAskSerial, list: observedList, base } : null;
-        return;
-      }
+      if (this.observedListKey(entries) !== list) { this.askAgain(entries, observed); return; }
       let result: Awaited<ReturnType<PluginHostApi['data']['invokeOperation']>>;
-      try { result = await this.host_.data.invokeOperation(OP_APPLY, {}, { consented: true }); }
-      catch (err) { this.removalFailed(list, err); return; }
+      try { result = await this.host_.data.invokeOperation(OP_APPLY, { rules: entries }, { consented: true }); }
+      catch (err) {
+        if (err instanceof OperationError && err.errorCode === 'EXCLUDES_CHANGED') {
+          // Nothing was removed: the rules in effect are no longer the list asked about.
+          try { [observed] = await Promise.all([readSettingsObservation((path, init) => this.doFetch(path, init)), this.loadExcludesPolicy()]); }
+          catch (readErr) { this.removalFailed(list, readErr); return; }
+          this.askAgain(observed.ui?.excludePatterns ?? [], observed);
+          return;
+        }
+        this.removalFailed(list, err); return;
+      }
       this.removalAsk = null;
       if (!result.success) { this.removalFailed(list, new Error(result.message ?? 'The engine did not confirm it.')); return; }
       const parsed = excludesResultSchema.safeParse(result.structuredData);
       if (!parsed.success || parsed.data.dryRun) {
-        this.removalOutcome = { kind: 'unsure', removed: 0, capped: false, scopes: [], list, detail: '' };
+        this.removalOutcome = { kind: 'unsure', capped: false, scopes: [], list, detail: '' };
       } else {
         const partial = parsed.data.capped || parsed.data.uncheckedScopes.length > 0;
-        this.removalOutcome = { kind: partial ? 'partly' : 'done', removed: parsed.data.confirmedRemovals,
+        this.removalOutcome = { kind: partial ? 'partly' : 'done',
           capped: parsed.data.capped, scopes: parsed.data.uncheckedScopes, list, detail: '' };
       }
       if (serial === this.surfaceSerial) await this.refresh();
@@ -2243,18 +2273,37 @@ export class LibrarySurface extends JfElement {
     }
   }
 
+  private observedListKey(entries: readonly unknown[]): string {
+    return this.savedListKey(entries.filter((entry): entry is string => typeof entry === 'string').join('\n'),
+      entries.filter(entry => typeof entry !== 'string'));
+  }
+
+  /**
+   * B2' — the list changed since it was asked about: nothing runs over an unasked list. The ask is
+   * withdrawn and, while the list still holds a rule added since the ask began, asked again for it.
+   * An override set meanwhile withdraws it (the saved list does not take effect).
+   */
+  private askAgain(entries: readonly unknown[], observed: Awaited<ReturnType<typeof readSettingsObservation>>): void {
+    const base = this.removalAsk?.base ?? [];
+    if (this.excludesClean) this.adoptObservedList(entries, observed.witness, observed.ui?.invalidExcludePatterns ?? []);
+    const added = entries.filter((entry): entry is string => typeof entry === 'string' && !base.includes(entry));
+    this.removalOutcome = null;
+    this.removalAsk = added.length && !isOverride(this.excludesPolicy)
+      ? { serial: ++this.removalAskSerial, list: this.observedListKey(entries), base } : null;
+  }
+
   private removalFailed(list: string, err: unknown): void {
     this.removalAsk = null;
     const unreachable = err instanceof OperationError ? ['NETWORK_ERROR', 'SERIALIZATION_ERROR'].includes(err.errorClass)
       || [502, 503, 504].includes(err.httpStatus ?? 0) : (err as { errorClass?: string })?.errorClass === 'NETWORK_ERROR' || err instanceof TypeError;
-    this.removalOutcome = { kind: unreachable ? 'unavailable' : 'unsure', removed: 0, capped: false, scopes: [], list,
+    this.removalOutcome = { kind: unreachable ? 'unavailable' : 'unsure', capped: false, scopes: [], list,
       detail: this.developer ? (err instanceof Error ? err.message : String(err)) : '' };
   }
 
   private keepRemovableFiles(): void {
     const returnFocus = this.focusInRemoval();
     this.removalAsk = null;
-    this.removalOutcome = { kind: 'kept', removed: 0, capped: false, scopes: [], list: '', detail: '' };
+    this.removalOutcome = { kind: 'kept', capped: false, scopes: [], list: '', detail: '' };
     if (returnFocus) void this.returnFocusFromRemoval();
   }
 
@@ -2754,16 +2803,16 @@ export class LibrarySurface extends JfElement {
     const outcome = this.removalOutcome;
     if (!outcome) return nothing;
     if (outcome.kind === 'kept') return html`<p role="status">Files already read stay searchable.</p>`;
-    const files = (n: number) => `${formatCount(n)} ${n === 1 ? 'file' : 'files'}`;
     const missing = 'Files that are no longer on disk aren\'t checked and may stay searchable.';
     const retry = html`<button type="button" class="text-action" aria-disabled=${this.removalBusy ? 'true' : 'false'}
       @click=${() => { if (!this.removalBusy) void this.handleApplyExcludes(); }}>Try again</button>`;
-    if (outcome.kind === 'done') return html`<p role="status">Done. ${files(outcome.removed)} removed from search. ${missing}</p>`;
+    // The result confirms deletion requests (a folder is one), not documents, so no number is said (R10).
+    if (outcome.kind === 'done') return html`<p role="status">Done. Files already read that match your skip rules are no longer in search. ${missing}</p>`;
     if (outcome.kind === 'partly') {
       const said = (scope: ExcludesResult['uncheckedScopes'][number]) => scope.status === 'not_removed'
         ? /rebuild/i.test(scope.reason) ? 'Waits for the rebuild to finish' : 'Couldn\'t be removed'
         : /offline|missing|unavailable/i.test(scope.reason) ? 'Offline or missing folder, not checked' : 'Couldn\'t be read, not checked';
-      return html`<div role="status"><p>Partly done. ${files(outcome.removed)} removed from search. Some matching files may still be searchable:</p>
+      return html`<div role="status"><p>Partly done. Some matching files may still be searchable:</p>
         <ul>${outcome.scopes.map(scope => html`<li title=${scope.reason}>${said(scope)}: <span class="literal-path">${scope.path}</span></li>`)}
           ${outcome.capped ? html`<li>Too many files to check them all at once.</li>` : nothing}</ul>
         <p>${missing}</p>${retry}</div>`;

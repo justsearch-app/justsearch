@@ -77,7 +77,8 @@ final class EngineRefusalHandlersTest {
           () -> mock(BrainRuntimeService.class, invocation -> { throw failure; }));
       default -> throw new AssertionError(path);
     };
-    String arguments = HandlerJson.MAPPER.writeValueAsString(Map.of(
+    // core.apply-excludes accepts only the consented list (slice 6b-2 R6); its refusal path is the same.
+    String arguments = path.equals("apply") ? "{\"rules\":[\"*.log\"]}" : HandlerJson.MAPPER.writeValueAsString(Map.of(
         "path", directory.toString(), "pathHash", "hash", "name", "index"));
 
     var thrown = assertThrows(RuntimeException.class,

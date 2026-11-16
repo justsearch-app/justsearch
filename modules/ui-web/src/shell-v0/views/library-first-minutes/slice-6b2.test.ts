@@ -11,6 +11,7 @@ import { __resetOwnReversalsForTest, listOpenReversals } from '../../state/ownRe
 import { setShowDeveloperTools } from '../../state/developerToolsState.js';
 import { __feedForTest, __resetAiStateForTest, type StatusSnapshot } from '../../state/aiStateStore.js';
 import { EPHEMERAL_TOAST_EVENT } from '../../components/advisory/ephemeralToast.js';
+import { OperationError } from '../../operations/OperationClient.js';
 
 type Witness = { acceptedRevision: number; lastCommittedOperationKey: string | null };
 type Schedule = { enabled: boolean; days: number[]; startMinute: number; endMinute: number };
@@ -33,7 +34,10 @@ function backend(initial: { patterns?: unknown[]; pause?: Partial<Pause>; overri
   const posts: { body: string; parsed: Record<string, unknown> }[] = [];
   const ops: { id: string; args: Record<string, unknown>; key?: string }[] = [];
   let hold: Promise<void> | null = null, release = () => {};
-  let hang = false, workerDown = false;
+  let hang = false, workerDown = false, loseNextOpAnswer = false;
+  let onRead: (() => void) | null = null;
+  const opReceipts = new Map<string, unknown>();
+  const removedFor: unknown[][] = [];
   const witness = (): Witness => ({ acceptedRevision: s.revision, lastCommittedOperationKey: s.lastKey });
   const commit = (operationKey: string | null) => { s.revision++; s.lastKey = operationKey ?? key(900 + s.revision); };
   const wire = () => structuredClone(s.ui);
@@ -43,7 +47,11 @@ function backend(initial: { patterns?: unknown[]; pause?: Partial<Pause>; overri
       patterns: s.ui.excludePatterns.filter(p => typeof p === 'string') });
     if (path.startsWith('/api/indexing/forgets?')) return Response.json({ items: [], complete: true, nextId: null });
     if (path !== '/api/settings/v2') return Response.json({ items: [] });
-    if (init?.method !== 'POST') return Response.json({ settingsMode: 'persistent', ui: wire(), witness: witness() });
+    if (init?.method !== 'POST') {
+      const observed = Response.json({ settingsMode: 'persistent', ui: wire(), witness: witness() });
+      const hook = onRead; onRead = null; hook?.();
+      return observed;
+    }
     const body = String(init.body);
     const attempt = JSON.parse(body) as { operationKey: string; witness: Witness; ui?: { excludePatterns?: unknown[] } };
     posts.push({ body, parsed: attempt });
@@ -78,6 +86,8 @@ function backend(initial: { patterns?: unknown[]; pause?: Partial<Pause>; overri
     const { args = {}, idempotencyKey } = JSON.parse(String(init?.body ?? '{}')) as { args?: Record<string, unknown>; idempotencyKey?: string };
     ops.push({ id, args, key: idempotencyKey });
     if (hold) await hold;
+    const replayed = idempotencyKey ? opReceipts.get(idempotencyKey) : undefined;
+    if (replayed) return Response.json(replayed);
     if (id === 'core.set-indexing-rules') {
       const based = args.witness as Witness | undefined;
       if (based && (based.acceptedRevision !== s.revision || based.lastCommittedOperationKey !== s.lastKey)) {
@@ -92,16 +102,30 @@ function backend(initial: { patterns?: unknown[]; pause?: Partial<Pause>; overri
         reason: id === 'core.indexing-pause' ? 'USER_PAUSED' : null, untilEpochMs: null } };
     } else return Response.json({ success: false, message: 'unknown', errorClass: 'HANDLER_FAILURE' });
     commit(idempotencyKey ?? null);
-    return Response.json({ success: true, message: 'Committed', structuredData: { witness: witness() } });
+    const receipt = { success: true, message: 'Committed', structuredData: { witness: witness() } };
+    if (idempotencyKey) opReceipts.set(idempotencyKey, receipt);
+    if (loseNextOpAnswer) { loseNextOpAnswer = false; throw new TypeError('Failed to fetch'); }
+    return Response.json(receipt);
   });
   vi.stubGlobal('fetch', operations);
-  const invoke = vi.fn(async (id: string, _args?: unknown, _options?: unknown) => {
+  const invoke = vi.fn(async (id: string, args?: Record<string, unknown>, _options?: unknown) => {
     if (workerDown) throw Object.assign(new Error('Failed to fetch'), { errorClass: 'NETWORK_ERROR' });
+    if (id === 'core.apply-excludes' && args && 'rules' in args) {
+      // The engine applies only the list consented to; another list in effect removes nothing.
+      if (JSON.stringify(args.rules) !== JSON.stringify(s.ui.excludePatterns)) {
+        throw new OperationError('The skip rules changed since you were asked', 'HANDLER_FAILURE', 200, 'EXCLUDES_CHANGED');
+      }
+      removedFor.push(structuredClone(args.rules as unknown[]));
+    }
     return { success: true, structuredData: id === 'core.preview-excludes' ? { ...doneResult, dryRun: true } : doneResult };
   });
   const host = createMockHostApi({ data: { fetch: fetchSettings as never, invokeOperation: invoke as never } });
   return {
-    s, host, posts, ops, invoke, fetchSettings,
+    s, host, posts, ops, invoke, fetchSettings, removedFor,
+    /** Runs once, right after the next settings read is answered (another window acting in between). */
+    afterNextRead(hook: () => void) { onRead = hook; },
+    /** The next operation commits, but its answer is lost on the way back. */
+    loseNextOpAnswer() { loseNextOpAnswer = true; },
     /** Another window (or an unrelated owner) commits through the same settings owner. */
     elsewhere(change: (ui: typeof s.ui) => typeof s.ui) { s.ui = change(structuredClone(s.ui)); commit(null); },
     holdWrites() { hold = new Promise(resolve => { release = () => { hold = null; resolve(); }; }); },
@@ -245,10 +269,10 @@ it('S6b-2 B4: Remove from search applies the saved rules and says it in plain wo
   const ask = askRegion(el); expect(ask).toHaveLength(1);
   await press(el, control(ask[0], 'Remove from search'));
   expect(f.invoke).toHaveBeenCalledTimes(1);
-  expect(f.invoke).toHaveBeenCalledWith('core.apply-excludes', {}, { consented: true });
+  expect(f.invoke).toHaveBeenCalledWith('core.apply-excludes', { rules: ['*.log', '*.tmp'] }, { consented: true });
   expect(askRegion(el)).toHaveLength(0);
   const said = text(el.shadowRoot);
-  expect(said).toContain('3 files removed from search');
+  expect(said).toContain('Done. Files already read that match your skip rules are no longer in search');
   expect(said, 'known limitation is stated').toContain('no longer on disk');
   expect(said).not.toContain('core.apply-excludes');
 });
@@ -631,4 +655,112 @@ it('S6b-12: an override keeps the editor editable and saved, explains when it ta
   expect(text(note)).toMatch(/takes effect .*override is removed|no effect until the override is removed/);
   expect(askRegion(el)).toHaveLength(0);
   expect(f.invoke).not.toHaveBeenCalled();
+});
+
+// Review repairs of the committed slice (R6–R10). Each case fails on the slice as committed for the reason named.
+
+it('R6: removal is bound to the list asked about; a list saved elsewhere after the check removes nothing and is asked again', async () => {
+  const f = backend(); const el = await mount(f);
+  await addRule(el, '*.tmp');
+  const first = askRegion(el)[0]; expect(first).toBeDefined();
+  // Another window saves "*" right after this window checked the saved list, before the removal runs.
+  f.afterNextRead(() => f.elsewhere(ui => ({ ...ui, excludePatterns: [...ui.excludePatterns, '*'] })));
+  await press(el, control(first, 'Remove from search'));
+  expect(f.invoke).toHaveBeenCalledTimes(1);
+  expect(f.invoke.mock.calls[0]![1], 'the removal carries the consented list').toEqual({ rules: ['*.log', '*.tmp'] });
+  expect(f.removedFor, 'nothing is removed under a list nobody was asked about').toEqual([]);
+  expect(text(el.shadowRoot)).not.toContain('Done.');
+  const again = askRegion(el);
+  expect(again, 'asked again for the list now saved').toHaveLength(1);
+  expect(again[0]).not.toBe(first);
+  expect(rule(el, 3).value).toBe('*');
+  await press(el, control(again[0], 'Remove from search'));
+  expect(f.removedFor).toEqual([['*.log', '*.tmp', '*']]);
+});
+
+it('R7: the bytes saved are the draft captured when the field was left, never text typed after returning to it', async () => {
+  const f = backend(); const el = await mount(f);
+  f.holdWrites();
+  await type(el, rule(el, 1), 'A'); await leave(el, rule(el, 1));
+  expect(f.posts).toHaveLength(1);
+  await type(el, rule(el, 1), 'B'); await leave(el, rule(el, 1));
+  // Back in the field: "*" is typed and the field is not left.
+  const field = rule(el, 1); await type(el, field, '*');
+  f.release(); await settle(el); await settle(el);
+  expect(globsSent(f)).toEqual([['A'], ['B']]);
+  expect(f.s.ui.excludePatterns).toEqual(['B']);
+  expect(field.value).toBe('*');
+  const statuses = [...el.shadowRoot!.querySelectorAll('section[aria-label="Exclude patterns"] [role="status"]')].map(text).join(' ');
+  expect(statuses, 'the unsaved "*" is not called saved').not.toMatch(/saved/i);
+});
+
+it('R7: a re-send after an unrelated save elsewhere sends the captured draft, not text typed meanwhile', async () => {
+  const f = backend(); const el = await mount(f);
+  f.elsewhere(ui => ({ ...ui, theme: 'light' }));
+  const field = rule(el, 1);
+  await type(el, field, 'A');
+  // While the refused save is being checked, the person returns to the field and types "*".
+  f.afterNextRead(() => { field.value = '*'; field.dispatchEvent(new Event('input', { bubbles: true, composed: true })); });
+  await leave(el, field);
+  await settle(el);
+  expect(globsSent(f)).toEqual([['A'], ['A']]);
+  expect(f.s.ui.excludePatterns).toEqual(['A']);
+  expect(f.s.ui.theme).toBe('light');
+  expect(field.value).toBe('*');
+});
+
+it('R8: a reading-rule write whose answer is lost says Not sure this saved, and is settled with the same key and bytes before a newer change', async () => {
+  const f = backend(); const el = await mount(f); const rules = editor(el);
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  f.loseNextOpAnswer();
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules); await settle(el);
+  expect(f.s.ui.indexingPause.pauseOnBattery, 'the server committed it').toBe(true);
+  expect(text(rules.shadowRoot)).toContain('Not sure this saved');
+  expect(named(rules.shadowRoot, 'Try again'), 'the promised retry control').toBeDefined();
+  // Turning it off again: the uncertain write is settled first, then the newer change is sent.
+  battery.checked = false; battery.dispatchEvent(new Event('change')); await settle(rules); await settle(el);
+  expect(f.ops).toHaveLength(3);
+  expect(f.ops[1]!.key, 'same key').toBe(f.ops[0]!.key);
+  expect(f.ops[1]!.args, 'same bytes').toEqual(f.ops[0]!.args);
+  expect(f.ops[2]!.args.pauseOnBattery).toBe(false);
+  expect(f.s.ui.indexingPause.pauseOnBattery, 'what is shown is what is saved').toBe(false);
+  expect(battery.checked).toBe(false);
+  expect(text(rules.shadowRoot)).not.toContain('Not sure this saved');
+});
+
+it('R8: Try again settles an uncertain reading-rule write by its key without sending anything newer', async () => {
+  const f = backend(); const el = await mount(f); const rules = editor(el);
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  f.loseNextOpAnswer();
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules); await settle(el);
+  const revision = f.s.revision;
+  await press(rules, control(rules.shadowRoot, 'Try again')); await settle(el);
+  expect(f.ops).toHaveLength(2);
+  expect(f.ops[1]!.key).toBe(f.ops[0]!.key);
+  expect(f.s.revision, 'the replay commits nothing new').toBe(revision);
+  expect(text(rules.shadowRoot)).not.toContain('Not sure this saved');
+  expect(text(rules.shadowRoot)).toContain('Reading rules saved');
+});
+
+it('R9: a reading-rule change queued behind a pending save is still saved after leaving Library', async () => {
+  const f = backend(); const el = await mount(f); const rules = editor(el);
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  f.holdWrites();
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules);
+  battery.checked = false; battery.dispatchEvent(new Event('change')); await settle(rules);
+  el.remove(); await settle();
+  f.release(); await settle(); await settle();
+  expect(f.ops.map(o => o.args.pauseOnBattery)).toEqual([true, false]);
+  expect(f.s.ui.indexingPause.pauseOnBattery).toBe(false);
+});
+
+it('R10: removal words never turn deletion-request counts into a number of files', async () => {
+  const f = backend(); const el = await mount(f);
+  // One confirmed folder request can stand for 100 read files.
+  f.invoke.mockResolvedValueOnce({ success: true, structuredData: { ...doneResult, confirmedRemovals: 1, matchedFiles: 100 } } as never);
+  await addRule(el, 'build/');
+  await press(el, control(askRegion(el)[0], 'Remove from search'));
+  const said = text(el.shadowRoot!.querySelector('.removal-slot'));
+  expect(said).toContain('Done.');
+  expect(said, 'one folder request is not "1 file removed"').not.toMatch(/\d+ files? removed/);
 });

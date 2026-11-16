@@ -7,6 +7,7 @@ import { requestAuthorization } from '../operations/authorizationBroker.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { settingsV2Schema, type SettingsV2 } from '../../api/generated/schema-types/settings-v2.js';
 import type { SettingsWitness } from '../../api/settingsAttempt.js';
+import { createOperationKey } from '../../api/operationKey.js';
 
 export type SavedIndexingRules = {
   schedule: NonNullable<NonNullable<NonNullable<SettingsV2['ui']>['indexingPause']>['schedule']> | null;
@@ -18,6 +19,13 @@ function sameRules(a: SavedIndexingRules, b: SavedIndexingRules): boolean {
   const key = (rules: SavedIndexingRules) => JSON.stringify([rules.pauseOnBattery, rules.schedule && [rules.schedule.enabled,
     [...(rules.schedule.days ?? [])].sort((x, y) => x - y), rules.schedule.startMinute, rules.schedule.endMinute]]);
   return key(a) === key(b);
+}
+
+/** A sent write whose answer was lost: it may or may not have been saved. */
+function outcomeUnknown(error: unknown): boolean {
+  return !(error instanceof OperationError)
+    || ['NETWORK_ERROR', 'SERIALIZATION_ERROR', 'HANDLER_ERROR', 'UNKNOWN'].includes(error.errorClass)
+    || [502, 503, 504].includes(error.httpStatus ?? 0);
 }
 
 /**
@@ -37,13 +45,14 @@ export class IndexingRulesEditor extends JfElement {
     indexingRulesError: { state: true },
     indexingRulesMessage: { state: true },
     conflictingRules: { state: true },
+    uncertainWrite: { state: true },
   };
   declare developer: boolean;
   declare apiBase: string;
   declare host_: PluginHostApi | undefined;
   declare readOnly: boolean;
   /** Library serializes its settings writers and advances its own shared settings witness. */
-  declare saveWithSettings: ((write: (operationKey: string) => Promise<OperationInvocationSuccess>) => Promise<void>) | undefined;
+  declare saveWithSettings: ((write: (operationKey: string) => Promise<OperationInvocationSuccess>, operationKey: string) => Promise<void>) | undefined;
   private savedRules: SavedIndexingRules = { schedule: null, pauseOnBattery: false };
   /** The revision the saved rules were observed at; every write is based on it. */
   private savedWitness: SettingsWitness | null = null;
@@ -52,6 +61,11 @@ export class IndexingRulesEditor extends JfElement {
   private loadSerial = 0;
   /** A change arrived while a save was in flight; it is saved when that one settles. */
   private saveAgain = false;
+  /**
+   * R8 — a sent write whose outcome is unknown: its key, rule pair and base revision. It is sent again
+   * unchanged, and settled, before any newer change is judged or sent; until then it says "Not sure this saved".
+   */
+  declare private uncertainWrite: { key: string; rules: SavedIndexingRules; witness: SettingsWitness } | null;
   private get indexingRulesDirty(): boolean {
     const next = this.draftRules();
     return next !== null && !sameRules(next, this.savedRules);
@@ -141,43 +155,61 @@ export class IndexingRulesEditor extends JfElement {
     void this.saveIndexingRules();
   };
 
-  /** Save the draft as it now is; a change during a save is saved right after it. */
+  /**
+   * Save the draft as it now is; a change during a save is saved right after it, also after the
+   * editor has left the page (R9). A write whose outcome is unknown is settled first (R8).
+   */
   private async saveIndexingRules(): Promise<void> {
     if (!this.indexingRulesLoaded || this.readOnly || this.conflictingRules) return;
     if (this.indexingRulesSaving) { this.saveAgain = true; return; }
-    this.indexingRulesError = this.draftProblem();
-    if (this.indexingRulesError || !this.indexingRulesDirty) return;
+    if (!this.uncertainWrite) {
+      this.indexingRulesError = this.draftProblem();
+      if (this.indexingRulesError || !this.indexingRulesDirty) return;
+    }
     this.indexingRulesSaving = true;
     this.indexingRulesMessage = '';
     ++this.loadSerial;
     try {
       do {
         this.saveAgain = false;
+        const uncertain = this.uncertainWrite;
+        if (uncertain && !await this.writeRules(uncertain.rules, uncertain)) break;
         if (this.draftProblem()) { this.indexingRulesError = this.draftProblem(); break; }
-        if (!this.indexingRulesDirty || !await this.writeRules(this.draftRules()!)) break;
-      } while (this.saveAgain && this.isConnected);
+        if (!this.indexingRulesDirty) { this.indexingRulesError = ''; break; }
+        if (!await this.writeRules(this.draftRules()!)) break;
+      } while (this.saveAgain);
     } finally {
       this.indexingRulesSaving = false;
     }
   }
 
-  /** One rule write on the observed revision; a revision moved only by other settings is taken up and tried again. */
-  private async writeRules(next: SavedIndexingRules): Promise<boolean> {
+  /**
+   * One rule write on the observed revision; a revision moved only by other settings is taken up and
+   * tried again. `same` re-sends an uncertain write with its own key and base revision (same bytes).
+   */
+  private async writeRules(next: SavedIndexingRules, same?: { key: string; witness: SettingsWitness }): Promise<boolean> {
     for (let attempt = 0; attempt < 3; attempt++) {
-      const witness = this.savedWitness;
+      const witness = same?.witness ?? this.savedWitness;
       if (!witness) { this.indexingRulesError = 'Could not save reading rules. Reload Library and try again.'; return false; }
-      const write = (operationKey?: string) => getOperationClient(this.apiBase).invokeWithConsent('core.set-indexing-rules', {
-        ...(operationKey ? { idempotencyKey: operationKey } : {}), args: { ...next, witness },
-      }, { requestConsent: requestAuthorization });
+      const operationKey = same?.key ?? createOperationKey();
+      same = undefined;
+      let sent = false;
+      const write = () => {
+        sent = true;
+        return getOperationClient(this.apiBase).invokeWithConsent('core.set-indexing-rules', {
+          idempotencyKey: operationKey, args: { ...next, witness },
+        }, { requestConsent: requestAuthorization });
+      };
       try {
-        let receipt: unknown, usedKey: string | undefined;
+        let receipt: unknown;
         if (this.saveWithSettings) {
-          await this.saveWithSettings(async key => { usedKey = key; const result = await write(key); receipt = result.structuredData?.['witness']; return result; });
+          await this.saveWithSettings(async () => { const result = await write(); receipt = result.structuredData?.['witness']; return result; }, operationKey);
         } else receipt = (await write()).structuredData?.['witness'];
         const observed = settingsV2Schema.shape.witness.safeParse(receipt);
+        this.uncertainWrite = null;
         // Only this write's direct successor is known to hold exactly these rules; otherwise the next
         // write is refused and rebased after reading the saved rules.
-        if (observed.success && observed.data && usedKey && observed.data.lastCommittedOperationKey === usedKey
+        if (observed.success && observed.data && observed.data.lastCommittedOperationKey === operationKey
             && observed.data.acceptedRevision === witness.acceptedRevision + 1) {
           this.savedWitness = observed.data;
         }
@@ -188,9 +220,18 @@ export class IndexingRulesEditor extends JfElement {
       } catch (error) {
         const conflict = error instanceof OperationError && (error.httpStatus === 409 || error.errorCode === 'VERSION_CONFLICT');
         if (!conflict) {
+          if (sent && outcomeUnknown(error)) {
+            // The answer was lost: keep the exact write to settle before anything newer.
+            this.uncertainWrite = { key: operationKey, rules: next, witness };
+            this.indexingRulesError = '';
+            return false;
+          }
+          this.uncertainWrite = null;
           this.indexingRulesError = `Could not save reading rules. ${error instanceof Error ? error.message : String(error)}`;
           return false;
         }
+        // Refused on its revision: that write was not saved.
+        this.uncertainWrite = null;
         const observed = await this.observeSaved();
         if (!observed) return false;
         if (sameRules(observed.rules, next)) { this.savedRules = next; this.savedWitness = observed.witness; return true; }
@@ -252,6 +293,7 @@ export class IndexingRulesEditor extends JfElement {
     this.indexingRulesError = '';
     this.indexingRulesMessage = '';
     this.conflictingRules = null;
+    this.uncertainWrite = null;
   }
 
   override connectedCallback(): void {
@@ -411,6 +453,8 @@ export class IndexingRulesEditor extends JfElement {
           <p id="indexing-battery-help">Applies only while this computer is known to run on battery. If the power source is unknown, this rule does not hold reading. Your preference is kept.</p>
         </details>
         ${this.renderSavedRules()}
+        ${this.uncertainWrite && !this.indexingRulesSaving ? html`<p role="alert">Not sure this saved.
+          <button type="button" @click=${() => void this.saveIndexingRules()}>Try again</button></p>` : nothing}
         <p id="indexing-rules-error" role="alert">${this.indexingRulesError}</p>
         <p role="status">${this.indexingRulesMessage}</p>
         ${!this.indexingRulesLoaded ? html`<p>Waiting for saved reading rules.</p>` : nothing}

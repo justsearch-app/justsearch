@@ -41,9 +41,11 @@ RULE = 'justsearch-journey-skip-1.tmp'
 
 def authored_run():
     state = {'savedFiles': {'files': {'models/embed.onnx': 'sha'}},
-             'settings': {'ui': {'theme': 'dark', 'excludePatterns': [RULE]}},
+             'settings': {'ui': {'theme': 'dark', 'excludePatterns': [RULE],
+                                 'indexingPause': {'schedule': dict(linux.READING_HOURS)}}},
              'roots': ['/corpus'], 'search': {'results': [linux.OPEN_FILE]}}
-    run = Mock(args=NS(phase='candidate'), facts={'skipRule': RULE, 'beforeState': state, 'corpus': '/corpus'})
+    run = Mock(args=NS(phase='candidate'), facts={'skipRule': RULE, 'readingHours': linux.READING_HOURS,
+                                                 'beforeState': state, 'corpus': '/corpus'})
     run.require.side_effect = lambda key: run.facts[key]
     run.current_state = state
     return run
@@ -138,9 +140,17 @@ class AuthoredStateTests(unittest.TestCase):
         for adapter in (linux, windows, gpu):
             for phase in ('candidate', 'predecessor') if adapter is not gpu else ('candidate',):
                 run = Mock(args=NS(phase=phase, resume=None), facts={})
-                settings = {'ui': {'theme': 'dark', 'excludePatterns': [RULE]}}
+                settings = {'ui': {'theme': 'dark', 'excludePatterns': [RULE],
+                                   'indexingPause': {'schedule': dict(linux.READING_HOURS)}}}
                 run.api.return_value = settings
-                run.wd.click.side_effect = lambda selector, *args: self.assertNotIn('bookmark', selector.lower(), 'The redesigned UI has no bookmark controls')
+                def click(selector, *args, settings=settings):
+                    self.assertNotIn('bookmark', selector.lower(), 'The redesigned UI has no bookmark controls')
+                    # Reading hours save on change: Only between, then Any time (kept, turned off).
+                    if selector == 'input#indexing-hours':
+                        settings['ui']['indexingPause'] = {'schedule': {**linux.READING_HOURS, 'enabled': True}}
+                    if selector == 'input[name="indexing-hours"]:not(#indexing-hours)':
+                        settings['ui']['indexingPause'] = {'schedule': dict(linux.READING_HOURS)}
+                run.wd.click.side_effect = click
                 run.wd.execute.return_value = {'pattern': RULE, 'label': 'Skip rule 2'}
                 state = {'settings': settings, 'savedFiles': {'files': {'embedding.onnx': 'sha'}}}
                 with self.subTest(platform=adapter.__name__, phase=phase), patch.object(linux, 'wait_for', immediate), patch.object(linux, 'snapshot', return_value=state):
@@ -173,6 +183,10 @@ class AuthoredStateTests(unittest.TestCase):
             order.append(('click', selector, *args))
             if args == ('Keep them',):
                 self.assertEqual(saved['ui']['excludePatterns'], [RULE], 'the ask is answered only after the rule persisted')
+            if selector == 'input#indexing-hours':
+                saved['ui']['indexingPause'] = {'schedule': {**linux.READING_HOURS, 'enabled': True}}
+            if selector == 'input[name="indexing-hours"]:not(#indexing-hours)':
+                saved['ui']['indexingPause'] = {'schedule': dict(linux.READING_HOURS)}
         run.wd.keys.side_effect = keys
         run.wd.click.side_effect = click
         run.api.side_effect = lambda path, *a: saved
@@ -182,6 +196,36 @@ class AuthoredStateTests(unittest.TestCase):
         self.assertIn(('click', 'button', 'Keep them'), order)
         self.assertLess(order.index(('keys', RULE + '\ue004')), order.index(('click', 'button', 'Keep them')))
         self.assertNotIn('Remove from search', json.dumps(order))
+
+    def test_j4_authors_reading_hours_in_library_and_turns_them_off_keeping_them(self):
+        # Only between saves the default hours on change; Any time turns them off and keeps days and times.
+        run = Mock(args=NS(phase='candidate', resume=None), facts={})
+        saved = {'ui': {'theme': 'dark', 'excludePatterns': [RULE]}}
+        clicks = []
+        def click(selector, *args):
+            clicks.append(selector)
+            if selector == 'input#indexing-hours':
+                saved['ui']['indexingPause'] = {'schedule': {**linux.READING_HOURS, 'enabled': True}}
+            if selector == 'input[name="indexing-hours"]:not(#indexing-hours)':
+                self.assertTrue(saved['ui']['indexingPause']['schedule']['enabled'], 'Only between persisted first')
+                saved['ui']['indexingPause'] = {'schedule': dict(linux.READING_HOURS)}
+        run.wd.click.side_effect = click
+        run.api.side_effect = lambda path, *a: saved
+        run.wd.execute.return_value = {'pattern': RULE, 'label': 'Skip rule 2'}
+        with patch.object(linux, 'wait_for', immediate), patch.object(linux, 'snapshot', return_value={}):
+            linux.author_state(run)
+        self.assertIn('input#indexing-hours', clicks, 'Only between is chosen in Library')
+        self.assertIn('input[name="indexing-hours"]:not(#indexing-hours)', clicks, 'then Any time')
+        self.assertLess(clicks.index('input#indexing-hours'), clicks.index('input[name="indexing-hours"]:not(#indexing-hours)'))
+        self.assertEqual(run.facts['readingHours'], {'enabled': False, 'days': [1, 2, 3, 4, 5, 6, 7],
+                                                     'startMinute': 540, 'endMinute': 1020})
+        # Reading hours that never persisted fail the journey.
+        lost = Mock(args=NS(phase='candidate', resume=None), facts={})
+        lost.api.return_value = {'ui': {'theme': 'dark', 'excludePatterns': [RULE]}}
+        lost.wd.execute.return_value = {'pattern': RULE, 'label': 'Skip rule 2'}
+        with patch.object(linux, 'wait_for', immediate), patch.object(linux, 'snapshot', return_value={}), \
+                self.assertRaises(AssertionError):
+            linux.author_state(lost)
 
     def test_h5_assert_state_requires_rule_and_dark_even_if_before_snapshot_matches(self):
         for phase, patterns, theme, passes in (('candidate', [RULE], 'dark', True),

@@ -235,12 +235,15 @@ class SkipRuleTests(unittest.TestCase):
     rule = 'justsearch-journey-skip-1.tmp'
 
     def restart_run(self, stored=True, visible=True):
+        hours = {'schedule': dict(linux.READING_HOURS)}  # J4 also authors reading hours (slice 6b-2)
         before = {'savedFiles': {'files': {'models/embed.onnx': 'sha'}},
-                  'settings': {'ui': {'theme': 'dark', 'excludePatterns': [self.rule]}},
+                  'settings': {'ui': {'theme': 'dark', 'excludePatterns': [self.rule], 'indexingPause': hours}},
                   'roots': ['/corpus'], 'search': {'results': [linux.OPEN_FILE]}}
-        current = dict(before, settings={'ui': {'theme': 'dark', 'excludePatterns': [self.rule] if stored else []}})
+        current = dict(before, settings={'ui': {'theme': 'dark', 'excludePatterns': [self.rule] if stored else [],
+                                                'indexingPause': hours}})
         run = Mock(binary=BINARY, work='/tmp/isolated', args=NS(phase='candidate'),
-                   facts={'beforeState': before, 'skipRule': self.rule, 'corpus': '/corpus'})
+                   facts={'beforeState': before, 'skipRule': self.rule, 'readingHours': linux.READING_HOURS,
+                          'corpus': '/corpus'})
         run.require.side_effect = lambda key: run.facts[key]
         run.current_state = current
         run.api.return_value = current['settings']

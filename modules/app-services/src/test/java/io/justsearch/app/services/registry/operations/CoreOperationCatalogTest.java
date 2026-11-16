@@ -287,16 +287,16 @@ final class CoreOperationCatalogTest {
   }
 
   /**
-   * apply-excludes remains a real HIGH-risk + Typed-confirm Operation after the obsolete worker
-   * restart operation is retired. Pinning ensures the typed-confirm isn't accidentally weakened.
+   * apply-excludes stays a HIGH-risk, UI-only Operation (the trust gate requires a consent capsule).
+   * Slice 6b-2: its declared consent is Library's in-place ask (Inline), bound to the saved list the
+   * ask was about through the optional {@code rules} argument, no longer a typed word.
    */
   @Test
-  void applyExcludesHasHighRiskTypedConfirm() {
+  void applyExcludesIsHighRiskWithItsInPlaceAskBoundToTheAskedList() {
     Operation op = catalog.findById(CoreOperationCatalog.APPLY_EXCLUDES).orElseThrow();
     assertEquals(RiskTier.HIGH, op.policy().risk());
-    assertInstanceOf(ConfirmStrategy.Typed.class, op.policy().confirm());
-    ConfirmStrategy.Typed typed = (ConfirmStrategy.Typed) op.policy().confirm();
-    assertEquals("ops.apply-excludes.confirm", typed.confirmTextKey().value());
+    assertInstanceOf(ConfirmStrategy.Inline.class, op.policy().confirm());
+    assertTrue(op.intf().inputs().contains("\"rules\""));
     assertEquals(Set.of(ExecutorTag.UI), op.executors());
   }
 

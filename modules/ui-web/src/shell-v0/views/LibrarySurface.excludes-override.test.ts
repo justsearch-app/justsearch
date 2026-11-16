@@ -95,7 +95,8 @@ it('OV1 without an override, including after restart, keeps the saved-list behav
   await addRule(el, 'more.txt');
   const region = ask(el); expect(region).not.toBeNull();
   region!.querySelector<HTMLButtonElement>('button')!.click(); await settle(el);
-  expect(invoke).toHaveBeenCalledWith('core.apply-excludes', {}, { consented: true });
+  // R6: the removal carries the saved list the ask was about.
+  expect(invoke).toHaveBeenCalledWith('core.apply-excludes', { rules: ['saved-only.txt', 'more.txt'] }, { consented: true });
   expect(confirm).not.toHaveBeenCalled();
 });
 it('OV1 an empty override is still named and is not replaced by the saved list', async () => {

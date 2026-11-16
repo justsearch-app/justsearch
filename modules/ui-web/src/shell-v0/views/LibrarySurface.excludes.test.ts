@@ -104,7 +104,7 @@ it('S32.2 there is no Save, Preview or Apply; a draft is not saved before its fi
   expect(invoke).not.toHaveBeenCalled();
 });
 
-it('S32.3 WX1 a partial removal says how many were confirmed and names every scope not checked or not removed', async () => {
+it('S32.3 WX1 a partial removal names every scope not checked or not removed, and counts no files from deletion requests', async () => {
   const { el, invoke } = fixture();
   const scopes = [
     { path: '/offline', status: 'not_checked', reason: 'Watched folder is offline or missing' },
@@ -116,7 +116,8 @@ it('S32.3 WX1 a partial removal says how many were confirmed and names every sco
   const output = el.shadowRoot?.querySelector('.removal-slot [role="status"]');
   expect(output).toBeTruthy();
   expect(output?.textContent).toContain('Partly done');
-  expect(output?.textContent).toContain('2 files removed from search');
+  // R10: confirmedRemovals counts deletion requests (a folder is one), never files.
+  expect(output?.textContent).not.toMatch(/\d+ files? removed/);
   expect(output?.textContent).toContain('Offline or missing folder, not checked: /offline');
   expect(output?.textContent).toContain("Couldn't be removed: /docs/refused.log");
   for (const scope of scopes) expect([...output!.querySelectorAll('li')].some(li => li.getAttribute('title') === scope.reason)).toBe(true);
@@ -130,7 +131,7 @@ it('S32.3 an old or missing result is not sure rather than a complete removal', 
   expect(el.shadowRoot?.querySelector('.removal-slot')?.textContent).toContain('Not sure the files were removed');
 });
 
-it('WX2 explains buffered removals and keeps them out of the completed count', async () => {
+it('WX2 explains buffered removals and says no count of removed files', async () => {
   const { el, invoke } = fixture();
   invoke.mockResolvedValue({ success: true, structuredData: { ...result, confirmedRemovals: 0,
     uncheckedScopes: [{ path: '/docs/pending.log', status: 'not_removed',
@@ -139,7 +140,7 @@ it('WX2 explains buffered removals and keeps them out of the completed count', a
   control(await addRuleAndAsk(el), 'Remove from search').click(); await settle(el);
   const text = el.shadowRoot?.querySelector('.removal-slot')?.textContent;
   expect(text).toContain('Partly done');
-  expect(text).toContain('0 files removed from search');
+  expect(text).not.toMatch(/\d+ files? removed/);
   expect(text).toContain('Waits for the rebuild to finish: /docs/pending.log');
   expect(el.shadowRoot?.querySelector('#excludes-help')?.textContent)
     .toContain('During a rebuild of search data, removal may wait');
@@ -200,6 +201,7 @@ it('S32.7 announces the final outcome once while a removal in flight ignores rep
   await settle(el);
   const statuses = el.shadowRoot?.querySelectorAll('.removal-slot [role="status"]');
   expect(statuses).toHaveLength(1);
-  expect(statuses?.[0]?.textContent).toContain('Done. 2 files removed from search');
+  expect(statuses?.[0]?.textContent).toContain('Done. Files already read that match your skip rules are no longer in search');
+  expect(statuses?.[0]?.textContent).not.toMatch(/\d+ files? removed/);
   expect(el.shadowRoot?.querySelector('.removal-slot')?.getAttribute('aria-live')).toBe('polite');
 });

@@ -73,17 +73,22 @@ tabs or leaving Library); removing a rule or an exact-path keep-out saves at onc
 last rule saves an empty list. A rule that is not complete yet (such as `[a`) is never saved: its
 field says why, and fixing it saves. Reading hours and the battery rule save on change (a time when
 its field is left); an invalid combination is not sent and says why. A save never disables the field
-being typed in; text typed during a save is saved when its field is left, and is not called saved
-before it is. An unknown outcome reads **Not sure this saved** with **Try again**, which checks the
-same save before any newer text is sent. When another window changed the same rules, the draft is
+being typed in; what is saved is the text as it was when its field was left, so text typed during a
+save is saved when its field is left again, and is not called saved before it is. An unknown outcome
+(of a skip-rule or a reading-hours save) reads **Not sure this saved** with **Try again**, which
+checks the same save, with its same key and contents, before any newer change is sent. A reading-hours
+change already requested still saves after leaving Library. When another window changed the same rules, the draft is
 kept and **Changed elsewhere** offers **Use the saved rules** or **Keep my draft**; a save elsewhere
 of other settings is not a conflict. Each reading-rules write carries the revision its draft was
 based on.
 
 Adding a skip rule asks in place, without moving focus: **Remove files already read that match your
 skip rules from search? Files on disk are not touched.** **Keep them** leaves them searchable;
-**Remove from search** applies all saved rules. If the saved list changes while the ask is open, it
-is withdrawn and asked again for the new list. The outcome is plain: done, partly done (naming
+**Remove from search** applies all saved rules: the answer is consent for the saved list it asked
+about, and the removal carries that list. If the saved list changes while the ask is open, or between
+the answer and the removal (another window, an override), nothing is removed and the ask is withdrawn
+and asked again for the new list. The outcome is plain and names no number of files (the engine
+confirms deletion requests, one per matching folder, not documents): done, partly done (naming
 offline or missing folders, unreadable files and files that couldn't be removed) with **Try again**,
 or not sure with **Try again**. Files no longer on disk are not checked and may stay searchable.
 While an override is set nothing is asked; the note explains the saved list takes effect when the
