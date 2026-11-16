@@ -194,3 +194,13 @@ browse-lockdown.test.ts fail before by assertion on 2d51325e39 and pass on the c
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "caa6061e-06e5-49fe-8f3b-1ece4af0a8c0",
+  "verdict": "accept",
+  "digest": "sha256:c89eb31049cb9d2dd1cae8b4d4225e764fa699757ddfeba35ae8a1da681954a3"
+}
+```
