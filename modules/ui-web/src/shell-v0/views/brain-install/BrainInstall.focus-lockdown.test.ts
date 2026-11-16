@@ -15,7 +15,7 @@ let server: ViteDevServer, browserServer: BrowserServer, browser: Browser, conte
 let output: string, url: string;
 let engine: Record<string, Recorded>;
 let liveStatus: unknown;
-declare global { interface Window { mountBrain(): Promise<void>; readInstall(): Promise<void>; brainCalls: string[]; spoken: string[]; refuseStart?: boolean } }
+declare global { interface Window { mountBrain(): Promise<void>; mountTopBar(): void; readInstall(): Promise<void>; brainCalls: string[]; spoken: string[]; refuseStart?: boolean } }
 
 beforeAll(async () => {
   engine = JSON.parse(await readFile(path.resolve('src/shell-v0/views/brain-install/__fixtures__/engine-install-statuses.json'), 'utf8'));
@@ -35,11 +35,14 @@ beforeAll(async () => {
           <style>html, body { margin: 0; height: 100%; background: var(--surface-1); color: var(--text-primary); font-family: var(--font-native); } #host { height: 100vh; display: flex; flex-direction: column; }</style>
           </head><body><div id="host"></div><script type="module">
           import '/src/shell-v0/views/BrainSurface.ts';
+          import '/src/shell-v0/components/StatusPill.ts';
           import { createMockHostApi } from '/src/shell-v0/plugin-api/testHostApi.ts';
           import { startAiStateStore } from '/src/shell-v0/state/aiStateStore.ts';
           import { refreshAiInstallNow } from '/src/shell-v0/utils/aiInstallPoll.ts';
           window.brainCalls = []; window.spoken = [];
           window.readInstall = () => refreshAiInstallNow();
+          // The top bar's status entry over the same AI state, where a run's share stands (G3'').
+          window.mountTopBar = () => { document.querySelector('#host').prepend(document.createElement('jf-status-pill')); };
           window.mountBrain = async () => {
             startAiStateStore('');
             const brain = document.createElement('jf-brain-surface'); brain.apiBase = '';
@@ -213,13 +216,19 @@ it('Pause keeps focus on its button as it becomes Resume; the pause is said once
   await expect.poll(() => focused(page)).toBe('Pause');
 }, 60_000);
 
-it('progress is spoken once per tenth, not on every poll', async () => {
+// G3'' — the heading stays "Installing AI"; the share stands once, in the top bar; the polite
+// announcement may carry it, once per tenth (S7b-9).
+it('progress is spoken once per tenth, not on every poll; the share shows in the top bar, not the heading', async () => {
   const { page, engine: state } = await open('running', {});
-  await expect.poll(() => heading(page).textContent()).toBe('Installing AI · 18%');
+  await page.evaluate(() => window.mountTopBar());
+  const topBar = page.locator('jf-status-pill .label');
+  await expect.poll(() => topBar.textContent()).toBe('Installing AI models · 18%');
+  expect(await heading(page).textContent()).toBe('Installing AI');
   await page.evaluate(() => { window.spoken.length = 0; });
   for (const done of [200_000, 210_000, 230_000, 260_000, 290_000]) {
     await publish(page, state, 'running', { downloadedBytes: done });
-    await expect.poll(() => heading(page).textContent()).toBe(`Installing AI · ${Math.floor(done / 949_616 * 100)}%`);
+    await expect.poll(() => topBar.textContent()).toBe(`Installing AI models · ${Math.round(done / 949_616 * 100)}%`);
+    expect(await heading(page).textContent()).toBe('Installing AI');
   }
   expect(await page.evaluate(() => window.spoken)).toEqual(['Installing AI, 20%', 'Installing AI, 30%']);
 }, 60_000);
@@ -332,7 +341,8 @@ function audit() {
 for (const theme of ['dark', 'light'] as const) {
   it(`${theme}, 600 px: the run and the stopped download fit; the stopped view has no red and no teal but Try again`, async () => {
     const { page, engine: state } = await open('runningRetrying', { theme, width: 600 });
-    await expect.poll(() => heading(page).textContent()).toBe('Installing AI · 24%');
+    await expect.poll(() => heading(page).textContent()).toBe('Installing AI');
+    await expect.poll(() => page.locator('jf-brain-surface [role="progressbar"]').count()).toBe(1);
     expect(await page.evaluate(audit)).toMatchObject({ clipped: [], offLadder: [], radius: [], overflow: false });
     const fits = () => page.evaluate(() => {
       const brain = document.querySelector('jf-brain-surface')!;

@@ -53,7 +53,7 @@ the downloaded files", "Setting up the downloaded parts", Cancel's toast "Instal
 parts stay on this computer." and the paused body "An earlier download is paused." are asserted exactly
 from W7 (delegated choice, cited in the entries that assert them); "Preparing the download" (the line
 while a run prepares) has no exact source and no check asserts it; the spoken progress "Installing AI,
-N%" repeats fm-12's heading words "Installing AI" and its share. No expected value is
+N%" is fm-12's heading words with the share, as G3'' allows (cited in the focus check's entry). No expected value is
 computed by production code: the part sizes are the shipped registry's byte counts and the pictured
 words. This builder wrote no acceptance record.
 
@@ -144,6 +144,25 @@ passes on the candidate and fails on the base by assertion. On origin/main (dea8
 check's 45 cases fail; the six that hold are the four named above for the first session, RS8 "before the
 run, Repair is offered" and RS8's cancelled repair (the base counts any file as an installation).
 
+A fifth builder session (builder-fm-s7b-20261116e) answered the acceptor's reject (the page heading
+carried the share that fm-12 shows once, in the top-bar status) under the orchestrator's decision G3''
+(delegated choice, cited verbatim in the affected entries): during any install run the heading is
+"Installing AI", with no share and no "· Paused"; the paused state is said by G4's body words; the
+polite announcement may still carry the share ("Installing AI, N%", once per tenth). The checks that
+pinned the heading now assert the plain heading and read the share where it stands, the top bar's
+status entry (the real status pill over the same AI state; its words "Installing AI models · N%" and
+"AI download paused · N%" are unchanged by this slice): flow, focus-lockdown, installOperations and
+repairRun. BrainSurface.redesign's remount case, which found "50%" anywhere in the page text, reads the
+page's progress bar instead. On the previous candidate (9e4a0cadba, a shared clone with the new check
+files copied in) the updated checks fail by assertion where the heading carried the share: 5 flow
+cases, 3 focus-lockdown cases, 2 installOperations cases and 8 repairRun cases; the redesign case holds
+there. The page evidence was re-run with --before origin/main and the same two overlays; every check
+passes on the candidate and fails on the base by assertion (flow 39 of 45, focus-lockdown 7 of 10,
+installOperations 4 of 4, repairRun 19 of 20, redesign 2 of 12 cases on dea8a9f97b). The "1 KB"
+sizes are now cited to the orchestrator's accepted deviation "KB under 1 MB" in the entries that assert
+them. Outside the gate's items, e2e/csp-chromium.mjs (run by src/boot/csp-styles-lockdown.test.ts)
+waited for "45%" in the heading; it now waits for the run's bar at 45 and measures it as before.
+
 ```json
 {
   "entries": [
@@ -154,7 +173,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "AI Brain's install flow rendered from the Engine's recorded statuses: the consent's five parts with page names, sizes, licences and Terms, Cancel starting nothing and Accept starting the install, \"Up to\" with staged bytes (S7b-1); unknown sizes and a missing manifest block Accept with a reason, a missing licence says so (S7b-10); progress heading, amounts, time left only when estimated, Done only after model presence observed after the part's last file, Waiting or a stage's refusal reason (S7b-2); Pause/Resume words and Cancel's toast without a promise of continuing (S7b-3); the stopped view with Done/Stopped/Waiting, Try again, Cancel install and Detail for support, no red, no connection claim (S7b-4); Try again's run covering only what is missing (S7b-5); Cancel install bound to the failed run (S7b-6); not installed after a first install that stopped with nothing placed, partial-only, supporting-only, unknown presence (S7b-7, G6'); restart reconstruction (S7b-8). Bytes an earlier download left: the action is \"Install AI\" with the most it can download, named so in its accessible name, never \"Resume Download\" or a promise to continue (G4', gap 2); a first install that runs, a paused run and a stopped download show only the install view, without steps, graphics card or Advanced settings, and the steps return after completion and after Cancel install (gap 3). Review repairs: Try again after a failed Best match first download asks the Engine to switch it on when done, as the consent accepted, and not when that choice was saved differently since (RS1); after a restart a complete GPU runtime package with no model file is not an installation (RS2); a damaged installation found on disk after a restart offers Repair, its repair run keeps the steps, and a failed (after Cancel install) or cancelled repair run keeps the repair classification (RS3); after Cancel install with model presence unreadable the page says it is checking, not \"AI isn't installed yet\", until presence resolves (RS4); a part the Engine reports verifying, in the download phase, reads \"Checking the downloaded files\" with no time left (RS5, W7). Second review repairs: a completed status left from the earlier run does not clear the accepted consent's completion intent, which follows Try again to its new run and is cleared only when its own run completes (RS7); a model file on disk before a repair run, whose tokenizer that run downloads, keeps the steps during the run and the repair classification after it was cancelled or failed (and Cancel install), while a model file the first install itself placed is still not an installation (RS8).",
+      "behaviour": "AI Brain's install flow rendered from the Engine's recorded statuses: the consent's five parts with page names, sizes, licences and Terms, Cancel starting nothing and Accept starting the install, \"Up to\" with staged bytes (S7b-1); unknown sizes and a missing manifest block Accept with a reason, a missing licence says so (S7b-10); progress under the plain heading \"Installing AI\" with the share only in the top-bar status entry (G3''), amounts, time left only when estimated, Done only after model presence observed after the part's last file, Waiting or a stage's refusal reason (S7b-2); Pause/Resume words and Cancel's toast without a promise of continuing (S7b-3); the stopped view with Done/Stopped/Waiting, Try again, Cancel install and Detail for support, no red, no connection claim (S7b-4); Try again's run covering only what is missing (S7b-5); Cancel install bound to the failed run (S7b-6); not installed after a first install that stopped with nothing placed, partial-only, supporting-only, unknown presence (S7b-7, G6'); restart reconstruction (S7b-8). Bytes an earlier download left: the action is \"Install AI\" with the most it can download, named so in its accessible name, never \"Resume Download\" or a promise to continue (G4', gap 2); a first install that runs, a paused run and a stopped download show only the install view, without steps, graphics card or Advanced settings, and the steps return after completion and after Cancel install (gap 3). Review repairs: Try again after a failed Best match first download asks the Engine to switch it on when done, as the consent accepted, and not when that choice was saved differently since (RS1); after a restart a complete GPU runtime package with no model file is not an installation (RS2); a damaged installation found on disk after a restart offers Repair, its repair run keeps the steps, and a failed (after Cancel install) or cancelled repair run keeps the repair classification (RS3); after Cancel install with model presence unreadable the page says it is checking, not \"AI isn't installed yet\", until presence resolves (RS4); a part the Engine reports verifying, in the download phase, reads \"Checking the downloaded files\" with no time left (RS5, W7). Second review repairs: a completed status left from the earlier run does not clear the accepted consent's completion intent, which follows Try again to its new run and is cleared only when its own run completes (RS7); a model file on disk before a repair run, whose tokenizer that run downloads, keeps the steps during the run and the repair classification after it was cancelled or failed (and Cancel install), while a model file the first install itself placed is still not an installation (RS8).",
       "sources": [
         {
           "kind": "owner-words",
@@ -164,7 +183,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
         },
         {
           "kind": "owner-words",
-          "quote": "fm-12 \"Installing AI · 50%\" \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
+          "quote": "fm-12 top-bar status \"Installing AI · 50%\"; page lead \"Installing AI\"; \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
           "location": "task t-20261113-fmimpl agreement, picture notes fm-11, fm-12, fm-12b",
           "label": "owner words"
         },
@@ -201,7 +220,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "G3/G3' Progress: header \"Installing AI · N%\"; \"Search by exact words keeps working while this runs.\"; \"X of Y · about N min left\" (ETA only when remainingSeconds > 0; during verification/configuration/activation the line says what is happening, no ETA); one row per part: \"Done\" only when the Engine's model presence shows every final file of that part placed in this run's observation after the run's last file for that part (not per-file \"installed\", not byte equality, not presence older than the run); otherwise \"a of b\" or \"Waiting\"; a stage's blockedReason is shown in words instead of \"Waiting\"; buttons \"Pause\" and \"Cancel\" together.",
+          "choice": "G3/G3' Progress (heading as G3'' replaced it): page heading \"Installing AI\"; \"Search by exact words keeps working while this runs.\"; \"X of Y · about N min left\" (ETA only when remainingSeconds > 0; during verification/configuration/activation the line says what is happening, no ETA); one row per part: \"Done\" only when the Engine's model presence shows every final file of that part placed in this run's observation after the run's last file for that part (not per-file \"installed\", not byte equality, not presence older than the run); otherwise \"a of b\" or \"Waiting\"; a stage's blockedReason is shown in words instead of \"Waiting\"; buttons \"Pause\" and \"Cancel\" together.",
           "label": "agent choice"
         },
         {
@@ -315,6 +334,22 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "RS8 (repair decisions, 2026-11-16, second review) Existing-installation evidence is per final model file: a final file counts when it was present before the current run placed anything (from the Engine's per-file plan or placement data if published; else presence observed before this run started); supporting files planned or downloaded by a repair never remove a model's evidence. If the Engine publishes no per-file data and no pre-run observation exists (reload during a repair), keep the classification from the last disk evidence and say nothing new; name that case in your report.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the top-bar status entry's existing words (\"Installing AI models · N%\", \"AI download paused · N%\"), which this slice does not change, and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator, 2026-11-16, accepted builder deviations (verbatim): \"7b builder deviations accepted (mine): KB under 1 MB; repair owed also on Engine-reported existing installation; \\\"Downloaded\\\" for on-disk step before install; consent first focus on Terms as before.\" Under it, sizes below 1 MB in the consent and the progress show whole KB (\"1 KB\", \"3 KB\", \"56 of 177 KB\"); MB and GB follow G2'.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/fm-brain-install.json",
@@ -330,7 +365,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "In headless Chromium with the real AI state store: Escape and Cancel return focus to Install AI and Accept is reachable by Tab; Pause keeps focus as it becomes Resume and the paused words are announced politely; progress is announced once per tenth; focus moves to the heading on failure, to Pause after Try again, to the heading on completion and after Cancel install; light and dark at 600 px nothing overflows or leaves the size and corner ladders, the stopped view has no error alert, no teal bar and Try again as its only filled action; the consent stays on the ladders at 600 px. When the install view takes the page focus is not lost: after Accept and download, and from a focused step when a run starts, focus moves to Pause (gap 3). After Try again, focus is never lost: a run that completes or fails again before any poll sees it running, and a refused start, put focus on the heading (RS6).",
+      "behaviour": "In headless Chromium with the real AI state store: Escape and Cancel return focus to Install AI and Accept is reachable by Tab; Pause keeps focus as it becomes Resume and the paused words are announced politely; progress is announced once per tenth (\"Installing AI, N%\"), while the heading stays \"Installing AI\" and the share shows in the top bar's status entry (G3''); focus moves to the heading on failure, to Pause after Try again, to the heading on completion and after Cancel install; light and dark at 600 px nothing overflows or leaves the size and corner ladders, the stopped view has no error alert, no teal bar and Try again as its only filled action; the consent stays on the ladders at 600 px. When the install view takes the page focus is not lost: after Accept and download, and from a focused step when a run starts, focus moves to Pause (gap 3). After Try again, focus is never lost: a run that completes or fails again before any poll sees it running, and a refused start, put focus on the heading (RS6).",
       "sources": [
         {
           "kind": "owner-words",
@@ -340,7 +375,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
         },
         {
           "kind": "owner-words",
-          "quote": "fm-12 \"Installing AI · 50%\" \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
+          "quote": "fm-12 top-bar status \"Installing AI · 50%\"; page lead \"Installing AI\"; \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
           "location": "task t-20261113-fmimpl agreement, picture notes fm-11, fm-12, fm-12b",
           "label": "owner words"
         },
@@ -367,7 +402,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "G3/G3' Progress: header \"Installing AI · N%\"; \"Search by exact words keeps working while this runs.\"; \"X of Y · about N min left\" (ETA only when remainingSeconds > 0; during verification/configuration/activation the line says what is happening, no ETA); one row per part: \"Done\" only when the Engine's model presence shows every final file of that part placed in this run's observation after the run's last file for that part (not per-file \"installed\", not byte equality, not presence older than the run); otherwise \"a of b\" or \"Waiting\"; a stage's blockedReason is shown in words instead of \"Waiting\"; buttons \"Pause\" and \"Cancel\" together.",
+          "choice": "G3/G3' Progress (heading as G3'' replaced it): page heading \"Installing AI\"; \"Search by exact words keeps working while this runs.\"; \"X of Y · about N min left\" (ETA only when remainingSeconds > 0; during verification/configuration/activation the line says what is happening, no ETA); one row per part: \"Done\" only when the Engine's model presence shows every final file of that part placed in this run's observation after the run's last file for that part (not per-file \"installed\", not byte equality, not presence older than the run); otherwise \"a of b\" or \"Waiting\"; a stage's blockedReason is shown in words instead of \"Waiting\"; buttons \"Pause\" and \"Cancel\" together.",
           "label": "agent choice"
         },
         {
@@ -416,6 +451,14 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "RS6 (repair decisions, 2026-11-16) Pending focus after Try again resolves on every outcome: a new run, completion, another failure, or a refused request; focus goes to the view's heading or the new primary control, never lost.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the top-bar status entry's existing words (\"Installing AI models · N%\", \"AI download paused · N%\"), which this slice does not change, and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
           "label": "agent choice"
         }
       ],
@@ -499,7 +542,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "G3/G3' Progress: header \"Installing AI · N%\"; \"Search by exact words keeps working while this runs.\"; \"X of Y · about N min left\" (ETA only when remainingSeconds > 0; during verification/configuration/activation the line says what is happening, no ETA); one row per part: \"Done\" only when the Engine's model presence shows every final file of that part placed in this run's observation after the run's last file for that part (not per-file \"installed\", not byte equality, not presence older than the run); otherwise \"a of b\" or \"Waiting\"; a stage's blockedReason is shown in words instead of \"Waiting\"; buttons \"Pause\" and \"Cancel\" together.",
+          "choice": "G3/G3' Progress (heading as G3'' replaced it): page heading \"Installing AI\"; \"Search by exact words keeps working while this runs.\"; \"X of Y · about N min left\" (ETA only when remainingSeconds > 0; during verification/configuration/activation the line says what is happening, no ETA); one row per part: \"Done\" only when the Engine's model presence shows every final file of that part placed in this run's observation after the run's last file for that part (not per-file \"installed\", not byte equality, not presence older than the run); otherwise \"a of b\" or \"Waiting\"; a stage's blockedReason is shown in words instead of \"Waiting\"; buttons \"Pause\" and \"Cancel\" together.",
           "label": "agent choice"
         },
         {
@@ -604,7 +647,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
         },
         {
           "kind": "owner-words",
-          "quote": "fm-12 \"Installing AI · 50%\" \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
+          "quote": "fm-12 top-bar status \"Installing AI · 50%\"; page lead \"Installing AI\"; \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
           "location": "task t-20261113-fmimpl agreement, picture notes fm-11, fm-12, fm-12b",
           "label": "owner words"
         }
@@ -622,7 +665,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "fm-12 \"Installing AI · 50%\" \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
+          "quote": "fm-12 top-bar status \"Installing AI · 50%\"; page lead \"Installing AI\"; \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
           "location": "task t-20261113-fmimpl agreement, picture notes fm-11, fm-12, fm-12b",
           "label": "owner words"
         },
@@ -645,7 +688,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "G3/G3' Progress: header \"Installing AI · N%\"; \"Search by exact words keeps working while this runs.\"; \"X of Y · about N min left\" (ETA only when remainingSeconds > 0; during verification/configuration/activation the line says what is happening, no ETA); one row per part: \"Done\" only when the Engine's model presence shows every final file of that part placed in this run's observation after the run's last file for that part (not per-file \"installed\", not byte equality, not presence older than the run); otherwise \"a of b\" or \"Waiting\"; a stage's blockedReason is shown in words instead of \"Waiting\"; buttons \"Pause\" and \"Cancel\" together.",
+          "choice": "G3/G3' Progress (heading as G3'' replaced it): page heading \"Installing AI\"; \"Search by exact words keeps working while this runs.\"; \"X of Y · about N min left\" (ETA only when remainingSeconds > 0; during verification/configuration/activation the line says what is happening, no ETA); one row per part: \"Done\" only when the Engine's model presence shows every final file of that part placed in this run's observation after the run's last file for that part (not per-file \"installed\", not byte equality, not presence older than the run); otherwise \"a of b\" or \"Waiting\"; a stage's blockedReason is shown in words instead of \"Waiting\"; buttons \"Pause\" and \"Cancel\" together.",
           "label": "agent choice"
         },
         {
@@ -716,7 +759,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "fm-12 \"Installing AI · 50%\" \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
+          "quote": "fm-12 top-bar status \"Installing AI · 50%\"; page lead \"Installing AI\"; \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
           "location": "task t-20261113-fmimpl agreement, picture notes fm-11, fm-12, fm-12b",
           "label": "owner words"
         },
@@ -725,7 +768,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "G3/G3' Progress: header \"Installing AI · N%\"; \"Search by exact words keeps working while this runs.\"; \"X of Y · about N min left\" (ETA only when remainingSeconds > 0; during verification/configuration/activation the line says what is happening, no ETA); one row per part: \"Done\" only when the Engine's model presence shows every final file of that part placed in this run's observation after the run's last file for that part (not per-file \"installed\", not byte equality, not presence older than the run); otherwise \"a of b\" or \"Waiting\"; a stage's blockedReason is shown in words instead of \"Waiting\"; buttons \"Pause\" and \"Cancel\" together.",
+          "choice": "G3/G3' Progress (heading as G3'' replaced it): page heading \"Installing AI\"; \"Search by exact words keeps working while this runs.\"; \"X of Y · about N min left\" (ETA only when remainingSeconds > 0; during verification/configuration/activation the line says what is happening, no ETA); one row per part: \"Done\" only when the Engine's model presence shows every final file of that part placed in this run's observation after the run's last file for that part (not per-file \"installed\", not byte equality, not presence older than the run); otherwise \"a of b\" or \"Waiting\"; a stage's blockedReason is shown in words instead of \"Waiting\"; buttons \"Pause\" and \"Cancel\" together.",
           "label": "agent choice"
         },
         {
@@ -735,10 +778,18 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "G4' Pause: since the Engine reports paused at once while the current file may still finish, the words after Pause are \"Paused. The file being downloaded may still finish.\" with Resume and Cancel; no claim of acknowledgement. Toast and post-restart promises of continuing go (aiVerdict.ts:532, BrainSurface.ts:2589, :3791).",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the top-bar status entry's existing words (\"Installing AI models · N%\", \"AI download paused · N%\"), which this slice does not change, and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
+          "label": "agent choice"
         }
       ],
       "conflictSearch": "decision records searched for a conflict (docs/decisions: resume, pause, consent, repair, first run): none",
-      "whatChanged": "Heading \"Installing AI · 25%\" and the paused line instead of \"Installing… 25%\" / \"Paused 25%\"; buttons \"Pause\" / \"Resume\"; the parts list replaces the staged-progress block in the hidden-while-unobserved checks."
+      "whatChanged": "Heading \"Installing AI\" (G3'': no share, no \"· Paused\") and the paused line instead of \"Installing… 25%\" / \"Paused 25%\"; the share is read from the top bar's status entry, mounted over the same store (\"Installing AI models · 25%\", \"AI download paused · 25%\"); buttons \"Pause\" / \"Resume\"; the parts list replaces the staged-progress block in the hidden-while-unobserved checks."
     },
     {
       "items": [
@@ -750,7 +801,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "fm-12 \"Installing AI · 50%\" \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
+          "quote": "fm-12 top-bar status \"Installing AI · 50%\"; page lead \"Installing AI\"; \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
           "location": "task t-20261113-fmimpl agreement, picture notes fm-11, fm-12, fm-12b",
           "label": "owner words"
         },
@@ -787,6 +838,14 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "G2' Consent: part names follow the page steps (Understand meaning; Related words, with \"helps Understand meaning\"; Best match first; Names of people and places; Checking answers against sources); licence and Terms per part; header \"Download AI models?\" and \"N will be downloaded to this computer. Each part comes from its own author, under the licence shown.\"; buttons \"Cancel\" / \"Accept and download\"; the total says \"Up to N will be downloaded\" when staged partial bytes exist (reuse not guaranteed), else \"N will be downloaded\"; the consent row list follows the actual plan, the five-part list is only the first-run case. The existing promise \"will be resumed, not downloaded again\" goes. Sizes: a consent/progress-only formatting context (MB whole, GB two decimals for parts, one for the total); the shared formatter and its other callers unchanged.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator, 2026-11-16, accepted builder deviations (verbatim): \"7b builder deviations accepted (mine): KB under 1 MB; repair owed also on Engine-reported existing installation; \\\"Downloaded\\\" for on-disk step before install; consent first focus on Terms as before.\" Under it, sizes below 1 MB in the consent and the progress show whole KB (\"1 KB\", \"3 KB\", \"56 of 177 KB\"); MB and GB follow G2'.",
+          "label": "agent choice"
         }
       ],
       "conflictSearch": "decision records searched for a conflict (docs/decisions: resume, pause, consent, repair, first run): none",
@@ -813,10 +872,26 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "G2' Consent: part names follow the page steps (Understand meaning; Related words, with \"helps Understand meaning\"; Best match first; Names of people and places; Checking answers against sources); licence and Terms per part; header \"Download AI models?\" and \"N will be downloaded to this computer. Each part comes from its own author, under the licence shown.\"; buttons \"Cancel\" / \"Accept and download\"; the total says \"Up to N will be downloaded\" when staged partial bytes exist (reuse not guaranteed), else \"N will be downloaded\"; the consent row list follows the actual plan, the five-part list is only the first-run case. The existing promise \"will be resumed, not downloaded again\" goes. Sizes: a consent/progress-only formatting context (MB whole, GB two decimals for parts, one for the total); the shared formatter and its other callers unchanged.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the top-bar status entry's existing words (\"Installing AI models · N%\", \"AI download paused · N%\"), which this slice does not change, and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator, 2026-11-16, accepted builder deviations (verbatim): \"7b builder deviations accepted (mine): KB under 1 MB; repair owed also on Engine-reported existing installation; \\\"Downloaded\\\" for on-disk step before install; consent first focus on Terms as before.\" Under it, sizes below 1 MB in the consent and the progress show whole KB (\"1 KB\", \"3 KB\", \"56 of 177 KB\"); MB and GB follow G2'.",
+          "label": "agent choice"
         }
       ],
       "conflictSearch": "decision records searched for a conflict (docs/decisions: resume, pause, consent, repair, first run): none",
-      "whatChanged": "Consent rows carry the page's part names and the consent's sizes (\"1 KB\", \"3 KB\"; \"Terms\")."
+      "whatChanged": "Consent rows carry the page's part names and the consent's sizes (\"1 KB\", \"3 KB\"; \"Terms\"). Progress kept across a tab switch and remount is read from the page's progress bar (its value 50), since the heading no longer carries the share (G3''; was: \"50%\" anywhere in the page text, which main's heading \"Installing… 50%\" supplied)."
     },
     {
       "items": [
@@ -838,6 +913,14 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "G2' Consent: part names follow the page steps (Understand meaning; Related words, with \"helps Understand meaning\"; Best match first; Names of people and places; Checking answers against sources); licence and Terms per part; header \"Download AI models?\" and \"N will be downloaded to this computer. Each part comes from its own author, under the licence shown.\"; buttons \"Cancel\" / \"Accept and download\"; the total says \"Up to N will be downloaded\" when staged partial bytes exist (reuse not guaranteed), else \"N will be downloaded\"; the consent row list follows the actual plan, the five-part list is only the first-run case. The existing promise \"will be resumed, not downloaded again\" goes. Sizes: a consent/progress-only formatting context (MB whole, GB two decimals for parts, one for the total); the shared formatter and its other callers unchanged.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator, 2026-11-16, accepted builder deviations (verbatim): \"7b builder deviations accepted (mine): KB under 1 MB; repair owed also on Engine-reported existing installation; \\\"Downloaded\\\" for on-disk step before install; consent first focus on Terms as before.\" Under it, sizes below 1 MB in the consent and the progress show whole KB (\"1 KB\", \"3 KB\", \"56 of 177 KB\"); MB and GB follow G2'.",
           "label": "agent choice"
         }
       ],
@@ -865,6 +948,14 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "G2' Consent: part names follow the page steps (Understand meaning; Related words, with \"helps Understand meaning\"; Best match first; Names of people and places; Checking answers against sources); licence and Terms per part; header \"Download AI models?\" and \"N will be downloaded to this computer. Each part comes from its own author, under the licence shown.\"; buttons \"Cancel\" / \"Accept and download\"; the total says \"Up to N will be downloaded\" when staged partial bytes exist (reuse not guaranteed), else \"N will be downloaded\"; the consent row list follows the actual plan, the five-part list is only the first-run case. The existing promise \"will be resumed, not downloaded again\" goes. Sizes: a consent/progress-only formatting context (MB whole, GB two decimals for parts, one for the total); the shared formatter and its other callers unchanged.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator, 2026-11-16, accepted builder deviations (verbatim): \"7b builder deviations accepted (mine): KB under 1 MB; repair owed also on Engine-reported existing installation; \\\"Downloaded\\\" for on-disk step before install; consent first focus on Terms as before.\" Under it, sizes below 1 MB in the consent and the progress show whole KB (\"1 KB\", \"3 KB\", \"56 of 177 KB\"); MB and GB follow G2'.",
+          "label": "agent choice"
         }
       ],
       "conflictSearch": "decision records searched for a conflict (docs/decisions: resume, pause, consent, repair, first run): none",
@@ -891,6 +982,14 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "G2' Consent: part names follow the page steps (Understand meaning; Related words, with \"helps Understand meaning\"; Best match first; Names of people and places; Checking answers against sources); licence and Terms per part; header \"Download AI models?\" and \"N will be downloaded to this computer. Each part comes from its own author, under the licence shown.\"; buttons \"Cancel\" / \"Accept and download\"; the total says \"Up to N will be downloaded\" when staged partial bytes exist (reuse not guaranteed), else \"N will be downloaded\"; the consent row list follows the actual plan, the five-part list is only the first-run case. The existing promise \"will be resumed, not downloaded again\" goes. Sizes: a consent/progress-only formatting context (MB whole, GB two decimals for parts, one for the total); the shared formatter and its other callers unchanged.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator, 2026-11-16, accepted builder deviations (verbatim): \"7b builder deviations accepted (mine): KB under 1 MB; repair owed also on Engine-reported existing installation; \\\"Downloaded\\\" for on-disk step before install; consent first focus on Terms as before.\" Under it, sizes below 1 MB in the consent and the progress show whole KB (\"1 KB\", \"3 KB\", \"56 of 177 KB\"); MB and GB follow G2'.",
+          "label": "agent choice"
         }
       ],
       "conflictSearch": "decision records searched for a conflict (docs/decisions: resume, pause, consent, repair, first run): none",
@@ -906,7 +1005,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "fm-12 \"Installing AI · 50%\" \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
+          "quote": "fm-12 top-bar status \"Installing AI · 50%\"; page lead \"Installing AI\"; \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
           "location": "task t-20261113-fmimpl agreement, picture notes fm-11, fm-12, fm-12b",
           "label": "owner words"
         },
@@ -915,7 +1014,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "G3/G3' Progress: header \"Installing AI · N%\"; \"Search by exact words keeps working while this runs.\"; \"X of Y · about N min left\" (ETA only when remainingSeconds > 0; during verification/configuration/activation the line says what is happening, no ETA); one row per part: \"Done\" only when the Engine's model presence shows every final file of that part placed in this run's observation after the run's last file for that part (not per-file \"installed\", not byte equality, not presence older than the run); otherwise \"a of b\" or \"Waiting\"; a stage's blockedReason is shown in words instead of \"Waiting\"; buttons \"Pause\" and \"Cancel\" together.",
+          "choice": "G3/G3' Progress (heading as G3'' replaced it): page heading \"Installing AI\"; \"Search by exact words keeps working while this runs.\"; \"X of Y · about N min left\" (ETA only when remainingSeconds > 0; during verification/configuration/activation the line says what is happening, no ETA); one row per part: \"Done\" only when the Engine's model presence shows every final file of that part placed in this run's observation after the run's last file for that part (not per-file \"installed\", not byte equality, not presence older than the run); otherwise \"a of b\" or \"Waiting\"; a stage's blockedReason is shown in words instead of \"Waiting\"; buttons \"Pause\" and \"Cancel\" together.",
           "label": "agent choice"
         },
         {
@@ -945,10 +1044,18 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "W7 (repair decisions, 2026-11-16) Words adopted, the source for exact assertions: \"Checking the downloaded files\" (verification), \"Setting up the downloaded parts\" (configuration/activation), the Cancel toast \"Install cancelled. Completed parts stay on this computer.\", and after restart with a paused download \"An earlier download is paused.\" followed by \"What it downloaded is kept on disk.\" only when the Engine reports downloaded bytes greater than 0.",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "G3'' (orchestrator, 2026-11-16, verbatim; replaces G3/G3' on this point): \"the page heading during any install run (first install, repair, additions) is \\\"Installing AI\\\", with no percentage and no \\\"· Paused\\\"; the percentage stands once, in the top-bar status; the paused state is said only by the body words of G4'. Screen-reader progress announcements may still carry the percentage politely (cite this decision).\" The checks read the top-bar status entry's existing words (\"Installing AI models · N%\", \"AI download paused · N%\"), which this slice does not change, and the spoken \"Installing AI, N%\" is the heading's words with the share, once per tenth.",
+          "label": "agent choice"
         }
       ],
       "conflictSearch": "decision records searched for a conflict (docs/decisions: resume, pause, consent, repair, first run): none",
-      "whatChanged": "Heading \"Installing AI · N%\" (\"Installing AI\" while planning) and the paused line; \"Pause\" / \"Resume\"; Cancel's toast says what is kept without continuing; the refused stage's reason on its part's row; no search-ready line."
+      "whatChanged": "Heading \"Installing AI\" during the run and while planning (G3'': no share) and the paused line; which observation the run follows is read from the share in the top bar's status entry, a real status pill over the same store state (now with the connection, verdict and activity the bar reads); \"Pause\" / \"Resume\"; Cancel's toast says what is kept without continuing; the refused stage's reason on its part's row; no search-ready line."
     },
     {
       "items": [
@@ -960,7 +1067,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "fm-12 \"Installing AI · 50%\" \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
+          "quote": "fm-12 top-bar status \"Installing AI · 50%\"; page lead \"Installing AI\"; \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
           "location": "task t-20261113-fmimpl agreement, picture notes fm-11, fm-12, fm-12b",
           "label": "owner words"
         },
@@ -986,7 +1093,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "fm-12 \"Installing AI · 50%\" \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
+          "quote": "fm-12 top-bar status \"Installing AI · 50%\"; page lead \"Installing AI\"; \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
           "location": "task t-20261113-fmimpl agreement, picture notes fm-11, fm-12, fm-12b",
           "label": "owner words"
         }
@@ -1058,7 +1165,7 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
       "sources": [
         {
           "kind": "owner-words",
-          "quote": "fm-12 \"Installing AI · 50%\" \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
+          "quote": "fm-12 top-bar status \"Installing AI · 50%\"; page lead \"Installing AI\"; \"Search by exact words keeps working while this runs.\" \"1.3 of 2.6 GB · about 24 min left\"; per part \"Done\" / \"120 of 956 MB\" / \"Waiting\"; buttons \"Pause\", \"Cancel\". Note: \"Installing. The bar shows the share, the line under it the amounts and time left; the percentage stands once, in the status. One list with the same names as the dialog. Pause and Cancel together. No repair message while an install is running.\"",
           "location": "task t-20261113-fmimpl agreement, picture notes fm-11, fm-12, fm-12b",
           "label": "owner words"
         },

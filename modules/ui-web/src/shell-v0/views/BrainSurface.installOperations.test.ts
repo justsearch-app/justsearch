@@ -5,6 +5,7 @@ import fixture from '../../api/__fixtures__/status-response-live.json';
 import { startAiStateStore, getAiState, __resetAiStateForTest, type InstallStatus } from '../state/aiStateStore.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import './BrainSurface.js';
+import { StatusPill } from '../components/StatusPill.js';
 
 interface Brain extends HTMLElement { apiBase: string; host_: unknown; updateComplete: Promise<boolean> }
 interface Control extends HTMLElement { updateComplete: Promise<boolean>; busy?: boolean }
@@ -25,8 +26,13 @@ async function click(el: Brain, label: string) {
   return native;
 }
 
-/** Slice 7b — the run's heading, and whether the page says the run is paused. */
+/** Slice 7b, G3'' — the run's plain heading, and whether the page says the run is paused. */
 const progressWords = (el: HTMLElement) => `${el.shadowRoot!.querySelector('.brain-headline')!.textContent}${el.shadowRoot!.querySelector('.flow-paused') ? ' · Paused' : ''}`;
+/** G3'' — the run's share stands once, in the top bar's status entry. */
+async function topBar() {
+  const pill = document.querySelector<StatusPill>('jf-status-pill')!; await pill.updateComplete;
+  return pill.shadowRoot!.querySelector('.label')!.textContent;
+}
 
 describe('install operation observations through the real poller and store', () => {
   it.each(['Pause', 'Resume'])('%s waits for the requested store read and releases busy state while it hangs', async action => {
@@ -54,17 +60,19 @@ describe('install operation observations through the real poller and store', () 
       if (url.endsWith('/plan-preview')) return json({ totalDownloadBytes: 1024, components: [{ id: 'embedding', label: 'Understand meaning', state: 'not-installed', totalBytes: 1024 }] });
       return json({});
     }));
-    startAiStateStore(''); const first = await mount(); const second = await mount();
+    startAiStateStore(''); document.body.append(new StatusPill()); const first = await mount(); const second = await mount();
     expect(installReads).toBe(1);
     const native = await click(first, action);
     // A hung follow-up read must release the actual shared button's busy state.
     expect(native.disabled).toBe(false);
     expect(installReads).toBe(2);
     for (const el of [first, second]) expect(progressWords(el))
-      .toBe(action === 'Pause' ? 'Installing AI · 25%' : 'Installing AI · 25% · Paused');
+      .toBe(action === 'Pause' ? 'Installing AI' : 'Installing AI · Paused');
+    expect(await topBar()).toBe(action === 'Pause' ? 'Installing AI models · 25%' : 'AI download paused · 25%');
     release!(); await advance(0, first); await second.updateComplete;
     for (const el of [first, second]) expect(progressWords(el))
-      .toBe(action === 'Pause' ? 'Installing AI · 25% · Paused' : 'Installing AI · 25%');
+      .toBe(action === 'Pause' ? 'Installing AI · Paused' : 'Installing AI');
+    expect(await topBar()).toBe(action === 'Pause' ? 'AI download paused · 25%' : 'Installing AI models · 25%');
     const retained = getAiState().installStatus;
     fail = true; await advance(1000, first); await second.updateComplete;
     expect(getAiState().installStatus).toBe(retained);

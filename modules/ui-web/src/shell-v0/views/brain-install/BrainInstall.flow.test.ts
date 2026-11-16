@@ -26,6 +26,7 @@ vi.mock('../../components/advisory/ephemeralToast.js', async original => ({
   emitEphemeralToast: (toast: { message: string }) => { toasts.push(toast.message); },
 }));
 import '../BrainSurface.js';
+import { StatusPill } from '../../components/StatusPill.js';
 import { createMockHostApi } from '../../plugin-api/testHostApi.js';
 import { setShowDeveloperTools } from '../../state/developerToolsState.js';
 import * as installFlow from '../../state/installFlow.js';
@@ -52,7 +53,13 @@ function engineState(key: string, status = ENGINE[key]!.status!): AiState {
   const runtime = { mode: 'offline', installed: { known: true, value: false } };
   const aiEngine = computeAiEngineVerdict({ installStatus: install, runtimeStatus: { onnxFeatures: [] } as never, runtime: runtime as never,
     reachable: true, snapshotLive: true, engineState: 'Down' });
-  return { phase: 'connected', installObservationLive: true, runtimeObservationLive: true, snapshotLive: true,
+  const now = Date.now();
+  // The rest of the store's state the top bar reads: a reachable Engine, search working by words.
+  return { phase: 'connected', connection: { reachable: true, lastSuccessMs: now, lastContactMs: now, consecutiveFailures: 0 },
+    verdict: { kind: 'operational', severity: 'ok', reasons: [] }, stability: { kind: 'settled' },
+    activity: { state: 'idle', shapeId: null, startedAtMs: null, canCancel: false, cancel: null },
+    indexingStatusLive: true, episodeMaxPendingJobs: 0, enrichSettleSamples: [],
+    installObservationLive: true, runtimeObservationLive: true, snapshotLive: true,
     index: { ownDocumentCount: { known: true, value: 8 } }, capabilities: { chat: false }, runtimeStatus: { onnxFeatures: [] },
     aiEngine, runtime, installStatus: install } as unknown as AiState;
 }
@@ -81,6 +88,12 @@ async function mount() {
 const words = (node: Element | ShadowRoot | null | undefined) => (node?.textContent ?? '').replace(/\s+/g, ' ').trim();
 const panel = (el: Brain) => el.shadowRoot!.querySelector('[data-testid="brain-simple-panel"]');
 const headline = (el: Brain) => words(el.shadowRoot!.querySelector('h1'));
+/** G3'' — a run's share stands once, in the top bar's status entry (the real status pill over the same AI state). */
+async function topBar() {
+  const pill = document.querySelector<StatusPill>('jf-status-pill') ?? document.body.appendChild(new StatusPill());
+  for (let i = 0; i < 4; ++i) { await new Promise(resolve => setTimeout(resolve, 0)); await pill.updateComplete; }
+  return words(pill.shadowRoot!.querySelector('.label'));
+}
 const buttons = (el: Brain) => [...el.shadowRoot!.querySelectorAll<Control>('jf-button')];
 const labels = (el: Brain) => buttons(el).map(b => b.label);
 /** The parts list under the progress: [name, state] per row. */
@@ -200,10 +213,12 @@ describe('S7b-10 consent that cannot be accepted', () => {
 });
 
 describe('S7b-2 progress (fm-12)', () => {
-  it('a run: share in the heading, amounts and time left, one row per part with Done / a of b / Waiting', async () => {
+  it('a run: plain heading, share in the top bar, amounts and time left, one row per part with Done / a of b / Waiting', async () => {
     show('runningRetrying');
     const el = await mount();
-    expect(headline(el)).toBe('Installing AI · 24%');
+    expect(headline(el)).toBe('Installing AI');
+    expect(await topBar()).toBe('Installing AI models · 24%');
+    expect(words(panel(el))).not.toContain('24%');
     expect(words(panel(el))).toContain('Search by exact words keeps working while this runs.');
     expect(words(el.shadowRoot!.querySelector('[role="progressbar"]')?.parentElement)).toContain('226 of 927 KB · about 2 min left');
     expect(partRows(el)).toEqual([
@@ -318,7 +333,7 @@ describe('S7b-2/S7b-4 the install view stands alone (fm-12, fm-12b)', () => {
   it('during a run only the install view shows; the steps return when the run is over', async () => {
     show('runningRetrying');
     const el = await mount();
-    expect(headline(el)).toBe('Installing AI · 24%');
+    expect(headline(el)).toBe('Installing AI');
     expect(rest(el)).toEqual({ steps: 0, graphics: false, advanced: false });
     publish('completed'); await settle(el);
     expect(partRows(el)).toEqual([]);
@@ -387,7 +402,8 @@ describe('S7b-5 Try again', () => {
     expect(operations.map(o => o.id)).toEqual(['core.start-ai-install']);
     expect(operations[0]!.args).toMatchObject({ acceptTerms: true });
     publish('retryRunning'); await settle(el);
-    expect(headline(el)).toBe('Installing AI · 33%');
+    expect(headline(el)).toBe('Installing AI');
+    expect(await topBar()).toBe('Installing AI models · 33%');
     expect(words(panel(el))).toContain('56 of 168 KB');
     expect(partRows(el)).toEqual([
       ['Understand meaning', 'Done'],
@@ -644,7 +660,7 @@ describe('RS3 an existing installation is known from disk, not from what this pa
     expect(headline(el)).toBe('Installed — repair available');
     expect(el.shadowRoot!.querySelector('[data-testid="install-repair-needed"]')).not.toBeNull();
     await publishStatus(el, repairRun);
-    expect(headline(el)).toMatch(/^Installing AI/);
+    expect(headline(el)).toBe('Installing AI');
     expect(steps(el)).toBeGreaterThan(0);
   });
   it('a repair run that fails keeps the repair classification once its stopped view is closed', async () => {
@@ -699,7 +715,7 @@ describe('RS8 a model file present before the run is installation evidence, what
     damaged();
     const el = await mount();
     await publishStatus(el, run('running'));
-    expect(headline(el)).toMatch(/^Installing AI/);
+    expect(headline(el)).toBe('Installing AI');
     expect(steps(el)).toBeGreaterThan(0);
   });
   it('a cancelled repair keeps the repair classification', async () => {

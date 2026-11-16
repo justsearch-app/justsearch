@@ -1550,6 +1550,7 @@ export class BrainSurface extends JfElement {
       words = 'Paused. The file being downloaded may still finish.';
     } else if (flow) {
       const pct = this.installPercent();
+      // G3'' — the heading carries no share; the polite announcement may, once per tenth (S7b-9).
       const tenth = pct === null ? -1 : Math.floor(pct / 10) * 10;
       key = `running:${flow.id}:${tenth}`;
       words = tenth < 0 ? 'Installing AI' : `Installing AI, ${tenth}%`;
@@ -3437,8 +3438,8 @@ export class BrainSurface extends JfElement {
         ? 'Pictures were being read when last observed; current answer availability is unconfirmed.'
         : 'Waiting for live install and AI observations.'];
       if (stopped) return ['The download stopped', 'Completed parts stay on this computer, and search by exact words keeps working.'];
-      if (aiState === 'installing') return [pct !== null ? `${sc.label} · ${pct}%` : sc.label, sc.sub];
-      if (failed || aiState === 'paused') return [sc.label, sc.sub];
+      // G3'' — a run's heading is plain "Installing AI" (fm-12): its share stands once, in the top-bar status.
+      if (aiState === 'installing' || failed || aiState === 'paused') return [sc.label, sc.sub];
       // G6' — a missing file is owed a repair only with a final file on disk; unobserved, nothing is said.
       // RS4 — after "Cancel install" too: unobserved disk evidence is not "not installed".
       if (!installed && (this.installStatus?.repairNeeded === true || dismissed) && this.existingInstallation() === null) {
