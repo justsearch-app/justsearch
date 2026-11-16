@@ -927,3 +927,14 @@ in src/boot/type-ladder-lockdown.test.ts (150 to 142: the fixture's Brain is a f
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-zzuwe78t",
+  "verdict": "reject",
+  "digest": "sha256:ca57b309fe4966d6d8b90db088d4fa8d392ad29fa2d3039f603abb8374aaceab",
+  "note": "Exact words without a source: 'Setting up the downloaded parts' (flow); toast 'Install cancelled. Completed parts stay on this computer.' (flow, repairRun); aiVerdict 'An earlier download is paused. What it downloaded is kept on disk.'. Prose stale: 26 of 29 flow cases fail on base, not 21 of 25; 'cancelled in this session' fails on base; unsourced words are asserted exactly, not by meaning."
+}
+```
