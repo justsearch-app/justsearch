@@ -456,3 +456,13 @@ Pending independent verification and acceptance on the committed candidate.
   "digest": "sha256:07a96a412d5aaa2a5b5b9a0fbb6d90c7f267104a501d9cdff7dcf8b2ec95ddff"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "337a5594-d004-4186-8fa5-e05346dece04",
+  "verdict": "accept",
+  "digest": "sha256:d2125c8d7af2ed6d3740890cf51050c02e734478b1f1c93ba9db0a4aaf595dc7"
+}
+```
