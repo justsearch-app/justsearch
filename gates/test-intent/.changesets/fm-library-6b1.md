@@ -193,13 +193,13 @@ hours, skip rules, settings persistence and operation implementations are outsid
           "label": "agent choice"
         }
       ],
-      "behaviour": "The desktop-CSP typography audit must capture exactly 168 surfaces with zero violations; the count cites the observed run.",
+      "behaviour": "The desktop-CSP typography audit must capture exactly 150 (168 before merging main after slice 7a, which removes 18) surfaces with zero violations; the count cites the observed run.",
       "conflictSearch": "Repository docs/decisions searched for Library, Browse, menus and reading again: no presentation decision conflicts. Private records were not read, per the builder brief.",
       "assertionChanges": [
         {
           "oldAssertion": "Exactly 164 surfaces and zero violations.",
-          "newAssertion": "Exactly 168 surfaces and zero violations (the folder row disclosure and the Read everything again ask, each in two themes).",
-          "reason": "Observed run of this candidate (headless Chromium 149): 168 surfaces, 0 violations; main's count is 164. Instrumented copy of the walker (labels only) shows dark and light library-tab-1-expanded-5 = Read everything again and library-tab-1-expanded-2 = the watched folder row; all library checks pass. On dac30b0694 the audit reported 4 violations: dark/light library-tab-1-expanded-4 and library-developer-expanded-1, elementHandle.click timeout, element is not enabled."
+          "newAssertion": "Exactly 150 surfaces and zero violations (the folder row disclosure and the Read everything again ask, each in two themes).",
+          "reason": "Observed run of this candidate (headless Chromium 149): 168 surfaces, 0 violations; main's count is 164. Instrumented copy of the walker (labels only) shows dark and light library-tab-1-expanded-5 = Read everything again and library-tab-1-expanded-2 = the watched folder row; all library checks pass. On dac30b0694 the audit reported 4 violations: dark/light library-tab-1-expanded-4 and library-developer-expanded-1, elementHandle.click timeout, element is not enabled. After merging origin/main 37c86d4add (slice 7a: Brain −18 views), the merged candidate's lockdown run (2026-11-16, headless) reports 150 views, 0 violations: main's 146 plus this slice's 4."
         }
       ]
     },
