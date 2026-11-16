@@ -40,6 +40,9 @@ async function mount() {
   } } });
   document.body.append(el); await settle(el); return el;
 }
+// Slice 7a (D2, AM2): one switch under the step; its state in words; the note says what works now.
+const word = (el: Brain) => el.shadowRoot!.querySelector('[data-step="reranker"] .switch-state')?.textContent;
+const note = (el: Brain) => el.shadowRoot!.querySelector('[data-step="reranker"] .step-note')?.textContent;
 function switches(el: Brain) {
   return [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="switch"][aria-label="Use Best match first"]')];
 }
@@ -81,23 +84,23 @@ afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unst
 describe('Best match first live switch', () => {
   it('shares the sentence and path choice, waits for completion, and switches back on', async () => {
     const el = await mount();
-    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true']);
     let release!: () => void;
     wait = new Promise(resolve => { release = resolve; });
     switches(el)[0]!.click(); await settle(el);
     expect(posts.map(p => p.rerankerEnabled)).toEqual([false]);
     expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('Changing…');
-    expect(switches(el).map(b => b.getAttribute('aria-disabled'))).toEqual(['true', 'true']);
+    expect(switches(el).map(b => b.getAttribute('aria-disabled'))).toEqual(['true']);
     release(); await settle(el);
-    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'false']);
-    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('Off — files kept');
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false']);
+    expect(word(el)).toBe('Off');
     emit(false); await settle(el);
-    switches(el)[1]!.click(); await settle(el);
+    switches(el)[0]!.click(); await settle(el);
     expect(posts.map(p => ({ enabled: p.rerankerEnabled, intent: p.rerankerSwitchIntent })))
       .toEqual([{ enabled: false, intent: true }, { enabled: true, intent: true }]);
     emit(true); await settle(el);
-    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
-    expect(el.shadowRoot!.querySelectorAll('[data-feature="reranker"] > .step-meta')[1]!.textContent?.trim()).toBe('On');
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true']);
+    expect(word(el)).toBe('On'); expect(note(el)).toBeUndefined();
     expect(operations).toEqual([]);
   });
 
@@ -105,7 +108,7 @@ describe('Best match first live switch', () => {
     refusal = 'Best match first is controlled by an operator override; change that override first';
     const el = await mount(); switches(el)[0]!.click(); await settle(el);
     expect(posts.map(p => p.rerankerEnabled)).toEqual([false]);
-    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true']);
     expect(el.shadowRoot!.textContent).toContain(refusal);
     expect(enabled).toBeNull();
   });
@@ -114,11 +117,10 @@ describe('Best match first live switch', () => {
     invalidReceipt = true;
     const el = await mount(); switches(el)[0]!.click(); await settle(el);
     expect(posts.map(p => p.rerankerEnabled)).toEqual([false]);
-    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent)
-      .toContain('Unknown — checking Best match first after an interrupted change');
+    expect(word(el)).toBe('Not known'); expect(note(el)).toBe('Checking after an interrupted change');
     window.dispatchEvent(new Event('focus')); await settle(el);
     emit(false); await settle(el);
-    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('Off — files kept');
+    expect(word(el)).toBe('Off');
   });
 
   it('refuses a stale second window and converges on its next settings observation', async () => {
@@ -129,8 +131,8 @@ describe('Best match first live switch', () => {
     expect(witness.acceptedRevision).toBe(1);
     expect(second.shadowRoot!.textContent).toContain('Reload and review your edit');
     emit(false); window.dispatchEvent(new Event('focus')); await settle(second);
-    expect(switches(second).map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'false']);
-    expect(second.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('Off — files kept');
+    expect(switches(second).map(b => b.getAttribute('aria-checked'))).toEqual(['false']);
+    expect(word(second)).toBe('Off');
   });
 
   it('accepts and completes a consented enable across installer revisions without a follow-up save', async () => {
@@ -156,18 +158,17 @@ describe('Best match first live switch', () => {
     expect(posts).toEqual([]);
     expect(operationArgs).toEqual([{ acceptTerms: true, enableRerankerOnCompletion: true }]);
     expect(enabled).toBe(true);
-    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true', 'true']);
-    expect(el.shadowRoot!.querySelectorAll('[data-feature="reranker"] > .step-meta')[1]!.textContent?.trim()).toBe('On');
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['true']);
+    expect(word(el)).toBe('On'); expect(note(el)).toBeUndefined();
   });
 
   it('keeps enabled but unavailable when a completed save has no serving reranker observation', async () => {
     enabled = false; emit(false);
     const el = await mount(); switches(el)[0]!.click(); await settle(el);
     expect(enabled).toBe(true);
-    expect(el.shadowRoot!.querySelectorAll('[data-feature="reranker"] > .step-meta')[1]!.textContent?.trim())
-      .toBe('Unavailable — Best match first is enabled');
+    expect(word(el)).toBe('On'); expect(note(el)).toBe('Not working now');
     emit(true); await settle(el);
-    expect(el.shadowRoot!.querySelectorAll('[data-feature="reranker"] > .step-meta')[1]!.textContent?.trim()).toBe('On');
+    expect(word(el)).toBe('On'); expect(note(el)).toBeUndefined();
   });
 
   it('consents to every missing selected part and cancellation leaves Off without a transfer', async () => {
@@ -188,6 +189,6 @@ describe('Best match first live switch', () => {
     expect(el.installConsentOpen).toBe(false);
     expect(operations).toEqual([]); expect(posts).toEqual([]);
     expect(enabled).toBe(false);
-    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false', 'false']);
+    expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false']);
   });
 });

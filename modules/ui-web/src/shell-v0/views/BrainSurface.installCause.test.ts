@@ -85,7 +85,7 @@ async function brain(install: InstallStatus): Promise<{ heading: string; detail:
   document.body.append(el);
   for (let i = 0; i < 3; i++) { await new Promise((resolve) => setTimeout(resolve, 0)); await el.updateComplete; }
   const root = el.shadowRoot!;
-  const result = { heading: words(root.querySelector('h1.brain-headline')), detail: words(root.querySelector('[data-testid="brain-simple-panel"] > .brain-status-detail')), text: words(root) };
+  const result = { heading: words(root.querySelector('h1.brain-headline')), detail: words(root.querySelector('[data-testid="brain-simple-panel"] > .brain-sentence')), text: words(root) };
   el.remove();
   return result;
 }

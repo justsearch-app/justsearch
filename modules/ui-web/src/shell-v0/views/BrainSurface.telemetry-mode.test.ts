@@ -7,6 +7,7 @@ import type { HealthSurface } from './HealthSurface.js';
 import { createMockHostApi } from '../plugin-api/testHostApi.js';
 import { requestMemberTab } from '../router/memberTabIntent.js';
 import { __resetUiModeForTest, setUiMode } from '../state/uiModeState.js';
+import { setShowDeveloperTools } from '../state/developerToolsState.js';
 
 const transitions = [
   { timestampMs: 100, fromMode: 'OFFLINE', toMode: 'ONLINE', reason: 'USER_SWITCH', success: true, durationMs: 5 },
@@ -43,7 +44,7 @@ beforeEach(() => {
   transitionsBody = { transitions }; tracesBody = { spans, tracesAvailable: true };
   unavailable = false; late = null; endpointRead = null; requests = []; signals = [];
 });
-afterEach(() => { document.body.innerHTML = ''; vi.useRealTimers(); vi.unstubAllGlobals(); __resetUiModeForTest(); });
+afterEach(() => { document.body.innerHTML = ''; vi.useRealTimers(); vi.unstubAllGlobals(); __resetUiModeForTest(); setShowDeveloperTools(false); });
 describe('developer telemetry belongs to Health AI Engine', () => {
   it.each(['simple', 'advanced'] as const)('Health opened first fetches and renders transitions, generation and spans under %s mode', async mode => {
     setUiMode(mode); const el = await mount();
@@ -58,6 +59,7 @@ describe('developer telemetry belongs to Health AI Engine', () => {
     expect(engine.querySelectorAll('[data-testid="brain-trace-row"]')).toHaveLength(1);
   });
   it('Brain never polls telemetry, with Advanced closed or open', async () => {
+    setShowDeveloperTools(true); // Slice 7a (AM5): nothing observed yet, so Advanced is a developer tool.
     const el = document.createElement('jf-brain-surface') as HTMLElement & { updateComplete: Promise<boolean> };
     document.body.appendChild(el); await el.updateComplete;
     el.shadowRoot!.querySelector<HTMLButtonElement>('.brain-links button')!.click(); await el.updateComplete;
@@ -92,9 +94,11 @@ describe('developer telemetry belongs to Health AI Engine', () => {
     expect(requests).toHaveLength(count); expect(el.transitions).toHaveLength(2);
   });
   it('engine history link focuses the section when Health is mounted already and when it mounts later', async () => {
+    setShowDeveloperTools(true); // Slice 7a (D5): Engine history shows with answers working (fm-14) or developer tools.
     const brain = document.createElement('jf-brain-surface') as HTMLElement & { updateComplete: Promise<boolean> };
     document.body.appendChild(brain); await brain.updateComplete;
     const link = brain.shadowRoot!.querySelector<HTMLAnchorElement>('.brain-links a')!;
+    expect(link?.textContent).toContain('Engine history in Health');
     link.addEventListener('click', event => event.preventDefault()); link.click();
     const el = await mount();
     await vi.waitFor(() => expect(el.shadowRoot!.activeElement?.id).toBe('ai-engine'));

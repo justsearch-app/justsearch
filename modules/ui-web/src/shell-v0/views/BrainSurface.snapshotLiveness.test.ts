@@ -340,6 +340,11 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
     (el as unknown as { settingsRead: boolean }).settingsRead = true;
     el.installStatus = { state: 'idle', phase: 'idle', installedFully: true };
     el.inference = { mode: 'online' };
+    // Slice 7a: live meaning evidence for the positive heading (AM3); Start/Stop answers is a developer tool (D5).
+    (el as unknown as { runtimeStatus: unknown }).runtimeStatus = { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] };
+    // X1: and the Worker's COMPATIBLE reading.
+    (el as unknown as { systemStatus: unknown }).systemStatus = { embedding: { compatState: 'COMPATIBLE' } };
+    (el as unknown as { devTools: boolean }).devTools = true;
     const aiEngine = computeAiEngineVerdict({
       installStatus: el.installStatus,
       runtimeStatus: null,
@@ -361,23 +366,26 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
     return el;
   }
 
-  /** The state words under the "Answer questions" step (its last meta line). */
+  /** What the "Answer questions" step says works now: its note, else its switch's state in words. */
   function answersStepState(dom: HTMLElement): string | undefined {
-    const metas = dom.querySelectorAll('.path-step[data-feature="chat"] .step-meta');
-    return metas[metas.length - 1]?.textContent?.trim();
+    return (dom.querySelector('.path-step[data-feature="chat"] .step-note')
+      ?? dom.querySelector('.path-step[data-feature="chat"] .switch-state'))?.textContent?.trim();
   }
 
   /** The Start/Stop answers action in the links below the path. */
   function answersAction(dom: HTMLElement): { label: string; availability?: Availability } | null {
-    return dom.querySelector('[data-testid="brain-simple-action"]') as unknown as { label: string; availability?: Availability } | null;
+    return dom.querySelector('[data-testid="brain-answers-action"]') as unknown as { label: string; availability?: Availability } | null;
   }
 
   it('THE round-13 photograph: with the backend gone, the card no longer reads "Online / Chat and summaries ready."', () => {
     const dom = domOf(panel(false).renderSimplePanel());
-    expect(dom.textContent).not.toContain('Chat and summaries ready.');
+    expect(dom.textContent).not.toContain('Everything below runs on this computer.');
     // Main's present-tense "Online" status word is gone; its successor is the answers step state,
-    // which must not report the retained "on" observation as current.
-    expect(answersStepState(dom)).toBe('Unknown — checking AI status');
+    // which must not report the retained "on" observation as current: the heading says once that AI
+    // status is being checked (W5), and the step is neither lit nor given a note of its own.
+    expect(dom.querySelector('.brain-headline')?.textContent).toBe('Checking AI status…');
+    expect(dom.querySelector('.path-step[data-feature="chat"]')?.getAttribute('data-lit')).toBe('false');
+    expect(dom.querySelector('.path-step[data-feature="chat"] .step-note')).toBeNull();
     expect(dom.querySelector('.brain-headline')?.textContent).not.toBe('AI is ready');
   });
 
@@ -423,7 +431,7 @@ describe('BrainSurface — the status card sentence (807 Part A)', () => {
   it('ANTI-REGRESSION: a live observation still renders the ready headline and availability', () => {
     const dom = domOf(panel(true).renderSimplePanel());
     expect(dom.querySelector('.brain-headline')?.textContent).toBe('AI is ready');
-    expect(dom.textContent).toContain('Chat and summaries ready.');
+    expect(dom.textContent).toContain('Everything below runs on this computer.');
     expect(answersStepState(dom)).toBe('On');
     expect(answersAction(dom)?.label).toBe('Stop answers');
     expect(answersAction(dom)?.availability).toEqual({ kind: 'available' });

@@ -11,7 +11,6 @@
 import { describe, expect, it } from 'vitest';
 import { render, type TemplateResult } from 'lit';
 import './BrainSurface.js';
-import { reasonFor } from '../state/readinessNotice.js';
 
 interface CalloutHarness {
   systemStatus: unknown;
@@ -54,11 +53,12 @@ const EMB_BLOCKED_LEGACY = {
 };
 
 describe('BrainSurface compat callout — tempdoc 613 reindex coherence', () => {
-  it('leads with the canonical reindex wording (identical to the Chat banner / 595 verdict)', () => {
+  // Slice 7a (X7, AM9): on AI Brain the cause is said in read words, the agreed sentence (W1); the
+  // canonical index wording stays the vocabulary of the other surfaces.
+  it('leads with Brain\'s read words for the reindex cause', () => {
     const text = calloutText(EMB_BLOCKED_LEGACY, ['index.embedding_legacy']);
-    // The lead is the SAME wording the Chat banner renders (asserted against the authority, not a
-    // string literal — so this fails if the two ever diverge).
-    expect(text).toContain(reasonFor('index.embedding_legacy').wording);
+    expect(text).toContain('Read everything again to restore full search.');
+    expect(text).not.toContain("Semantic search isn't available on this index yet — rebuild it to enable meaning-based results.");
   });
 
   it('drops the old hardcoded fork wording', () => {
@@ -74,7 +74,7 @@ describe('BrainSurface compat callout — tempdoc 613 reindex coherence', () => 
 
   it('falls back to a generic remedy line when the verdict carries no reindex code (no per-cause fork)', () => {
     const text = calloutText(EMB_BLOCKED_LEGACY, []);
-    expect(text).toContain('Rebuild the index to restore full search.');
+    expect(text).toContain('Read everything again to restore full search.'); // Slice 7a (AM9): read words.
   });
 });
 
@@ -94,10 +94,13 @@ describe('BrainSurface compat callout — schema arm speaks the REAL compat voca
     schema: { compatState, reindexRequiredReason: 'schema_mismatch' },
   });
 
-  it('BLOCKED_MISMATCH renders the callout with the canonical index.schema_mismatch wording', () => {
+  it('BLOCKED_MISMATCH renders the callout with index.schema_mismatch in read words (Slice 7a X7)', () => {
     const text = calloutText(schemaOnly('BLOCKED_MISMATCH'), ['index.schema_mismatch']);
-    // `StatusLifecycleHandler.compatBlockedReason` maps schema BLOCKED_MISMATCH → this code.
-    expect(text).toContain(reasonFor('index.schema_mismatch').wording);
+    // `StatusLifecycleHandler.compatBlockedReason` maps schema BLOCKED_MISMATCH → this code. Its meaning
+    // stays (search works fully; reading again adds newer features), in read words.
+    expect(text).not.toContain('The index format is out of date — search is fully working; rebuilding picks up newer index features.');
+    expect(text).toMatch(/Search works fully/);
+    expect(text).toMatch(/reading everything again/i);
     expect(text).toContain('Schema incompatible');
     expect(text).toContain('schema_mismatch'); // the reindexRequiredReason detail
   });
@@ -106,9 +109,10 @@ describe('BrainSurface compat callout — schema arm speaks the REAL compat voca
     expect(rebuildRemedy(schemaOnly('BLOCKED_MISMATCH'), ['index.schema_mismatch'])).not.toBeNull();
   });
 
-  it('BLOCKED_LEGACY renders too, worded from its own canonical code (index.blocked_legacy)', () => {
+  it('BLOCKED_LEGACY renders too, worded from its own code (index.blocked_legacy) in read words (Slice 7a X7)', () => {
     const text = calloutText(schemaOnly('BLOCKED_LEGACY'), ['index.blocked_legacy']);
-    expect(text).toContain(reasonFor('index.blocked_legacy').wording);
+    expect(text).toContain('Read everything again to restore full search.');
+    expect(text).not.toContain('The index was built before semantic search was available — rebuild it to enable meaning-based results.');
     expect(rebuildRemedy(schemaOnly('BLOCKED_LEGACY'), ['index.blocked_legacy'])).not.toBeNull();
   });
 

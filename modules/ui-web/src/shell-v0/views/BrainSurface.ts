@@ -88,7 +88,8 @@ import { confirmAsync } from '../components/ConfirmDialog.js';
 import { deepActiveElement } from '../utils/keyboardHandler.js';
 import { ModalController } from '../primitives/modalController.js';
 import { TransientController } from '../primitives/transientController.js';
-import { composeBrainSentence, PICTURES_NOT_AVAILABLE_WITH_MODEL, type BrainFeature, type BrainFeatureId } from '../state/brainPage.js';
+import { PICTURES_NOT_AVAILABLE_WITH_MODEL, type BrainFeature, type BrainFeatureId } from '../state/brainPage.js';
+import { getShowDeveloperTools, subscribeShowDeveloperTools } from '../state/developerToolsState.js';
 import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 // Sandbox round 7 — the install consent dialog names the real packages, licences and terms links
@@ -275,6 +276,28 @@ export function observedEpLabel(f: OnnxFeatureRow): string {
 export function featureInUse(f: OnnxFeatureRow | undefined): boolean | null {
   if (f == null || f.status === 'unknown') return null;
   return f.status !== 'inactive' && f.modelActive === true;
+}
+
+/**
+ * AI Brain's words for the causes that a full read of the files fixes (X7, AM9). The embedding causes
+ * share the agreed sentence (W1); the others keep their meaning in read words.
+ */
+const BRAIN_READ_AGAIN_WORDS: Readonly<Record<string, string>> = {
+  'index.blocked_legacy': 'Read everything again to restore full search.',
+  'index.embedding_legacy': 'Read everything again to restore full search.',
+  'index.embedding_mismatch': 'Read everything again to restore full search.',
+  'index.schema_mismatch': 'Search works fully; reading everything again adds newer search features.',
+  'index.rebuild_brake_exhausted': 'Reading everything again did not finish after repeated attempts. Search works on what was read, but new files are not added. Read everything again to try once more.',
+  'index.rebuild_brake_unreadable': 'Your files need reading again, but the record of earlier attempts could not be opened, so it does not start by itself. Search works on what was read, but new files are not added. Read everything again to continue.',
+};
+
+/** Whether `node` sits inside `host`, across shadow roots. */
+function composedWithin(node: Node, host: Element): boolean {
+  for (let current: Node | null = node; current; ) {
+    if (current === host) return true;
+    current = current.parentNode ?? (current instanceof ShadowRoot ? current.host : null);
+  }
+  return false;
 }
 
 /**
@@ -595,6 +618,7 @@ export class BrainSurface extends JfElement {
     downloadedFiles: { state: true },
     removalConfirm: { state: true },
     removalError: { state: true },
+    devTools: { state: true },
   };
 
   declare apiBase: string;
@@ -647,7 +671,6 @@ export class BrainSurface extends JfElement {
   private unsubAi: (() => void) | null = null;
   private uiModeUnsub: (() => void) | null = null;
   private rerankerSettings: SettingsV2 | null = null;
-  private rerankerApplied: boolean | null = null;
   private rerankerUncertain = false;
   private refreshRevision = 0;
   private planRevision = 0;
@@ -675,8 +698,14 @@ export class BrainSurface extends JfElement {
   private pictureApplied: boolean | null = null;
   /** Read order of the last picture reading change; a runtime read started earlier may predate it. */
   private pictureChangeOrder = 0;
-  private pictureTargetEnabled = false;
   declare featureInfo: BrainFeatureId | null;
+  /** Settings › Advanced › Show developer tools: what the pictures do not show (D5). */
+  declare devTools: boolean;
+  private devToolsUnsub: (() => void) | null = null;
+  /** Whether answers work here, as last observed; an unknown observation keeps it (AM1). */
+  private answersShown = false;
+  private focusHeadlinePending = false;
+  private focusHeadlineVisit = 0;
   declare planLoading: boolean;
   declare planError: string | null;
   private readonly featureTransient = new TransientController(this, {
@@ -721,6 +750,7 @@ export class BrainSurface extends JfElement {
     this.removalConfirm = null;
     this.removalError = null;
     this.planError = null;
+    this.devTools = getShowDeveloperTools();
   }
 
   static styles = [
@@ -1172,37 +1202,59 @@ export class BrainSurface extends JfElement {
     .stage-label {
       color: var(--text-primary);
     }
-    .body { padding: 1.75rem 2.5rem; gap: 1.5rem; min-width: 0; overflow-wrap: anywhere; }
-    .brain-headline { margin: 0 0 0.75rem; font-size: var(--font-size-headline); font-variation-settings: "opsz" 32; font-weight: 400; }
-    .brain-sentence { font-size: var(--font-size-lg); font-variation-settings: "opsz" 32; color: var(--text-secondary); line-height: 1.8; margin: 0 0 1rem; max-width: 65rem; }
-    .brain-status-detail, .step-meta { font-size: var(--font-size-xs); color: var(--text-secondary); line-height: 1.5; }
-    .brain-status-detail { margin-bottom: 0.5rem; }
-    button.feature-phrase, button.step-info, .brain-links button, .feature-panel button {
+    /* fm-10 / fm-13 / fm-14 — one centred column; the heading, one sentence, the steps, then the links. */
+    .body { padding: 1.625rem 2.75rem 2rem; gap: 0; min-width: 0; overflow-wrap: anywhere; box-sizing: border-box; width: 100%; max-width: 960px; margin-inline: auto; }
+    .body > * + * { margin-top: 1rem; }
+    .brain-headline { margin: 0; font-size: var(--font-size-headline); line-height: 2.25rem; font-variation-settings: "opsz" 32; font-weight: 400; letter-spacing: -0.02em; outline: none; }
+    .brain-sentence { font-size: var(--font-size-md); color: var(--text-secondary); line-height: 1.6; margin: 0.5rem 0 0; max-width: 51.25rem; }
+    .brain-status-detail, .step-meta { font-size: var(--font-size-secondary); color: var(--text-secondary); line-height: 1.4; }
+    .brain-status-detail { margin-top: 0.5rem; }
+    .install-row { margin-top: 1rem; gap: 0.875rem; }
+    .install-note { font-size: var(--font-size-sm); color: var(--text-secondary); }
+    button.step-info, .brain-links button, .feature-panel button {
       border: 0; border-radius: 0; padding: 0; background: transparent; color: var(--text-primary); font: inherit; font-weight: 500;
     }
-    button.feature-phrase { display: inline; text-align: left; }
-    button.feature-phrase:hover, button.step-info:hover { color: var(--text-primary); background: transparent; }
+    button.step-info:hover { color: var(--text-primary); background: transparent; }
     button:focus-visible, a:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 4px; }
-    .feature-switch-wrap { display: inline-flex; flex-wrap: wrap; max-width: 100%; align-items: center; vertical-align: middle; margin-inline: 0.4rem; }
-    button.feature-switch { border: 1px solid var(--border-subtle); border-radius: 14px; width: 2rem; height: 1.15rem; padding: 0.1rem; background: var(--surface-tertiary); }
-    button.feature-switch span { display: block; width: 0.8rem; height: 0.8rem; border-radius: 50%; background: var(--text-secondary); }
+    /* The step's switch and its state in words; state is the thumb's position and the track's fill. */
+    .step-switch { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.45rem; margin-top: 0.45rem; max-width: 100%; }
+    .switch-state { font-size: var(--font-size-secondary); color: var(--text-primary); }
+    button.feature-switch { display: inline-flex; align-items: center; box-sizing: border-box; border: 0; border-radius: 9999px; width: 2.125rem; height: 1.25rem; padding: 0 0.1875rem; background: var(--border-strong, var(--border-subtle)); flex: none; }
+    button.feature-switch span { display: block; width: 0.875rem; height: 0.875rem; border-radius: 9999px; background: var(--text-secondary); }
     button.feature-switch[aria-checked='true'] { background: var(--accent-tint); }
     button.feature-switch[aria-checked='true'] span { margin-left: auto; background: var(--accent-on-tint); }
     button.feature-switch[aria-disabled='true'] { opacity: 0.6; cursor: default; }
     .switch-reason { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-    .feature-switch-wrap:focus-within .switch-reason { position: static; width: auto; height: auto; clip-path: none; font-size: var(--font-size-xs); max-width: min(18rem, 100%); }
-    .brain-path { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: 0.75rem; row-gap: 2.5rem; padding: 1.5rem 0; }
+    .step-switch:focus-within .switch-reason { position: static; width: auto; height: auto; clip-path: none; font-size: var(--font-size-secondary); color: var(--text-secondary); flex-basis: 100%; }
+    /* The steps: five columns, the picture branch above "Read the text". A step and the line into it
+       are teal only while the step works now; a step that cannot work here is dashed. */
+    .brain-path { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: 0.75rem; row-gap: 2.5rem; padding: 0.625rem 0 0.5rem; margin-top: 1.25rem; }
     .brain-path > .path-step { grid-row: 2; }
-    .path-step { position: relative; min-width: 0; display: flex; align-items: center; flex-direction: column; text-align: center; gap: 0.35rem; font-size: var(--font-size-sm); }
-    .path-step::before { content: ''; position: absolute; height: 1px; background: var(--border-subtle); width: calc(100% + 0.75rem); top: 1.3rem; left: -50%; z-index: 0; }
-    .files-step::before, .picture-branch .path-step::before { display: none; }
-    .step-symbol { display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-subtle); background: var(--surface-1); border-radius: 50%; width: 2.65rem; height: 2.65rem; margin-bottom: 0.5rem; position: relative; z-index: 1; }
-    .step-symbol[data-active='true'] { border-color: var(--accent-tint); color: var(--text-tint); }
-    button.step-info { display: flex; flex-direction: column; align-items: center; }
-    .picture-branch { position: relative; grid-column: 2; grid-row: 1; justify-self: center; width: min(20rem, 200%); }
-    .picture-branch::after { content: ''; left: 50%; height: 2.5rem; position: absolute; bottom: -2.5rem; border-left: 1px dashed var(--border-subtle); }
-    .graphics-card { display: grid; grid-template-columns: max-content minmax(3rem, 1fr) minmax(8rem, max-content); align-items: center; gap: 1.5rem; font-size: var(--font-size-sm); }
-    .graphics-card .progress-bar { background: var(--accent-tint); }
+    .path-step { position: relative; min-width: 0; display: flex; align-items: center; flex-direction: column; text-align: center; }
+    .brain-path > .path-step::before { content: ''; position: absolute; height: 2px; background: var(--border-subtle); width: calc(100% + 0.75rem); top: calc(1.375rem - 1px); left: calc(-50% - 0.75rem); z-index: 0; }
+    .brain-path > .path-step[data-lit='true']::before { background: var(--accent-tint); opacity: 0.7; }
+    .brain-path > .path-step[data-reach='na']::before { background: none; border-top: 2px dashed var(--border-subtle); height: 0; }
+    .brain-path > .files-step::before { display: none; }
+    .step-symbol { display: flex; align-items: center; justify-content: center; box-sizing: border-box; border: 1.5px solid var(--border-subtle); background: var(--surface-1); color: var(--text-secondary); border-radius: 50%; width: 2.75rem; height: 2.75rem; flex: none; position: relative; z-index: 1; }
+    .path-step[data-lit='true'] > .step-symbol { border-color: var(--accent-tint); color: var(--text-tint); }
+    .path-step[data-reach='na'] > .step-symbol { border-style: dashed; }
+    .step-text { display: flex; flex-direction: column; align-items: center; margin-top: 0.75rem; min-width: 0; max-width: 100%; }
+    .step-name { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-primary); }
+    .path-step[data-reach='na'] .step-name { color: var(--text-secondary); }
+    .step-meta { margin-top: 0.125rem; }
+    .step-reason { max-width: 10rem; }
+    .picture-branch { position: relative; grid-column: 2 / span 3; grid-row: 1; min-width: 0; }
+    .picture-branch .path-step { flex-direction: row; align-items: center; text-align: left; margin-left: calc((100% - 1.5rem) / 6 - 1.375rem); }
+    .picture-branch .step-text { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 1.25rem; margin: 0 0 0 0.875rem; }
+    .picture-branch .step-words { display: flex; flex-direction: column; align-items: flex-start; }
+    .picture-branch .step-switch { margin-top: 0; }
+    .picture-branch::after { content: ''; position: absolute; left: calc((100% - 1.5rem) / 6 - 1px); top: 2.75rem; bottom: -2.5rem; border-left: 2px dashed var(--border-subtle); }
+    .step-words { display: flex; flex-direction: column; align-items: center; min-width: 0; max-width: 100%; }
+    .graphics-card { display: flex; flex-wrap: wrap; align-items: center; column-gap: 2.5rem; row-gap: 0.5rem; margin-top: 0.375rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle); font-size: var(--font-size-sm); }
+    .graphics-name { font-weight: 500; white-space: nowrap; }
+    .graphics-card .progress { flex: 1 1 8rem; height: 0.5rem; border-radius: 4px; }
+    .graphics-card .progress-bar { background: var(--accent-tint); opacity: 0.75; border-radius: 4px; }
+    .graphics-reading { font-variant-numeric: tabular-nums; margin-top: 0; }
     @keyframes reading-memory-arrival {
       from { outline: 2px solid var(--accent, Highlight); outline-offset: 4px; }
       to { outline: 2px solid transparent; outline-offset: 4px; }
@@ -1211,8 +1263,10 @@ export class BrainSurface extends JfElement {
     @media (prefers-reduced-motion: reduce) {
       .reading-memory-arrival { animation-timing-function: step-end; }
     }
-    .brain-links { align-items: center; font-size: var(--font-size-sm); color: var(--text-secondary); gap: 1.5rem; }
-    .brain-links a { display: inline-flex; align-items: center; gap: 0.4rem; color: inherit; text-decoration: none; }
+    /* Text actions: the normal text colour in medium weight. */
+    .brain-links { align-items: center; font-size: var(--font-size-sm); color: var(--text-primary); column-gap: 1.75rem; row-gap: 0.5rem; margin-top: 1.125rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle); }
+    .graphics-card + .brain-links { border-top: 0; padding-top: 0; margin-top: 0.875rem; }
+    .brain-links button, .brain-links a { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--text-primary); font-weight: 500; text-decoration: none; }
     .feature-panel { position: absolute; top: calc(100% + 0.75rem); right: 0; width: min(25rem, calc(100vw - 6rem)); max-height: min(24rem, 60vh, calc(100vh - 8rem)); overflow: auto; text-align: left; padding: 1rem; box-sizing: border-box; background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 14px; z-index: 1; box-shadow: 0 0.5rem 2rem #0004; }
     .feature-tradeoffs { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
     .feature-tradeoffs h3 { font-size: var(--font-size-xs); color: var(--text-secondary); font-weight: 400; }
@@ -1236,26 +1290,26 @@ export class BrainSurface extends JfElement {
 
     .section, .variant { border: 0; border-radius: 0; background: transparent; padding: 1rem 0; border-top: 1px solid var(--border-subtle); }
     jf-button::part(control) { border: 0; border-radius: 0; background: transparent; }
-    jf-button.install-action::part(control), jf-button.consent-confirm::part(control) { background: var(--accent-tint); color: var(--accent-on-tint); border-radius: 14px; }
+    jf-button.install-action::part(control), jf-button.consent-confirm::part(control) { background: var(--accent-tint); color: var(--accent-on-tint); border-radius: 8px; }
     jf-button.repair-action::part(control) { background: transparent; border-color: transparent; color: var(--text-primary); font-weight: 500; }
     dialog.consent { box-sizing: border-box; width: min(32rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); overflow: auto; }
     @media (max-width: 800px) {
       .body { padding: 1.25rem; }
-      .brain-path { grid-template-columns: 1fr; padding-top: 0; gap: 1.5rem; }
+      .brain-path { grid-template-columns: minmax(0, 1fr); padding-top: 0; gap: 1rem; }
       .brain-path > .path-step { grid-row: auto; }
       .files-step { order: 0; }
       .read-step { order: 1; }
       .picture-branch { order: 2; }
-      [data-feature='meaning'] { order: 3; }
-      [data-feature='reranker'] { order: 4; }
-      [data-feature='chat'] { order: 5; }
-      .path-step { align-items: flex-start; text-align: left; padding-left: 3.5rem; }
-      .path-step::before { display: none; }
-      .step-symbol { position: absolute; left: 0; top: 0; }
-      button.step-info { align-items: flex-start; }
-      .picture-branch { grid-column: auto; grid-row: auto; width: 100%; }
-      .picture-branch::after { display: none; }
-      .graphics-card { grid-template-columns: 1fr; gap: 0.5rem; }
+      [data-step='meaning'] { order: 3; }
+      [data-step='reranker'] { order: 4; }
+      [data-step='chat'] { order: 5; }
+      .path-step, .picture-branch .path-step { flex-direction: row; align-items: flex-start; text-align: left; margin-left: 0; }
+      .brain-path > .path-step::before, .picture-branch::after { display: none; }
+      .step-text, .picture-branch .step-text { align-items: flex-start; margin: 0 0 0 0.875rem; }
+      .step-words { align-items: flex-start; }
+      .step-switch { justify-content: flex-start; }
+      .step-reason { max-width: none; }
+      .picture-branch { grid-column: auto; grid-row: auto; }
       .feature-panel { width: min(25rem, 100%); left: 0; right: auto; }
       .feature-tradeoffs { grid-template-columns: 1fr; gap: 0; }
     }
@@ -1321,6 +1375,11 @@ export class BrainSurface extends JfElement {
       this.activeTab = memberId;
       return true;
     });
+    this.devTools = getShowDeveloperTools();
+    this.devToolsUnsub = subscribeShowDeveloperTools((show) => {
+      this.devTools = show;
+      if (!show) this.closeFeatureInfo();
+    });
     this.readingMemoryUnsub = subscribeReadingMemoryFocus(() => this.requestReadingMemoryArrival());
     if (takeReadingMemoryFocus()) this.requestReadingMemoryArrival();
     void this.refreshAll();
@@ -1356,7 +1415,6 @@ export class BrainSurface extends JfElement {
       if (s.runtimeStatus) {
         const changed = s.runtimeStatus !== this.runtimeStatus;
         this.runtimeStatus = s.runtimeStatus;
-        if (changed && !this.pendingActions.has('reranker-switch')) this.rerankerApplied = null;
         if (!this.pendingActions.has('picture-switch') && this.runtimeReadFollowsPictureChange()) this.pictureApplied = null;
         const reranker = s.runtimeStatus.onnxFeatures?.find(feature => feature.id === 'reranker');
         if (changed && !this.pendingActions.has('reranker-switch')
@@ -1400,6 +1458,17 @@ export class BrainSurface extends JfElement {
 
   protected override willUpdate(changed: Map<string, unknown>): void {
     super.willUpdate(changed);
+    const answers = this.answersWorkNow();
+    if (answers !== null) this.answersShown = answers;
+    // Back to Overview where there is no tab row: the tab or Memory that had focus is gone (AM7).
+    const previousTab = changed.get('activeTab') as string | undefined;
+    if (changed.has('activeTab') && previousTab !== undefined && previousTab !== 'runtime'
+      && this.activeTab === 'runtime' && !this.answersShown) {
+      const active = deepActiveElement();
+      const tabs = this.shadowRoot?.querySelector('jf-surface-tabs');
+      this.focusHeadlinePending = !active || active === this.ownerDocument.body || !active.isConnected
+        || (tabs != null && composedWithin(active, tabs));
+    }
     // An unanswered question belongs to this visible visit and this row only.
     if (this.removalConfirm && (this.activeTab !== 'runtime' || !this.expanded.advanced
       || !this.downloadedFiles?.parts?.some(part => part.id === this.removalConfirm
@@ -1415,6 +1484,21 @@ export class BrainSurface extends JfElement {
   /** 574 §22.G — drive the modal contract from the declarative `installConsentOpen` state. */
   protected override updated(changed: Map<string, unknown>): void {
     super.updated(changed);
+    if (this.focusHeadlinePending) {
+      this.focusHeadlinePending = false;
+      // The heading is drawn through the tab host's slot: focus it only once the host has drawn the
+      // row-less Overview, and only if this visit is still the one that lost focus (AM7, X4).
+      const visit = ++this.focusHeadlineVisit;
+      const tabs = this.shadowRoot?.querySelector<HTMLElement & { updateComplete?: Promise<boolean> }>('jf-surface-tabs');
+      void Promise.resolve(tabs?.updateComplete).then(() => {
+        if (visit !== this.focusHeadlineVisit || !this.isConnected || this.activeTab !== 'runtime' || this.answersShown) return;
+        const active = deepActiveElement();
+        // Still lost: nothing, a removed element, or the tab host's own row — not the Overview it draws.
+        const lost = !active || active === this.ownerDocument.body || !active.isConnected
+          || (tabs != null && composedWithin(active, tabs) && active.getRootNode() !== this.shadowRoot);
+        if (lost) this.shadowRoot?.querySelector<HTMLElement>('.brain-headline')?.focus({ preventScroll: true });
+      });
+    }
     if (this.readingMemoryArrival && this.readingMemoryFrame === null) {
       // Let the navigation close Settings' modal before trying to focus the area underneath it.
       this.readingMemoryFrame = requestAnimationFrame(() => {
@@ -1468,6 +1552,8 @@ export class BrainSurface extends JfElement {
     this.uiModeUnsub = null;
     this.memberTabUnsub?.();
     this.memberTabUnsub = null;
+    this.devToolsUnsub?.();
+    this.devToolsUnsub = null;
   }
 
   private client(): OperationClient {
@@ -1510,7 +1596,8 @@ export class BrainSurface extends JfElement {
         if (!this.isConnected || revision !== this.refreshRevision || choice !== this.choiceRevision) return;
         this.pictureApplied = JSON.parse(attempt.body).pictureReadingEnabled as boolean;
         this.pictureChangeOrder = markAiReadOrder();
-        this.rerankerSettings = { ...this.rerankerSettings, witness: result.witness };
+        // The receipt witnesses the saved choice too: the switch shows it even if the next read fails.
+        this.rerankerSettings = { ...this.rerankerSettings, pictureReadingEnabled: this.pictureApplied, witness: result.witness };
         this.runtimeError = null;
       } catch (error) {
         if (!this.isConnected || revision !== this.refreshRevision || choice !== this.choiceRevision) return;
@@ -1527,7 +1614,6 @@ export class BrainSurface extends JfElement {
     this.settingsRead = true;
     if (this.rerankerSettings?.witness?.acceptedRevision !== settings.witness?.acceptedRevision
         || this.rerankerSettings?.witness?.lastCommittedOperationKey !== settings.witness?.lastCommittedOperationKey) {
-      this.rerankerApplied = null;
       this.pictureApplied = null;
     }
     // Another window or a later read can reveal a change this one never received a receipt for.
@@ -1578,8 +1664,16 @@ export class BrainSurface extends JfElement {
     return this._unifiedAiState?.installObservationLive === true;
   }
 
+  /** The page's own facts are live; otherwise its heading says once that AI status is being checked. */
+  private pageKnown(): boolean {
+    return (this.installKnown() && this.installStatus?.state === 'running') || this.aiKnown();
+  }
+
   private hasInstalledAi(): boolean {
-    return this.installStatus?.installedFully === true || (this.installStatus?.repairNeeded === true && this.installBegan())
+    // A first install that runs has files still to come, not an installed AI missing a file (AM4).
+    const firstInstallRunning = this.installStatus?.state === 'running' && this.installStatus.installedFully !== true;
+    return this.installStatus?.installedFully === true
+      || (!firstInstallRunning && this.installStatus?.repairNeeded === true && this.installBegan())
       || ['online', 'background', 'indexing', 'starting', 'offline'].includes(this._unifiedAiState?.aiEngine?.kind ?? '')
       || (this._unifiedAiState?.runtime?.installed?.known === true && this._unifiedAiState.runtime.installed.value);
   }
@@ -1619,6 +1713,82 @@ export class BrainSurface extends JfElement {
     return this.planPreview?.components?.some(c => c.id === id && c.state === 'installed') === true;
   }
 
+  /**
+   * Whether the files of the answer model the Engine runs answers with are all on disk (X5, R5): the
+   * package of the observed profile (`chat-<profile>`), the standard `chat` package otherwise. The
+   * Engine's file reports leave a dev-only package out; then the model the Engine loaded under that
+   * profile is what shows its files are there.
+   */
+  private answerFilesComplete(): boolean {
+    const profile = this.runtimeStatus?.active?.chatProfile;
+    const id = profile != null && profile !== 'standard' ? `chat-${profile}` : 'chat';
+    const listed = this.modelPresence?.packages?.find(p => p.id === id)?.complete
+      ?? this.planPreview?.components?.find(c => c.id === id)?.state;
+    if (typeof listed === 'boolean') return listed;
+    if (listed !== undefined || id === 'chat') return listed === 'installed';
+    return (this.runtimeStatus?.active?.modelPath ?? '').trim() !== '';
+  }
+
+  /**
+   * Whether answers work on this computer now (AM1), from the answer runtime alone: the answer model is
+   * installed, answers are not switched off, and the runtime is ready, starting, or unloaded but
+   * started again by a question (processor operation counts). An unloaded model the runtime will not
+   * load again (`operating.chat.reloadAllowed === false`) refuses questions, so it does not count.
+   * `null` when the observation is not live, so the caller keeps what it last showed. Search / Ask
+   * keeps its own readiness.
+   */
+  private answersWorkNow(): boolean | null {
+    if (!this.aiKnown()) return null;
+    const state = this._unifiedAiState!;
+    const off = this.settings.chatEnabled === false || (this.settings.chatEnabled == null && state.chatDisabledBySpec === true);
+    if (off || state.chatFailureReason) return false;
+    const kind = state.aiEngine.kind;
+    if (!this.packagePresent('chat') && state.capabilities?.chat !== true && kind !== 'online') return false;
+    const reloadBlocked = (this.systemStatus ?? state.status)?.operating?.chat?.reloadAllowed === false;
+    return kind === 'online' || kind === 'starting' || state.capabilities?.chat === true
+      || (state.chatUnloadedReason != null && !reloadBlocked);
+  }
+
+  /** Why a part cannot work on this computer, in ordinary words; the planner's reason is support detail. */
+  private unavailableWords(component: { state?: string } | undefined): string {
+    if (component?.state === 'not-in-mode') return 'Not part of this install';
+    if (this.policy?.gpuAccelerationEnabled === false) return 'Turned off by your administrator';
+    if (typeof navigator !== 'undefined' && /Linux/.test(navigator.platform)) return 'Not available on Linux yet';
+    const gpu = this.systemStatus?.gpu;
+    const operating = this.systemStatus?.operating?.gpu;
+    if (gpu?.cudaFunctional === true) return 'Needs a graphics card with more memory';
+    if (gpu?.cudaFunctional === false && /nvidia|geforce|rtx|quadro/i.test(operating?.adapter ?? '')) return 'Needs a newer NVIDIA graphics driver';
+    if (gpu?.available === false || gpu?.deviceCount === 0 || gpu?.cudaFunctional === false || operating?.profile === 'NO_GPU') {
+      return 'Needs an NVIDIA graphics card';
+    }
+    return 'Not available on this computer';
+  }
+
+  /**
+   * The answer package's download size, only while it measures the model answers run with (AM8, X5).
+   * Answers running on another profile's model show that profile's own package size (`chat-<profile>`,
+   * which the plan leaves out when it is dev-only) where the registry measures it unambiguously, else
+   * none. Otherwise, before the files are downloaded it is the download Install would make; once they
+   * are, a saved model path or no profile at all (an operator's model, or no engine observed; null is
+   * not "standard") has no trustworthy size here.
+   */
+  private answerSize(component: { totalBytes?: number } | undefined): number | null {
+    if ((this.llm.modelPath ?? '').trim() !== '') return null;
+    const profile = this.runtimeStatus?.active?.chatProfile;
+    if (profile != null && profile !== 'standard') {
+      const planned = this.planPreview?.components?.find(c => c.id === `chat-${profile}`)?.totalBytes;
+      if (planned != null) return planned;
+      // One model file and its supporting files: the footprint the planner states for a package.
+      const pkg = this.manifest?.packages?.find(p => p.id === `chat-${profile}`);
+      const files = pkg?.variants?.length === 1 ? [pkg.variants[0]!, ...(pkg.supportingFiles ?? [])] : [];
+      return files.length > 0 && files.every(f => Number.isSafeInteger(f.sizeBytes) && f.sizeBytes > 0)
+        ? files.reduce((sum, f) => sum + f.sizeBytes, 0) : null;
+    }
+    if (!this.packagePresent('chat')) return component?.totalBytes ?? null;
+    if (profile == null) return null;
+    return component?.totalBytes ?? null;
+  }
+
   /** The installer replaces the previous run's package records only after planning. */
   private installPlanPending(): boolean {
     return this.installStatus?.state === 'running'
@@ -1628,6 +1798,9 @@ export class BrainSurface extends JfElement {
   private brainFeatures(): Record<BrainFeatureId, BrainFeature> {
     const live = this.aiKnown();
     const installed = this.hasInstalledAi();
+    const settingsKnown = this.settingsRead && !!this.rerankerSettings?.witness;
+    // Each fact stands once (fm-10): while the heading says AI status is being checked, no step repeats it.
+    const checkingSaid = !this.pageKnown();
     const features = {} as Record<BrainFeatureId, BrainFeature>;
     for (const [id, packageId, label] of [
       ['meaning', 'embedding', 'Understand meaning'],
@@ -1641,116 +1814,126 @@ export class BrainSurface extends JfElement {
         ? this._unifiedAiState?.capabilities?.chat === true || this._unifiedAiState?.runtime?.mode === 'online'
         : onnx?.modelActive === true);
       const unavailable = !present && (component?.state === 'unavailable' || component?.state === 'not-in-mode');
-      const selected = installed && id === 'reranker'
-        ? this.rerankerApplied ?? (onnx?.status === 'active' && onnx.modelActive === true
-          ? true : this.rerankerSettings?.rerankerEnabled ?? onnx?.status === 'active')
-        : installed && id === 'chat' && (present || (component != null && component.declined !== true && component.state !== 'declined'))
-        ? this.settings.chatEnabled ?? (this.systemStatus?.inference?.chatEnabledSpec
-          ?? this._unifiedAiState?.status?.inference?.chatEnabledSpec
-          ?? this._unifiedAiState?.capabilities?.chat === true)
-        : !unavailable && component != null && component.declined !== true && component.state !== 'declined';
-      const active = !live ? null : id === 'reranker' && this.rerankerApplied !== null ? this.rerankerApplied : id === 'chat' ? this._unifiedAiState?.capabilities?.chat ?? null
-        : onnx?.status == null || onnx.status === 'unknown' ? null : onnx.status === 'active' && onnx.modelActive === true;
+      const wanted = component != null && component.declined !== true && component.state !== 'declined';
+      const runtimeControl = installed && (id === 'reranker' || id === 'chat' && (present || wanted));
+      const acquisitionControl = !runtimeControl && component?.declinable === true && (!installed || !present);
+      // AM2 — the switch shows the stored choice, never the runtime: unset answers follow the configured
+      // default. Unset Best match first shows the Engine's effective default for this computer: off where
+      // it keeps reranking off (on the processor, or disabled), on otherwise; unobserved, it is not known.
+      const storedAnswers = this.settings.chatEnabled ?? (this.systemStatus?.inference?.chatEnabledSpec
+        ?? this._unifiedAiState?.status?.inference?.chatEnabledSpec ?? false);
+      const rerankerChoice = id !== 'reranker' ? null : this.rerankerSettings?.rerankerEnabled
+        ?? (onnx?.status == null || onnx.status === 'unknown' ? null : onnx.reason !== 'cpu_default_off' && onnx.reason !== 'disabled');
+      const selected = runtimeControl
+        ? id === 'reranker' ? rerankerChoice === true : storedAnswers
+        : !unavailable && wanted;
+      // Meaning search does not work while the files' meaning must be read again (or is being read
+      // again) or new models wait for activation, whatever the encoder reports (AM3). It works only
+      // while the Worker accepts meaning queries, which it does only in COMPATIBLE (X1).
+      const compat = this.systemStatus?.embedding?.compatState;
+      const meaningBlocked = id === 'meaning' && (this.installStatus?.phase === 'activation_required'
+        || compat === 'BLOCKED_LEGACY' || compat === 'BLOCKED_MISMATCH' || compat === 'REBUILDING');
+      const encoder = onnx?.status == null || onnx.status === 'unknown' ? null : onnx.status === 'active' && onnx.modelActive === true;
+      const active = !live ? null : meaningBlocked ? false : id === 'chat' ? this._unifiedAiState?.capabilities?.chat === true
+        || (this.answersWorkNow() === true && this._unifiedAiState?.chatUnloadedReason != null)
+        : id === 'meaning' && encoder === true && compat !== 'COMPATIBLE' ? null : encoder;
       const percent = packageProgress?.bytesTotal && packageProgress.bytesTotal > 0
         ? Math.floor(((packageProgress.bytesDownloaded ?? 0) / packageProgress.bytesTotal) * 100) : null;
       const stopped = this.installStatus?.state === 'cancelled';
       const running = this.installKnown() && this.installStatus?.state === 'running';
-      const state = id === 'reranker' && this.busy['reranker-switch'] ? 'Changing…'
-        : id === 'reranker' && this.rerankerUncertain ? 'Unknown — checking Best match first after an interrupted change'
+      const pending = id === 'reranker' ? this.pendingActions.has('reranker-switch')
+        : id === 'chat' ? this.pendingActions.has('inference-switch') : false;
+      const uncertain = id === 'reranker' && this.rerankerUncertain;
+      const choiceKnown = runtimeControl ? id === 'reranker' ? settingsKnown && rerankerChoice !== null : this.settingsRead : component != null;
+      const switchWord = !runtimeControl && !acquisitionControl ? null
+        : pending || this.pendingActions.has(`component:${packageId}`) ? 'Changing…'
+        : uncertain || !choiceKnown ? 'Not known'
+        : acquisitionControl ? selected ? 'Included' : 'Not included'
+        : id === 'chat' && this.settings.chatEnabled == null ? 'Automatic'
+        : selected ? 'On' : 'Off';
+      const engine = this._unifiedAiState?.aiEngine;
+      const note = uncertain ? 'Checking after an interrupted change'
         : running && packageProgress?.state === 'pending' ? 'Waiting to download'
         : running && packageProgress?.state === 'downloading' ? `Downloading${percent === null ? '' : ` ${percent}%`}`
-        : !live ? 'Unknown — checking AI status'
+        : !live ? checkingSaid ? null : 'Unknown — checking AI status'
         : stopped && packageProgress != null && !present && (packageProgress.bytesDownloaded ?? 0) > 0 ? `Cancelled · ${formatBytes(packageProgress.bytesDownloaded ?? 0)} kept`
-        : unavailable ? `Unavailable on this computer: ${component!.unavailableReason || 'Not available in this install mode.'}`
+        : unavailable ? null
         : !component && !present ? 'Unknown — package status unavailable'
+        : !installed || !runtimeControl && id !== 'meaning' ? null
         : !present ? 'Not downloaded'
-        : active === null ? 'Unknown — last observed files are downloaded'
-        : id === 'chat' && installed && this.settingsRead && !selected ? 'Off — background work can continue'
-        : id === 'chat' && selected && active === false ? this.installStatus?.repairNeeded && this.installBegan() ? 'Unavailable — repair needed; answers are enabled' : 'Unavailable — answers are enabled'
-        : id === 'reranker' && installed && active === true && this.rerankerSettings?.rerankerEnabled === false && this.rerankerApplied === null ? 'On — the saved Off choice is not applied'
-        : id === 'reranker' && installed && active === false ? selected ? 'Unavailable — Best match first is enabled' : 'Off — files kept'
-        : active ? 'On' : 'Off';
-      const runtimeControl = installed && (id === 'reranker' || id === 'chat' && (present || (component != null && component.declined !== true && component.state !== 'declined')));
-      const acquisitionControl = !runtimeControl && component?.declinable === true && (!installed || !present);
-      const blockedReason = !live ? 'Checking AI status before changing features.' : unavailable ? component?.unavailableReason || state
+        : id === 'meaning' && active === false ? 'Not working now'
+        : id === 'reranker' && rerankerChoice === null ? 'Not confirmed yet'
+        : !selected ? active === true ? 'Off is not applied yet' : null
+        : active === null ? 'Not confirmed yet'
+        : active === true ? null
+        : id === 'chat' && this.installStatus?.repairNeeded && this.installBegan() ? 'Not working — repair needed'
+        : id === 'chat' && this.inference?.answersPausedWhileIndexing === true ? 'Paused while files are read'
+        : id === 'chat' && engine?.kind === 'indexing' ? 'Waiting while files are read'
+        : id === 'chat' && engine?.kind === 'starting' ? 'Starting…'
+        : 'Not working now';
+      const blockedReason = !live ? 'Checking AI status before changing features.' : unavailable ? this.unavailableWords(component)
         : (runtimeControl && (!this.settingsRead || id === 'reranker' && !this.rerankerSettings?.witness) ? id === 'reranker' ? 'Saved Best match first choice is not known. Refresh settings before changing it.' : 'Saved answer choice is not known. Refresh settings before changing answers.' : null)
         ?? this.planLockReason()
         ?? (this.busy['inference-switch'] ? 'Saving the answer choice' : null)
         ?? (installed && !component && !present ? 'Package status is unavailable. Refresh to check the files.' : null)
         ?? (id === 'chat' && installed && !selected && this.policy?.onlineAiEnabled === false ? 'Online AI is disabled by administrator policy.' : null)
         ?? (acquisitionControl && !present && this.policy?.downloadsEnabled === false ? 'Downloads are disabled by administrator policy.' : null);
+      const bytes = unavailable ? null : id === 'chat' ? this.answerSize(component) : component?.totalBytes ?? null;
       features[id] = {
         id, label, selected, installed: present, active, availability: unavailable ? 'unavailable' : component ? 'available' : 'unknown',
-        state: runtimeControl && id === 'chat' ? !this.settingsRead ? `${state} · Saved answer choice is not known` : this.settings.chatEnabled == null ? `${state} · automatic (no saved answer choice)` : state : state,
-        size: component?.totalBytes && component.totalBytes > 0 ? formatBytes(component.totalBytes) : null,
-        switchable: !unavailable && (acquisitionControl || runtimeControl || (!live && !installed && id !== 'meaning')), blockedReason,
+        note, size: bytes != null && bytes > 0 ? `${formatBytes(bytes)} download` : null,
+        switchable: !unavailable && (acquisitionControl || runtimeControl), switchWord, blockedReason,
+        unreachable: unavailable ? this.unavailableWords(component) : null,
       };
     }
     const mmproj = live && this._unifiedAiState?.runtime?.mode === 'online'
       ? this.runtimeStatus?.active?.mmprojActive ?? null : null;
     const pictureOverride = this.rerankerSettings?.pictureReadingOverrideEnabled;
-    const pictureChoice = pictureOverride != null ? mmproj ?? pictureOverride
-      : this.pictureApplied ?? this.rerankerSettings?.pictureReadingEnabled
-        ?? (mmproj ?? this.packagePresent('chat'));
-    const pictureFiles = this.modelPresence?.packages?.find(p => p.id === 'chat')?.complete
-      ?? this.planPreview?.components?.find(c => c.id === 'chat')?.state === 'installed';
+    // Unset is drawn as the Engine's effective default, On, and nothing is written (W2); the note says
+    // when it cannot work, e.g. while the answer model's files are missing.
+    const pictureChoice = pictureOverride ?? this.rerankerSettings?.pictureReadingEnabled ?? true;
+    const pictureActive = live ? this.pictureApplied ?? mmproj : null;
+    // This part's files are the observed answer model's; they are missing only while the Engine does
+    // not report the picture reader active (a lit step never carries a note the Engine contradicts).
+    const pictureFilesMissing = !this.answerFilesComplete() && pictureActive !== true;
     const pictureMismatch = mmproj === true && pictureChoice === false && this.pictureApplied === null;
     const pictureModelCannotRead = mmproj === false && this.pictureApplied === null && this.runtimeReadFollowsPictureChange();
+    // Picture reading runs in the answer model: where answers cannot work, the built-in reader is what reads scans.
+    const reachable = installed && features.chat.availability !== 'unavailable';
+    const pictureKnown = this.settingsRead && !!this.rerankerSettings?.witness && !this.pictureUncertain;
     features.pictures = {
-      id: 'pictures', label: 'Text in scans and images', selected: this.settingsRead && !!this.rerankerSettings?.witness && (pictureMismatch || pictureChoice),
-      installed: features.chat.installed, active: live ? this.pictureApplied ?? mmproj : null,
+      id: 'pictures', label: 'Text in scans and images', selected: pictureKnown && pictureChoice,
+      installed: features.chat.installed, active: pictureActive,
       availability: features.chat.availability,
-      state: !live ? 'Unknown — checking AI status' : !installed ? features.chat.availability === 'unavailable'
-        ? 'Text in scans and images is unavailable on this computer'
-        : 'Text in scans and images comes with the answer model’s files; it is not a separate download'
-        : this.pendingActions.has('picture-switch') ? this.pictureTargetEnabled ? 'Starting picture reading…' : 'Stopping picture reading…'
-        : this.pictureUncertain ? 'Unknown — checking picture reading after an interrupted change'
-        : !this.settingsRead || !this.rerankerSettings?.witness ? PICTURE_CHOICE_UNKNOWN
-        : pictureOverride === false ? 'Off — operator controlled'
-        : pictureOverride === true ? mmproj === true ? 'On — operator controlled'
-          : mmproj === false ? 'Unavailable — operator picture reader is not active' : 'Enabled by an operator override'
-        : pictureMismatch ? 'On — the saved Off choice is not applied'
-        : !pictureChoice ? 'Off - files and read text kept'
-        : !pictureFiles ? 'Unavailable — picture reading files are missing'
+      note: !live ? checkingSaid ? null : 'Unknown — checking AI status'
+        : !reachable ? 'Simple scans are read already'
+        : this.pictureUncertain ? 'Checking after an interrupted change'
+        : !pictureKnown ? null
+        : pictureOverride != null ? 'Set by an operator override'
+        : pictureMismatch ? 'Off is not applied yet'
+        : !pictureChoice ? null
+        : pictureFilesMissing ? 'Not working — its files are missing'
         : pictureModelCannotRead ? PICTURES_NOT_AVAILABLE_WITH_MODEL
-        : 'On',
-      size: null, switchable: installed,
+        : (this.pictureApplied ?? mmproj) === null ? 'Not confirmed yet'
+        : null,
+      size: null, switchable: reachable,
+      switchWord: !reachable ? null : this.pendingActions.has('picture-switch') ? 'Changing…'
+        : !pictureKnown ? 'Not known' : pictureChoice ? 'On' : 'Off',
       blockedReason: !live ? 'Checking AI status before changing features.'
         : this.pictureUncertain ? 'Checking the interrupted picture reading change.'
         : pictureOverride != null ? 'Text in scans and images is controlled by an operator override; change that override first'
-        : features.chat.availability === 'unavailable' ? 'Text in scans and images is unavailable on this computer'
         : !this.settingsRead || !this.rerankerSettings?.witness ? PICTURE_CHOICE_UNKNOWN
         : this.planLockReason(),
+      unreachable: null,
     };
     return features;
-  }
-
-  private renderBrainSentence(verdict: AiEngineVerdict, installed: boolean, features: Record<BrainFeatureId, BrainFeature>, readingPictures: boolean | null): TemplateResult {
-    const parts = composeBrainSentence(verdict, installed, features, readingPictures, this.aiKnown());
-    const picturePart = parts.find(part => part.feature === 'pictures');
-    if (picturePart && features.pictures.state === PICTURE_CHOICE_UNKNOWN) {
-      picturePart.text = `. ${PICTURE_CHOICE_UNKNOWN.slice(0, -1)}`;
-    } else if (picturePart && installed && this.rerankerSettings?.pictureReadingEnabled === false
-        && features.pictures.state === 'Off - files and read text kept') {
-      picturePart.text = ". It doesn't read text in scans and images";
-    }
-    for (let i = 1; i < parts.length; ++i) {
-      const punctuation = parts[i]!.text.match(/^[.,]/)?.[0];
-      if (punctuation) {
-        parts[i - 1]!.text += punctuation;
-        parts[i]!.text = parts[i]!.text.slice(1);
-      }
-    }
-    return html`${parts.map(part => {
-      if (!part.feature) return part.text;
-      const text = part.text.trimStart();
-      return html`${part.text.slice(0, part.text.length - text.length)}<button type="button" class="feature-phrase" aria-expanded=${this.featureInfo === part.feature} aria-controls=${`brain-feature-panel-${part.feature}`} @click=${(event: Event) => this.openFeatureInfo(part.feature!, event)}>${text}</button>${this.renderFeatureSwitch(features[part.feature], 'sentence')}`;
-    })}`;
   }
 
   private renderRepairAlert(): TemplateResult | typeof nothing {
     const remedy = this.repairRemedy();
     if (remedy.kind === 'none') return nothing;
+    // A file the running install has yet to fetch is not a repair (AM4); manual links stay (7b).
+    if (remedy.kind !== 'manual' && this.installStatus?.state === 'running') return nothing;
     if (remedy.kind === 'manual') return html`<div role="alert" data-testid="install-manual-fallback">
       Automatic repair could not download these files. Download each one and save it to the path shown, then restart AI.
       ${remedy.packages.map(p => html`<div><strong>${p.label}</strong> — ${p.attempts} attempts${p.error ? ` · ${p.error}` : ''}<div><code>${p.url}</code></div><div>→ <code>${p.targetPath}</code></div></div>`)}
@@ -1763,24 +1946,26 @@ export class BrainSurface extends JfElement {
     </div>`;
   }
 
-  private renderFeatureSwitch(feature: BrainFeature, location: 'sentence' | 'path'): TemplateResult | typeof nothing {
-    if (!feature.switchable) return nothing;
-    const id = `brain-${location}-${feature.id}`;
-    return html`<span class="feature-switch-wrap"><button type="button" id=${id} class="feature-switch" role="switch"
+  /** The step's switch with its state in words; an unknown choice is said, never drawn as an unchecked switch. */
+  private renderFeatureSwitch(feature: BrainFeature): TemplateResult | typeof nothing {
+    if (!feature.switchable || feature.switchWord === null) return nothing;
+    const id = `brain-switch-${feature.id}`;
+    if (feature.switchWord === 'Not known') {
+      return html`<span class="step-switch"><span class="switch-state">Not known</span></span>`;
+    }
+    return html`<span class="step-switch"><button type="button" id=${id} class="feature-switch" role="switch"
         aria-label=${`Use ${feature.label}`} aria-checked=${feature.selected ? 'true' : 'false'}
-        aria-disabled=${feature.blockedReason ? 'true' : 'false'} aria-describedby=${feature.blockedReason ? `${id}-reason` : nothing}
+        aria-disabled=${feature.blockedReason ? 'true' : 'false'}
+        aria-describedby=${feature.blockedReason ? `${id}-state ${id}-reason` : `${id}-state`}
         @click=${() => { if (!feature.blockedReason) void this.changeFeature(feature); }}
-      ><span></span></button>${location === 'sentence' && feature.id === 'reranker' ? nothing : html`<button type="button" class="feature-phrase" aria-label=${`About ${feature.label}`}
-        aria-expanded=${this.featureInfo === feature.id} aria-controls=${`brain-feature-panel-${feature.id}`}
-        @click=${(event: Event) => this.openFeatureInfo(feature.id, event)}>${icon({ name: 'help-circle', size: 12 })}</button>`}${feature.blockedReason ? html`<span id=${`${id}-reason`} class="switch-reason">${feature.blockedReason}</span>` : nothing}</span>`;
+      ><span></span></button><span id=${`${id}-state`} class="switch-state">${feature.switchWord}</span>${feature.blockedReason
+        ? html`<span id=${`${id}-reason`} class="switch-reason">${feature.blockedReason}</span>` : nothing}</span>`;
   }
 
   private async changeFeature(feature: BrainFeature): Promise<void> {
     if (feature.blockedReason || this.planLockReason()) return;
     if (feature.id === 'pictures' && this.hasInstalledAi()) {
-      const complete = this.modelPresence?.packages?.find(p => p.id === 'chat')?.complete
-        ?? this.planPreview?.components?.find(c => c.id === 'chat')?.state === 'installed';
-      if (!feature.selected && !complete) {
+      if (!feature.selected && !this.answerFilesComplete()) {
         // The saved decline is withdrawn only by the accepted install (design D4): a cancelled
         // consent leaves it, so Repair cannot restore files the user removed.
         await this.startInstall('pictures', this.declinedIds(['chat']));
@@ -1801,7 +1986,7 @@ export class BrainSurface extends JfElement {
   }
 
   /**
-   * Start AI / Resume Chat AI / Start Chat AI turn answers on the way the answers switch does: when
+   * Start answers turns answers on the way the answers switch does: when
    * the answer model's files were removed (declined), they open the download consent and save
    * nothing until the accepted download starts (design D4); otherwise they switch answers on.
    */
@@ -1848,60 +2033,95 @@ export class BrainSurface extends JfElement {
     this.featureOpener = null;
   }
 
+  /** "You get / It costs" — not in the pictures, so a developer tool (D5). */
   private renderFeaturePanel(feature: BrainFeature): TemplateResult | typeof nothing {
-    if (this.featureInfo !== feature.id) return nothing;
+    if (!this.devTools || this.featureInfo !== feature.id) return nothing;
     const benefits: Record<BrainFeatureId, string> = {
       meaning: 'Find files by what they mean, even when they use different words.',
       reranker: 'Reorders search results to put the best match first.',
       chat: 'Answers written from your files, with sources you can check.',
-      pictures: 'Finds text in scans and pictures. Off keeps files and text already read; On resumes waiting files.',
+      pictures: 'Finds text in scans and pictures. Off keeps what was already read; On reads waiting files.',
     };
     return html`<div id=${`brain-feature-panel-${feature.id}`} class="feature-panel" tabindex="-1" role="region" aria-label=${`About ${feature.label}`}>
       <strong>${feature.label}</strong>
       <div class="feature-tradeoffs"><div><h3>You get</h3><p>+ ${benefits[feature.id]}</p></div>
-        <div><h3>It costs</h3><p>${feature.size ? `${feature.size} registry file footprint. ` : ''}${feature.id === 'pictures' ? 'Included in the answer model’s files. ' : ''}Uses processing and graphics memory while working. Other heavy apps may slow down.</p></div></div>
+        <div><h3>It costs</h3><p>${feature.size ? `${feature.size}. ` : ''}${feature.id === 'pictures' ? 'Included in the answer model’s files. ' : ''}Uses processing and graphics memory while working. Other heavy apps may slow down.</p></div></div>
       <button type="button" @click=${() => this.closeFeatureInfo()}>${icon({ name: 'x', size: 14 })} Close</button>
     </div>`;
   }
 
+  /** The step's name: plain text, or with developer tools the opener of its "You get / It costs" panel. */
+  private renderStepName(feature: BrainFeature): TemplateResult {
+    return this.devTools
+      ? html`<button type="button" class="step-info step-name" @click=${(event: Event) => this.openFeatureInfo(feature.id, event)}
+          aria-expanded=${this.featureInfo === feature.id} aria-controls=${`brain-feature-panel-${feature.id}`}>${feature.label}</button>`
+      : html`<span class="step-name">${feature.label}</span>`;
+  }
+
+  /**
+   * The steps from your files to answers (fm-10, fm-13, fm-14). A step is lit only while it works now;
+   * a step that cannot work on this computer is drawn as not reachable with its reason, once. Each
+   * fact stands once: a size under its step, the switch under its step with its state in words.
+   */
   private renderFeaturePath(): TemplateResult {
     const features = this.brainFeatures();
+    const live = this.aiKnown();
+    // Each fact stands once (fm-10): while the heading says AI status is being checked, no step repeats it.
+    const unknown = this.pageKnown() ? html`<span class="step-meta">Unknown — checking AI status</span>` : nothing;
     // The person's own files (Help excluded), as the composer and Library count them.
     const count = this._unifiedAiState?.index?.ownDocumentCount;
-    const renderStep = (feature: BrainFeature, glyph: 'zap' | 'list' | 'message-square' | 'image') => html`
-      <div class="path-step" data-feature=${feature.id}>
-        <button type="button" class="step-info" @click=${(event: Event) => this.openFeatureInfo(feature.id, event)} aria-expanded=${this.featureInfo === feature.id} aria-controls=${`brain-feature-panel-${feature.id}`}>
-          <span class="step-symbol" data-active=${feature.active === true}>${icon({ name: glyph, size: 20 })}</span>
-          ${feature.label}
-        </button>
-        <div class="step-meta">${feature.id === 'chat' && feature.installed ? this._unifiedAiState?.runtime?.modelLabel ?? this.runtimeStatus?.active?.chatProfile ?? '' : ''}${feature.size ? ` · ${feature.size} registry footprint` : ''}${feature.id === 'meaning' ? ' · needed' : ''}</div>
-        <div class="step-meta">${feature.state}</div>
-        ${this.renderFeatureSwitch(feature, 'path')}
+    const glyphs = { meaning: 'zap', reranker: 'list', chat: 'message-square', pictures: 'image' } as const;
+    const renderStep = (feature: BrainFeature) => html`
+      <div class="path-step" data-feature=${feature.id} data-step=${feature.id} data-lit=${feature.active === true ? 'true' : 'false'}
+          data-reach=${feature.unreachable ? 'na' : 'ok'}>
+        <span class="step-symbol" aria-hidden="true">${icon({ name: glyphs[feature.id], size: 20 })}</span>
+        <div class="step-text">
+          <div class="step-words">
+            ${this.renderStepName(feature)}
+            ${feature.size ? html`<span class="step-meta">${feature.size}</span>` : nothing}
+            ${feature.unreachable ? html`<span class="step-meta step-reason">${feature.unreachable}</span>` : nothing}
+            ${feature.note ? html`<span class="step-meta step-note">${feature.note}</span>` : nothing}
+          </div>
+          ${this.renderFeatureSwitch(feature)}
+        </div>
         ${this.renderFeaturePanel(feature)}
       </div>`;
     return html`<section class="brain-path" aria-label="How AI uses your files">
-      <div class="path-step files-step"><span class="step-symbol">${icon({ name: 'copy', size: 20 })}</span><span>Your files</span><span class="step-meta">${!this.aiKnown() ? 'Unknown — checking AI status' : !count?.known ? 'File count unknown' : count.value === 0 ? 'None yet' : `${NUM.format(count.value)} ${count.value === 1 ? 'file' : 'files'}`}</span></div>
-      <div class="path-step read-step"><span class="step-symbol">${icon({ name: 'file-text', size: 20 })}</span><span>Read the text</span><span class="step-meta">${this.aiKnown() ? 'Built in' : 'Unknown — checking AI status'}</span></div>
-      <div class="picture-branch">${renderStep(features.pictures, 'image')}</div>
-      ${renderStep(features.meaning, 'zap')}
-      ${renderStep(features.reranker, 'list')}
-      ${renderStep(features.chat, 'message-square')}
+      <div class="path-step files-step" data-step="files" data-lit=${live ? 'true' : 'false'} data-reach="ok">
+        <span class="step-symbol" aria-hidden="true">${icon({ name: 'copy', size: 20 })}</span>
+        <div class="step-text"><div class="step-words"><span class="step-name">Your files</span>${!live ? unknown : html`<span class="step-meta">${!count?.known ? 'File count unknown' : count.value === 0 ? 'None yet' : `${NUM.format(count.value)} ${count.value === 1 ? 'file' : 'files'}`}</span>`}</div></div>
+      </div>
+      <div class="path-step read-step" data-step="read" data-lit=${live ? 'true' : 'false'} data-reach="ok">
+        <span class="step-symbol" aria-hidden="true">${icon({ name: 'file-text', size: 20 })}</span>
+        <div class="step-text"><div class="step-words"><span class="step-name">Read the text</span>${live ? html`<span class="step-meta">Built in</span>` : unknown}</div></div>
+      </div>
+      <div class="picture-branch">${renderStep(features.pictures)}</div>
+      ${renderStep(features.meaning)}
+      ${renderStep(features.reranker)}
+      ${renderStep(features.chat)}
     </section>`;
   }
 
-  private renderGraphicsCard(): TemplateResult {
+  /**
+   * The graphics card's memory, only with a current reading (AM8): while installing, starting or
+   * switching, with a stale or missing reading, nothing is drawn — and nothing is inferred from that.
+   */
+  private renderGraphicsCard(): TemplateResult | typeof nothing {
     const gpu = this.systemStatus?.gpu;
-    const adapter = this.systemStatus?.operating?.gpu?.adapter;
-    const fresh = this.aiKnown();
-    const total = fresh ? gpu?.totalVramBytes : null;
-    const used = fresh ? gpu?.usedVramBytes : null;
-    const known = total != null && total > 0 && used != null && used >= 0 && used <= total;
-    const devices = this.systemStatus?.gpu?.deviceCount;
+    const operating = this.systemStatus?.operating?.gpu;
+    const total = gpu?.totalVramBytes;
+    const used = gpu?.usedVramBytes;
+    const current = this.aiKnown() && !isGpuReadingProvisional(this._unifiedAiState?.aiEngine?.stability)
+      && this.installStatus?.state !== 'running' && operating?.stale !== true;
+    if (!current || total == null || total <= 0 || used == null || used < 0 || used > total) return nothing;
+    const devices = gpu?.deviceCount;
+    const adapter = operating?.adapter;
+    const words = `${formatBytes(used)} of ${formatBytes(total)} in use${adapter ? ` · ${adapter}` : ''}${devices && devices > 1 ? ` · one of ${devices} graphics devices` : ''}`;
     return html`<section class="graphics-card" aria-label="Graphics card memory">
-      <span>Graphics card</span><div class="progress" role=${known ? 'meter' : 'img'} aria-label="Graphics memory used by all apps"
-        aria-valuemin=${known ? 0 : nothing} aria-valuemax=${known ? total : nothing} aria-valuenow=${used ?? nothing} aria-valuetext=${known ? `${formatBytes(used!)} of ${formatBytes(total!)} in use by all apps${devices && devices > 1 ? ` · one of ${devices} graphics devices` : ''}` : nothing}>
-        ${known ? html`<div class="progress-bar" .style=${`width: ${(used! / total!) * 100}%`}></div>` : nothing}
-      </div><span class="step-meta">${known ? `${formatBytes(used!)} of ${formatBytes(total!)} in use · all apps` : 'Memory use unknown'}${adapter ? ` · ${adapter}` : ''}${devices && devices > 1 ? ` · one of ${devices} graphics devices` : ''}</span>
+      <span class="graphics-name">Graphics card</span><div class="progress" role="meter" aria-label="Graphics memory used by all apps"
+        aria-valuemin="0" aria-valuemax=${total} aria-valuenow=${used} aria-valuetext=${`${formatBytes(used)} of ${formatBytes(total)} in use by all apps`}>
+        <div class="progress-bar" .style=${`width: ${(used / total) * 100}%`}></div>
+      </div><span class="step-meta graphics-reading">${words}</span>
     </section>`;
   }
 
@@ -2447,7 +2667,6 @@ export class BrainSurface extends JfElement {
 
   private async setPictureReadingEnabled(enabled: boolean): Promise<void> {
     await this.withBusy('picture-switch', async () => {
-      this.pictureTargetEnabled = enabled;
       this.runtimeError = null;
       ++this.choiceRevision;
       const attempt = createSettingsAttempt({ pictureReadingEnabled: enabled, pictureReadingSwitchIntent: true },
@@ -2488,7 +2707,6 @@ export class BrainSurface extends JfElement {
         throw error;
       }
       this.rerankerUncertain = false;
-      this.rerankerApplied = enabled ? null : false;
       this.rerankerSettings = { ...this.rerankerSettings, rerankerEnabled: enabled, witness: result.witness };
       await this.refreshSettings(true);
     });
@@ -2661,11 +2879,10 @@ export class BrainSurface extends JfElement {
     // from before; only its SOURCE changed (the one `computeAiEngineVerdict` derivation, not the
     // old 5-source ladder).
     // A live install observation needs no runtime observation to show download progress.
-    const known = (this.installKnown() && this.installStatus?.state === 'running') || this.aiKnown();
+    const known = this.pageKnown();
     const aiVerdict: AiEngineVerdict = known ? this.deriveAiEngineVerdict() : { kind: 'connecting', stability: { kind: 'provisional', cause: 'checking' }, installFailure: null };
     const aiState = aiVerdict.kind;
     const activationRequired = known && aiState !== 'installing' && this.installStatus?.phase === 'activation_required';
-    const indexingActivity = this.indexingProgress().activity;
     const downloadsDisabled = this.policy?.downloadsEnabled === false;
     const onlineDisabled = this.policy?.onlineAiEnabled === false;
     const repairRemedy = this.repairRemedy();
@@ -2711,21 +2928,12 @@ export class BrainSurface extends JfElement {
         label: aiEngineHeadline(aiVerdict),
         sub: aiEngineBody(aiVerdict),
       },
+      // D3 — an installed AI that is not answering is headed by what works (the ladder below), never
+      // "AI Offline" or "Installed with limitations"; a missing file keeps its repair heading.
       offline: {
         dot: 'offline',
-        // Tempdoc 805 G.3: `repairNeeded` is a claim about DISK (a required file is missing), while
-        // `installedFully` is a claim about install HISTORY — round 11 had the first true and the
-        // second (correctly) also true, and the label said neither. When something is genuinely
-        // missing, name the action; "Installed with limitations" alone tells a user nothing to do.
-        // Tempdoc 824 §3.3c/§3.4: which sentence is true also depends on whether the capability is
-        // observably running and on whether Repair can still succeed — `deriveRepairRemedy` is the
-        // one place that decides, so this panel and the Detailed one cannot name different remedies.
-        label:
-          repairRemedyHeadline(repairRemedy) ??
-          (this.installStatus?.installedFully === false
-            ? 'Installed with limitations'
-            : 'AI Offline'),
-        sub: repairRemedySub(repairRemedy) ?? chatUnavailableReason ?? 'Start AI to enable chat and summaries.',
+        label: repairRemedyHeadline(repairRemedy) ?? aiEngineHeadline(aiVerdict),
+        sub: repairRemedySub(repairRemedy) ?? '',
       },
       starting: {
         dot: 'starting',
@@ -2761,12 +2969,12 @@ export class BrainSurface extends JfElement {
       // because you haven't clicked Resume yet" from "genuinely still indexing"; both read the same
       // sub-label before this, and a Sandbox round waited 5+ minutes expecting the first case to
       // resolve on its own the way the second one does.
+      // AM9 — answers words: the page says what the answer step can do, not the reading work's name.
       indexing: {
         dot: 'indexing',
-        label: indexingActivity.summary,
-        sub: [indexingActivity.summary, indexingActivity.detail,
-          aiVerdict.awaitingChatEnable ? 'Click Resume Chat AI below to start chat.' : null,
-        ].filter(Boolean).join(' — '),
+        label: aiVerdict.awaitingChatEnable ? 'Answers are off' : 'Answers wait while files are read',
+        sub: aiVerdict.awaitingChatEnable ? 'Turn on Answer questions below to use them.'
+          : 'Answers come back when JustSearch finishes reading the files.',
       },
       connecting: { dot: 'starting', label: 'Connecting…', sub: 'Checking AI status…' },
     };
@@ -2774,7 +2982,7 @@ export class BrainSurface extends JfElement {
       ? {
           dot: 'starting',
           label: 'Downloaded — activation required',
-          sub: 'Activate the downloaded models to rebuild affected indexes.',
+          sub: 'Activate the downloaded models. Search then reads your files again with them.',
         }
       : statusConfig[aiState] ?? statusConfig.offline!;
 
@@ -2859,7 +3067,7 @@ export class BrainSurface extends JfElement {
         // (0.2.0 F-6; mirrors `IndexingOverlay`'s "Go Online" escape hatch).
         case 'indexing':
           return {
-            label: 'Resume Chat AI',
+            label: 'Start answers',
             iconName: 'check-circle-2' as const,
             onClick: () => void this.turnAnswersOn(),
             availability: chatUnavailableReason
@@ -2876,7 +3084,7 @@ export class BrainSurface extends JfElement {
         // (enabled:true is legal and converges during/after the procedure per backend semantics).
         case 'background':
           return {
-            label: 'Start Chat AI',
+            label: 'Start answers',
             iconName: 'check-circle-2' as const,
             onClick: () => void this.turnAnswersOn(),
             availability: chatUnavailableReason
@@ -2901,8 +3109,8 @@ export class BrainSurface extends JfElement {
     })();
 
     const features = this.brainFeatures();
-    const readingPictures = this.systemStatus?.inference?.procedure === 'VDU_BATCH'
-      ? this.aiKnown() ? true : null : false;
+    const readingPictures = this._unifiedAiState?.snapshotLive === true
+      && (this.systemStatus ?? this._unifiedAiState.status)?.inference?.procedure === 'VDU_BATCH';
     const installed = this.hasInstalledAi();
     const processorOnly = this.runtimeStatus?.active?.gpuLayers === 0;
     const reindexRequired = this.systemStatus?.embedding?.compatState === 'BLOCKED_LEGACY'
@@ -2910,35 +3118,65 @@ export class BrainSurface extends JfElement {
     // FC11a — a failed install is said as failed, whatever its files on disk would owe a repair: after
     // it, nothing usable is installed until it runs again, and the verdict's words say what to do.
     const failed = known && aiState === 'install_failed';
-    const headline = !known ? 'Checking AI status…'
-      : aiState === 'installing' || failed ? sc.label
-      : activationRequired ? 'Downloaded — activation required'
-      : reindexRequired ? 'Rebuild search to use these models'
-      : repairRemedyHeadline(repairRemedy) ? repairRemedyHeadline(repairRemedy)
-      : aiState === 'not_installed' ? "AI isn't installed yet"
-      : this.inference?.answersPausedWhileIndexing === true ? 'Answers paused while indexing'
-      : aiState === 'online' && !readingPictures ? processorOnly ? 'AI is running on the processor' : 'AI is ready'
-      : sc.label;
+    const meaning = features.meaning.active;
+    const answers = this.answersWorkNow();
+    // D3/AM3 — the heading says what works. Failure, repair, activation and policy headings stay; a
+    // positive heading needs live evidence of meaning search; an unknown says nothing either way.
+    const [headline, sentence] = ((): [string, string | null] => {
+      // W5 — the last-known truth stays, said once: a picture-reading pass seen before the observation was lost.
+      if (!known) return ['Checking AI status…', (this.systemStatus ?? this._unifiedAiState?.status)?.inference?.procedure === 'VDU_BATCH'
+        ? 'Pictures were being read when last observed; current answer availability is unconfirmed.'
+        : 'Waiting for live install and AI observations.'];
+      if (aiState === 'installing' || failed || aiState === 'paused') return [sc.label, sc.sub];
+      if (activationRequired) return ['Downloaded — activation required', sc.sub];
+      if (reindexRequired) return ['Read your files again to use these models', 'Search still finds files by their words until then.'];
+      const repairHeadline = repairRemedyHeadline(repairRemedy);
+      if (repairHeadline) return [repairHeadline, repairRemedy.kind === 'manual' ? repairRemedySub(repairRemedy) : null];
+      if (aiState === 'not_installed' || !installed) {
+        return ["AI isn't installed yet", 'Search already works with exact words. Installing AI adds the steps that are not lit yet.'];
+      }
+      if (this.inference?.answersPausedWhileIndexing === true) {
+        return ['Answers paused while files are read', 'Answers resume when JustSearch finishes reading the files. The answer model stays loaded.'];
+      }
+      // A picture-reading pass: answers wait for it only when it borrows the loaded answer model.
+      if (aiState === 'online' && readingPictures === true) {
+        return ['Reading text in scans and images', this._unifiedAiState?.status?.inference?.engineReason === 'automatic-vdu'
+          ? 'Answers resume after the current document.' : 'Everything below runs on this computer.'];
+      }
+      if (this.systemStatus?.embedding?.compatState === 'REBUILDING') {
+        return ['Reading your files again for meaning search', 'Search still finds files by their words until then.'];
+      }
+      if (aiState === 'starting') return ['Starting…', sc.sub];
+      if (meaning === true && answers === true && aiState === 'online') {
+        return [processorOnly ? 'AI is running on the processor' : 'AI is ready', 'Everything below runs on this computer.'];
+      }
+      if (meaning === true) return ['Search understands meaning', 'It finds files by what they are about, not only by their words.'];
+      if (meaning === false || features.meaning.note === 'Not downloaded') return ["Meaning search isn't working", 'Search still finds files by their words.'];
+      return ['AI is installed', 'Checking which steps work now.'];
+    })();
     const installSize = this.planPreview?.totalDownloadBytes;
     const actionLabel = primaryAction.label === 'Install AI' && typeof installSize === 'number' && installSize >= 0
       ? `Install AI · ${formatBytes(installSize)}` : primaryAction.label;
     const additionsLabel = `Install additions · ${typeof installSize === 'number' && installSize >= 0 ? formatBytes(installSize) : 'size unknown'}`;
     const additions = known && repairRemedy.kind === 'none' && installed && !activationRequired && aiState !== 'installing'
       && this.planPreview?.components?.some(c => c.state === 'to-download' && !c.declined) === true;
+    const filled = primaryAction.primary && (!installed || failed || activationRequired);
+    const choiceUnknown = (['reranker', 'chat', 'pictures'] as const).some(id => features[id].switchWord === 'Not known');
+    const showAdvanced = installed || this.installBegan() || downloadsDisabled || this.devTools || !!this.expanded.advanced;
     return html`
       <div data-testid="brain-simple-panel">
         <h1 class="brain-headline" tabindex="-1">${headline}${aiState === 'installing' && pct !== null ? ` ${pct}%` : ''}</h1>
-        <p class="brain-sentence">${this.inference?.answersPausedWhileIndexing === true && known ? html`Answers resume automatically when bulk file indexing ends. The answer model stays loaded.` : this.renderBrainSentence(aiVerdict, installed, features, readingPictures)}</p>
-        <div class="brain-status-detail">${aiState === 'connecting' ? html`<jf-pulse-dots></jf-pulse-dots>` : nothing}${known ? (aiState === 'installing' || failed || repairRemedy.kind === 'none' ? sc.sub : repairRemedy.kind === 'manual' ? repairRemedySub(repairRemedy) : nothing) : `Waiting for live install and AI observations. ${indexingActivity.summary}${indexingActivity.detail ? ` — ${indexingActivity.detail}` : ''}`}${this.installStalled() ? html` <span role="status">Download stalled — no recent progress.</span>` : nothing}</div>
-        ${known && (!installed || aiState === 'installing' || activationRequired || failed) ? html`<div class="status-row">
-          <jf-button class=${primaryAction.primary && (!installed || failed) ? 'install-action' : ''}
-            variant=${primaryAction.primary && (!installed || failed) ? 'primary' : 'ghost'}
+        ${sentence ? html`<p class="brain-sentence">${sentence}</p>` : nothing}
+        ${aiState === 'connecting' || this.installStalled() ? html`<div class="brain-status-detail">${aiState === 'connecting' ? html`<jf-pulse-dots></jf-pulse-dots>` : nothing}${this.installStalled() ? html`<span role="status">Download stalled — no recent progress.</span>` : nothing}</div>` : nothing}
+        ${known && (!installed || aiState === 'installing' || activationRequired || failed) ? html`<div class="status-row install-row">
+          <jf-button class=${filled ? 'install-action' : ''}
+            variant=${filled ? 'primary' : 'ghost'}
             .availability=${primaryAction.availability}
             .onActivate=${primaryAction.onClick}
             label=${actionLabel}
             data-testid="brain-simple-action"
-          >${icon({ name: primaryAction.iconName, size: 14 })} ${actionLabel}</jf-button>
-          ${!installed ? html`<span class="brain-status-detail">You will see each licence before anything downloads.</span>` : nothing}
+          >${icon({ name: primaryAction.label.startsWith('Install') ? 'download' : primaryAction.iconName, size: 16 })} ${actionLabel}</jf-button>
+          ${!installed && aiState !== 'installing' ? html`<span class="install-note">You see each licence before anything downloads. Everything runs on this computer.</span>` : nothing}
         </div>` : nothing}
         ${additions ? html`<div class="status-row">
           <jf-button variant="ghost" label=${additionsLabel}
@@ -2998,15 +3236,15 @@ export class BrainSurface extends JfElement {
         ${known && !(failed && repairRemedy.kind !== 'manual') ? this.renderRepairAlert() : nothing}
         ${this.renderFeaturePath()}
         ${this.renderGraphicsCard()}
-        <div class="row brain-links">
-          <button type="button" aria-expanded=${!!this.expanded.advanced} @click=${() => this.toggleSection('advanced')}>${icon({ name: 'settings', size: 14 })} Advanced settings</button>
-          ${installed && aiState !== 'installing' && !activationRequired ? html`<jf-button variant="ghost" data-testid="brain-simple-action"
+        ${!(showAdvanced || this.devTools || this.answersShown || choiceUnknown) ? nothing : html`<div class="row brain-links">
+          ${showAdvanced ? html`<button type="button" aria-expanded=${!!this.expanded.advanced} @click=${() => this.toggleSection('advanced')}>${icon({ name: 'settings', size: 16 })} Advanced settings</button>` : nothing}
+          ${this.devTools && installed && aiState !== 'installing' && !activationRequired ? html`<jf-button variant="ghost" data-testid="brain-answers-action"
             label=${features.chat.selected ? 'Stop answers' : 'Start answers'}
             .availability=${features.chat.blockedReason ? unavailableBecause(features.chat.blockedReason) : AVAILABLE}
             .onActivate=${() => void this.changeFeature(features.chat)}>${icon({ name: features.chat.selected ? 'square' : 'play', size: 14 })} ${features.chat.selected ? 'Stop answers' : 'Start answers'}</jf-button>` : nothing}
-          <a href="#justsearch://surface/core.health-surface" @click=${() => requestMemberTab('core.health-surface', 'ai-engine')}>${icon({ name: 'history', size: 14 })} Engine history in Health</a>
-          <jf-button variant="ghost" label="Refresh status" .onActivate=${() => void this.refreshAll()}>${icon({ name: 'refresh-cw', size: 14 })}</jf-button>
-        </div>
+          ${this.answersShown || this.devTools ? html`<a href="#justsearch://surface/core.health-surface" @click=${() => requestMemberTab('core.health-surface', 'ai-engine')}>${icon({ name: 'history', size: 16 })} Engine history in Health</a>` : nothing}
+          ${this.devTools || choiceUnknown ? html`<jf-button variant="ghost" label="Refresh status" .onActivate=${() => void this.refreshAll()}>${icon({ name: 'refresh-cw', size: 14 })}${choiceUnknown && !this.devTools ? ' Refresh status' : ''}</jf-button>` : nothing}
+        </div>`}
 
       </div>
     `;
@@ -3057,7 +3295,14 @@ export class BrainSurface extends JfElement {
       ),
     ];
     const activity = this.indexingProgress().activity;
-    const canonicalWordings = reindexCauses.map((code) => reasonFor(code, activity).wording);
+    // X7/AM9 — on AI Brain the same causes are said in read words (the app reads files, it does not
+    // "index" them); the canonical wording stays the shared vocabulary everywhere else. The shared
+    // projection's qualification of an unconfirmed observation ("… — last observed: ") is kept.
+    const canonicalWordings = [...new Set(reindexCauses.map((code) => {
+      const qualified = reasonFor(code, activity).wording;
+      const brainWords = BRAIN_READ_AGAIN_WORDS[code];
+      return brainWords ? qualified.replace(reasonFor(code).wording, brainWords) : qualified;
+    }))];
     return html`
       <div class="section warning-section">
         <div class="status-layout">
@@ -3071,7 +3316,7 @@ export class BrainSurface extends JfElement {
                     </div>`,
                 )
               : html`<div class="warning-heading">
-                  ${activity.confirmed ? '' : `${activity.summary} — last observed: `}Rebuild the index to restore full search.
+                  ${activity.confirmed ? '' : `${activity.summary} — last observed: `}Read everything again to restore full search.
                 </div>`}
             ${embeddingBlocked
               ? html`
@@ -3764,8 +4009,8 @@ export class BrainSurface extends JfElement {
           <button type="button" aria-expanded=${!!this.expanded.model} @click=${() => this.toggleSection('model')}>${icon({ name: 'folder', size: 14 })} Change</button>
           ${this.expanded.model ? this.settingInput('modelPath', 'Model path') : nothing}
         </div></div>
-        <div class="advanced-row"><div>Pause answers while indexing<p>Wait while indexing files (bulk import, reindex); keep the answer model loaded</p></div><div>
-          <button type="button" class="component-toggle" role="switch" aria-label="Pause answers while indexing"
+        <div class="advanced-row"><div>Pause answers while files are read<p>Wait while many files are being read (a large import, reading everything again); keep the answer model loaded</p></div><div>
+          <button type="button" class="component-toggle" role="switch" aria-label="Pause answers while files are read"
             aria-checked=${this.rerankerSettings?.pauseAnswersWhileIndexing === true}
             ?disabled=${!this.settingsRead || !this.rerankerSettings?.witness || !!this.busy['answer-pause-switch']}
             @click=${() => this.setPauseAnswersWhileIndexing(this.rerankerSettings?.pauseAnswersWhileIndexing !== true)}><span></span></button>
@@ -3780,8 +4025,9 @@ export class BrainSurface extends JfElement {
       <section aria-label="Downloaded files"><h3 class="advanced-heading">Downloaded files</h3>
         <p class="advanced-note">Files on this computer, measured on disk. Remove files deletes a switched-off part's downloaded files; Download again asks first.</p>
         ${this.renderDownloadedFiles()}
-        <p class="advanced-note">Download choices use registry sizes. Skipping a part keeps its existing files.</p>
-        ${this.renderComponentList()}${this.renderTierBreakdown()}${this.renderPackageHistory()}${this.renderSearchQualityFeatures()}
+        ${/* Not in the pictures (AM5): the legacy panels are developer tools, live. */ ''}
+        ${this.devTools ? html`<p class="advanced-note">Download choices use registry sizes. Skipping a part keeps its existing files.</p>
+          ${this.renderComponentList()}${this.renderTierBreakdown()}${this.renderPackageHistory()}${this.renderSearchQualityFeatures()}` : nothing}
         ${this.renderPackImport()}
       </section>
       <section aria-label="Maintenance"><h3 class="advanced-heading">Maintenance</h3>
@@ -3827,7 +4073,7 @@ export class BrainSurface extends JfElement {
     // this surface's shadow CSS styles it); the remaining tabs are the declared members (Memory).
     const members = getSurface('core.brain-surface')?.members ?? [];
     const items: SurfaceTabItem[] = [
-      { id: 'runtime', label: 'AI Brain', altitude: 'PRODUCT', slot: 'tab-runtime' },
+      { id: 'runtime', label: 'Overview', altitude: 'PRODUCT', slot: 'tab-runtime' },
       ...members.map((mid) => ({
         id: mid,
         label: present({ kind: 'surface', id: mid }).label,
@@ -3841,6 +4087,7 @@ export class BrainSurface extends JfElement {
         api-base=${this.apiBase}
         .host_=${this.host_}
         active-id=${this.activeTab}
+        ?tablist-hidden=${!this.answersShown && this.activeTab === 'runtime'}
         .items=${items}
         @tab-change=${(e: CustomEvent<{ id: string }>) => (this.activeTab = e.detail.id)}
       >

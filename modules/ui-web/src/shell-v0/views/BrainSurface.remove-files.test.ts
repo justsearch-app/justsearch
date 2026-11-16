@@ -14,6 +14,7 @@ vi.mock('../state/aiStateStore.js', async original => ({
 }));
 import './BrainSurface.js';
 import type { ConfirmBand } from '../components/ConfirmBand.js';
+import { setShowDeveloperTools } from '../state/developerToolsState.js';
 
 // Advanced settings > Downloaded files (design D4): rows with measured sizes, Remove files with an
 // inline confirmation, Download again through the existing consent, and switch-on paths that save
@@ -119,7 +120,7 @@ beforeEach(() => {
     return json({});
   }));
 });
-afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); });
+afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); setShowDeveloperTools(false); });
 
 describe('Advanced settings - Downloaded files', () => {
   it('lists each part with its measured size, Remove files where allowed and the reason elsewhere', async () => {
@@ -325,6 +326,7 @@ describe('after Remove files (repair round 1)', () => {
   });
 
   it('stale installed rows: including the part in Downloaded files asks first instead of withdrawing the decline', async () => {
+    setShowDeveloperTools(true); // Slice 7a (X6, AM5): the component list's include switches are developer tools.
     removedReranker();
     const el = await mount();
 

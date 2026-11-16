@@ -2,13 +2,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import './BrainSurface.js';
 import { __resetUiModeForTest, getUiMode, setUiMode } from '../state/uiModeState.js';
+import { setShowDeveloperTools } from '../state/developerToolsState.js';
 
 interface BrainHost extends HTMLElement { apiBase: string; updateComplete: Promise<boolean> }
 beforeEach(() => {
   __resetUiModeForTest();
   vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ui: { mode: 'simple' }, llm: {} }))));
 });
-afterEach(() => { document.body.innerHTML = ''; vi.unstubAllGlobals(); __resetUiModeForTest(); });
+afterEach(() => { document.body.innerHTML = ''; vi.unstubAllGlobals(); __resetUiModeForTest(); setShowDeveloperTools(false); });
 async function mount(): Promise<BrainHost> {
   const el = document.createElement('jf-brain-surface') as BrainHost;
   el.apiBase = ''; document.body.appendChild(el);
@@ -26,6 +27,8 @@ describe('AI Brain independent of global detail level', () => {
   });
   it.each(['simple', 'advanced'] as const)('opening Advanced never writes ui.mode (%s)', async mode => {
     setUiMode(mode);
+    // Slice 7a (AM5): with nothing observed yet, Advanced settings is reached with developer tools.
+    setShowDeveloperTools(true);
     const el = await mount();
     const advanced = el.shadowRoot!.querySelector<HTMLButtonElement>('.brain-links button')!;
     advanced.click(); await el.updateComplete;

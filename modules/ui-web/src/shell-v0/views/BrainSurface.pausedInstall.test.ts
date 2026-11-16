@@ -106,7 +106,8 @@ describe('BrainSurface — idle panel over a paused download', () => {
   it('a genuinely fresh install is untouched — still "AI isn\'t installed yet" / "Install AI"', async () => {
     const text = await renderFor(FRESH);
     expect(text).toContain("AI isn't installed yet");
-    expect(text).toContain('Install AI models to get started');
+    // Slice 7a (fm-10): the sentence under the heading is the picture's.
+    expect(text).toContain('Search already works with exact words. Installing AI adds the steps that are not lit yet.');
     expect(text).not.toContain('Download Paused');
   });
 

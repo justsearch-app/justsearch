@@ -10,6 +10,7 @@ import { takeMemberTabIntent } from '../router/memberTabIntent.js';
 import { __feedForTest, __feedContactForTest, __tickClockForTest, __resetAiStateForTest, type InferenceSnapshot } from '../state/aiStateStore.js';
 import { __seedForTest, __resetForTest } from '../../i18n/resourceCatalog.js';
 import { searchRegister } from './settingsRegister.js';
+import { setShowDeveloperTools } from '../state/developerToolsState.js';
 
 type Surface = HTMLElement & { updateComplete: Promise<unknown>; activeCategory: string; activeTab: string };
 let saved: number;
@@ -31,6 +32,8 @@ async function mount(tag: string) {
   document.body.append(el); await settle(el); return el;
 }
 async function advanced(el: Surface) {
+  // Slice 7a (AM5): with nothing observed yet, AI Brain's Advanced settings is a developer tool.
+  setShowDeveloperTools(true); await settle(el);
   el.shadowRoot!.querySelector<HTMLButtonElement>('.brain-links button')?.click(); await settle(el);
 }
 function field(el: Surface) {
@@ -160,7 +163,7 @@ describe('Reading memory save ownership', () => {
     await poll(brain); shown(brain, 16384); error(brain, 409);
   });
 });
-afterEach(() => { document.body.replaceChildren(); takeMemberTabIntent('core.brain-surface'); __resetAiStateForTest(); __resetForTest(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { document.body.replaceChildren(); takeMemberTabIntent('core.brain-surface'); __resetAiStateForTest(); __resetForTest(); vi.unstubAllGlobals(); vi.restoreAllMocks(); setShowDeveloperTools(false); });
 
 describe('Context window has one home', () => {
   it('Settings links to AI Brain and has no second context control', async () => {

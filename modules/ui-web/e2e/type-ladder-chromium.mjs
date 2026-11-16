@@ -177,6 +177,8 @@ async function firstVisible(controls) {
 }
 async function visitTabs(page, theme, surface, scope) {
   const tabs = await scope.locator('[role="tab"]').all();
+  // A surface without a tab row (AI Brain before answers work) still has its sub-views audited.
+  if (tabs.length === 0) await expandSubviews(page, theme, surface, scope);
   for (let i = 0; i < tabs.length; i++) {
     await capture(page, theme, `${surface}-tab-${i + 1}`, () => tabs[i].click());
     await expandSubviews(page, theme, `${surface}-tab-${i + 1}`, scope);

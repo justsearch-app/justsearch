@@ -1,54 +1,31 @@
 // SPDX-License-Identifier: Apache-2.0
-import type { AiEngineVerdict } from './aiVerdict.js';
 
 /** Saved On with complete files, while the running answer model is confirmed unable to read pictures. */
-export const PICTURES_NOT_AVAILABLE_WITH_MODEL = 'On — not available with this answer model';
+export const PICTURES_NOT_AVAILABLE_WITH_MODEL = 'Not available with this answer model';
 
 export type BrainFeatureId = 'meaning' | 'reranker' | 'chat' | 'pictures';
+
+/**
+ * One step of AI Brain's Overview. The switch shows the stored choice only (`selected`, `switchWord`);
+ * the step's light (`active`) and `note` show what works now, so a choice is never drawn as activity.
+ */
 export interface BrainFeature {
   id: BrainFeatureId;
   label: string;
-  /** Observed availability, distinct from the saved acquisition/runtime choice. */
+  /** Observed: works now (true), does not (false), not known (null). */
   active: boolean | null;
   availability?: 'available' | 'unavailable' | 'unknown';
+  /** The stored choice: the saved runtime choice once installed, the download choice before. */
   selected: boolean;
   installed: boolean;
-  state: string;
+  /** What works now when it differs from the choice, or why the step cannot work; null when the switch says it. */
+  note: string | null;
+  /** The download size, labelled as one, or null. */
   size: string | null;
   switchable: boolean;
+  /** The switch's state in words; "Not known" replaces the switch. */
+  switchWord: string | null;
   blockedReason: string | null;
-}
-
-export interface BrainSentencePart {
-  text: string;
-  feature?: BrainFeatureId;
-}
-
-/** One sentence authority for the two presentations of each feature's shared state. */
-export function composeBrainSentence(
-  verdict: AiEngineVerdict,
-  installed: boolean,
-  features: Readonly<Record<BrainFeatureId, BrainFeature>>,
-  readingPictures: boolean | null,
-  known = verdict.kind !== 'connecting',
-): BrainSentencePart[] {
-  const { meaning, reranker, chat, pictures } = features;
-  const parts: BrainSentencePart[] = [];
-  if (!known) {
-    return [{ text: `AI status and feature availability are still being checked. ${readingPictures === null ? 'Pictures were being read when last observed; current answer availability is unconfirmed. ' : ''}Everything runs on this computer.` }];
-  }
-  if (!installed) {
-    parts.push({ text: 'Search already works with exact words. Installing AI lets it understand what your files are about', feature: 'meaning' });
-    parts.push({ text: reranker.availability === 'unavailable' ? ', with best match first unavailable on this computer' : reranker.selected ? ', put the best match first' : ', without best match first', feature: 'reranker' });
-    parts.push({ text: chat.availability === 'unavailable' ? ', with answers unavailable on this computer' : chat.selected ? ' and answer your questions with sources' : ', without answers to questions', feature: 'chat' });
-    parts.push({ text: `. ${pictures.state}`, feature: 'pictures' });
-  } else {
-    parts.push({ text: meaning.active === true ? 'It understands what your files are about' : meaning.active === false ? 'Understanding meaning is not active' : 'Understanding meaning is unconfirmed', feature: 'meaning' });
-    parts.push({ text: reranker.active === true ? ', puts the best match first' : reranker.active === false ? ', without best match first' : ', with best match first unconfirmed', feature: 'reranker' });
-    parts.push({ text: !chat.installed ? '. Answers are not downloaded yet' : !chat.selected ? '. Answers are off; background work can continue' : readingPictures === null ? '. Pictures were being read when last observed; current answer availability is unconfirmed' : readingPictures ? '. Answers are temporarily unavailable while pictures are being read; they resume after the current document' : chat.active === true ? ' and answers your questions with sources' : chat.active === null ? '. Answer availability is unconfirmed' : '. Answers are not available yet', feature: 'chat' });
-    parts.push({ text: pictures.state === PICTURES_NOT_AVAILABLE_WITH_MODEL ? `. Text in scans and images: ${pictures.state}` : pictures.active === true ? '. It reads text in scans and images' : pictures.active === false ? ". It doesn't read text in scans and images yet" : '. Reading text in scans and images is unconfirmed', feature: 'pictures' });
-  }
-  if (verdict.kind === 'connecting') parts.push({ text: '. AI status is still being checked' });
-  parts.push({ text: '. Everything runs on this computer.' });
-  return parts;
+  /** Ordinary words for a step that cannot work on this computer; drawn as not reachable. */
+  unreachable: string | null;
 }
