@@ -27,16 +27,20 @@ the Engine silently. The Engine is unchanged (G1), so this check passes on origi
 evidence, gates/test-intent/evidence/fm-brain-install-engine.json, records that.
 
 The page evidence, gates/test-intent/evidence/fm-brain-install.json, was written by run-evidence with
---before origin/main (dea8a9f97b), one --check per file, with the fixture file overlaid. In the new
-BrainInstall.flow.test.ts 21 of 25 cases fail on origin/main, every one by assertion on its claimed
+--before origin/main (dea8a9f97b), one --check per file, with two overlays: the fixture file, and
+state/installFlow.ts, the new module the page checks reset the window's Cancel install through
+(origin/main's page and bar never import it, so it only lets the files load there). In the new
+BrainInstall.flow.test.ts 33 of 37 cases fail on origin/main, every one by assertion on its claimed
 behaviour (old consent words, no parts list, "AI install failed" instead of the stopped view, no Try
-again or Cancel install, "Pause download", "Installing… 24%", and the G6' defect itself: after a restart
-that followed a cancelled first install with nothing placed, the base page offers Repair). Four cases
-hold on the base and guard the candidate: Cancel starts nothing and Accept starts the install, unknown
-sizes block Accept, a cancelled first install in the same session is not installed, a completed run
-shows no flow. In BrainInstall.focus-lockdown.test.ts five of eight cases fail on the base by
-assertion; Escape/Cancel focus restoration and the consent's ladder cases hold there. Every modified
-file fails on the base by assertion on the changed expectation only.
+again or Cancel install, "Pause download", "Installing… 24%", "Resume Download", "resuming continues",
+no line while a part is verified, a cancelled first install in this session not offered Install AI, and
+the G6' defect itself: the base page offers Repair after a first install that stopped with nothing
+placed, and over supporting files alone). Four cases hold on the base and guard the candidate: Cancel
+starts nothing and Accept starts the install, unknown sizes block Accept, a completed run shows no flow,
+and a cancelled repair run keeps the repair classification (RS3; the base counts any file as an
+installation). In BrainInstall.focus-lockdown.test.ts 7 of 10 cases fail on the base by assertion;
+Escape/Cancel focus restoration and the two consent ladder cases hold there. Every modified file fails
+on the base by assertion.
 
 Choices this builder made inside the decisions, named for the acceptor: sizes below 1 MB in the
 consent and progress show whole KB (the decisions name MB and GB only; the loopback fixtures are KB
@@ -44,11 +48,12 @@ sized); the paused body keeps "kept on disk" and drops only the promise of conti
 note on a step whose files are on disk before AI is installed (S7b-6 "the parts already placed show as
 installed under their steps"); positive final-file evidence also counts the Engine's installedFully, a
 running ONNX model, and an Engine verdict that already implies an installation (online, offline,
-starting, indexing, background), because each is only reached from placed files; a run that just
-failed or was cancelled counts as an installation needing repair only when this page saw an installed
-AI before or the runtime runs a model (only an activated install has one). Words without an exact source (the phase lines "Preparing the download" / "Setting up the
-downloaded parts", the toast "Install cancelled. Completed parts stay on this computer.", the
-announcements) are asserted where a decision states them and otherwise by meaning. No expected value is
+starting, indexing, background), because each is only reached from placed files. Exact words: "Checking
+the downloaded files", "Setting up the downloaded parts", Cancel's toast "Install cancelled. Completed
+parts stay on this computer." and the paused body "An earlier download is paused." are asserted exactly
+from W7 (delegated choice, cited in the entries that assert them); "Preparing the download" (the line
+while a run prepares) has no exact source and no check asserts it; the spoken progress "Installing AI,
+N%" repeats fm-12's heading words "Installing AI" and its share. No expected value is
 computed by production code: the part sizes are the shipped registry's byte counts and the pictured
 words. This builder wrote no acceptance record.
 
@@ -80,6 +85,35 @@ modified older checks follow the gaps: BrainSurface.pausedInstall.test.ts (gap 2
 BrainSurface.liveRepairs.test.ts and BrainOverview.install.test.ts (gap 3) and the type-ladder census
 in src/boot/type-ladder-lockdown.test.ts (150 to 142: the fixture's Brain is a first install that runs).
 
+A third builder session (builder-fm-s7b-20261116c) repaired six review findings under the orchestrator's
+repair decisions RS1-RS6 and W7 (delegated choices, cited in the entries) and this prose after the
+acceptor's reject. Each new check failed on the previous candidate (823fb31438) by assertion for the
+reason under test and passes now: RS1 Try again sent only acceptTerms where the accepted consent had
+asked to switch Best match first on; RS2 "Installed — repair available" over a complete GPU runtime
+package with no model file; RS3 a repair run over a damaged installation found after a restart hid the
+steps, and after it failed (and Cancel install) the page said "AI isn't installed yet" and a cancelled
+one lost the repair alert; RS4 "AI isn't installed yet" after Cancel install while model presence was
+unreadable; RS5 "226 of 927 KB · about 2 min left" while a part was verified; RS6 focus lost to the page
+when the new run completed before a poll saw it running, and left on Try again after another failure or
+a refused start. The RS1 case "a choice changed since the consent wins" held on the previous candidate
+(it never sent the intent) and guards the repair.
+
+Named for the acceptor: (e) an existing installation is a final model file in model presence that the
+current or just-ended run did not place (the Engine lists the parts its plan found on disk as installed
+with no bytes to download; the run's other parts are its own), or installedFully, a running model, an
+installed verdict; so a first install that stops is not an installation in the same session and its
+steps stay hidden while it runs, while a run over files already on disk keeps the steps and the repair
+classification; (f) a package's "complete" counts as a model file only for the shipped registry's model
+packages (each has variants, and the Engine calls them complete only with a variant present; the
+unchanged BrainSurface.firstRun F2 reports them so), never for another package such as cuda-runtime;
+(g) the completion intent lives in the page: recorded at Accept with the saved choice then, sent by Try
+again while that saved choice reads the same, dropped when the person changes the choice on this page
+(its switch or a decline), on Cancel install, on Repair and when a run completes; the Engine does not
+publish it, so after a reload Try again cannot carry it; (h) with a byte count the paused body stays "N
+already downloaded is kept on disk." (unchanged BrainSurface.pausedInstall and unrequestedAi checks pin
+it), so W7's "What it downloaded is kept on disk." is not shown; without a count the body is "An earlier
+download is paused." alone; (i) a refused Try again moves focus to the stopped view's heading.
+
 ```json
 {
   "entries": [
@@ -90,7 +124,7 @@ in src/boot/type-ladder-lockdown.test.ts (150 to 142: the fixture's Brain is a f
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "AI Brain's install flow rendered from the Engine's recorded statuses: the consent's five parts with page names, sizes, licences and Terms, Cancel starting nothing and Accept starting the install, \"Up to\" with staged bytes (S7b-1); unknown sizes and a missing manifest block Accept with a reason, a missing licence says so (S7b-10); progress heading, amounts, time left only when estimated, Done only after model presence observed after the part's last file, Waiting or a stage's refusal reason (S7b-2); Pause/Resume words and Cancel's toast without a promise of continuing (S7b-3); the stopped view with Done/Stopped/Waiting, Try again, Cancel install and Detail for support, no red, no connection claim (S7b-4); Try again's run covering only what is missing (S7b-5); Cancel install bound to the failed run (S7b-6); not installed after a first install that stopped with nothing placed, partial-only, supporting-only, unknown presence (S7b-7, G6'); restart reconstruction (S7b-8). Bytes an earlier download left: the action is \"Install AI\" with the most it can download, named so in its accessible name, never \"Resume Download\" or a promise to continue (G4', gap 2); a first install that runs, a paused run and a stopped download show only the install view, without steps, graphics card or Advanced settings, and the steps return after completion and after Cancel install (gap 3).",
+      "behaviour": "AI Brain's install flow rendered from the Engine's recorded statuses: the consent's five parts with page names, sizes, licences and Terms, Cancel starting nothing and Accept starting the install, \"Up to\" with staged bytes (S7b-1); unknown sizes and a missing manifest block Accept with a reason, a missing licence says so (S7b-10); progress heading, amounts, time left only when estimated, Done only after model presence observed after the part's last file, Waiting or a stage's refusal reason (S7b-2); Pause/Resume words and Cancel's toast without a promise of continuing (S7b-3); the stopped view with Done/Stopped/Waiting, Try again, Cancel install and Detail for support, no red, no connection claim (S7b-4); Try again's run covering only what is missing (S7b-5); Cancel install bound to the failed run (S7b-6); not installed after a first install that stopped with nothing placed, partial-only, supporting-only, unknown presence (S7b-7, G6'); restart reconstruction (S7b-8). Bytes an earlier download left: the action is \"Install AI\" with the most it can download, named so in its accessible name, never \"Resume Download\" or a promise to continue (G4', gap 2); a first install that runs, a paused run and a stopped download show only the install view, without steps, graphics card or Advanced settings, and the steps return after completion and after Cancel install (gap 3). Review repairs: Try again after a failed Best match first download asks the Engine to switch it on when done, as the consent accepted, and not when that choice was saved differently since (RS1); after a restart a complete GPU runtime package with no model file is not an installation (RS2); a damaged installation found on disk after a restart offers Repair, its repair run keeps the steps, and a failed (after Cancel install) or cancelled repair run keeps the repair classification (RS3); after Cancel install with model presence unreadable the page says it is checking, not \"AI isn't installed yet\", until presence resolves (RS4); a part the Engine reports verifying, in the download phase, reads \"Checking the downloaded files\" with no time left (RS5, W7).",
       "sources": [
         {
           "kind": "owner-words",
@@ -187,6 +221,54 @@ in src/boot/type-ladder-lockdown.test.ts (150 to 142: the fixture's Brain is a f
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator, 2026-11-16, gap 3: \"fm-12 and fm-12b show only the install view (header, sentence, overall line, one row per part, buttons): the page's steps are not shown during an install or while the stopped view is shown; they return when the install view is gone (installed, cancelled, dismissed). Focus must not be lost when the view switches.\"",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "RS1 (repair decisions, 2026-11-16) Try again sends the completion intent of the accepted consent (which features the user chose to turn on when done), minus any choice the user changed since; never clears a requested feature.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "RS2 (repair decisions, 2026-11-16) Existing-installation evidence is positive presence of a final model file only; supporting-file-only packages (cuda-runtime and the like) never establish \"Installed — repair available\" (G6').",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "RS3 (repair decisions, 2026-11-16) Existing-installation status comes from the same disk evidence wherever it is used (classification, steps shown during a repair run, after failure or cancel of a repair run), never from page history; a failed or cancelled repair keeps the repair classification while the final files are unchanged.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "RS4 (repair decisions, 2026-11-16) After \"Cancel install\", unknown disk evidence stays \"unknown\" (neutral words, no \"AI isn't installed yet\") until presence resolves.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "RS5 (repair decisions, 2026-11-16) A package reported verifying (or configuring/activating) shows what is happening and no ETA, whatever the overall phase says (G3').",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "W7 (repair decisions, 2026-11-16) Words adopted, the source for exact assertions: \"Checking the downloaded files\" (verification), \"Setting up the downloaded parts\" (configuration/activation), the Cancel toast \"Install cancelled. Completed parts stay on this computer.\", and after restart with a paused download \"An earlier download is paused.\" followed by \"What it downloaded is kept on disk.\" only when the Engine reports downloaded bytes greater than 0.",
+          "label": "agent choice"
         }
       ],
       "evidence": "gates/test-intent/evidence/fm-brain-install.json",
@@ -202,7 +284,7 @@ in src/boot/type-ladder-lockdown.test.ts (150 to 142: the fixture's Brain is a f
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "In headless Chromium with the real AI state store: Escape and Cancel return focus to Install AI and Accept is reachable by Tab; Pause keeps focus as it becomes Resume and the paused words are announced politely; progress is announced once per tenth; focus moves to the heading on failure, to Pause after Try again, to the heading on completion and after Cancel install; light and dark at 600 px nothing overflows or leaves the size and corner ladders, the stopped view has no error alert, no teal bar and Try again as its only filled action; the consent stays on the ladders at 600 px. When the install view takes the page focus is not lost: after Accept and download, and from a focused step when a run starts, focus moves to Pause (gap 3).",
+      "behaviour": "In headless Chromium with the real AI state store: Escape and Cancel return focus to Install AI and Accept is reachable by Tab; Pause keeps focus as it becomes Resume and the paused words are announced politely; progress is announced once per tenth; focus moves to the heading on failure, to Pause after Try again, to the heading on completion and after Cancel install; light and dark at 600 px nothing overflows or leaves the size and corner ladders, the stopped view has no error alert, no teal bar and Try again as its only filled action; the consent stays on the ladders at 600 px. When the install view takes the page focus is not lost: after Accept and download, and from a focused step when a run starts, focus moves to Pause (gap 3). After Try again, focus is never lost: a run that completes or fails again before any poll sees it running, and a refused start, put focus on the heading (RS6).",
       "sources": [
         {
           "kind": "owner-words",
@@ -280,6 +362,14 @@ in src/boot/type-ladder-lockdown.test.ts (150 to 142: the fixture's Brain is a f
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator, 2026-11-16, gap 3: \"fm-12 and fm-12b show only the install view (header, sentence, overall line, one row per part, buttons): the page's steps are not shown during an install or while the stopped view is shown; they return when the install view is gone (installed, cancelled, dismissed). Focus must not be lost when the view switches.\"",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "RS6 (repair decisions, 2026-11-16) Pending focus after Try again resolves on every outcome: a new run, completion, another failure, or a refused request; focus goes to the view's heading or the new primary control, never lost.",
           "label": "agent choice"
         }
       ],
@@ -432,10 +522,18 @@ in src/boot/type-ladder-lockdown.test.ts (150 to 142: the fixture's Brain is a f
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "G4' Pause: since the Engine reports paused at once while the current file may still finish, the words after Pause are \"Paused. The file being downloaded may still finish.\" with Resume and Cancel; no claim of acknowledgement. Toast and post-restart promises of continuing go (aiVerdict.ts:532, BrainSurface.ts:2589, :3791).",
           "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "W7 (repair decisions, 2026-11-16) Words adopted, the source for exact assertions: \"Checking the downloaded files\" (verification), \"Setting up the downloaded parts\" (configuration/activation), the Cancel toast \"Install cancelled. Completed parts stay on this computer.\", and after restart with a paused download \"An earlier download is paused.\" followed by \"What it downloaded is kept on disk.\" only when the Engine reports downloaded bytes greater than 0.",
+          "label": "agent choice"
         }
       ],
       "conflictSearch": "decision records searched for a conflict (docs/decisions: resume, pause, consent, repair, first run): none",
-      "whatChanged": "The paused body keeps the kept amount and drops \"resuming continues from there\" / \"resuming continues from where it stopped\" (aiVerdict.ts:532)."
+      "whatChanged": "The paused body keeps the kept amount and drops \"resuming continues from there\" (aiVerdict.ts:532); without a byte count it says only \"An earlier download is paused.\" (W7: nothing is claimed as kept without reported bytes), instead of \"resuming continues from where it stopped\"."
     },
     {
       "items": [
@@ -793,6 +891,14 @@ in src/boot/type-ladder-lockdown.test.ts (150 to 142: the fixture's Brain is a f
           "removed": [
             "modules/ui-web/src/shell-v0/state/installComponents.ts#searchReadyNotice"
           ]
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "W7 (repair decisions, 2026-11-16) Words adopted, the source for exact assertions: \"Checking the downloaded files\" (verification), \"Setting up the downloaded parts\" (configuration/activation), the Cancel toast \"Install cancelled. Completed parts stay on this computer.\", and after restart with a paused download \"An earlier download is paused.\" followed by \"What it downloaded is kept on disk.\" only when the Engine reports downloaded bytes greater than 0.",
+          "label": "agent choice"
         }
       ],
       "conflictSearch": "decision records searched for a conflict (docs/decisions: resume, pause, consent, repair, first run): none",

@@ -489,3 +489,143 @@ describe('S7b-8 after a restart the page rebuilds from disk', () => {
     expect(headline(el)).not.toMatch(/stopped|Installing/);
   });
 });
+
+describe('RS1 Try again keeps what the accepted consent asked to switch on', () => {
+  // An installed AI without Best match first: its switch opens the consent for that part alone.
+  let reranker: boolean | null;
+  const failedAddition = { state: 'failed', phase: 'download', installedFully: true, repairNeeded: false, startedAtEpochMs: 1_794_800_000_000,
+    downloadedBytes: 0, totalBytes: 189_843, errorCode: 'REQUIRED_DOWNLOADS_FAILED', lastError: 'reranker: curl exit 18', message: 'AI installation failed',
+    packages: [{ packageId: 'reranker', label: 'Search reranker', stage: 'enrichment', state: 'failed', bytesDownloaded: 0, bytesTotal: 189_843 }], stages: [] };
+  function installed(status: Record<string, unknown>): AiState {
+    return { phase: 'connected', installObservationLive: true, runtimeObservationLive: true, snapshotLive: true,
+      index: { ownDocumentCount: { known: true, value: 8 } }, capabilities: { chat: false },
+      runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }, { id: 'reranker', status: 'inactive', reason: 'disabled', modelActive: false }] },
+      aiEngine: computeAiEngineVerdict({ installStatus: status as never, runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] } as never,
+        runtime: { mode: 'offline', installed: { known: true, value: true } } as never, reachable: true, snapshotLive: true, engineState: 'Down' }),
+      runtime: { mode: 'offline', installed: { known: true, value: true } }, installStatus: { ...status, updatedAtEpochMs: Date.now() } } as unknown as AiState;
+  }
+  async function acceptBestMatchFirst(): Promise<Brain> {
+    reranker = false;
+    preview = { totalDownloadBytes: 189_843, components: [
+      { id: 'embedding', label: 'Embedding model', state: 'installed', totalBytes: 173_860, downloadBytes: 0 },
+      { id: 'reranker', label: 'Search reranker', state: 'to-download', declinable: true, totalBytes: 189_843, downloadBytes: 189_843 },
+    ] } as InstallPlanPreview;
+    presence = { packages: [{ id: 'embedding', complete: true, presentVariantFiles: ['model.onnx'] }, { id: 'reranker', complete: false, presentVariantFiles: [] }] };
+    const stub = (globalThis.fetch as ReturnType<typeof vi.fn>).getMockImplementation() as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => String(input).endsWith('/api/settings/v2') && init?.method !== 'POST'
+      ? json({ ui: {}, llm: {}, rerankerEnabled: reranker, witness: { acceptedRevision: 0, lastCommittedOperationKey: null } })
+      : stub(input, init)));
+    store.current = installed({ state: 'completed', installedFully: true, startedAtEpochMs: 1_794_799_000_000 });
+    const el = await mount();
+    el.shadowRoot!.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Use Best match first"]')!.click(); await settle(el);
+    await press(el, 'Accept and download');
+    expect(operations.map(o => o.args)).toEqual([{ acceptTerms: true, enableRerankerOnCompletion: true }]);
+    return el;
+  }
+  it('a failed Best match first download: Try again asks the Engine to switch it on when done, as accepted', async () => {
+    const el = await acceptBestMatchFirst();
+    store.current = installed(failedAddition);
+    for (const listener of store.listeners) listener(store.current);
+    await settle(el);
+    expect(headline(el)).toBe('The download stopped');
+    await press(el, 'Try again');
+    expect(operations.map(o => o.id)).toEqual(['core.start-ai-install', 'core.start-ai-install']);
+    expect(operations[1]!.args).toEqual({ acceptTerms: true, enableRerankerOnCompletion: true });
+  });
+  it('a choice changed since the consent wins: Try again then does not switch it on', async () => {
+    const el = await acceptBestMatchFirst();
+    reranker = true; // saved elsewhere after the consent (another window, Settings)
+    store.current = installed(failedAddition);
+    for (const listener of store.listeners) listener(store.current);
+    await settle(el);
+    await press(el, 'Try again');
+    expect(operations[1]!.args).toEqual({ acceptTerms: true });
+  });
+});
+
+describe('RS2 supporting files alone never establish an installation (G6\')', () => {
+  it('after a restart, a complete GPU runtime package with no model file is not an installation', async () => {
+    show('restartAfterFailedNothingPlaced');
+    // The Engine reports a package of supporting files only as complete with no variant file.
+    presence = { ...ENGINE.restartAfterFailedNothingPlaced!.presence!, packages: ENGINE.restartAfterFailedNothingPlaced!.presence!.packages
+      .map(p => p.id === 'cuda-runtime' ? { ...p, complete: true, presentVariantFiles: [], missingFiles: [] } : p) };
+    const el = await mount();
+    expect(headline(el)).toBe("AI isn't installed yet");
+    expect(labels(el)).not.toContain('Repair');
+    expect(el.shadowRoot!.querySelector('[data-testid="install-repair-needed"]')).toBeNull();
+  });
+});
+
+describe('RS3 an existing installation is known from disk, not from what this page saw', () => {
+  // After a restart: the Engine's status says nothing of a run, model presence shows four parts' final
+  // files and Related words missing. Nothing on this page saw an installation before.
+  const damaged = () => { show('restartAfterFailedNothingPlaced'); presence = ENGINE.restartAfterFailed!.presence; preview = ENGINE.failedPartsMissing!.preview!; };
+  const steps = (el: Brain) => el.shadowRoot!.querySelectorAll('.path-step').length;
+  const repairRun = ENGINE.retryRunning!.status! as { startedAtEpochMs: number; packages: Array<Record<string, unknown>> } & Record<string, unknown>;
+  // The repair run as the Engine reports its end: the parts it found on disk stay installed (no bytes).
+  const ended = (state: 'failed' | 'cancelled') => ({ ...repairRun, state, phase: 'download', errorCode: state === 'failed' ? 'REQUIRED_DOWNLOADS_FAILED' : '',
+    lastError: state === 'failed' ? 'splade: curl exit 18' : '', packages: repairRun.packages.map(p => p.packageId === 'splade' ? { ...p, state: state === 'failed' ? 'failed' : 'downloading' } : p) });
+  const publishStatus = async (el: Brain, status: Record<string, unknown>) => {
+    store.current = engineState('retryRunning', status as never);
+    for (const listener of store.listeners) listener(store.current);
+    await settle(el);
+  };
+  it('Repair is offered from disk; its run keeps the steps, which say what still works', async () => {
+    damaged();
+    const el = await mount();
+    expect(headline(el)).toBe('Installed — repair available');
+    expect(el.shadowRoot!.querySelector('[data-testid="install-repair-needed"]')).not.toBeNull();
+    await publishStatus(el, repairRun);
+    expect(headline(el)).toMatch(/^Installing AI/);
+    expect(steps(el)).toBeGreaterThan(0);
+  });
+  it('a repair run that fails keeps the repair classification once its stopped view is closed', async () => {
+    damaged();
+    const el = await mount();
+    await publishStatus(el, repairRun);
+    await publishStatus(el, ended('failed'));
+    expect(headline(el)).toBe('The download stopped');
+    await press(el, 'Cancel install');
+    expect(headline(el)).toBe('Installed — repair available');
+    expect(el.shadowRoot!.querySelector('[data-testid="install-repair-needed"]')).not.toBeNull();
+  });
+  it('a repair run that is cancelled keeps the repair classification', async () => {
+    damaged();
+    const el = await mount();
+    await publishStatus(el, repairRun);
+    await publishStatus(el, ended('cancelled'));
+    expect(headline(el)).not.toMatch(/isn't installed/);
+    expect(el.shadowRoot!.querySelector('[data-testid="install-repair-needed"]')).not.toBeNull();
+  });
+});
+
+describe('RS4 after Cancel install, unknown disk evidence stays unknown', () => {
+  it('model presence unreadable: neutral words, not "AI isn\'t installed yet", until presence resolves', async () => {
+    show('failedNothingPlaced');
+    const stub = (globalThis.fetch as ReturnType<typeof vi.fn>).getMockImplementation() as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+    let readable = false;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) =>
+      String(input).endsWith('/api/ai/models/status') && !readable ? json({}, 503) : stub(input, init)));
+    const el = await mount();
+    expect(headline(el)).toBe('The download stopped');
+    await press(el, 'Cancel install');
+    expect(headline(el)).toBe('Checking AI status…');
+    expect(words(panel(el))).not.toMatch(/isn't installed/);
+    readable = true;
+    window.dispatchEvent(new Event('focus')); await settle(el);
+    expect(headline(el)).toBe("AI isn't installed yet");
+  });
+});
+
+describe('RS5 a part being verified shows what is happening and no time left (G3\')', () => {
+  it('a package the Engine reports verifying, in the download phase: "Checking the downloaded files", no estimate', async () => {
+    const status = structuredClone(ENGINE.runningRetrying!.status!) as { phase: string; remainingSeconds: number; packages: Array<{ packageId: string; state: string }> };
+    status.packages.find(p => p.packageId === 'splade')!.state = 'verifying';
+    expect(status.phase).toBe('download');
+    expect(status.remainingSeconds).toBeGreaterThan(0);
+    show('runningRetrying'); store.current = engineState('runningRetrying', status as never);
+    const el = await mount();
+    expect(words(el.shadowRoot!.querySelector('.flow-line'))).toBe('Checking the downloaded files');
+    expect(words(panel(el))).not.toMatch(/min left/);
+  });
+});

@@ -81,7 +81,30 @@ export function phaseWords(phase: string | null | undefined): string | null {
   }
 }
 
+/**
+ * RS5 (G3') — what a running install is doing when it is not moving bytes. The Engine marks a part
+ * `verifying` while leaving the run's phase at `download`, so a verifying part speaks first.
+ */
+export function runActivity(status: AiInstallStatus | null | undefined): string | null {
+  if (status?.state !== 'running') return null;
+  if ((status.packages ?? []).some(p => p.state === 'verifying')) return 'Checking the downloaded files';
+  return phaseWords(status.phase);
+}
+
 export interface ModelPresencePart { id: string; complete: boolean; presentVariantFiles?: string[] }
+
+/** The shipped registry's packages that carry a model file (each has variants; cuda-runtime has none). */
+const MODEL_PACKAGES = new Set([...PART_ORDER, 'chat-compact']);
+
+/**
+ * RS2 (G6') — a final model file of this package is on this computer: model presence lists a variant
+ * file, or reports complete a package that carries a model (the Engine calls such a package complete
+ * only with a variant file present). A package of supporting files only, such as the GPU runtime, is
+ * complete without any model file and never counts.
+ */
+export function modelFilePresent(part: ModelPresencePart): boolean {
+  return (part.presentVariantFiles?.length ?? 0) > 0 || (part.complete === true && MODEL_PACKAGES.has(part.id));
+}
 
 /** When the page saw each part reported installed, and when its last model-presence request began. */
 export interface DoneEvidence {

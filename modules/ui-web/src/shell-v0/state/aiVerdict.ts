@@ -527,10 +527,11 @@ export function aiEngineBody(v: AiEngineVerdict): string {
     case 'paused':
       // The number is the whole point: the bytes stayed, and the idle surface shows that they did.
       // G4' (slice 7b) — whether a later download reuses them is not guaranteed, so nothing here
-      // promises that it continues from them.
+      // promises that it continues from them. W7 — without a reported byte count nothing is claimed
+      // as kept.
       return v.resumableBytes && v.resumableBytes > 0
         ? `${formatBytes(v.resumableBytes)} already downloaded is kept on disk.`
-        : 'An earlier download is paused. What it downloaded is kept on disk.';
+        : 'An earlier download is paused.';
     case 'installing':
       return 'Downloading models.';
     case 'install_failed':

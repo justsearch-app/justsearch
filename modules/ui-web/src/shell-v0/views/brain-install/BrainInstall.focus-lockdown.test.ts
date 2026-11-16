@@ -15,7 +15,7 @@ let server: ViteDevServer, browserServer: BrowserServer, browser: Browser, conte
 let output: string, url: string;
 let engine: Record<string, Recorded>;
 let liveStatus: unknown;
-declare global { interface Window { mountBrain(): Promise<void>; readInstall(): Promise<void>; brainCalls: string[]; spoken: string[] } }
+declare global { interface Window { mountBrain(): Promise<void>; readInstall(): Promise<void>; brainCalls: string[]; spoken: string[]; refuseStart?: boolean } }
 
 beforeAll(async () => {
   engine = JSON.parse(await readFile(path.resolve('src/shell-v0/views/brain-install/__fixtures__/engine-install-statuses.json'), 'utf8'));
@@ -43,7 +43,9 @@ beforeAll(async () => {
           window.mountBrain = async () => {
             startAiStateStore('');
             const brain = document.createElement('jf-brain-surface'); brain.apiBase = '';
-            brain.host_ = createMockHostApi({ data: { invokeOperation: async id => { window.brainCalls.push(id); return { success: true, structuredData: { state: 'running' } }; } } });
+            brain.host_ = createMockHostApi({ data: { invokeOperation: async id => { window.brainCalls.push(id);
+              if (window.refuseStart && id === 'core.start-ai-install') throw new Error('AI install is already running.');
+              return { success: true, structuredData: { state: 'running' } }; } } });
             document.querySelector('#host').append(brain);
             await brain.updateComplete;
             // What a screen reader hears from the page's polite status region, change by change.
@@ -244,6 +246,32 @@ it('focus follows the flow: a failure to its heading, Try again to Pause, comple
   await page.keyboard.press('Enter');
   await expect.poll(() => heading(page).textContent()).not.toBe('The download stopped');
   await expect.poll(() => focused(page)).toBe(await heading(page).textContent());
+}, 60_000);
+
+it('RS6 focus after Try again resolves on every outcome: completion, another failure, a refused request', async () => {
+  const { page, engine: state } = await open('failedPartsMissing');
+  const tryAgain = async () => {
+    await expect.poll(() => heading(page).textContent()).toBe('The download stopped');
+    await page.getByRole('button', { name: 'Try again' }).focus();
+    await page.keyboard.press('Enter');
+  };
+  // The new run completes before any poll sees it running: focus goes to the heading.
+  await tryAgain();
+  await expect.poll(() => page.evaluate(() => window.brainCalls)).toEqual(['core.start-ai-install']);
+  await publish(page, state, 'completed');
+  await expect.poll(() => page.getByRole('button', { name: 'Try again' }).count()).toBe(0);
+  await expect.poll(() => focused(page), { message: 'focus after completion' }).toBe(await heading(page).textContent());
+  // The new run fails before any poll sees it running: focus goes to the stopped view's heading.
+  await publish(page, state, 'failedPartsMissing', { startedAtEpochMs: Date.now() });
+  await tryAgain();
+  await expect.poll(() => page.evaluate(() => window.brainCalls.length)).toBe(2);
+  await publish(page, state, 'failedPartsMissing', { startedAtEpochMs: Date.now() + 1 });
+  await expect.poll(() => focused(page), { message: 'focus after another failure' }).toBe('The download stopped');
+  // The Engine refuses the start: the stopped view stays and focus goes to its heading.
+  await page.evaluate(() => { window.refuseStart = true; });
+  await tryAgain();
+  await expect.poll(() => page.evaluate(() => window.brainCalls.length)).toBe(3);
+  await expect.poll(() => focused(page), { message: 'focus after a refused start' }).toBe('The download stopped');
 }, 60_000);
 
 /**

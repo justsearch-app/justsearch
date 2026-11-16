@@ -575,7 +575,8 @@ describe('presentAiEngineVerdict (Design pass 3 — the presentation projection)
 
   it('paused without a byte count still says the download is paused, never invents a number', () => {
     const p = presentAiEngineVerdict(verdictFor('paused'));
-    expect(p.body).toBe('An earlier download is paused. What it downloaded is kept on disk.');
+    // W7 — "What it downloaded is kept on disk." only with downloaded bytes reported.
+    expect(p.body).toBe('An earlier download is paused.');
   });
 
   it('install_failed says in words what went wrong and what to do; the service\'s own text is not the body (FC11)', () => {

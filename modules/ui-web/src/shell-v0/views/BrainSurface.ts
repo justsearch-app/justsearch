@@ -76,7 +76,8 @@ import {
   formatTimeLeft,
   formatTotalSize,
   partName,
-  phaseWords,
+  modelFilePresent,
+  runActivity,
   stoppedRunId,
   dismissStoppedRun,
   dismissedStoppedRun,
@@ -723,12 +724,15 @@ export class BrainSurface extends JfElement {
   private presenceRequestedAt: number | null = null;
   private presenceInFlight = false;
   private presenceAgain = false;
-  /** Whether this page saw an installed AI before a run ended without it (an existing installation). */
-  private installedEarlier = false;
   private installFlowView: string | null = null;
   private installFlowFocus: 'headline' | 'pause' | null = null;
-  /** The stopped run "Try again" left: focus waits for a run other than it. */
+  /** The stopped view "Try again" left (its flow id): focus waits only while it still stands. */
   private retryFrom: string | null = null;
+  /**
+   * RS1 — what the accepted consent asked the Engine to switch on once its download is done, with the
+   * saved choice at that moment. "Try again" asks the same unless that choice changed since.
+   */
+  private completionIntent: { feature: 'reranker' | 'pictures' | 'chat'; choice: boolean | null } | null = null;
   private installAnnouncementKey = '';
   private installAnnouncement = '';
   private focusHeadlineVisit = 0;
@@ -1416,16 +1420,12 @@ export class BrainSurface extends JfElement {
       // conditionally-armed pollInstall/pollPack/pollRuntime timers (which only ever self-armed
       // AFTER a prior fetch had already succeeded — the structural cause of the "stuck on
       // Connecting… forever" bug, tempdoc 663 §O). Same non-null-adopt rule as inference/status.
-      // A running model exists only after an activated install, so it marks an existing installation too.
-      if (s.installStatus?.installedFully === true || s.runtime?.installed?.known === true && s.runtime.installed.value
-        || s.runtimeStatus?.onnxFeatures?.some(f => f.modelActive === true) === true
-        || ['online', 'background', 'indexing', 'starting', 'offline'].includes(s.aiEngine?.kind ?? '')) {
-        this.installedEarlier = true;
-      }
       if (s.installStatus) {
         const previous = this.installStatus;
         this.installStatus = s.installStatus;
         this.observeInstallParts(s.installStatus);
+        // RS1 — a completed run has done what its consent asked; nothing is left to try again.
+        if (s.installStatus.state === 'completed') this.completionIntent = null;
         if ((previous?.state !== s.installStatus.state && previous != null)
           || (previous?.phase === 'activation_required' && s.installStatus.phase !== 'activation_required')) {
           void this.refreshInstallPlanPreview();
@@ -1555,11 +1555,20 @@ export class BrainSurface extends JfElement {
   /** 574 §22.G — drive the modal contract from the declarative `installConsentOpen` state. */
   protected override updated(changed: Map<string, unknown>): void {
     super.updated(changed);
-    const flow = this.installFlowFocus === 'pause' ? this.installFlow() : null;
-    const waiting = this.installFlowFocus === 'pause' && this.retryFrom !== null
-      && !(flow?.view === 'running' && flow.id !== this.retryFrom);
+    let waiting = false;
+    if (this.installFlowFocus === 'pause' && this.retryFrom !== null) {
+      // RS6 — after "Try again", focus waits while the run it left still stands (its stopped view, or
+      // that run shown as starting while the request is out); any other outcome resolves it: a new
+      // run to Pause, completion or another failure to the heading.
+      const flow = this.installFlow();
+      const left = flow?.view === 'stopped' ? flow.id : flow?.view === 'running' ? `${flow.id}:failed` : null;
+      waiting = left === this.retryFrom;
+      if (!waiting) {
+        if (flow?.view !== 'running') this.installFlowFocus = 'headline';
+        this.retryFrom = null;
+      }
+    }
     if (this.installFlowFocus && !waiting) {
-      this.retryFrom = null;
       const target = this.installFlowFocus === 'pause'
         ? this.shadowRoot?.querySelector<HTMLElement & { updateComplete?: Promise<boolean> }>('jf-button.flow-pause')
         : this.shadowRoot?.querySelector<HTMLElement & { updateComplete?: Promise<boolean> }>('.brain-headline');
@@ -1760,7 +1769,7 @@ export class BrainSurface extends JfElement {
 
   private hasInstalledAi(): boolean {
     // A first install that runs has files still to come, not an installed AI missing a file (AM4).
-    const firstInstallRunning = this.installStatus?.state === 'running' && this.installStatus.installedFully !== true;
+    const firstInstallRunning = this.installStatus?.state === 'running' && this.existingInstallation() !== true;
     return this.installStatus?.installedFully === true
       || (!firstInstallRunning && this.repairEvidence())
       || ['online', 'background', 'indexing', 'starting', 'offline'].includes(this._unifiedAiState?.aiEngine?.kind ?? '')
@@ -1789,32 +1798,34 @@ export class BrainSurface extends JfElement {
     return remedy.kind !== 'none' && this.repairEvidence() ? remedy : { kind: 'none' };
   }
 
-  /**
-   * G6' — a repair is owed only to an installation: a final model file is on this computer (not a
-   * staged `.partial`, not supporting files alone). A run that just ended (failed or cancelled) counts
-   * its own missing files as needing repair; that says nothing of an installation unless this page
-   * saw one before, so a first install that stopped stays "not installed".
-   */
+  /** G6' — a repair is owed only to an existing installation; a missing file alone says nothing of one. */
   private repairEvidence(): boolean {
     const status = this.installStatus;
     if (status?.repairNeeded !== true && deriveRepairRemedy(status).kind !== 'manual') return false;
-    if (this.finalFilePresent() !== true) return false;
-    return !(status?.state === 'failed' || status?.state === 'cancelled') || this.installedEarlier;
+    return this.existingInstallation() === true;
   }
 
   /**
-   * A final model file on disk: the Engine's model presence lists one, the Engine's file-level
-   * completeness says an install completed (`installedFully`), or the runtime runs a model, which it
-   * loads only from a placed file (as the Engine verdicts of an installed AI say). Null while none of
-   * them is observed.
+   * RS2/RS3 (G6') — an existing installation, from what is on disk now, the same wherever the page
+   * asks (its heading, Repair, the steps during a run, after a run failed or was cancelled): a final
+   * model file in the Engine's model presence (`modelFilePresent`: supporting files alone, such as the
+   * GPU runtime's, never count), or the Engine's own evidence of one (`installedFully`, a running
+   * model, a verdict of an installed AI). A file the current or just-ended run placed is not an
+   * earlier installation: the Engine lists the parts its plan found already on disk as installed with
+   * no bytes to download, and every other part of the run as its own. Null while model presence is
+   * not observed.
    */
-  private finalFilePresent(): boolean | null {
+  private existingInstallation(): boolean | null {
     if (this.installStatus?.installedFully === true
       || this.runtimeStatus?.onnxFeatures?.some(f => f.modelActive === true)
       || ['online', 'background', 'indexing', 'starting', 'offline'].includes(this._unifiedAiState?.aiEngine?.kind ?? '')) return true;
     const packages = this.modelPresence?.packages;
     if (!packages) return null;
-    return packages.some(p => p.complete || (p.presentVariantFiles?.length ?? 0) > 0);
+    const status = this.installStatus;
+    const runOwn = status?.state === 'running' || status?.state === 'failed' || status?.state === 'cancelled';
+    const placedByRun = (id: string) => runOwn && (status?.packages ?? []).some(p => p.packageId === id
+      && p.state !== 'skipped' && !(p.state === 'installed' && (p.bytesTotal ?? 0) === 0));
+    return packages.some(p => modelFilePresent(p) && !placedByRun(p.id));
   }
 
   private doneEvidence(): DoneEvidence {
@@ -1875,7 +1886,7 @@ export class BrainSurface extends JfElement {
    */
   private installViewAlone(flow = this.installFlow()): boolean {
     if (flow?.view === 'stopped') return true;
-    return flow?.view === 'running' && this.installStatus?.installedFully !== true && !this.installedEarlier;
+    return flow?.view === 'running' && this.existingInstallation() !== true;
   }
 
   /** The install flow the page draws: a run (fm-12), a stopped download (fm-12b), or none. */
@@ -2700,8 +2711,15 @@ export class BrainSurface extends JfElement {
     } finally { --this.planReads; }
   }
 
+  /** RS1 — a choice the person makes on this page after the consent replaces its completion intent. */
+  private dropCompletionIntent(...features: Array<'reranker' | 'pictures' | 'chat'>): void {
+    if (this.completionIntent && features.includes(this.completionIntent.feature)) this.completionIntent = null;
+  }
+
   private async setComponentDeclined(id: string, declined: boolean): Promise<void> {
     if (this.planLockReason()) return;
+    if (id === 'reranker') this.dropCompletionIntent('reranker');
+    if (id === 'chat') this.dropCompletionIntent('chat', 'pictures');
     ++this.choiceRevision;
     ++this.planRevision; // invalidate a preview requested before this choice
     await this.withBusy(`component:${id}`, async () => {
@@ -2746,6 +2764,8 @@ export class BrainSurface extends JfElement {
     const planDigest = include.length > 0 ? this.planPreview?.planDigest ?? '' : '';
     this.consentInclude = [];
     this.installConsentOpen = false;
+    this.completionIntent = feature === 'reranker' || feature === 'pictures' || feature === 'chat'
+      ? { feature, choice: this.savedCompletionChoice(feature) } : null;
     await this.withBusy('install-start', async () => {
       this.runtimeError = null;
       const data = (await this.invokeOp('core.start-ai-install', { acceptTerms: true,
@@ -2811,17 +2831,37 @@ export class BrainSurface extends JfElement {
    */
   private async retryInstall(): Promise<void> {
     if (this.installStatus?.state === 'running' || this.pendingActions.size > 0 || this.removalRunning()) return;
+    const flow = this.installFlow();
+    if (flow?.view !== 'stopped') return;
     this.installFlowFocus = 'pause';
-    this.retryFrom = `${this.installStatus?.startedAtEpochMs ?? 0}`;
-    await this.withBusy('install-start', async () => {
+    this.retryFrom = flow.id;
+    // RS1 — the accepted consent's completion intent, unless its choice was saved differently since.
+    const intent = this.completionIntent;
+    const keep = intent !== null && this.savedCompletionChoice(intent.feature) === intent.choice;
+    const data = await this.withBusy('install-start', async () => {
       this.runtimeError = null;
-      const data = (await this.invokeOp('core.start-ai-install', { acceptTerms: true })) as InstallStatus;
-      if (data) void refreshAiInstallNow();
-      else {
-        this.installFlowFocus = null;
-        this.retryFrom = null;
-      }
+      const started = (await this.invokeOp('core.start-ai-install', { acceptTerms: true,
+        ...(keep && intent.feature === 'reranker' ? { enableRerankerOnCompletion: true } : {}),
+        ...(keep && intent.feature === 'pictures' ? { enablePictureReadingOnCompletion: true } : {}),
+        ...(keep && intent.feature === 'chat' ? { enableChatOnCompletion: true } : {}),
+      })) as InstallStatus;
+      if (started) void refreshAiInstallNow();
+      return started;
     });
+    if (!keep) this.completionIntent = null;
+    if (!data && this.retryFrom === flow.id) {
+      // RS6 — refused: the stopped view stays, and focus goes to its heading.
+      this.installFlowFocus = 'headline';
+      this.retryFrom = null;
+      this.requestUpdate();
+    }
+  }
+
+  /** RS1 — the saved choice a completion enable is for, as this page last read it (null: unknown). */
+  private savedCompletionChoice(feature: 'reranker' | 'pictures' | 'chat'): boolean | null {
+    if (feature === 'reranker') return this.rerankerSettings?.rerankerEnabled ?? null;
+    if (feature === 'pictures') return this.rerankerSettings?.pictureReadingEnabled ?? null;
+    return this.settings?.chatEnabled ?? null;
   }
 
   /** G5' — closes this failed run's stopped view; the page then says what is on disk. */
@@ -2829,6 +2869,8 @@ export class BrainSurface extends JfElement {
     const flow = this.installFlow();
     if (flow?.view !== 'stopped') return;
     dismissStoppedRun(flow.id);
+    // "Cancel install" ends what that consent asked for; a later install asks again.
+    this.completionIntent = null;
     this.installFlowFocus = 'headline';
     void this.refreshInstallPlanPreview();
   }
@@ -2848,6 +2890,7 @@ export class BrainSurface extends JfElement {
         confirmLabel: 'Repair',
       });
       if (!ok) return;
+      this.completionIntent = null;
       const data = (await this.invokeOp('core.repair-ai-install', { acceptTerms: true })) as InstallStatus;
       if (data) void refreshAiInstallNow();
     });
@@ -2871,6 +2914,7 @@ export class BrainSurface extends JfElement {
    * legal escape action from every state (offline / indexing / background), so there is no dead button.
    */
   private async setChatEnabled(enabled: boolean): Promise<void> {
+    this.dropCompletionIntent('chat');
     await this.withBusy('inference-switch', async () => {
       this.runtimeError = null;
       ++this.choiceRevision;
@@ -2892,6 +2936,7 @@ export class BrainSurface extends JfElement {
   }
 
   private async setPictureReadingEnabled(enabled: boolean): Promise<void> {
+    this.dropCompletionIntent('pictures');
     await this.withBusy('picture-switch', async () => {
       this.runtimeError = null;
       ++this.choiceRevision;
@@ -2917,6 +2962,7 @@ export class BrainSurface extends JfElement {
   }
 
   private async setRerankerEnabled(enabled: boolean): Promise<void> {
+    this.dropCompletionIntent('reranker');
     await this.withBusy('reranker-switch', async () => {
       this.runtimeError = null;
       ++this.choiceRevision;
@@ -3356,7 +3402,8 @@ export class BrainSurface extends JfElement {
       if (aiState === 'installing') return [pct !== null ? `${sc.label} · ${pct}%` : sc.label, sc.sub];
       if (failed || aiState === 'paused') return [sc.label, sc.sub];
       // G6' — a missing file is owed a repair only with a final file on disk; unobserved, nothing is said.
-      if (!installed && this.installStatus?.repairNeeded === true && this.finalFilePresent() === null && !dismissed) {
+      // RS4 — after "Cancel install" too: unobserved disk evidence is not "not installed".
+      if (!installed && (this.installStatus?.repairNeeded === true || dismissed) && this.existingInstallation() === null) {
         return ['Checking AI status…', 'Waiting for live install and AI observations.'];
       }
       if (activationRequired) return ['Downloaded — activation required', sc.sub];
@@ -3865,7 +3912,7 @@ export class BrainSurface extends JfElement {
     const done = status?.downloadedBytes ?? 0;
     const total = status?.totalBytes ?? 0;
     const amounts = total > 0 && !pending ? formatAmountOf(done, total, 'total') : null;
-    const doing = stopped ? null : phaseWords(status?.state === 'running' ? status.phase : null);
+    const doing = stopped ? null : runActivity(status);
     const left = stopped || paused || doing ? null : formatTimeLeft(status?.remainingSeconds);
     const line = doing ?? (amounts ? `${amounts}${left ? ` · ${left}` : ''}` : null);
     const failure = stopped ? (status?.lastError || status?.message || '').trim() : '';
