@@ -63,7 +63,9 @@ describe('R1 notice precedence', () => {
     // Opened by mouse; the pointer stays on the pill.
     trigger().click(); await flush();
     trigger().dispatchEvent(new MouseEvent('mouseenter')); await flush();
-    expect(header()).toContain('1 need you');
+    // Slice 8 (fm-15, H1): no counts in the header; the one request is listed under Needs you.
+    expect(panel().shadowRoot!.querySelectorAll('section[aria-label="Needs you"] article')).toHaveLength(1);
+    expect(panel().shadowRoot!.querySelector('.header')!.textContent).not.toMatch(/need you/);
     await vi.advanceTimersByTimeAsync(7_000); await flush();
     expect(notice()).toBeNull();
     await vi.advanceTimersByTimeAsync(60_000); await flush();

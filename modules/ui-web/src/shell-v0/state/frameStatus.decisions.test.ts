@@ -20,7 +20,8 @@ const grant = (grantId: string, action: string, ms: number, transport = 'APPROVA
 const operation = (id: string, outcome: string, ms: number, pendingId?: string): BackendLedgerEntry => ({ id: `operation:${id}`,
   kind: 'operation', occurredAt: at(ms), originator: 'agent', transport: 'MCP', operationId: 'core.reindex', outcome,
   ...(pendingId ? { pendingId } : {}) } as BackendLedgerEntry);
-const earlier = (rows: BackendLedgerEntry[]) => deriveFrameStatus({ ai: null, now, contactLostAt: null,
+// Slice 8 (fm-15, H4'): decision history is what Settings › Advanced › Show developer tools shows.
+const earlier = (rows: BackendLedgerEntry[]) => deriveFrameStatus({ ai: null, now, contactLostAt: null, developer: true,
   activity: unifiedActivity(rows, []) }).sections.earlier.map(row => ({ title: row.title, detail: row.detail, tone: row.tone }));
 
 it('L16 one Allow is one Earlier row showing its latest state', () => {

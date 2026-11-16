@@ -86,9 +86,9 @@ describe('frame status projection', () => {
       installObservationLive: true, aiEngine: { kind: 'installing', stability: { kind: 'settled' }, installFailure: null } }) });
     const install = result.sections.running.find(row => row.id === 'ai-install')!;
     expect(install.percent).toBe(50);
-    expect(install.actions).toContainEqual({ kind: 'install-toggle', target: 'pause', label: 'Pause download' });
+    expect(install.actions).toContainEqual({ kind: 'install-toggle', target: 'pause', label: 'Pause' });
     const paused = derive({ ai: ai({ installStatus: { state: 'running', paused: true }, installObservationLive: true }) });
-    expect(paused.sections.running.find(row => row.id === 'ai-install')!.actions).toContainEqual({ kind: 'install-toggle', target: 'resume', label: 'Resume download' });
+    expect(paused.sections.running.find(row => row.id === 'ai-install')!.actions).toContainEqual({ kind: 'install-toggle', target: 'resume', label: 'Resume' });
   });
   it('ref-09 agent request deadlines read as their consequence relative to now, never as a raw time', () => {
     const expiresAt = new Date(now + 4 * 60_000).toISOString();
@@ -265,10 +265,13 @@ describe('concurrent source facts', () => {
     const m = derive({ ai: ai({ activity: { state: 'generating' } as unknown as AiState['activity'], stability: { kind: 'provisional', cause: 'rebuilding' } as AiState['stability'] }),
       roots: [{ pathHash: 'notes', collection: 'Notes', status: 'indexing', inFlightCount: 3, fileCount: 8 } as NonNullable<FrameStatusInput['roots']>[number]], rootsLive: false,
       presence: { live: false, runs: [{ sessionId: 'agent1', state: 'RUNNING' } as NonNullable<FrameStatusInput['presence']>['runs'][number]] } });
-    expect(m.sections.running.map(f => f.id)).toEqual(['rebuilding', 'answering', 'background:agent1', 'folder-work:notes']);
+    // Slice 8 (H3''): the panel reads a folder with Library's inputs, so during a rebuild the folder is
+    // unconfirmed (Library says "Rebuilding…") and its row does not claim reading; the rebuild row speaks.
+    expect(m.sections.running.map(f => f.id)).toEqual(['rebuilding', 'answering', 'background:agent1']);
     expect(m.pill.label).toContain('Rebuilding search');
-    expect(m.sections.running.find(f => f.id === 'folder-work:notes')!.stale).toBe(true);
     expect(m.sections.running.find(f => f.id === 'background:agent1')!.stale).toBe(true);
+    const settled = derive({ ai: ai(), roots: [{ pathHash: 'notes', collection: 'Notes', status: 'indexing', inFlightCount: 3, fileCount: 8 } as NonNullable<FrameStatusInput['roots']>[number]], rootsLive: false });
+    expect(settled.sections.running.find(f => f.id === 'folder-work:notes')!.stale).toBe(true);
   });
   it('ST7 Earlier orders advisories and completed operations newest first regardless of read state', () => {
     const read = advisory(true); const unread = { ...advisory(), key: 'older', event: { ...read.event, occurredAt: '2025-01-01T00:00:00Z' } };
@@ -298,7 +301,10 @@ describe('round 7 repairs', () => {
   it('R3 permission rows read in plain words, never the raw grant action', () => {
     const entry = (action: string) => ({ id: `g-${action}`, source: 'backend' as const, kind: 'grant', occurredAt: '2026-11-03T10:00:00Z',
       originator: 'user' as never, label: `grant ${action} Search Index`, grant: { action, subject: 'Search Index' } });
-    const rows = derive({ activity: ['ISSUED', 'CONSUMED', 'REVOKED', 'EXPIRED'].map(entry) }).sections.earlier;
+    // Slice 8 (H4', RV8-3): successful permission history (issued, used) shows with developer tools; the
+    // default panel keeps withdrawn and expired permissions.
+    expect(derive({ activity: ['ISSUED', 'CONSUMED', 'REVOKED', 'EXPIRED'].map(entry) }).sections.earlier.map(r => r.detail)).toEqual(['Withdrawn', 'Expired']);
+    const rows = derive({ activity: ['ISSUED', 'CONSUMED', 'REVOKED', 'EXPIRED'].map(entry), developer: true }).sections.earlier;
     expect(rows.map(r => r.detail)).toEqual(expect.arrayContaining(['Allowed', 'Used', 'Withdrawn', 'Expired']));
     for (const row of rows) {
       expect(row.title).toBe('Permission for Search Index');

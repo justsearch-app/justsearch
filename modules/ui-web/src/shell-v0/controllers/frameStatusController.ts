@@ -3,7 +3,8 @@ import { setFirstUseRoots, getFirstUse, subscribeFirstUse } from '../state/first
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
 import { stoppedInstall, subscribeStoppedRun } from '../state/installFlow.js';
-import { deriveFrameStatus, spokenStatus, completedLongWork, transientPlacement, FINISHED_DWELL_MS, type FrameStatus, type Spoken, type StatusFact, type DurableStatusOperation } from '../state/frameStatus.js';
+import { deriveFrameStatus, spokenStatus, completedLongWork, transientPlacement, FINISHED_DWELL_MS, type FrameStatus, type Spoken, type StatusFact, type DurableStatusOperation, type FolderMemory } from '../state/frameStatus.js';
+import { getShowDeveloperTools, subscribeShowDeveloperTools } from '../state/developerToolsState.js';
 import { subscribeTasks, listTasks, completeTask } from '../substrates/tasks/index.js';
 import { subscribePending, listPending } from '../substrates/pending-effects/index.js';
 import { subscribeConsent, listPendingConsentRequests } from '../substrates/consent/index.js';
@@ -97,6 +98,11 @@ export class FrameStatusController implements ReactiveController {
   private readonly retiredFailures = new Set<string>();
   private roots: readonly IndexedRootView[] = [];
   private rootsLive = false;
+  private lastKnownFailed: Readonly<Record<string, number>> = {};
+  /** S8 H3'' — what this window saw of each folder; a profile switch or a new Engine process starts it again. */
+  private folders: FolderMemory = new Map();
+  /** S8 H4' — Settings › Advanced › Show developer tools (the existing per-profile preference). */
+  developer = getShowDeveloperTools();
   private readonly rootPaths = new Map<string, string>();
   private lastRemoteStamp: number | null = null;
   private remoteBusy = false;
@@ -147,7 +153,9 @@ export class FrameStatusController implements ReactiveController {
       onStatusBarChange(() => this.host.requestUpdate()), subscribeFirstUse(() => this.refresh()),
       subscribeIndexedRoots(() => this.observeRoots()), subscribeSeenCursor(() => this.refresh()),
       subscribeStatusEpoch(() => this.invalidateRemote()), subscribeStoppedRun(() => this.refresh()),
-      subscribeProfileSwitch(() => this.invalidateRemote())];
+      subscribeProfileSwitch(() => this.invalidateRemote()),
+      subscribeShowDeveloperTools(show => { this.developer = show; this.refresh(); })];
+    this.developer = getShowDeveloperTools();
     this.observeRoots();
     this.timer = setInterval(() => this.refresh(), 1_000);
     this.stopFocusWatch = onWindowFocusChange(() => { this.focusChanges++; this.refresh(); void this.readRemote(); });
@@ -256,6 +264,7 @@ export class FrameStatusController implements ReactiveController {
     const observation = getIndexedRoots();
     this.roots = observation.roots;
     this.rootsLive = observation.confirmed;
+    this.lastKnownFailed = observation.lastKnownFailed ?? {};
     this.rootPaths.clear();
     for (const [hash, path] of Object.entries(observation.paths)) this.rootPaths.set(hash, path);
     setFirstUseRoots(observation.confirmed ? observation.roots : null, this.rootPaths);
@@ -267,6 +276,7 @@ export class FrameStatusController implements ReactiveController {
     this.remoteBusy = false;
     this.presence = []; this.presenceLive = false; this.presenceAtMs = null;
     this.operations.clear(); this.deadlines.clear(); this.activity = [];
+    this.folders = new Map();
     this.observeRoots();
     void this.readRemote();
   }
@@ -414,6 +424,7 @@ export class FrameStatusController implements ReactiveController {
       consents: listPendingConsentRequests().map(c => ({ id: String(c.id), pluginId: c.contributorId, capability: c.capability })),
       gettingStarted: getFirstUse(), update: getAppUpdateStatus(), conditions: this.conditions, finished: this.finished,
       roots: this.roots, rootPaths: this.rootPaths, rootsLive: this.rootsLive && !!this.ai?.indexingStatusLive,
+      folders: this.folders, lastKnownFailed: this.lastKnownFailed, developer: this.developer,
       activity: this.activity, withdrawn: withdrawnAuthorizations(), presence: { runs: this.presence, live: this.presenceLive && !!this.ai?.snapshotLive }, operations: [...this.operations.values()],
       installFlow: stoppedInstall(this.ai?.installStatus) });
     let next = derive();
@@ -537,6 +548,7 @@ export class FrameStatusController implements ReactiveController {
       ...(this.presenceLive && this.ai?.snapshotLive ? ['presence'] : []),
       ...[...this.operations.values()].filter(o => o.fresh && o.outcome).map(o => `operation:${o.id}`)]);
     this.model = next;
+    this.folders = next.folders ?? this.folders;
     // S5c — the engine-loss treatment follows this pill's own decision, after the same grace, and
     // ends a restart on the first contact with the engine after it was asked for.
     reportEngineReachability(next.pill.kind === 'unreachable', this.ai?.connection.lastContactMs ?? null);

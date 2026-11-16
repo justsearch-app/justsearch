@@ -38,10 +38,10 @@ it('Earlier names an expired request instead of saying approval requested', () =
   expect(model.sections.earlier[0]!.title).toBe('Denied automatically');
 });
 it('Earlier names an allowed request and retires its keyed GATED row', () => {
-  const model = deriveFrameStatus({ ai: null, now, contactLostAt: null,
-    activity: unifiedActivity([gate('request', 'allowed', 'GATED', -2000),
-      gate('allowed', 'allowed', 'APPROVED', -1000)], []),
-  });
+  const activity = unifiedActivity([gate('request', 'allowed', 'GATED', -2000), gate('allowed', 'allowed', 'APPROVED', -1000)], []);
+  // Slice 8 (fm-15, H4'): an allowed request is history developer tools show; the default panel leaves it out.
+  expect(deriveFrameStatus({ ai: null, now, contactLostAt: null, activity }).sections.earlier).toEqual([]);
+  const model = deriveFrameStatus({ ai: null, now, contactLostAt: null, developer: true, activity });
   expect(model.sections.earlier).toHaveLength(1);
   expect(model.sections.earlier[0]!.title).toContain('Allowed');
 });
@@ -67,7 +67,10 @@ it('terminal ledger outcomes remain in Earlier before the waiting snapshot is wi
     const activity = unifiedActivity([gate('request', 'answered', 'GATED', -2000),
       gate('answer', 'answered', disposition, -1000)], []);
     for (const authorizations of [[{ pendingId: 'answered', operationId: 'core.apply-excludes' }], []]) {
-      const model = deriveFrameStatus({ ai: null, now, contactLostAt: null, activity, authorizations });
+      // Slice 8 (H4'): with developer tools; the default panel leaves out only the allowed one.
+      const shown = deriveFrameStatus({ ai: null, now, contactLostAt: null, activity, authorizations });
+      expect(shown.sections.earlier).toHaveLength(disposition === 'APPROVED' ? 0 : 1);
+      const model = deriveFrameStatus({ ai: null, now, contactLostAt: null, developer: true, activity, authorizations });
       expect(model.sections.needs).toHaveLength(0);
       expect(model.sections.earlier).toHaveLength(1);
       expect(model.sections.earlier[0]!.title).toContain(disposition === 'DENIED' ? 'Denied by you'
@@ -100,7 +103,10 @@ it.each(['APPROVED', 'DENIED'])('L9 a same-key copy withdrawn by a %s answer add
   const activity = unifiedActivity([gate('first', 'answered', 'GATED', -4000), gate('second', 'copy', 'GATED', -3000),
     gate('answer', 'answered', disposition, -2000), gate('withdrawn', 'copy', 'WITHDRAWN', -2000)], []);
   for (const authorizations of [[{ pendingId: 'copy', operationId: 'core.apply-excludes' }], []]) {
-    const model = deriveFrameStatus({ ai: null, now, contactLostAt: null, activity, authorizations });
+    // Slice 8 (H4'): with developer tools; the default panel leaves out only the allowed one.
+    expect(deriveFrameStatus({ ai: null, now, contactLostAt: null, activity, authorizations }).sections.earlier.map(row => row.id))
+      .toEqual(disposition === 'APPROVED' ? [] : ['activity:answer']);
+    const model = deriveFrameStatus({ ai: null, now, contactLostAt: null, developer: true, activity, authorizations });
     expect(model.sections.needs).toHaveLength(0);
     expect(model.sections.earlier.map(row => row.id)).toEqual(['activity:answer']);
     expect(model.sections.earlier[0]!.title).toContain(disposition === 'APPROVED' ? 'Allowed' : 'Denied by you');
