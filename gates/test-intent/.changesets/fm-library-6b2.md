@@ -675,3 +675,13 @@ The scripts are out of the gate's scope by design.
   "note": "S32.7 drops main's check that a Preview started while a removal runs does nothing; the candidate invokes core.preview-excludes (developer-tools Count matching files) while core.apply-excludes is pending. No source removes that guard. Restore the assertion and make the count wait, or cite a source."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "5fbc0647-39bb-4822-a0ff-fca70e0bdb6f",
+  "verdict": "accept",
+  "digest": "sha256:1bd657321afb6d948e3aef721ad71fe382b3e97eda1054d37ce661a79f4c36b2"
+}
+```
