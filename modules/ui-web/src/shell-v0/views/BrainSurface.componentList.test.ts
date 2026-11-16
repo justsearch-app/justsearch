@@ -161,7 +161,7 @@ describe('BrainSurface — the component list', () => {
     expect(text).toContain('Search embeddings');
     expect(text).toContain('Turns your documents into vectors so search can find them by meaning.');
     expect(text).toContain('Search reranker');
-    expect(text).toContain('1.12 GB');
+    expect(text).toContain('1.1 GB');
   });
 
   it('groups by necessity and states the CONSEQUENCE of each category', async () => {
@@ -228,7 +228,7 @@ describe('BrainSurface — the component list', () => {
     const el = await mountWith(PREVIEW_ENRICHMENT);
     const subtotal = (n: string) =>
       el.shadowRoot?.querySelector(`[data-testid="component-subtotal-${n}"]`)?.textContent?.trim();
-    expect(subtotal('improves-results')).toBe('4 components · 1.29 GB');
+    expect(subtotal('improves-results')).toBe('4 components · 1.3 GB');
     // A one-member group prints no subtotal: its row already carries that figure.
     expect(subtotal('required')).toBeUndefined();
     expect(subtotal('adds-feature')).toBeUndefined();
@@ -256,7 +256,7 @@ describe('BrainSurface — the component list', () => {
     expect(el2.shadowRoot?.textContent).not.toContain('Will download');
     expect(
       el2.shadowRoot?.querySelector('[data-testid="install-component-summary"]')?.textContent?.trim(),
-    ).toBe('3 installed · 3.30 GB on disk');
+    ).toBe('3 installed · 3.3 GB on disk');
   });
 
   it('keeps the primary action beside the status it acts on, and only there', async () => {

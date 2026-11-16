@@ -4,8 +4,8 @@ import type { AiState } from './aiStateStore.js';
 import { selectIndexingProgress, type IndexingProgress } from './indexingProgress.js';
 import { awaitsUnrequestedAi, gapOnlyAiProvides, isSearchUnavailableCause, isReindexCause, readinessNotice, warrantsSearchDegradationBanner } from './readinessNotice.js';
 import { aiEngineBody, aiEngineHeadline } from './aiVerdict.js';
-import { formatCount } from '../display/format.js';
-import { formatAmountOf, formatTimeLeft, runActivity } from './installFlow.js';
+import { formatBytesOf, formatCount } from '../display/format.js';
+import { formatTimeLeft, runActivity } from './installFlow.js';
 import { composeStageRows } from './installComponents.js';
 import { indexingCountsLine, indexingCountsLabel, enrichingCountsLine, enrichingCountsLabel } from './statusProgress.js';
 import { indexingTaskStatus } from './indexingProgress.js';
@@ -682,7 +682,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   const carried = new Set<string>();
   if (ai && installShown) {
     const doing = runActivity(install);
-    const amounts = (install?.totalBytes ?? 0) > 0 && install?.downloadedBytes != null ? formatAmountOf(install.downloadedBytes, install.totalBytes!, 'total') : null;
+    const amounts = (install?.totalBytes ?? 0) > 0 && install?.downloadedBytes != null ? formatBytesOf(install.downloadedBytes, install.totalBytes!) : null;
     const left = ai.installObservationLive && install?.state === 'running' && !install.paused && !doing ? formatTimeLeft(install.remainingSeconds) : null;
     const stopped = install?.state === 'running' ? composeStageRows(install).filter(stage => ['blocked', 'failed'].includes(stage.state) && stage.blockedReason) : [];
     for (const stage of stopped) carried.add(`aiinstall:${stage.id}`);

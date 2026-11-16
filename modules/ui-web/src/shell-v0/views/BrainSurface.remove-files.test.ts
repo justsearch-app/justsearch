@@ -126,7 +126,7 @@ describe('Advanced settings - Downloaded files', () => {
   it('lists each part with its measured size, Remove files where allowed and the reason elsewhere', async () => {
     const el = await mount();
 
-    expect(text(row(el, 'chat'))).toContain('3.0 MB on disk');
+    expect(text(row(el, 'chat'))).toContain('3 MB on disk');
     expect(row(el, 'chat').querySelector('[data-remove="chat"]')).not.toBeNull();
     expect(text(row(el, 'reranker'))).toContain('Switch Best match first off first');
     expect(row(el, 'reranker').querySelector('[data-remove]')).toBeNull();
@@ -142,11 +142,11 @@ describe('Advanced settings - Downloaded files', () => {
     const confirm = section(el).querySelector<HTMLElement>('[data-testid="removal-confirm"]')!;
     const band = confirm.querySelector<ConfirmBand>('jf-confirm-band')!;
     expect(band.shadowRoot!.querySelector('[role="group"]')!.getAttribute('aria-label')).toBe('Remove Chat model files?');
-    expect(band.consequence).toBe('This deletes 2 files (3.0 MB) from this computer.');
+    expect(band.consequence).toBe('This deletes 2 files (3 MB) from this computer.');
     expect(text(confirm)).toContain("Answers and Text in scans and images won't work until you download it again.");
     expect([...confirm.querySelectorAll('li')].map(text)).toEqual([
-      'answer.gguf · 2.0 MB', 'mmproj-F16.gguf · 1.0 MB',
-      "custom.gguf · 2.0 KB · kept - not verified as JustSearch's download"]);
+      'answer.gguf · 2 MB', 'mmproj-F16.gguf · 1 MB',
+      "custom.gguf · 2 KB · kept - not verified as JustSearch's download"]);
     expect(remove.getAttribute('aria-expanded')).toBe('true');
 
     answer(el, 'keep');
@@ -175,7 +175,7 @@ describe('Advanced settings - Downloaded files', () => {
     answer(el, 'confirm'); await settle(el);
 
     expect(text(row(el, 'chat').querySelector('[role="alert"]'))).toBe('Switch answers off first');
-    expect(text(row(el, 'chat'))).toContain('3.0 MB on disk');
+    expect(text(row(el, 'chat'))).toContain('3 MB on disk');
   });
 
   it('while a removal runs elsewhere, Remove files is disabled and the page says so', async () => {
@@ -285,7 +285,7 @@ describe('after Remove files (repair round 1)', () => {
 
     const outcome = section(el).querySelector('[data-testid="removal-outcome"]');
     expect([...(outcome?.querySelectorAll('[data-testid="removal-deleted"] li') ?? [])].map(text))
-      .toEqual(['answer.gguf · 2.0 MB', 'mmproj-F16.gguf · 1.0 MB']);
+      .toEqual(['answer.gguf · 2 MB', 'mmproj-F16.gguf · 1 MB']);
   });
 
   it('a part left incomplete says it is not usable and keeps Remove files and Download again', async () => {

@@ -16,13 +16,37 @@
 const LOCAL_NUM = new Intl.NumberFormat();
 const NUM = /\D/.test(LOCAL_NUM.format(10_000)) ? LOCAL_NUM : new Intl.NumberFormat('en-US');
 
+/**
+ * The one way to write a file or download size (first minutes, PE1): steps of 1024, units B, KB, MB, GB
+ * and TB after a space, at most three figures, a decimal only below 10, no trailing zeros ("157 B",
+ * "12 KB", "341 MB", "1.2 GB", "1 GB"). A value that would round to 1000 is written in the next unit.
+ */
+const STEP = 1024;
+const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'] as const;
+
+function unitFor(n: number): number {
+  let unit = 0;
+  while (unit < UNITS.length - 1 && n / STEP ** unit >= 999.5) unit++;
+  return unit;
+}
+
+function figures(n: number, unit: number): string {
+  const value = n / STEP ** unit;
+  return String(unit === 0 || value >= 9.95 ? Math.round(value) : Math.round(value * 10) / 10);
+}
+
 /** Human-readable byte size. Zero/absent → `'0 B'` (the chosen single canonical zero-case). */
 export function formatBytes(n: number | undefined | null): string {
   if (!n || n <= 0) return '0 B';
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
-  return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+  const unit = unitFor(n);
+  return `${figures(n, unit)} ${UNITS[unit]}`;
+}
+
+/** "1.3 of 2.6 GB", "120 of 956 MB": a part of a whole, both in the unit of the whole. */
+export function formatBytesOf(done: number, total: number): string {
+  const whole = Math.max(0, total);
+  const unit = unitFor(whole);
+  return `${figures(Math.max(0, Math.min(done, whole)), unit)} of ${figures(whole, unit)} ${UNITS[unit]}`;
 }
 
 /** Locale-grouped integer (e.g. `12,340`). */

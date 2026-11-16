@@ -116,7 +116,7 @@ afterEach(() => {
 describe('repairs R2 and R4: sizes measure the running model; Advanced speaks read words', () => {
   // R2/X5 — answers run on the compact model. models/status drops dev-only packages, so the standard
   // answer package reads incomplete; the manifest (the model registry) names chat-compact with one
-  // model file and its projector: 2740937888 + 672423616 bytes. The standard package is 6.34 GB.
+  // model file and its projector: 2740937888 + 672423616 bytes. The standard package is 6.3 GB.
   it('shows the compact answer model’s own package size, never the standard one', async () => {
     preview = plan(true, 'available'); settings = { ...settings, ui: { chatEnabled: true } };
     preview = { ...preview, components: preview.components!.map(c => c.id === 'chat' ? { ...c, state: 'to-download', totalBytes: 6807977504, downloadBytes: 6807977504 } : c) };
@@ -138,8 +138,8 @@ describe('repairs R2 and R4: sizes measure the running model; Advanced speaks re
         onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] } } as unknown as AiState;
     const el = await mount();
     expect(step(el, 'chat'), 'Answer questions step').not.toBeNull();
-    expect(words(el.shadowRoot!)).not.toContain('6.34 GB download');
-    expect(words(step(el, 'chat'))).toContain('3.18 GB download');
+    expect(words(el.shadowRoot!)).not.toContain('6.3 GB download');
+    expect(words(step(el, 'chat'))).toContain('3.2 GB download');
     expect(words(step(el, 'chat'))).not.toMatch(/not working|not applied/i);
   });
   // R4 — Advanced settings › Answers names the pause setting in the read words the page already uses

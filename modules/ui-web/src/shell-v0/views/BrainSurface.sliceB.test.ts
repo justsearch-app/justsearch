@@ -329,7 +329,7 @@ describe('Brain step 1 review repairs', () => {
     emit({ installStatus: { state: 'completed', installedFully: true, pendingRegistryAdditions: ['reranker'] } });
     const el = await mount(); await advanced(el);
     expect(el.shadowRoot!.querySelector('[data-testid="install-pending-registry-additions"]')!.textContent).toContain('run Install');
-    await clickButton(el, 'Install additions · 1.0 KB');
+    await clickButton(el, 'Install additions · 1 KB');
     expect(el.installConsentOpen).toBe(true);
     // Slice 7b G2 — consent rows carry the page's part names.
     expect(el.shadowRoot!.querySelector('dialog')!.textContent).toContain('Best match first');

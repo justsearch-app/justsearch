@@ -570,7 +570,7 @@ describe('presentAiEngineVerdict (Design pass 3 — the presentation projection)
     });
     expect(p.headline).toBe('Download Paused');
     // Slice 7b G4' — what is kept, without promising a later download continues from it.
-    expect(p.body).toBe('1.06 GB already downloaded is kept on disk.');
+    expect(p.body).toBe('1.1 GB already downloaded is kept on disk.');
   });
 
   it('paused without a byte count still says the download is paused, never invents a number', () => {

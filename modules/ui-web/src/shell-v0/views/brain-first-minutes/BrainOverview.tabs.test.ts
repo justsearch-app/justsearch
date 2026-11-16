@@ -120,7 +120,7 @@ describe('S7a-5 answers work: Overview | Memory', () => {
     expect(tabNames(el)).toEqual(['Overview', 'Memory']);
     const meter = el.shadowRoot!.querySelector('.graphics-card');
     expect(meter, 'graphics card meter').not.toBeNull();
-    expect(words(meter)).toContain('5.80 GB of 12.00 GB in use · RTX 4070');
+    expect(words(meter)).toContain('5.8 GB of 12 GB in use · RTX 4070');
     const links = words(el.shadowRoot!.querySelector('.brain-links'));
     expect(links).toContain('Advanced settings'); expect(links).toContain('Engine history in Health');
     expect(el.shadowRoot!.querySelector('.brain-headline')?.textContent?.trim()).toBe('AI is ready');

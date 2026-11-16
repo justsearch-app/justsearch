@@ -146,7 +146,7 @@ describe('S7a-1 not installed (fm-10)', () => {
     expect(words(sentence(el))).toBe('Search already works with exact words. Installing AI adds the steps that are not lit yet.');
     expect(sentence(el)!.querySelectorAll('button, [role="switch"]')).toHaveLength(0);
     const filled = [...panel(el)!.querySelectorAll('jf-button')].filter(b => b.getAttribute('variant') === 'primary');
-    expect(filled.map(b => b.getAttribute('label'))).toEqual(['Install AI · 2.51 GB']);
+    expect(filled.map(b => b.getAttribute('label'))).toEqual(['Install AI · 2.5 GB']);
     expect(words(panel(el))).toContain('You see each licence before anything downloads. Everything runs on this computer.');
     expect(lit(el)).toEqual({ files: 'true', read: 'true', pictures: 'false', meaning: 'false', reranker: 'false', chat: 'false' });
     expect(words(step(el, 'files'))).toContain('8 files');
@@ -154,8 +154,8 @@ describe('S7a-1 not installed (fm-10)', () => {
     expect(words(step(el, 'pictures'))).toContain('Simple scans are read already');
     expect(step(el, 'pictures')!.querySelectorAll('[role="switch"]')).toHaveLength(0);
     expect(step(el, 'meaning')!.querySelectorAll('[role="switch"]')).toHaveLength(0);
-    expect(words(step(el, 'meaning'))).toContain('1.20 GB download');
-    expect(words(step(el, 'reranker'))).toContain('341.0 MB download');
+    expect(words(step(el, 'meaning'))).toContain('1.2 GB download');
+    expect(words(step(el, 'reranker'))).toContain('341 MB download');
     const included = step(el, 'reranker')!.querySelectorAll<HTMLElement>('[role="switch"]');
     expect(included).toHaveLength(1);
     expect(included[0]!.getAttribute('aria-checked')).toBe('true');
@@ -171,7 +171,7 @@ describe('S7a-1 not installed (fm-10)', () => {
     expect(chat!.dataset.reach).toBe('na');
     expect(chat!.querySelectorAll('[role="switch"]')).toHaveLength(0);
     expect(words(chat)).toContain('Needs an NVIDIA graphics card');
-    expect(words(chat)).not.toContain('5.70 GB');
+    expect(words(chat)).not.toContain('5.7 GB');
     expect(tablist(el)).toBeNull();
   });
 
@@ -200,7 +200,7 @@ describe('S7a-1 not installed (fm-10)', () => {
     expect(mutations).toEqual([]); expect(operations).toEqual([]);
     expect(step(el, 'reranker')!.querySelector('[role="switch"]')!.getAttribute('aria-checked')).toBe('false');
     expect(words(step(el, 'reranker')!.querySelector('.switch-state'))).toBe('Not included');
-    const after = 'Install AI · 2.18 GB';
+    const after = 'Install AI · 2.2 GB';
     expect([...panel(el)!.querySelectorAll('jf-button')].map(b => b.getAttribute('label'))).toContain(after);
     el.remove(); document.body.append(el); await settle(el);
     expect(step(el, 'reranker')!.querySelector('[role="switch"]')!.getAttribute('aria-checked')).toBe('false');
@@ -323,7 +323,7 @@ describe('S7a-9 sizes and words', () => {
       capabilities: { chat: true, rag: true, extract: true, embedding: true },
       runtimeStatus: { active: { chatProfile: 'standard' }, onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] } } as unknown as AiState;
     const el = await mount();
-    for (const [id, bytes] of [['meaning', '1.20 GB'], ['reranker', '341.0 MB'], ['chat', '5.70 GB']] as const) {
+    for (const [id, bytes] of [['meaning', '1.2 GB'], ['reranker', '341 MB'], ['chat', '5.7 GB']] as const) {
       const size = [...(step(el, id)?.querySelectorAll('.step-meta') ?? [])].map(words).find(t => t.includes(bytes));
       expect(size, `${id} size`).toBeTruthy();
       expect(size).toMatch(/download/i);
@@ -346,9 +346,9 @@ describe('S7a-9 sizes and words', () => {
       capabilities: { chat: true, rag: true, extract: true, embedding: true },
       runtimeStatus: { ...runtimeStatus, onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] } } as unknown as AiState;
     const el = await mount();
-    expect(words(el.shadowRoot!)).not.toContain('5.70 GB');
+    expect(words(el.shadowRoot!)).not.toContain('5.7 GB');
     expect(step(el, 'chat'), 'Answer questions step').not.toBeNull();
-    expect(words(step(el, 'meaning'))).toContain('1.20 GB download');
+    expect(words(step(el, 'meaning'))).toContain('1.2 GB download');
   });
   it('keeps one kept-files wording at most and no CUDA reason on the default page', async () => {
     preview = plan(true, 'no-card'); settings = { ...settings, rerankerEnabled: false };

@@ -68,7 +68,7 @@ const preview: InstallPlanPreview = {
 
 describe('composeInstallConsent', () => {
   it('states the exact download total from the plan preview, not a hardcoded size', () => {
-    // 10_890_000_000 B formats to "10.14 GB".
+    // 10_890_000_000 B formats to "10 GB".
     //
     // Sandbox round 8 corrected this assertion's rationale (not its value): it used to claim this was
     // "the SAME number the progress screen shows", which is false whenever a download is being
@@ -76,7 +76,7 @@ describe('composeInstallConsent', () => {
     // TRANSFER — while the progress screen counts up to the file-size total, which still includes the
     // bytes already staged on disk. The two differ by exactly `resumableBytes`, which is why the
     // dialog now names that amount on its own line instead of leaving the gap unexplained.
-    expect(composeInstallConsent(manifest, preview).downloadTotal).toBe('10.14 GB');
+    expect(composeInstallConsent(manifest, preview).downloadTotal).toBe('10 GB');
   });
 
   it('with bytes an earlier download left staged, states the most it downloads, not that it resumes them (7b G2\')', () => {
@@ -87,12 +87,12 @@ describe('composeInstallConsent', () => {
     });
     // Reuse of the staged bytes is not guaranteed: "Up to" the whole 10_890_000_000 B.
     expect(staged.upTo).toBe(true);
-    expect(staged.consentTotal).toBe('10.1 GB');
+    expect(staged.consentTotal).toBe('10 GB');
     expect(staged).not.toHaveProperty('resumedTotal');
   });
 
   it('says no "Up to" without staged bytes (the ordinary first-run case)', () => {
-    expect(composeInstallConsent(manifest, preview)).toMatchObject({ upTo: false, consentTotal: '10.1 GB' });
+    expect(composeInstallConsent(manifest, preview)).toMatchObject({ upTo: false, consentTotal: '10 GB' });
     expect(composeInstallConsent(manifest, { ...preview, resumableBytes: 0 }).upTo).toBe(false);
     expect(composeInstallConsent(manifest, null)).toMatchObject({ upTo: false, consentTotal: null });
   });
@@ -102,7 +102,7 @@ describe('composeInstallConsent', () => {
       ...preview,
       totalDownloadBytes: 734_003_200,
     });
-    expect(smaller.downloadTotal).toBe('700.0 MB');
+    expect(smaller.downloadTotal).toBe('700 MB');
     expect(smaller.downloadTotal).not.toBe(
       composeInstallConsent(manifest, preview).downloadTotal,
     );
@@ -168,7 +168,7 @@ describe('composeInstallConsent', () => {
     const early = composeInstallConsent(null, preview);
     expect(early.termsUnavailable).toBe(true);
     expect(early.packages).toEqual([]);
-    expect(early.downloadTotal).toBe('10.14 GB');
+    expect(early.downloadTotal).toBe('10 GB');
   });
 
   it('a zero/absent byte total is treated as unknown, never rendered as "0 B"', () => {

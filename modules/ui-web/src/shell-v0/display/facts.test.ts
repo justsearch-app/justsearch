@@ -120,11 +120,11 @@ describe('projectFact — status metric-facts (§17.2 migration off the bypass s
   it('core.size formats bytes, unknown when no status', () => {
     expect(
       projectFact('core.size', withState({ status: { worker: { core: { indexSizeBytes: 53_477_376 } } } })).value,
-    ).toBe('51.0 MB');
+    ).toBe('51 MB');
     expect(projectFact('core.size', withState({ status: null })).presence).toBe('unknown');
   });
   it('core.memory formats bytes', () => {
-    expect(projectFact('core.memory', withState({ status: { memoryUsedBytes: 238_026_752 } })).value).toBe('227.0 MB');
+    expect(projectFact('core.memory', withState({ status: { memoryUsedBytes: 238_026_752 } })).value).toBe('227 MB');
   });
   it('metric-facts carry NO confidence/provenance (value-only — render plainly, §17.3)', () => {
     const f = projectFact('core.files', withState({ index: { ownDocumentCount: known(1) } }));

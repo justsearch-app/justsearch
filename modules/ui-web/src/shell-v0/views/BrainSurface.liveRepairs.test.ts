@@ -120,7 +120,7 @@ describe('Brain live redesign repairs', () => {
     expect(operations).toEqual(['core.set-chat-enabled']);
     release(json({ components: [] })); await settle(el);
     expect(switches(el).map(b => b.getAttribute('aria-checked'))).toEqual(['false']);
-    expect(el.shadowRoot!.querySelector('[data-feature="chat"]')!.textContent).toContain('1.0 KB');
+    expect(el.shadowRoot!.querySelector('[data-feature="chat"]')!.textContent).toContain('1 KB');
   });
   it('D8 a preview begun before an acquisition save cannot overwrite its new choices', async () => {
     emit({ installStatus: { state: 'idle', installedFully: false }, runtime: { mode: 'offline', installed: { known: true, value: false } } as AiState['runtime'], aiEngine: { kind: 'not_installed', stability: { kind: 'settled' }, installFailure: null } });
@@ -132,7 +132,7 @@ describe('Brain live redesign repairs', () => {
     el.shadowRoot!.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Use Best match first"]')!.click(); await settle(el);
     expect(declines).toHaveLength(1);
     release(json({ totalDownloadBytes: 999999, components: [] })); await settle(el);
-    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('1.0 KB');
+    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('1 KB');
   });
   it('D10 Automatic GPU layers starts at maximum so the left endpoint can save processor-only zero', async () => {
     const el = await mount(); await advanced(el);
@@ -170,7 +170,7 @@ describe('Brain live redesign repairs', () => {
     emit({ status: { gpu: { totalVramBytes: 12 * 1024 ** 3, usedVramBytes: 9 * 1024 ** 3, deviceCount: 2 } } as AiState['status'] });
     // Slice 7a (AM8): fm-14's words; without a current reading there is no meter and nothing is inferred.
     const el = await mount(); const card = () => el.shadowRoot!.querySelector('.graphics-card');
-    expect(card()?.textContent).toContain('9.00 GB of 12.00 GB in use · one of 2 graphics devices');
+    expect(card()?.textContent).toContain('9 GB of 12 GB in use · one of 2 graphics devices');
     expect(card()?.querySelector('[role="meter"]')?.getAttribute('aria-valuenow')).toBe(String(9 * 1024 ** 3));
     emit({ snapshotLive: false }); await el.updateComplete;
     expect(card()).toBeNull();
@@ -311,10 +311,10 @@ describe('Brain review repairs', () => {
     previewGet = null;
     release(json({ ...preview, components: preview.components!.map(c => ({ ...c, totalBytes: 2048 })) }));
     await vi.advanceTimersByTimeAsync(0); await el.updateComplete;
-    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('2.0 KB');
+    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('2 KB');
     await vi.advanceTimersByTimeAsync(4999); expect(slow).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1); await el.updateComplete;
-    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('1.0 KB');
+    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('1 KB');
     el.remove(); await vi.advanceTimersByTimeAsync(20000); expect(slow).toHaveBeenCalledTimes(1);
   });
 });
