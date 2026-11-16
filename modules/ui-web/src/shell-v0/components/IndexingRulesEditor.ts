@@ -9,6 +9,8 @@ import { settingsV2Schema, type SettingsV2 } from '../../api/generated/schema-ty
 import { requireSettingsWitness, type SettingsWitness } from '../../api/settingsAttempt.js';
 import { createOperationKey } from '../../api/operationKey.js';
 import { keepUnsettled, MAY_BE_LOST, readUnsettled, SaveQueue, type SendOutcome } from '../state/saveQueue.js';
+import { refreshStatusNow } from '../state/aiStateStore.js';
+import type { IndexingProgress } from '../state/indexingProgress.js';
 import { z } from 'zod';
 
 export type SavedIndexingRules = {
@@ -98,7 +100,20 @@ export class IndexingRulesEditor extends JfElement {
     indexingRulesError: { state: true },
     indexingRulesMessage: { state: true },
     conflictingRules: { state: true },
+    readWaiting: { attribute: false },
+    readNowSending: { state: true },
+    readNowStarted: { state: true },
+    readNowNote: { state: true },
   };
+  /** Slice 6c — from fresh status: whether a reading rule alone holds files, and the Engine's release. */
+  declare readWaiting: IndexingProgress['readWaiting'];
+  declare private readNowSending: boolean;
+  /** This window asked and the Engine started (or joined) the release; kept until status shows its end. */
+  declare private readNowStarted: boolean;
+  declare private readNowNote: string;
+  private readNowSawActive = false;
+  private readNowQuietUpdates = 0;
+  private readNowHadFocus = false;
   declare developer: boolean;
   declare apiBase: string;
   declare host_: PluginHostApi | undefined;
@@ -449,6 +464,9 @@ export class IndexingRulesEditor extends JfElement {
     this.developer = false;
     this.apiBase = '';
     this.readOnly = false;
+    this.readNowSending = false;
+    this.readNowStarted = false;
+    this.readNowNote = '';
     this.indexingRules = { enabled: false, days: [1, 2, 3, 4, 5, 6, 7], start: '09:00', end: '17:00', pauseOnBattery: false };
     this.indexingRulesLoaded = false;
     this.indexingRulesSaving = false;
@@ -470,9 +488,62 @@ export class IndexingRulesEditor extends JfElement {
     super.disconnectedCallback();
   }
 
+  protected override willUpdate(changed: PropertyValues): void {
+    super.willUpdate(changed);
+    this.readNowHadFocus = this.shadowRoot?.activeElement?.matches('[data-read-now]') ?? false;
+    if (!changed.has('readWaiting')) return;
+    const status = this.readWaiting;
+    if (status?.active) this.readNowSawActive = true;
+    else if (this.readNowStarted && (this.readNowSawActive || ++this.readNowQuietUpdates >= 2)) this.readNowStarted = false;
+    if (this.readNowNote && !status?.offered) this.readNowNote = '';
+  }
+
   protected override updated(changed: PropertyValues): void {
     super.updated(changed);
     if (this.indexingRuleFocus) void this.focusPendingIndexingRule();
+    // The action is replaced in place: focus follows to its line, or to the group's heading.
+    if (this.readNowHadFocus && !this.shadowRoot?.querySelector('[data-read-now]')) {
+      const line = this.shadowRoot?.getElementById('read-now-status');
+      (line?.textContent?.trim() ? line : this.shadowRoot?.getElementById('when-to-index'))?.focus();
+    }
+  }
+
+  /** "Read waiting files now": one release in the Engine; the reading rules are not changed. */
+  private async readWaitingNow(): Promise<void> {
+    if (this.readNowSending) return;
+    this.readNowSending = true;
+    this.readNowNote = '';
+    try {
+      const result = await getOperationClient(this.apiBase).invokeWithConsent('core.indexing-read-now',
+        { args: {}, idempotencyKey: createOperationKey() }, { requestConsent: requestAuthorization });
+      const outcome = result.structuredData?.['outcome'];
+      if (outcome === 'started' || outcome === 'joined') {
+        this.readNowStarted = true;
+        this.readNowSawActive = false;
+        this.readNowQuietUpdates = 0;
+      } else if (outcome === 'nothing-waiting') {
+        this.readNowNote = 'Nothing is waiting to be read.';
+      } else {
+        void refreshStatusNow();
+      }
+    } catch (error: unknown) {
+      this.readNowNote = `Could not confirm the reading request. Check the current status before trying again. ${
+        error instanceof Error ? error.message : ''}`.trim();
+    } finally {
+      this.readNowSending = false;
+    }
+  }
+
+  private renderReadWaiting() {
+    const reading = this.readWaiting?.active || this.readNowStarted;
+    const offer = !reading && this.readWaiting?.offered && !this.readNowNote.startsWith('Nothing');
+    return html`<div class="read-now">
+      ${offer ? html`<button type="button" class="text-action" data-read-now
+        aria-disabled=${this.readNowSending ? 'true' : 'false'}
+        @click=${() => void this.readWaitingNow()}>Read waiting files now</button>` : nothing}
+      <p id="read-now-status" role="status" tabindex="-1">${reading
+        ? 'Reading the waiting files. Your reading rules are unchanged.' : this.readNowNote}</p>
+    </div>`;
   }
 
   private async loadSettings(mode: 'preserve' | 'discard' = 'preserve'): Promise<boolean> {
@@ -592,6 +663,10 @@ export class IndexingRulesEditor extends JfElement {
     p:empty { display: none; }
     summary { cursor: pointer; }
     #indexing-rules-error { color: var(--text-primary); }
+    .read-now .text-action { color: var(--text-secondary); padding: .25rem 0; }
+    .read-now .text-action:hover { color: var(--text-primary); text-decoration: underline; }
+    #read-now-status:focus { outline: none; }
+    #read-now-status:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
     @media (forced-colors: active) {
       button, input { color: CanvasText; background: Canvas; border-color: CanvasText; }
       button:focus-visible, input:focus-visible, summary:focus-visible { outline-color: Highlight; }
@@ -642,6 +717,7 @@ export class IndexingRulesEditor extends JfElement {
         ${!this.indexingRulesLoaded ? html`<p>Waiting for saved reading rules.</p>` : nothing}
         ${this.readOnly ? html`<p>Settings are read-only in this session.</p>` : nothing}
       </form>
+      ${this.renderReadWaiting()}
     </section>`;
   }
 }

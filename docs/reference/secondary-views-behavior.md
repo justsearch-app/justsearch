@@ -64,8 +64,18 @@ warnings and recovery actions remain visible even without a verification timesta
 **Read everything again** is a quiet text action at the foot of **Folders**, beside **Activity**.
 It asks **Read every watched folder again?** in the page; **Read again** includes unchanged files,
 and **Cancel** or Escape starts nothing and returns focus to the action. While a confirmed request
-is in flight the action stays focused but does nothing. Library has no more menu or
-waiting-work action. Operation acceptance and completion are distinct.
+is in flight the action stays focused but does nothing. Library has no more menu. Operation
+acceptance and completion are distinct.
+
+**Read waiting files now** is a text action under **When to read files**, shown only while fresh
+status says reading hours or the battery rule hold files back (never for a manual Pause or settings
+recovery, and never as a disabled control). It reads them once without changing the rules; files
+arriving meanwhile are read too, while picture reading and other background work keep waiting.
+The action is replaced in place by **Reading the waiting files. Your reading rules are unchanged.**
+(announced politely, with focus) until the Engine reports the release ended; the folder rows then
+show the results as usual. Pause, a rule change, a new hold (such as battery starting) or a restart
+ends it. A click that finds nothing says **Nothing is waiting to be read.** If the action disappears
+while focused, focus moves to the **When to read files** heading.
 
 **Skip these files** and **When to read files** save as you change them; there is no Save, Reload,
 Preview or Apply row. A skip rule saves when its field is left (Tab, a click elsewhere, switching

@@ -170,6 +170,7 @@ public final class SubstratePhase {
         runtimeSpecStoreSupplier,
         runtimeReconcilerSupplier,
         operationLeaseService, recordedIngestion, authority.roots());
+    OperationHandlerRegistrations.registerReadWaitingFiles(operationHandlers, knowledgeClientSupplier);
     AgentToolHandlers.registerEager(operationHandlers, agentTools);
     // Tempdoc 560 WS4 — the operation-catalog collapse + two-phase composition. Core + agent-tools +
     // the MCP-host's contributions compose into the ONE ContributionRegistry, and capability-derived

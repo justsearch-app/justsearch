@@ -104,6 +104,7 @@ private static final Logger log = LoggerFactory.getLogger(WorkerStatusCache.clas
           .map(reason -> reason.toLowerCase(Locale.ROOT)).toList());
       if (pause.untilEpochMs() != null) extras.put("indexingPauseUntilEpochMs", pause.untilEpochMs());
       extras.put("indexingWaitingForResume", pause.waiting() > 0);
+      if (pause.released()) extras.put("indexingReleased", true);
     }
     var bulk = knowledgeServer.bulkWork();
     var automatic = java.util.EnumSet.noneOf(io.justsearch.core.scheduling.BulkWorkGate.Reason.class);

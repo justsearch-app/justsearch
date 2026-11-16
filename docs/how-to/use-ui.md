@@ -156,7 +156,9 @@ In **Library → Folders**, **Skip these files** holds one rule per line. Choose
 and leave the field: it is saved. Library then asks in place whether to remove files already read that
 match your skip rules; **Keep them** leaves them searchable, **Remove from search** removes them (files on
 disk are not touched). **When to read files** saves as you change it. If another window changed the same
-rules, choose **Use the saved rules** or **Keep my draft**.
+rules, choose **Use the saved rules** or **Keep my draft**. While reading hours or the battery rule hold
+files back, **Read waiting files now** under **When to read files** reads them once without changing
+the rules.
 
 ### Reading files again
 

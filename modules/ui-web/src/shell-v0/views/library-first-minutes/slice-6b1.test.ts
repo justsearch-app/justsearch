@@ -51,12 +51,17 @@ it('6b1-1: Library removes its more button and menu', async () => {
   expect(el.shadowRoot!.querySelector('[aria-label="More Library actions"]')).toBeNull();
   expect(el.shadowRoot!.querySelector('jf-menu')).toBeNull();
 });
-it('6b1-7: Library has no misleading waiting-work action', async () => {
+it('6b1-7: with nothing held, Library has no waiting-work action and no menu offers one', async () => {
   const el = await library();
   const more = el.shadowRoot?.querySelector<HTMLButtonElement>('[aria-label="More Library actions"]');
   if (more) { more.click(); await settle(el); }
   expect(el.shadowRoot).not.toBeNull();
+  // Slice 6c shows "Read waiting files now" under "When to read files" only while a reading rule
+  // holds files back; this status holds nothing, so the wording appears nowhere in Library.
   expect(el.shadowRoot!.textContent).not.toContain('Read waiting files now');
+  const editor = el.shadowRoot!.querySelector('jf-indexing-rules-editor');
+  expect(editor?.shadowRoot?.textContent ?? '').not.toContain('Read waiting files now');
+  expect(el.shadowRoot!.querySelector('jf-menu')).toBeNull();
 });
 it('6b1-2: the quiet foot action asks in place, and Cancel runs nothing and restores focus', async () => {
   const invoke = vi.spyOn(getOperationClient(''), 'invokeWithConsent');

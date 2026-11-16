@@ -19,6 +19,7 @@ import io.justsearch.app.api.status.operating.BulkWorkKind;
 import io.justsearch.app.api.status.operating.DegradationCode;
 import io.justsearch.app.api.status.operating.DegradationScope;
 import io.justsearch.app.api.status.operating.IndexingReason;
+import io.justsearch.app.api.status.operating.IndexingReleaseView;
 import io.justsearch.app.api.status.operating.IndexingState;
 import io.justsearch.app.api.status.operating.OperatingBlock;
 import io.justsearch.app.api.status.operating.OperatingChatView;
@@ -412,8 +413,12 @@ final class OperatingStateAssembler {
       PowerStatusView power, WorkerOperationalView worker, long workerSampledAtMs, Instant now) {
     var pauseSource = indexingHold;
     var pause = pauseSource == null ? null : pauseSource.get();
-    boolean userHeld = pause != null
+    boolean holdPresent = pause != null
         && pause.state() != io.justsearch.core.scheduling.IndexingHold.State.RUNNING;
+    // While "read waiting files now" releases the reading rules, file reading is reported as it
+    // runs; the rule reasons stay listed for the lanes they still hold.
+    boolean released = holdPresent && pause.released();
+    boolean userHeld = holdPresent && !released;
     if (!userHeld && (worker == null || worker.core() == null)) {
       return null;
     }
@@ -430,7 +435,7 @@ final class OperatingStateAssembler {
     // IDLE wins with nothing to drain; the present reasons are still listed, as before E1.
     EnumSet<IndexingReason> allReasons = EnumSet.noneOf(IndexingReason.class);
     present.stream().map(r -> IndexingReason.valueOf(r.name())).forEach(allReasons::add);
-    if (userHeld) pause.reasons().stream().map(IndexingReason::valueOf).forEach(allReasons::add);
+    if (holdPresent) pause.reasons().stream().map(IndexingReason::valueOf).forEach(allReasons::add);
     List<IndexingReason> reasons = List.copyOf(allReasons);
     IndexingState state =
         userHeld ? IndexingState.valueOf(pause.state().name()) : idle(worker)
@@ -445,22 +450,33 @@ final class OperatingStateAssembler {
       lastIndexingReasons = reasons;
       indexingSince = now.toString();
     }
+    // The primary bulk-work reason; a released hold's rule reasons precede it in the list.
+    IndexingReason bulkReason = present.isEmpty() ? null
+        : IndexingReason.valueOf(present.iterator().next().name());
     String reasonCode =
         userHeld ? policyReasonCode(pause)
-            : state == IndexingState.PAUSED && reasons.get(0) == IndexingReason.GAME_MODE
+            : state == IndexingState.PAUSED && bulkReason == IndexingReason.GAME_MODE
             ? LifecycleReasonCode.INDEXING_PAUSED_GAME_MODE.code()
-            : state == IndexingState.PAUSED && reasons.get(0) == IndexingReason.ENERGY_SAVER
+            : state == IndexingState.PAUSED && bulkReason == IndexingReason.ENERGY_SAVER
             ? LifecycleReasonCode.INDEXING_PAUSED_ENERGY_SAVER.code()
-            : state == IndexingState.PAUSED && reasons.get(0) == IndexingReason.GPU_BUSY_EXTERNAL
+            : state == IndexingState.PAUSED && bulkReason == IndexingReason.GPU_BUSY_EXTERNAL
                 ? LifecycleReasonCode.INDEXING_PAUSED_GPU_BUSY.code()
             : state == IndexingState.SLOWED
                 ? LifecycleReasonCode.INDEXING_SLOWED_CHAT_GENERATING.code()
                 : null;
+    boolean bulkSlowed = state == IndexingState.PAUSED || state == IndexingState.PAUSING
+        || state == IndexingState.SLOWED;
     List<BulkWorkKind> affects =
-        userHeld ? List.of(BulkWorkKind.INDEXING, BulkWorkKind.VDU)
-            : state == IndexingState.PAUSED || state == IndexingState.PAUSING || state == IndexingState.SLOWED
-            ? List.of(BulkWorkKind.INDEXING)
+        userHeld || released && bulkSlowed ? List.of(BulkWorkKind.INDEXING, BulkWorkKind.VDU)
+            : released ? List.of(BulkWorkKind.VDU)
+            : bulkSlowed ? List.of(BulkWorkKind.INDEXING)
             : List.of();
+    List<IndexingReason> readingRuleReasons = userHeld
+        ? pause.reasons().stream().filter(r -> "SCHEDULE".equals(r) || "ON_BATTERY".equals(r))
+            .map(IndexingReason::valueOf).toList()
+        : List.of();
+    boolean heldFilesWaiting = userHeld && worker != null && worker.migration() != null
+        && worker.migration().pendingReadyJobsCount() > 0;
     return new OperatingIndexingView(
         state,
         reasons,
@@ -471,7 +487,8 @@ final class OperatingStateAssembler {
         null,
         Instant.ofEpochMilli(workerSampledAtMs).toString(),
         userHeld ? pause.untilEpochMs() : null,
-        userHeld && (pause.waiting() > 0 || worker != null && worker.core() != null && !idle(worker)));
+        userHeld && (pause.waiting() > 0 || worker != null && worker.core() != null && !idle(worker)),
+        readingRuleReasons, heldFilesWaiting, new IndexingReleaseView(released));
   }
 
   private static String policyReasonCode(io.justsearch.core.scheduling.IndexingHold.Snapshot pause) {
@@ -540,6 +557,7 @@ final class OperatingStateAssembler {
   private static OperatingIndexingView withIndexingSampledAt(
       OperatingIndexingView i, String sampledAt) {
     return new OperatingIndexingView(i.state(), i.reasons(), i.reasonCode(), i.since(),
-        i.affects(), i.pendingJobs(), i.agingReleaseAt(), sampledAt, i.untilEpochMs(), i.waitingForResume());
+        i.affects(), i.pendingJobs(), i.agingReleaseAt(), sampledAt, i.untilEpochMs(), i.waitingForResume(),
+        i.readingRuleReasons(), i.heldFilesWaiting(), i.release());
   }
 }

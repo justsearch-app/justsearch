@@ -31,6 +31,7 @@ import io.justsearch.app.services.registry.operations.handlers.IndexGcHandler;
 import io.justsearch.app.services.registry.operations.handlers.PingBackendHandler;
 import io.justsearch.app.services.registry.operations.handlers.PreflightAiPackHandler;
 import io.justsearch.app.services.registry.operations.handlers.PreviewExcludesHandler;
+import io.justsearch.app.services.registry.operations.handlers.ReadWaitingFilesHandler;
 import io.justsearch.app.services.registry.operations.handlers.ReconcileRootHandler;
 import io.justsearch.app.services.registry.operations.handlers.ReconfigureHandler;
 import io.justsearch.app.services.registry.operations.handlers.ReindexHandler;
@@ -64,6 +65,13 @@ import java.util.function.Supplier;
 public final class OperationHandlerRegistrations {
 
   private OperationHandlerRegistrations() {}
+
+  /** "Read waiting files now" reads the indexing hold through the Engine's knowledge client. */
+  public static void registerReadWaitingFiles(HandlerRegistry handlers,
+      Supplier<io.justsearch.app.services.worker.KnowledgeClient> knowledgeClientSupplier) {
+    handlers.register(CoreOperationCatalog.READ_WAITING_FILES,
+        new ReadWaitingFilesHandler(knowledgeClientSupplier));
+  }
 
   public static void registerWorker(
       HandlerRegistry handlers,

@@ -1229,6 +1229,57 @@
   "audience" : "USER",
   "consumers" : [ ]
 }, {
+  "id" : "core.indexing-read-now",
+  "type" : "operation",
+  "presentation" : {
+    "labelKey" : "ops.indexing-read-now.label",
+    "descriptionKey" : "ops.indexing-read-now.description"
+  },
+  "intf" : {
+    "inputs" : {
+      "type" : "object",
+      "properties" : { },
+      "additionalProperties" : false
+    },
+    "result" : {
+      "type" : "object",
+      "properties" : {
+        "outcome" : {
+          "type" : "string",
+          "enum" : [ "started", "joined", "nothing-waiting", "not-held" ]
+        },
+        "reason" : {
+          "type" : "string",
+          "enum" : [ "paused", "recovery", "not-held" ]
+        }
+      }
+    },
+    "errors" : [ ],
+    "uiHints" : { }
+  },
+  "policy" : {
+    "risk" : "MEDIUM",
+    "confirm" : {
+      "kind" : "NONE"
+    },
+    "audit" : "METADATA_ONLY",
+    "undoSupported" : false,
+    "inverseOperationId" : null
+  },
+  "availability" : { },
+  "lineage" : {
+    "affects" : [ ],
+    "supersedes" : [ ]
+  },
+  "provenance" : {
+    "tier" : "CORE",
+    "contributorId" : "core",
+    "version" : "1.0"
+  },
+  "executors" : [ "UI" ],
+  "audience" : "USER",
+  "consumers" : [ ]
+}, {
   "id" : "core.set-indexing-rules",
   "type" : "operation",
   "presentation" : {

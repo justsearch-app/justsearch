@@ -73,7 +73,7 @@ const INDEXING_OPERATIONS = new Set([
   'core.reconcile-root', 'core.add-watched-root', 'core.remove-watched-root', 'core.forget-indexed-path',
   'core.retry-forget', 'core.withdraw-forget', 'core.clear-failed-jobs', 'core.index-gc', 'core.settle-index',
   'core.cancel-indexing-job', 'core.retry-indexing-job', 'core.preview-excludes', 'core.apply-excludes',
-  'core.indexing-pause', 'core.indexing-resume', 'core.set-indexing-rules', 'core.accept-gaps',
+  'core.indexing-pause', 'core.indexing-resume', 'core.indexing-read-now', 'core.set-indexing-rules', 'core.accept-gaps',
   'core.cancel-reindex',
 ].map(canonicalOperation));
 

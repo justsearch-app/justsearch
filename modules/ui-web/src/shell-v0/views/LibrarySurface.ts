@@ -3051,7 +3051,7 @@ export class LibrarySurface extends JfElement {
         </div>
         <div class="removal-slot" aria-live="polite">${this.renderRemoval()}</div>
       </section>
-      <jf-indexing-rules-editor api-base=${this.apiBase} .host_=${this.host_}
+      <jf-indexing-rules-editor api-base=${this.apiBase} .host_=${this.host_} .readWaiting=${this.indexProgress.readWaiting}
         .developer=${this.developer} .saveWithSettings=${this.saveIndexingRulesWithSettings}></jf-indexing-rules-editor>
       </div>
       ${this.developer && !(this.unfinishedForgets?.items.length ?? 0) && this.forgetReadStatus !== 'unavailable' && !this.forgetMessage ? html`<details class="removal-history"><summary>Removal history</summary>${this.renderUnfinishedForgets()}</details>` : nothing}
