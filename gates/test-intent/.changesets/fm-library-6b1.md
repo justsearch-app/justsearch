@@ -417,3 +417,13 @@ Pending independent verification and acceptance on the committed candidate.
   "digest": "sha256:af91d82f76a5e1ec41770e3f649486264953c340d9a9bb60e8cac708cea3e62a"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "rmmukio_",
+  "verdict": "accept",
+  "digest": "sha256:07a96a412d5aaa2a5b5b9a0fbb6d90c7f267104a501d9cdff7dcf8b2ec95ddff"
+}
+```
