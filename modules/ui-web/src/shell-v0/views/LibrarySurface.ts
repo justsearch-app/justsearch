@@ -41,7 +41,7 @@ import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { present } from '../display/present.js';
 import { formatCount, formatFileCount } from '../display/format.js';
 import { offerReversal, ReversalClosedError } from '../state/ownReversals.js';
-import { keepUnsettled, readUnsettled, SaveQueue, type SendOutcome } from '../state/saveQueue.js';
+import { keepUnsettled, MAY_BE_LOST, readUnsettled, SaveQueue, type SendOutcome } from '../state/saveQueue.js';
 import { FocusKeeper, focusRowsUnder } from '../primitives/focusKeeper.js';
 import '../components/ConfirmBand.js';
 import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
@@ -415,6 +415,8 @@ export class LibrarySurface extends JfElement {
   });
   /** Only the latest glob change can be undone. */
   private skipUndoSerial = 0;
+  /** R27 — the unsettled skip-rule saves could not be kept for a reload; tried again on each queue change. */
+  private skipCheckpointLost = false;
   /** The Undo being run, answered when its queued snapshot settles. */
   private undoWaiter: { serial: number; resolve: () => void; reject: (error: Error) => void } | null = null;
   declare private excludesPolicy: ExcludesPolicy | null;
@@ -1726,9 +1728,11 @@ export class LibrarySurface extends JfElement {
   /** R24 — what is not settled yet, kept in this window's sessionStorage; removed once nothing is. */
   private keepUnsettledSkipRules(): void {
     const snapshots = this.skipQueue.snapshots;
-    keepUnsettled(UNSETTLED_SKIP_RULES, snapshots.length && this.excludesWitness ? {
+    const kept = keepUnsettled(UNSETTLED_SKIP_RULES, snapshots.length && this.excludesWitness ? {
       base: { text: this.excludesSavedText ?? '', literals: this.excludesSavedLiterals, witness: this.excludesWitness },
       snapshots, attempt: this.excludesAttempt, undoSerial: this.skipUndoSerial } : null);
+    const lost = snapshots.length > 0 && !(kept && this.excludesWitness);
+    if (lost !== this.skipCheckpointLost) { this.skipCheckpointLost = lost; this.requestUpdate(); }
   }
 
   /**
@@ -3039,6 +3043,7 @@ export class LibrarySurface extends JfElement {
               .onActivate=${() => void this.handlePreviewExcludes()}>Count matching files</jf-button>
           </div>` : nothing}
         ${this.excludesError && !this.skipQueue.uncertain ? html`<p id="excludes-error" role="alert">${this.excludesError}</p>` : nothing}
+        ${this.skipCheckpointLost ? html`<p role="status">${MAY_BE_LOST}.</p>` : nothing}
         <div role="status" aria-live="polite" aria-atomic="true" data-testid="excludes-result">
           ${this.excludesResult ? this.renderExcludesResult(this.excludesResult)
             // "Saved" is never said over text that is not saved yet.

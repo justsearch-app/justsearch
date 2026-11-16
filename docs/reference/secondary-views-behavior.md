@@ -83,7 +83,9 @@ coming back. Changes already made still save after leaving Library. A reload of 
 reloads itself after an Engine restart) keeps them: the window keeps its unsettled changes in its
 session storage, sends a save whose answer was lost again with its same key and contents, and shows
 the rest as **Your changes are not saved yet** with **Try again**; nothing kept is sent before that
-save is settled. When another window changed the same rules, the draft is kept and **Changed
+save is settled. When the session storage is full or unavailable, the editor says **Your changes may
+be lost if this window reloads** until its changes are saved or they can be kept again (tried on
+each new change); it never keeps an older part of them in place of the whole. When another window changed the same rules, the draft is kept and **Changed
 elsewhere** offers **Use the saved rules** or **Keep my draft** (which saves the draft as it is then);
 a save elsewhere of other settings is not a conflict.
 After **Use the saved rules** focus goes to the first rule field (or **Add a rule** when there are

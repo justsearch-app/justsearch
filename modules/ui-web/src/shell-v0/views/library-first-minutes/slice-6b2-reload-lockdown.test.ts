@@ -19,6 +19,13 @@ let server: ViteDevServer, browser: Browser, scratch: string, origin: string;
  */
 const harness = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <link rel="stylesheet" href="/src/styles/tokens.css"></head><body><script type="module">
+// R27 — a full sessionStorage: once capped, a record may not grow past the size it had (kept across a reload).
+const setSession = Storage.prototype.setItem;
+Storage.prototype.setItem = function (key, value) {
+  const limit = this === sessionStorage ? JSON.parse(localStorage.getItem('sessionCap') ?? 'null')?.[key] : undefined;
+  if (limit !== undefined && String(value).length > limit) throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
+  return setSession.call(this, key, value);
+};
 const initial = { revision: 1, lastKey: '0194f72c-0000-7000-8000-000000000001', mode: null, posts: [], ops: [], receipts: {},
   ui: { theme: 'dark', excludePatterns: ['*.log'], indexingPause: { paused: false, untilEpochMs: null, reason: null, pauseOnBattery: false } } };
 const s = JSON.parse(localStorage.getItem('fx') ?? 'null') ?? initial;
@@ -33,6 +40,11 @@ window.fixture = {
   holdWrites: () => { hold = new Promise(resolve => { release = () => { hold = null; resolve(); }; }); },
   release: () => release(),
   state: () => JSON.parse(JSON.stringify(s)),
+  /** Storage is full: no kept record may grow from here on. */
+  capSession: () => localStorage.setItem('sessionCap', JSON.stringify(Object.fromEntries(
+    Object.keys(sessionStorage).map(key => [key, sessionStorage.getItem(key).length])))),
+  uncapSession: () => localStorage.removeItem('sessionCap'),
+  kept: () => Object.fromEntries(Object.keys(sessionStorage).map(key => [key, JSON.parse(sessionStorage.getItem(key))])),
   setMode: mode => { s.mode = mode; keep(); },
   /** Another window saves: the revision moves. */
   elsewhere: ui => { s.ui = { ...s.ui, ...ui }; commit('0194f72c-0000-7000-8000-0000000000' + (s.revision + 16).toString(16).slice(-2)); keep(); },
@@ -113,7 +125,7 @@ type Saved = { revision: number; lastKey: string; posts: { key: string; body: st
   ui: { excludePatterns: unknown[]; indexingPause: Record<string, unknown> } };
 type FixtureWindow = Window & { settle(): Promise<void>; deepActive(): Element | null; undoLatest(): boolean;
   fixture: { state(): Saved; setMode(mode: string | null): void; elsewhere(ui: Record<string, unknown>): void;
-    holdWrites(): void; release(): void } };
+    holdWrites(): void; release(): void; capSession(): void; uncapSession(): void; kept(): Record<string, { snapshots: unknown[] }> } };
 const win = (page: Page) => page.evaluate.bind(page);
 const settle = (page: Page) => win(page)(() => (window as unknown as FixtureWindow).settle());
 const saved = (page: Page) => win(page)(() => (window as unknown as FixtureWindow).fixture.state());
@@ -127,6 +139,10 @@ async function present(target: Locator): Promise<Locator> {
   return target;
 }
 const button = (page: Page, name: string) => present(page.getByRole('button', { name, exact: true }));
+const call = (page: Page, name: 'capSession' | 'uncapSession') => win(page)(fn => { (window as unknown as FixtureWindow).fixture[fn](); }, name);
+const kept = (page: Page) => win(page)(() => (window as unknown as FixtureWindow).fixture.kept());
+const MAY_BE_LOST = 'Your changes may be lost if this window reloads';
+const warnings = (page: Page) => page.getByText(MAY_BE_LOST).count();
 const alerts = (page: Page) => page.getByRole('alert').allTextContents().then(all => all.map(text => text.replace(/\s+/g, ' ').trim()).filter(Boolean));
 
 async function open(): Promise<{ page: Page; errors: Error[] }> {
@@ -365,4 +381,79 @@ it('R26: Add a rule adds exactly one empty focused field after Keep them, after 
     expect(await isFocused(rule(page, count))).toBe(true);
     expect(await rule(page, 3).inputValue()).toBe('*.dat');
   } finally { await page.close(); }
+}, 120_000);
+
+it('R27: a skip-rule checkpoint that cannot be written while a save is unanswered warns, and no older partial one is restored', async () => {
+  const { page, errors } = await open();
+  try {
+    await setMode(page, 'hang');
+    await typeRuleAndLeave(page, '*.tmp');
+    expect(Object.values(await kept(page)).map(record => record.snapshots.length), 'the first change is kept').toEqual([1]);
+    expect(await warnings(page)).toBe(0);
+    await call(page, 'capSession');
+    await typeRuleAndLeave(page, '*.bak');
+    expect(await warnings(page), 'the newer change could not be kept: said before any reload').toBe(1);
+    expect(await kept(page), 'never an older partial record').toEqual({});
+    await setMode(page, null);
+    await reload(page);
+    const after = await saved(page);
+    expect(after.posts, 'nothing restored is sent').toHaveLength(1);
+    expect(after.ui.excludePatterns).toEqual(['*.log']);
+    expect(await ruleCount(page), 'the saved rules show, not the older change alone').toBe(1);
+    expect(await alerts(page)).toEqual([]);
+    expect(errors).toEqual([]);
+  } finally { await call(page, 'uncapSession'); await page.close(); }
+}, 90_000);
+
+it('R27: a reading-hours checkpoint that cannot be written while a save is unanswered warns, and no older partial one is restored', async () => {
+  const { page, errors } = await open();
+  try {
+    await setMode(page, 'hang');
+    await page.getByRole('radio', { name: 'Only between', exact: true }).check(); await settle(page);
+    expect(Object.values(await kept(page)).map(record => record.snapshots.length), 'the first change is kept').toEqual([1]);
+    await call(page, 'capSession');
+    await page.getByRole('checkbox', { name: 'Pause while on battery', exact: true }).check(); await settle(page);
+    expect(await warnings(page), 'the newer change could not be kept: said before any reload').toBe(1);
+    expect(await kept(page), 'never an older partial record').toEqual({});
+    await setMode(page, null);
+    await reload(page);
+    const after = await saved(page);
+    expect(after.ops.filter(op => op.id === 'core.set-indexing-rules'), 'nothing restored is sent').toHaveLength(1);
+    expect(await page.getByRole('radio', { name: 'Any time', exact: true }).isChecked(), 'the saved rules show').toBe(true);
+    expect(await page.getByRole('checkbox', { name: 'Pause while on battery', exact: true }).isChecked()).toBe(false);
+    expect(await alerts(page)).toEqual([]);
+    expect(errors).toEqual([]);
+  } finally { await call(page, 'uncapSession'); await page.close(); }
+}, 90_000);
+
+it('R27: the checkpoint is tried again on the next queue change; the warning goes once a whole one is kept or the queue settles', async () => {
+  const { page, errors } = await open();
+  try {
+    await win(page)(() => (window as unknown as FixtureWindow).fixture.holdWrites());
+    await typeRuleAndLeave(page, '*.tmp');
+    await call(page, 'capSession');
+    await typeRuleAndLeave(page, '*.bak');
+    expect(await warnings(page)).toBe(1);
+    await call(page, 'uncapSession');
+    await typeRuleAndLeave(page, '*.zip');
+    expect(await warnings(page), 'a whole checkpoint was kept').toBe(0);
+    expect(Object.values(await kept(page)).map(record => record.snapshots.length), 'the whole queue').toEqual([3]);
+    await call(page, 'capSession');
+    await win(page)(() => (window as unknown as FixtureWindow).fixture.release()); await settle(page);
+    expect((await saved(page)).ui.excludePatterns).toEqual(['*.log', '*.tmp', '*.bak', '*.zip']);
+    expect(await warnings(page), 'the skip-rule queue settled').toBe(0);
+    expect(await kept(page)).toEqual({});
+    await call(page, 'uncapSession');
+    await win(page)(() => (window as unknown as FixtureWindow).fixture.holdWrites());
+    await page.getByRole('radio', { name: 'Only between', exact: true }).check(); await settle(page);
+    await call(page, 'capSession');
+    await page.getByRole('checkbox', { name: 'Pause while on battery', exact: true }).check(); await settle(page);
+    expect(await warnings(page), 'reading hours could not be kept').toBe(1);
+    expect(await kept(page)).toEqual({});
+    await win(page)(() => (window as unknown as FixtureWindow).fixture.release()); await settle(page);
+    expect((await saved(page)).ui.indexingPause).toMatchObject({ schedule: { enabled: true }, pauseOnBattery: true });
+    expect(await warnings(page), 'the reading-hours queue settled while storage stayed full').toBe(0);
+    expect(await kept(page)).toEqual({});
+    expect(errors).toEqual([]);
+  } finally { await call(page, 'uncapSession'); await page.close(); }
 }, 120_000);

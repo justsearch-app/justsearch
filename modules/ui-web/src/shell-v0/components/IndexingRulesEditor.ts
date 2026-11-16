@@ -8,7 +8,7 @@ import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { settingsV2Schema, type SettingsV2 } from '../../api/generated/schema-types/settings-v2.js';
 import { requireSettingsWitness, type SettingsWitness } from '../../api/settingsAttempt.js';
 import { createOperationKey } from '../../api/operationKey.js';
-import { keepUnsettled, readUnsettled, SaveQueue, type SendOutcome } from '../state/saveQueue.js';
+import { keepUnsettled, MAY_BE_LOST, readUnsettled, SaveQueue, type SendOutcome } from '../state/saveQueue.js';
 import { z } from 'zod';
 
 export type SavedIndexingRules = {
@@ -122,6 +122,8 @@ export class IndexingRulesEditor extends JfElement {
   /** R24 — the head's write while it is out: a reload before its answer settles it with this key. */
   private inFlight: { key: string; witness: SettingsWitness } | null = null;
   private restoreChecked = false;
+  /** R27 — the unsettled changes could not be kept for a reload; tried again on each queue change. */
+  private checkpointLost = false;
   /** R25 — the control the person last changed, for "Keep my draft". */
   private lastControl: HTMLElement | null = null;
   /**
@@ -365,8 +367,10 @@ export class IndexingRulesEditor extends JfElement {
   /** R24 — what is not settled yet, kept in this window's sessionStorage; removed once nothing is. */
   private keepUnsettledRules(): void {
     const snapshots = this.queue.snapshots;
-    keepUnsettled(UNSETTLED_READING_RULES, snapshots.length && this.savedWitness ? {
+    const kept = keepUnsettled(UNSETTLED_READING_RULES, snapshots.length && this.savedWitness ? {
       base: { rules: this.savedRules, witness: this.savedWitness }, snapshots, sent: this.retained ?? this.inFlight } : null);
+    const lost = snapshots.length > 0 && !(kept && this.savedWitness);
+    if (lost !== this.checkpointLost) { this.checkpointLost = lost; this.requestUpdate(); }
   }
 
   /**
@@ -632,6 +636,7 @@ export class IndexingRulesEditor extends JfElement {
             ? ' Your newer changes are not saved yet.' : ''}` : 'Your changes are not saved yet.'}
           <button type="button" @click=${() => void this.saveIndexingRules()}>Try again</button></p>` : nothing}
         <p id="indexing-rules-error" role="alert">${this.indexingRulesError}</p>
+        ${this.checkpointLost ? html`<p role="status">${MAY_BE_LOST}.</p>` : nothing}
         <p role="status">${this.queue.sending && !this.conflictingRules ? 'Saving…'
           : this.indexingRulesDirty || this.queue.snapshots.length ? '' : this.indexingRulesMessage}</p>
         ${!this.indexingRulesLoaded ? html`<p>Waiting for saved reading rules.</p>` : nothing}

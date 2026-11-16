@@ -92,16 +92,25 @@ export class SaveQueue<S> {
 
 /**
  * R24 — an editor's unsettled saves in this window's sessionStorage, so the app's own reload (after an
- * Engine restart) does not drop them. `null` removes the record. Storage that cannot be used keeps
- * the saves in memory only.
+ * Engine restart) does not drop them. `null` removes the record.
+ *
+ * R27 — the record is the whole queue or nothing: when the newer record cannot be written (storage full
+ * or unavailable), the older one is removed, never left to be restored as if it were the queue. Returns
+ * whether the record now kept is exactly `value`; on `false` the saves live in memory only and the
+ * editor says a reload may lose them.
  */
-export function keepUnsettled(key: string, value: unknown): void {
+export function keepUnsettled(key: string, value: unknown): boolean {
   try {
     if (value === null) sessionStorage.removeItem(key); else sessionStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch {
-    // Unavailable or full storage: the queue in memory is unchanged.
+    try { sessionStorage.removeItem(key); } catch { /* Storage unavailable: nothing older can be read back either. */ }
+    return false;
   }
 }
+
+/** R27 — said next to an editor's save status while its unsettled saves could not be kept for a reload. */
+export const MAY_BE_LOST = 'Your changes may be lost if this window reloads';
 
 /** The record {@link keepUnsettled} left in this window, unvalidated; null when none or unreadable. */
 export function readUnsettled(key: string): unknown {
