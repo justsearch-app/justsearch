@@ -212,3 +212,13 @@ unchanged normal ingestion path and are not re-proven under a release here.
   "digest": "sha256:9a853a38c14312f0c92e81bccee71c1795e5897a735d1b6f4a99d0c0d9f95d7b"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-pn8q_j06",
+  "verdict": "accept",
+  "digest": "sha256:b05663f7555e9a9b4b8116b4a690d70a9c21ea9592a57ca3cc680015029220a6"
+}
+```
