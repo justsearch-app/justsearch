@@ -1208,3 +1208,13 @@ waited for "45%" in the heading; it now waits for the run's bar at 45 and measur
   "note": "Page heading 'Installing AI · N%' has no source: fm-12 shows the page lead 'Installing AI' and the share only in the top-bar status pill; its note, quoted in these entries, says 'the percentage stands once, in the status'. Affected: flow, focus-lockdown, installOperations, repairRun. The candidate shows the share twice."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-86rjupuo",
+  "verdict": "accept",
+  "digest": "sha256:3111b73e1d99239e9edbe6793e3d1deb09532d8d9fe077fb8fab0fd1be2c117a"
+}
+```
