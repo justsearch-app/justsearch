@@ -53,6 +53,7 @@ import { readIndexedRoots, subscribeIndexedRoots, getIndexedRoots, forgetIndexed
 import { takeLibraryRoot, subscribeLibraryRoot, type LibraryRootRequest } from '../router/libraryRootIntent.js';
 import { resolvePathLazy } from '../hooks/resolvePathLazy.js';
 import { icon } from '../components/Icon.js';
+import { disclosureMark, disclosureStyles } from '../components/disclosure.js';
 // 569 §14 — render the indexed-folder cards through the projection engine (the 2nd real surface).
 import { activeBodyFor, subscribePresentation } from '../state/presentationRuntime.js';
 import { subscribeAiState } from '../state/aiStateStore.js';
@@ -310,6 +311,7 @@ export class LibrarySurface extends JfElement {
     loading: { state: true },
     error: { state: true },
     excludesText: { state: true },
+    skipFieldOpen: { state: true },
     excludesLiterals: { state: true },
     unfinishedForgets: { state: true },
     forgetReadStatus: { state: true },
@@ -376,6 +378,8 @@ export class LibrarySurface extends JfElement {
   declare loading: boolean;
   declare error: string | null;
   declare excludesText: string;
+  /** fm-07 — an empty field added while the list holds no rule; with none, no rule field shows. */
+  declare private skipFieldOpen: boolean;
   declare excludesInvalidPatterns: string[];
   declare excludesLoaded: boolean;
   /** A load or a match count is running. */
@@ -407,6 +411,8 @@ export class LibrarySurface extends JfElement {
   declare private removalBusy: boolean;
   private removalAskSerial = 0;
   private lastEditedRule = 0;
+  /** fm-07 — a pointer is pressing Add a rule (from pointerdown until its pointerup). */
+  private addRulePressed = false;
   /**
    * R7/R11 — the drafts captured when their field was left (or by Try again or Undo), saved in order.
    * Only these bytes are ever sent: text typed after returning to a field stays a draft until it is left.
@@ -571,6 +577,7 @@ export class LibrarySurface extends JfElement {
     this.loading = false;
     this.error = null;
     this.excludesText = '';
+    this.skipFieldOpen = false;
     this.excludesInvalidPatterns = [];
     this.excludesLoaded = false;
     this.excludesLiterals = [];
@@ -631,6 +638,7 @@ export class LibrarySurface extends JfElement {
   // AgentView). The Folders tab's own body scrolls inside `.folders-scroll`; the Browse member
   // surface carries its own SurfaceLayout.
   static styles = [
+    disclosureStyles,
     css`
     :host {
       display: contents;
@@ -854,7 +862,6 @@ export class LibrarySurface extends JfElement {
       .excludes-header { display: block; }
       .excludes-header .actions { margin: .5rem 0; }
       .rules-help { font-size: var(--font-size-xs); color: var(--text-secondary); margin: .5rem 0; }
-      .rules-help summary { cursor: pointer; }
       .skip-rule { display: flex; align-items: center; border-bottom: 1px solid var(--border-subtle); }
       .skip-rule input { flex: 1; min-width: 0; padding: .5rem .2rem; font: inherit; font-size: var(--font-size-sm); font-family: monospace;
         border: 0; background: transparent; color: var(--text-primary); }
@@ -1103,6 +1110,8 @@ export class LibrarySurface extends JfElement {
 
   protected override willUpdate(changed: Map<string, unknown>): void {
     super.willUpdate(changed);
+    // fm-07 — an open empty field belongs to the empty list it was added to; a rule ends that.
+    if (changed.has('excludesText') && this.excludesText !== '') this.skipFieldOpen = false;
     // DE1 — a removal band whose folder left the list (removed in another window) is no longer asking.
     if (changed.has('roots') && this.removeConfirm && !this.roots.some(root => root.pathHash === this.removeConfirm?.hash)) {
       this.removeConfirm = null;
@@ -1774,16 +1783,14 @@ export class LibrarySurface extends JfElement {
    * fields the person opened at the end; the one that had focus keeps it.
    */
   private replaceDraftText(text: string): void {
-    const fields = this.excludesText.split('\n');
+    const fields = this.skipFields;
     let open = 0;
     while (open < fields.length && !fields[fields.length - 1 - open]!.trim()) open++;
-    // With no rule shown, the first empty field is the one every empty list shows.
-    if (open === fields.length) open--;
-    const next = [...text.split('\n'), ...fields.slice(fields.length - open)];
+    const next = [...(text ? text.split('\n') : []), ...fields.slice(fields.length - open)];
     const inputs = [...(this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input') ?? [])];
     const active = deepActiveElement();
     const at = inputs.findIndex(input => input === active);
-    this.excludesText = next.join('\n');
+    this.setSkipFields(next);
     if (open === 0 || at < fields.length - open) return;
     const target = next.length - (fields.length - at);
     void this.updateComplete.then(() => {
@@ -1791,6 +1798,16 @@ export class LibrarySurface extends JfElement {
       if (now && now !== active && now !== document.body) return;
       this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input')[target]?.focus();
     });
+  }
+
+  /** fm-07 — the rule fields shown: one per line of the draft, none for an empty list unless one was added. */
+  private get skipFields(): string[] {
+    return this.excludesText === '' && !this.skipFieldOpen ? [] : this.excludesText.split('\n');
+  }
+
+  private setSkipFields(fields: readonly string[]): void {
+    this.excludesText = fields.join('\n');
+    this.skipFieldOpen = this.excludesText === '' && fields.length > 0;
   }
 
   /** R25 — focus a rule field (the first when that one is gone), or Add a rule when no rule is shown. */
@@ -2441,6 +2458,35 @@ export class LibrarySurface extends JfElement {
   }
 
   /**
+   * Leaving a skip-rule field saves the draft (below). fm-07 — a field left empty goes first, so an added
+   * rule never typed leaves no field and changes nothing saved; leaving the window keeps it.
+   */
+  private leaveSkipRule(event: FocusEvent): void {
+    const field = event.target as HTMLElement;
+    if (!field.matches('.skip-rule input')) return;
+    const rows = [...(this.shadowRoot?.querySelectorAll('.skip-rule') ?? [])];
+    const index = rows.findIndex(row => row.contains(field));
+    const fields = this.skipFields;
+    const to = event.relatedTarget instanceof Element ? event.relatedTarget : null;
+    // A pointer press on Add a rule keeps the field (Add focuses it): removing it would move the button
+    // from under the pointer and lose the press.
+    const adding = this.addRulePressed && !!to?.closest('.add-rule');
+    if (index >= 0 && !fields[index]?.trim() && !adding && (to || document.hasFocus())) {
+      // Fields are rendered by position: focus moving to a later row stays on that row after the removal.
+      const toRow = to ? rows.findIndex(row => row.contains(to)) : -1;
+      const toPart = toRow > index && to?.matches('input') ? 'input' : null;
+      this.setSkipFields(fields.filter((_, i) => i !== index));
+      if (this.lastEditedRule >= index) this.lastEditedRule = Math.max(0, this.lastEditedRule - 1);
+      if (toPart) {
+        void this.updateComplete.then(() => {
+          this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input')[toRow - 1]?.focus();
+        });
+      }
+    }
+    void this.handleSaveExcludes();
+  }
+
+  /**
    * A save-triggering event — leaving a skip-rule field, switching tabs, leaving Library, Try again:
    * the draft as it is now is captured and queued behind every earlier change (R7, R11). A rule that
    * is not complete yet is not captured; its field says why. Typing after returning to a field changes
@@ -2955,8 +3001,7 @@ export class LibrarySurface extends JfElement {
         <div class="excludes-header">
           <div>
             <h3>Skip these files</h3>
-            <p>One rule per line. A rule is saved when you leave its field.</p>
-            <details class="rules-help"><summary>How rules work</summary><p>
+            <details class="rules-help"><summary class="disclosure">${disclosureMark()}How rules work</summary><p>
               One glob per line. Bare names like <code>node_modules</code> or
               <code>dist/</code> match at any depth.
               <code>[ab]</code> matches one listed character; <code>[a-z]</code> matches a range;
@@ -3006,38 +3051,44 @@ export class LibrarySurface extends JfElement {
               }}>Remove keep-out</jf-button>
           </li>`)}</ul>
         </section>` : nothing}
-        <div class="skip-rules" role="group" aria-label="Exclude patterns"
-          @focusout=${(event: FocusEvent) => { if ((event.target as HTMLElement).matches('.skip-rule input')) void this.handleSaveExcludes(); }}>
-          ${this.excludesText.split('\n').map((rule, index) => {
+        <div class="skip-rules" role="group" aria-label="Exclude patterns" @focusout=${this.leaveSkipRule}>
+          <span id="excludes-saving" class="visually-hidden">A rule is saved when you leave its field.</span>
+          ${this.skipFields.map((rule, index) => {
             const problem = this.excludesRuleProblem?.index === index ? this.excludesRuleProblem : null;
             return html`<div class="skip-rule">
             <input type="text" aria-label=${`Skip rule ${index + 1}`}
-              aria-describedby=${`excludes-help${isOverride(this.excludesPolicy) ? ' excludes-override' : ''}${problem ? ` rule-problem-${index}` : ''}${this.excludesError ? ' excludes-error' : ''}`}
+              aria-describedby=${`excludes-saving excludes-help${isOverride(this.excludesPolicy) ? ' excludes-override' : ''}${problem ? ` rule-problem-${index}` : ''}${this.excludesError ? ' excludes-error' : ''}`}
               aria-invalid=${problem || this.excludesError ? 'true' : 'false'}
               ?disabled=${!this.excludesLoaded}
               .value=${rule} @input=${(event: Event) => {
-                const rules = this.excludesText.split('\n'); rules[index] = (event.target as HTMLInputElement).value;
-                this.excludesText = rules.join('\n');
+                const rules = this.skipFields; rules[index] = (event.target as HTMLInputElement).value;
+                this.setSkipFields(rules);
                 this.lastEditedRule = index;
               }}>
-            <jf-button variant="ghost" label=${`Remove skip rule ${index + 1}`}
+            ${!rule.trim() ? nothing : html`<jf-button variant="ghost" label=${`Remove skip rule ${index + 1}`}
               .disabled=${!this.excludesLoaded}
               .onActivate=${() => {
-                this.excludesText = this.excludesText.split('\n').filter((_, i) => i !== index).join('\n');
+                this.setSkipFields(this.skipFields.filter((_, i) => i !== index));
                 this.lastEditedRule = Math.max(0, index - 1);
                 void this.handleSaveExcludes();
               }}
-              >${icon({ name: 'x', size: 14 })}</jf-button>
+              >${icon({ name: 'x', size: 14 })}</jf-button>`}
           </div>${problem ? html`<p id=${`rule-problem-${index}`} class="rule-problem" role="alert">${problem.reason}</p>` : nothing}`;
           })}
           <jf-button class="add-rule" variant="ghost" label="Add a rule"
             .disabled=${!this.excludesLoaded}
+            @pointerdown=${() => {
+              this.addRulePressed = true;
+              window.addEventListener('pointerup', () => { this.addRulePressed = false; }, { once: true });
+            }}
             .onActivate=${() => {
-              // R26 — one empty field per press, focused; nothing is awaited, so no press is refused as busy.
-              this.excludesText += '\n';
+              // R26 — one empty focused field per press; nothing is awaited, so no press is refused as busy.
+              // fm-07 — an empty field already last is the one focused, never a second empty one.
+              const fields = this.skipFields;
+              if (fields.length === 0 || fields[fields.length - 1]!.trim()) this.setSkipFields([...fields, '']);
               void this.updateComplete.then(() => {
-                const fields = this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input');
-                fields?.[fields.length - 1]?.focus();
+                const inputs = this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input');
+                inputs?.[inputs.length - 1]?.focus();
               });
             }}><span aria-hidden="true">+</span> Add a rule</jf-button>
         </div>

@@ -226,6 +226,9 @@ it('S6b-1: no Save, Reload, Preview or Apply row; first run writes nothing on op
     expect(named(el.shadowRoot, name), name).toBeUndefined();
     expect(named(editor(el).shadowRoot, name), name).toBeUndefined();
   }
+  // fm-07 PD4: with no rules there is no rule field until Add a rule; one added and left empty writes nothing.
+  expect(el.shadowRoot!.querySelector('input[aria-label^="Skip rule "]')).toBeNull();
+  await press(el, control(el.shadowRoot, 'Add a rule'));
   const field = rule(el, 1); field.focus(); await leave(el, field);
   const any = editor(el).shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery');
   expect(any).toBeTruthy(); any!.focus(); any!.blur(); await settle(el);
@@ -254,7 +257,8 @@ it('S6b-1: a blank new row writes nothing; deleting the last rule saves an empty
   await press(el, control(el.shadowRoot, 'Add a rule'));
   await leave(el, rule(el, 2));
   expect(f.posts).toEqual([]);
-  await press(el, control(el.shadowRoot, 'Remove skip rule 2'));
+  // fm-07 PD4: the blank row left goes by itself (it never had a remove cross).
+  expect(el.shadowRoot!.querySelector('input[aria-label="Skip rule 2"]')).toBeNull();
   await press(el, control(el.shadowRoot, 'Remove skip rule 1'));
   expect(globsSent(f)).toEqual([[]]);
   expect(f.s.ui.excludePatterns).toEqual([]);
@@ -463,7 +467,9 @@ it('B3: a load failure says so with Try again, and the editor is not editable un
     ? new Response('{}', { status: 503 }) : real(path, init));
   const el = await mount(f);
   expect(text(el.shadowRoot)).toContain("Couldn't load your skip rules");
-  expect(rule(el, 1).disabled).toBe(true);
+  // fm-07 PD4: no rule field shows before the list is known; Add a rule is not available.
+  expect(el.shadowRoot!.querySelector('input[aria-label^="Skip rule "]')).toBeNull();
+  expect((control(el.shadowRoot, 'Add a rule') as HTMLElement & { disabled: boolean }).disabled).toBe(true);
   fail = false;
   await press(el, control(el.shadowRoot!.querySelector('section[aria-label="Exclude patterns"]'), 'Try again'));
   expect(rule(el, 1).disabled).toBe(false);

@@ -336,8 +336,11 @@ it('R26: Add a rule adds exactly one empty focused field after Keep them, after 
   const { page } = await open();
   try {
     const add = page.getByRole('button', { name: 'Add a rule', exact: true });
+    // fm-07 PD4: a press while an empty field is already last focuses that field, so the count is of rules held.
+    const filled = async () => (await page.getByRole('textbox', { name: /^Skip rule \d+$/ }).evaluateAll(
+      (fields: HTMLInputElement[]) => fields.filter(field => field.value.trim()).length));
     const addsOne = async (how: string, meanwhile?: () => Promise<void>) => {
-      const count = await ruleCount(page);
+      const count = await filled();
       await add.click(); await settle(page);
       if (meanwhile) await meanwhile();
       expect(await ruleCount(page), how).toBe(count + 1);
@@ -358,10 +361,10 @@ it('R26: Add a rule adds exactly one empty focused field after Keep them, after 
     await addsOne('across a passive re-read', async () => {
       await win(page)(() => window.dispatchEvent(new Event('focus'))); await settle(page);
     });
-    await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Shift+Tab'); await settle(page);
-    await (await button(page, 'Remove skip rule 4')).click(); await settle(page);
-    await (await button(page, 'Remove skip rule 3')).click(); await settle(page);
+    // fm-07 PD4: the empty field left goes by itself, without a save.
+    await page.keyboard.press('Shift+Tab'); await settle(page);
     expect(await ruleCount(page)).toBe(2);
+    expect((await saved(page)).ui.excludePatterns).toEqual(['*.log', '*.tmp']);
     await win(page)(() => (window as unknown as FixtureWindow).fixture.holdWrites());
     await typeRuleAndLeave(page, '*.dat');
     await addsOne('while a save completes', async () => {
