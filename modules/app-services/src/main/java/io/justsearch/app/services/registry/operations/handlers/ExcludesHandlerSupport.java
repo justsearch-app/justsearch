@@ -26,6 +26,12 @@ final class ExcludesHandlerSupport {
 
   static OperationResult run(
       Supplier<ExcludesService> supplier, boolean dryRun, Logger log, String handlerLabel, EngineContext engineContext) {
+    return run(supplier, dryRun, null, log, handlerLabel, engineContext);
+  }
+
+  /** {@code consentedRules}: the saved list a removal was consented for, or null for none. */
+  static OperationResult run(Supplier<ExcludesService> supplier, boolean dryRun, List<?> consentedRules,
+      Logger log, String handlerLabel, EngineContext engineContext) {
     ExcludesService excludes;
     try {
       excludes = supplier.get();
@@ -40,7 +46,10 @@ final class ExcludesHandlerSupport {
 
     ExcludesService.ExcludesResult result;
     try {
-      result = excludes.applyExcludes(dryRun, engineContext);
+      result = consentedRules == null ? excludes.applyExcludes(dryRun, engineContext)
+          : excludes.applyConsentedExcludes(consentedRules, engineContext);
+    } catch (ExcludesService.RulesChangedException changed) {
+      return OperationResult.failure(changed.getMessage(), "EXCLUDES_CHANGED", Map.of(), false);
     } catch (Exception e) {
       io.justsearch.app.services.worker.EngineRefusals.rethrow(e);
       log.error("{}: applyExcludes threw (dryRun={})", handlerLabel, dryRun, e);

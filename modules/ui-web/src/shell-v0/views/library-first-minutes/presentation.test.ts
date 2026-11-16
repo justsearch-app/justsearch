@@ -96,7 +96,9 @@ it('K5/M1/M7/M11: expert history and activity are opt-in, unavailable removals a
   expect(el.shadowRoot!.querySelector('.removal-history')).toBeNull();
   expect(el.shadowRoot!.querySelector('jf-ingestion-summary')).toBeNull();
   expect(el.shadowRoot!.querySelector('[label="Activity"]')).not.toBeNull();
-  expect(el.shadowRoot!.querySelector('[label="Save patterns"]')).not.toBeNull();
+  // The skip-rule editor stays in the default view; since slice 6b-2 it has no Save row.
+  expect(el.shadowRoot!.querySelector('[label="Add a rule"]')).not.toBeNull();
+  expect(el.shadowRoot!.querySelector('[label="Save patterns"]')).toBeNull();
   Object.assign(el, { forgetReadStatus: 'unavailable', roots: [], otherSources: { sources: [{ collection: 'notes', docCount: 3 }], truncated: false } });
   await settle(el);
   expect(el.shadowRoot!.querySelector('[data-testid="unfinished-forgets"]')).not.toBeNull();

@@ -228,6 +228,8 @@ export class OperationClient {
   async invoke(
     operationId: string,
     request: OperationInvocationRequest = {},
+    /** Abandons the request, including any admission wait, when the caller stops waiting. */
+    signal?: AbortSignal,
   ): Promise<OperationInvocationSuccess> {
     if (!operationId) {
       throw new OperationError('operationId required', 'BAD_REQUEST');
@@ -254,6 +256,7 @@ export class OperationClient {
         method: 'POST',
         headers,
         body,
+        ...(signal ? { signal } : {}),
       });
     } catch (err: unknown) {
       const detail = err instanceof Error ? err.message : String(err);
@@ -352,13 +355,15 @@ export class OperationClient {
         argsSummary?: string;
         purpose?: string;
       }) => Promise<{ approved: boolean; allowAlways: boolean; superseded?: boolean; failedClosed?: boolean }>;
+      /** Abandons the invocations (and their admission waits) when the caller stops waiting. */
+      signal?: AbortSignal;
     } = {},
   ): Promise<OperationInvocationSuccess> {
     // Preserve the exact JSON input sent before the asynchronous ceremony. A caller can
     // keep editing its own request while the prompt is open; that cannot change this retry.
     const original = JSON.parse(JSON.stringify(request)) as OperationInvocationRequest;
     try {
-      return await this.invoke(operationId, original);
+      return await this.invoke(operationId, original, opts.signal);
     } catch (err: unknown) {
       if (
         err instanceof OperationError &&
@@ -396,7 +401,7 @@ export class OperationClient {
             idempotencyKey: approval.operationKey ?? original.idempotencyKey,
             preparationNonce: approval.preparationNonce ?? original.preparationNonce,
             confirmationToken: approval.capsule,
-          });
+          }, opts.signal);
         }
       }
       throw err;

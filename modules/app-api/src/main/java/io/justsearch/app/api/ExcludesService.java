@@ -34,6 +34,28 @@ public interface ExcludesService {
    */
   ExcludesResult applyExcludes(boolean dryRun, EngineContext engineContext) throws Exception;
 
+  /**
+   * Remove read files matching the rules in effect, only when those rules are exactly the saved list
+   * the person was asked about ({@code consentedRules}: glob strings and exact-path entries, as saved).
+   * The comparison uses the same policy snapshot the removal then applies, so a list saved elsewhere
+   * after the ask, or an override in effect, removes nothing.
+   *
+   * @throws RulesChangedException before anything is removed when the rules in effect differ
+   * @throws Exception as {@link #applyExcludes} otherwise
+   */
+  default ExcludesResult applyConsentedExcludes(List<?> consentedRules, EngineContext engineContext) throws Exception {
+    throw new UnsupportedOperationException("Consent-bound exclusion removal unavailable");
+  }
+
+  /** The rules in effect are not the list the removal was consented for; nothing was removed. */
+  final class RulesChangedException extends Exception {
+    private static final long serialVersionUID = 1L;
+
+    public RulesChangedException() {
+      super("The skip rules in effect changed since removal was asked for; nothing was removed");
+    }
+  }
+
   /** Effective matcher policy and the resolver's winning source; reading it does not walk disk. */
   default ExcludesPolicy effectivePolicy() {
     throw new UnsupportedOperationException("Effective exclusion policy unavailable");

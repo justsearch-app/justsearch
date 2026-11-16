@@ -12,21 +12,37 @@ interface Editor extends HTMLElement {
   handleSaveExcludes?: () => Promise<void>;
   handlePreviewExcludes(): Promise<void>; handleApplyExcludes(): Promise<void>;
 }
+type Pressable = HTMLElement & { onActivate?: () => unknown };
+async function settle(el: Editor) { for (let i = 0; i < 30; i++) { await Promise.resolve(); await el.updateComplete; } }
+function control(root: ParentNode | null | undefined, name: string): Pressable {
+  const found = [...(root?.querySelectorAll<Pressable>('button, jf-button') ?? [])].find(c =>
+    c.textContent?.trim() === name || c.getAttribute('label') === name || c.getAttribute('aria-label') === name);
+  expect(found, name).toBeDefined(); return found!;
+}
+/** Add *.tmp and leave its field: the save asks in place whether to remove matching read files. */
+async function addRuleAndAsk(el: Editor): Promise<HTMLElement> {
+  el.excludesText = '*.log\n*.tmp'; await settle(el);
+  const field = el.shadowRoot!.querySelector<HTMLInputElement>('input[aria-label="Skip rule 2"]');
+  expect(field).toBeTruthy(); field!.focus(); field!.blur(); await settle(el);
+  const ask = el.shadowRoot!.querySelector<HTMLElement>('[role="region"][aria-label^="Remove files already read"]');
+  expect(ask, 'the in-place removal ask').toBeTruthy(); return ask!;
+}
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const result = { dryRun: false, patterns: 1, rootsProcessed: 1, deletedByPathJobs: 0,
   deletedById: 2, matchedFiles: 3, perPattern: [{ pattern: '*.log', matches: 3 }],
   capped: false, confirmedRemovals: 2, uncheckedScopes: [] };
 function fixture() {
+  // Policy observation is independent of the retained settings-attempt transport.
+  let savedPatterns: string[] = [];
+  let witness: { acceptedRevision: number; lastCommittedOperationKey: string | null } = { acceptedRevision: 0, lastCommittedOperationKey: null };
   const send = vi.fn<PluginHostApi['data']['fetch']>().mockImplementation(async (_, init) => {
     if (init?.body) {
       const attempt = JSON.parse(String(init.body));
-      return json({ state: 'COMPLETE', operationKey: attempt.operationKey,
-        witness: { acceptedRevision: attempt.witness.acceptedRevision + 1, lastCommittedOperationKey: attempt.operationKey } });
+      witness = { acceptedRevision: attempt.witness.acceptedRevision + 1, lastCommittedOperationKey: attempt.operationKey };
+      return json({ state: 'COMPLETE', operationKey: attempt.operationKey, witness });
     }
-    return json({ ui: { excludePatterns: ['*.log'] }, witness: { acceptedRevision: 0, lastCommittedOperationKey: null } });
+    return json({ ui: { excludePatterns: savedPatterns.length ? savedPatterns : ['*.log'] }, witness });
   });
-  // Policy observation is independent of the retained settings-attempt transport.
-  let savedPatterns: string[] = [];
   const fetchPolicy: PluginHostApi['data']['fetch'] = async (path, init) => {
     if (path === '/api/indexing/excludes') return json({ source: 'settings.json', sourceDetail: null, patterns: savedPatterns });
     const response = await send(path, init);
@@ -44,7 +60,7 @@ function fixture() {
 }
 afterEach(() => { document.body.innerHTML = ''; vi.restoreAllMocks(); });
 
-it('S32.1 recovers the real OperationClient 428 only after typed consent', async () => {
+it('S32.1 recovers the real OperationClient 428 after the in-place answer, without a second dialog', async () => {
   const { el, confirm, send } = fixture();
   const transport = vi.fn<typeof fetch>()
     .mockResolvedValueOnce(json({ success: false, errorClass: 'CONFIRMATION_REQUIRED',
@@ -53,117 +69,113 @@ it('S32.1 recovers the real OperationClient 428 only after typed consent', async
     .mockResolvedValueOnce(json({ success: true, structuredData: result }));
   const client = new OperationClient({ apiBase: '', fetchImpl: transport });
   el.host_.data.invokeOperation = (id, args, opts) => client.invokeWithConsent(id, { args }, opts);
-  await el.loadExcludes();
-  await el.handleApplyExcludes();
-  expect(el.error, 'S32.1: the 428 must recover through typed consent').toBeNull();
-  expect(confirm).toHaveBeenCalledWith(expect.stringContaining('saved patterns'),
-    { confirmLabel: 'Apply', destructive: true, typedConfirmWord: 'core.apply-excludes' });
+  await el.loadExcludes(); document.body.appendChild(el); await settle(el);
+  const ask = await addRuleAndAsk(el);
+  control(ask, 'Remove from search').click(); await settle(el);
+  expect(el.error, 'S32.1: the 428 must recover through the consented answer').toBeNull();
+  expect(confirm, 'the in-place answer is the consent').not.toHaveBeenCalled();
   expect(transport.mock.calls.map(([url]) => url)).toEqual([
     '/api/operations/core.apply-excludes/invoke', '/api/authorizations/approve', '/api/operations/core.apply-excludes/invoke',
   ]);
-  expect(send).toHaveBeenCalledTimes(1);
+  expect(send.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
 });
 
-it('S32.1 cancelling typed Apply removes nothing and never saves a draft', async () => {
+it('S32.1 Keep them removes nothing and never saves again', async () => {
   const { el, confirm, invoke, send } = fixture();
-  confirm.mockResolvedValue(false);
-  await el.loadExcludes();
-  await el.handleApplyExcludes();
+  await el.loadExcludes(); document.body.appendChild(el); await settle(el);
+  const ask = await addRuleAndAsk(el);
+  control(ask, 'Keep them').click(); await settle(el);
   expect(invoke).not.toHaveBeenCalled();
-  expect(send).toHaveBeenCalledTimes(1);
+  expect(confirm).not.toHaveBeenCalled();
+  expect(send.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
   expect(el.error).toBeNull();
 });
 
-it('S32.2 Save is explicit and unsaved drafts disable Preview and Apply', async () => {
+it('S32.2 there is no Save, Preview or Apply; a draft is not saved before its field is left', async () => {
   const { el, send, invoke } = fixture();
   await el.loadExcludes();
   el.excludesText = '*.tmp';
   document.body.appendChild(el); await el.updateComplete;
   const root = el.shadowRoot!;
-  expect(root.querySelector('jf-button[label="Save patterns"]')).not.toBeNull();
-  expect(root.textContent).toContain('Save changes what future reading skips');
-  for (const label of ['Preview', 'Apply']) {
-    expect((root.querySelector(`jf-button[label="${label}"]`) as HTMLElement & { disabled: boolean }).disabled).toBe(true);
-  }
+  for (const label of ['Save patterns', 'Preview', 'Apply', 'Reload saved patterns']) expect(root.querySelector(`jf-button[label="${label}"]`)).toBeNull();
+  expect(root.textContent).toContain('A rule is saved when you leave its field');
   await el.handlePreviewExcludes(); await el.handleApplyExcludes();
   expect(send.mock.calls.filter(([path, init]) => path === '/api/settings/v2' && init?.signal)).toHaveLength(1);
   expect(invoke).not.toHaveBeenCalled();
 });
 
-it('S32.3 WX1 renders confirmed scope counts and every unchecked scope without claiming documents', async () => {
+it('S32.3 WX1 a partial removal names every scope not checked or not removed, and counts no files from deletion requests', async () => {
   const { el, invoke } = fixture();
   const scopes = [
     { path: '/offline', status: 'not_checked', reason: 'Watched folder is offline or missing' },
     { path: '/docs/refused.log', status: 'not_removed', reason: 'Engine refused deletion' },
   ];
   invoke.mockResolvedValue({ success: true, structuredData: { ...result, uncheckedScopes: scopes } });
-  await el.loadExcludes(); await el.handleApplyExcludes();
-  document.body.appendChild(el); await el.updateComplete;
-  const output = el.shadowRoot?.querySelector('[data-testid="excludes-result"]');
-  expect(output?.textContent).toContain('Partial Apply');
-  expect(output?.textContent).toContain('2 matching files or folders confirmed no longer searchable');
-  for (const scope of scopes) { expect(output?.textContent).toContain(scope.path); expect(output?.textContent).toContain(scope.reason); }
-  expect(output?.getAttribute('role')).toBe('status');
+  await el.loadExcludes(); document.body.appendChild(el); await settle(el);
+  control(await addRuleAndAsk(el), 'Remove from search').click(); await settle(el);
+  const output = el.shadowRoot?.querySelector('.removal-slot [role="status"]');
+  expect(output).toBeTruthy();
+  expect(output?.textContent).toContain('Partly done');
+  // R10: confirmedRemovals counts deletion requests (a folder is one), never files.
+  expect(output?.textContent).not.toMatch(/\d+ files? removed/);
+  expect(output?.textContent).toContain('Offline or missing folder, not checked: /offline');
+  expect(output?.textContent).toContain("Couldn't be removed: /docs/refused.log");
+  for (const scope of scopes) expect([...output!.querySelectorAll('li')].some(li => li.getAttribute('title') === scope.reason)).toBe(true);
 });
 
-it('S32.3 an old or missing result is unconfirmed rather than a complete Apply', async () => {
+it('S32.3 an old or missing result is not sure rather than a complete removal', async () => {
   const { el, invoke } = fixture();
   invoke.mockResolvedValue({ success: true, structuredData: { deletedById: 3 } });
-  await el.loadExcludes(); await el.handleApplyExcludes();
-  document.body.appendChild(el); await el.updateComplete;
-  expect(el.shadowRoot?.querySelector('[data-testid="excludes-result"]')?.textContent).toContain('unconfirmed');
+  await el.loadExcludes(); document.body.appendChild(el); await settle(el);
+  control(await addRuleAndAsk(el), 'Remove from search').click(); await settle(el);
+  expect(el.shadowRoot?.querySelector('.removal-slot')?.textContent).toContain('Not sure the files were removed');
 });
 
-it('WX2 explains buffered removals and keeps them out of the completed count', async () => {
+it('WX2 explains buffered removals and says no count of removed files', async () => {
   const { el, invoke } = fixture();
   invoke.mockResolvedValue({ success: true, structuredData: { ...result, confirmedRemovals: 0,
     uncheckedScopes: [{ path: '/docs/pending.log', status: 'not_removed',
       reason: 'Removal completes when the index rebuild finishes' }] } });
-  await el.loadExcludes(); await el.handleApplyExcludes();
-  document.body.appendChild(el); await el.updateComplete;
-  const text = el.shadowRoot?.querySelector('[data-testid="excludes-result"]')?.textContent;
-  expect(text).toContain('Partial Apply');
-  expect(text).toContain('0 matching files or folders confirmed no longer searchable');
-  expect(text).toContain('/docs/pending.log');
-  expect(text).toContain('Removal completes when the index rebuild finishes');
+  await el.loadExcludes(); document.body.appendChild(el); await settle(el);
+  control(await addRuleAndAsk(el), 'Remove from search').click(); await settle(el);
+  const text = el.shadowRoot?.querySelector('.removal-slot')?.textContent;
+  expect(text).toContain('Partly done');
+  expect(text).not.toMatch(/\d+ files? removed/);
+  expect(text).toContain('Waits for the rebuild to finish: /docs/pending.log');
   expect(el.shadowRoot?.querySelector('#excludes-help')?.textContent)
-    .toContain('During a rebuild of search data, removal may wait until the rebuild finishes.');
+    .toContain('During a rebuild of search data, removal may wait');
 });
 
-it('S32.6 invalid saves keep the draft editable with an inline announced error', async () => {
+it('S32.6 an incomplete rule keeps the draft editable with an inline announced reason and is not sent', async () => {
   const { el, send } = fixture();
   await el.loadExcludes(); el.excludesText = '[broken';
-  send.mockResolvedValueOnce(json({ errorCode: 'INVALID_REQUEST', error: 'Invalid settings request' }, 400));
-  expect(el.handleSaveExcludes).toBeTypeOf('function');
   await el.handleSaveExcludes?.();
   document.body.appendChild(el); await el.updateComplete;
   const field = el.shadowRoot?.querySelector<HTMLInputElement>('.skip-rule input');
   expect(field?.value).toBe('[broken'); expect(field?.disabled).toBe(false);
   expect(field?.getAttribute('aria-invalid')).toBe('true');
-  expect(el.shadowRoot?.querySelector('#excludes-error[role="alert"]')?.textContent).toContain('Invalid settings request');
+  expect(el.shadowRoot?.querySelector('#rule-problem-0[role="alert"]')?.textContent).toContain('a [ needs a closing ]');
+  expect(send.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
 });
 
-it('S32.5 keeps the conflicting draft while reviewing latest settings before a fresh Save', async () => {
+it('S32.5 keeps the conflicting draft, shows the saved rules, and Keep my draft saves on their revision', async () => {
   const { el, send } = fixture();
   await el.loadExcludes(); el.excludesText = 'my draft';
-  send.mockResolvedValueOnce(json({ errorCode: 'VERSION_CONFLICT', state: 'FAILED' }, 409));
-  expect(el.handleSaveExcludes).toBeTypeOf('function');
+  send.mockResolvedValueOnce(json({ errorCode: 'VERSION_CONFLICT', state: 'FAILED' }, 409))
+    .mockResolvedValueOnce(json({ ui: { excludePatterns: ['elsewhere'] },
+      witness: { acceptedRevision: 1, lastCommittedOperationKey: '01993ba0-0000-7000-8000-000000000001' } }));
   await el.handleSaveExcludes?.();
-  document.body.appendChild(el); await el.updateComplete;
-  const review = el.shadowRoot?.querySelector('jf-button[label="Review latest settings, keep draft"]') as HTMLElement & { onActivate?: () => void };
-  expect(review).toBeTruthy();
-  send.mockResolvedValueOnce(json({ ui: { excludePatterns: ['elsewhere'] },
-    witness: { acceptedRevision: 1, lastCommittedOperationKey: '01993ba0-0000-7000-8000-000000000001' } }));
-  review.onActivate?.();
-  for (let i = 0; i < 12; i++) { await Promise.resolve(); await el.updateComplete; }
+  document.body.appendChild(el); await settle(el);
+  const conflict = el.shadowRoot?.querySelector('.skip-conflict');
+  expect(conflict?.textContent).toContain('Changed elsewhere');
+  expect(conflict?.textContent).toContain('elsewhere');
   expect(el.excludesText).toBe('my draft');
-  expect(el.shadowRoot?.querySelector('.excludes-section details.saved-patterns')?.textContent).toContain('elsewhere');
   send.mockImplementationOnce(async (_, init) => {
     const attempt = JSON.parse(String(init?.body));
     return json({ state: 'COMPLETE', operationKey: attempt.operationKey,
       witness: { acceptedRevision: 2, lastCommittedOperationKey: attempt.operationKey } });
   });
-  await el.handleSaveExcludes?.();
+  control(conflict, 'Keep my draft').click(); await settle(el);
   const writes = send.mock.calls.filter(([, init]) => init?.method === 'POST');
   expect(writes).toHaveLength(2);
   expect(JSON.parse(String(writes[1]?.[1]?.body)).ui.excludePatterns).toEqual(['my draft']);
@@ -171,28 +183,35 @@ it('S32.5 keeps the conflicting draft while reviewing latest settings before a f
   expect(el.excludesText).toBe('my draft');
 });
 
-it('S32.7 announces busy and the final result once while Apply blocks overlapping actions', async () => {
+it('S32.7 announces busy and the final outcome once while a removal in flight ignores repeated answers', async () => {
   const { el, invoke, confirm } = fixture();
-  await el.loadExcludes(); document.body.appendChild(el); await el.updateComplete;
+  await el.loadExcludes(); document.body.appendChild(el); await settle(el);
+  const ask = await addRuleAndAsk(el);
   let finish!: (value: unknown) => void;
   invoke.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-  const applying = el.handleApplyExcludes();
-  for (let i = 0; i < 12; i++) { await Promise.resolve(); await el.updateComplete; }
+  control(ask, 'Remove from search').click(); await settle(el);
   try {
-    const statuses = el.shadowRoot?.querySelectorAll('[data-testid="excludes-result"][role="status"]');
-    expect(statuses).toHaveLength(1);
-    expect(statuses?.[0]?.textContent).toContain('Working on exclusions');
-    for (const label of ['Save patterns', 'Preview', 'Apply', 'Reload saved patterns']) {
-      expect((el.shadowRoot?.querySelector(`jf-button[label="${label}"]`) as HTMLElement & { disabled: boolean }).disabled).toBe(true);
-    }
-    await el.handleApplyExcludes(); await el.handlePreviewExcludes();
-    expect(confirm).toHaveBeenCalledTimes(1); expect(invoke).toHaveBeenCalledTimes(1);
+    // R15: while the removal runs, one polite status says so.
+    const busy = el.shadowRoot?.querySelectorAll('.removal-slot [role="status"]');
+    expect(busy).toHaveLength(1);
+    expect(busy?.[0]?.textContent?.trim()).toBe('Removing matching files from search…');
+    expect(busy?.[0]?.closest('[aria-live]')?.getAttribute('aria-live')).toBe('polite');
+    expect(control(ask, 'Remove from search').getAttribute('aria-disabled')).toBe('true');
+    control(ask, 'Remove from search').click(); control(ask, 'Keep them').click(); await settle(el);
+    // As on main: a removal or a count started while the removal runs does nothing (R20).
+    await el.handleApplyExcludes(); await el.handlePreviewExcludes(); await settle(el);
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(confirm).not.toHaveBeenCalled();
   } finally {
     finish({ success: true, structuredData: result });
-    await applying;
   }
-  const statuses = el.shadowRoot?.querySelectorAll('[data-testid="excludes-result"][role="status"]');
-  await el.updateComplete;
-  expect(statuses?.[0]?.textContent).toContain('Apply complete');
+  await settle(el);
+  const statuses = el.shadowRoot?.querySelectorAll('.removal-slot [role="status"]');
+  expect(statuses).toHaveLength(1);
+  expect(statuses?.[0]?.textContent).toContain('Done. Files already read that match your skip rules are no longer in search');
+  expect(statuses?.[0]?.textContent).not.toMatch(/\d+ files? removed/);
+  expect(statuses?.[0]?.textContent).not.toContain('Removing matching files from search');
+  // R15: the outcome is announced as a whole, as on main.
   expect(statuses?.[0]?.getAttribute('aria-atomic')).toBe('true');
+  expect(el.shadowRoot?.querySelector('.removal-slot')?.getAttribute('aria-live')).toBe('polite');
 });

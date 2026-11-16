@@ -961,7 +961,16 @@
   "intf" : {
     "inputs" : {
       "type" : "object",
-      "properties" : { }
+      "properties" : {
+        "rules" : {
+          "type" : "array",
+          "maxItems" : 512,
+          "items" : {
+            "type" : [ "string", "object" ]
+          }
+        }
+      },
+      "additionalProperties" : false
     },
     "result" : {
       "type" : "object",
@@ -1009,8 +1018,7 @@
   "policy" : {
     "risk" : "HIGH",
     "confirm" : {
-      "kind" : "TYPED",
-      "confirmTextKey" : "ops.apply-excludes.confirm"
+      "kind" : "INLINE"
     },
     "audit" : "METADATA_ONLY",
     "undoSupported" : false,
@@ -1237,6 +1245,20 @@
         },
         "pauseOnBattery" : {
           "type" : "boolean"
+        },
+        "witness" : {
+          "type" : "object",
+          "required" : [ "acceptedRevision", "lastCommittedOperationKey" ],
+          "properties" : {
+            "acceptedRevision" : {
+              "type" : "integer",
+              "minimum" : 0
+            },
+            "lastCommittedOperationKey" : {
+              "type" : [ "string", "null" ]
+            }
+          },
+          "additionalProperties" : false
         }
       },
       "additionalProperties" : false

@@ -57,7 +57,7 @@ withdrawal cannot reverse it. Remove an installed keep-out separately to permit 
 ## Permit reading again
 
 In Library, review **Exact paths kept out** alongside **Skip these files**. Remove the intended
-exact-path row and use **Save patterns**. Exact rows are separate from the glob editor, so editing globs keeps
+exact-path row; the change saves at once. Exact rows are separate from the glob editor, so editing globs keeps
 their original path bytes. Removing a rule permits a later reading pass; it does not create a new
 watcher or immediately restore removed rows. A separate remaining exclusion can still block reading.
 

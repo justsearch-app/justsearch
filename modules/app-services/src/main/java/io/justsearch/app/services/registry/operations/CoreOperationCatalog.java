@@ -179,10 +179,12 @@ public final class CoreOperationCatalog implements OperationCatalog {
       new OperationRef("core.preview-excludes");
 
   /**
-   * Slice 3a-2-c LibraryView Apply Excludes button. HIGH risk (destructive:
-   * deletes already-indexed documents whose paths match the configured globs).
-   * No args. Returns the full ExcludesService.ExcludesResult in structuredData. Typed confirmation
-   * preserves this operation's HIGH-risk consent boundary.
+   * Library's "Remove from search" answer to its in-place ask. HIGH risk (destructive: deletes
+   * already-indexed documents whose paths match the saved rules). Optional {@code rules}: the saved
+   * list the ask was about; the removal then runs only while exactly that list is in effect and is
+   * refused with {@code EXCLUDES_CHANGED}, removing nothing, otherwise. The consent is that in-place
+   * answer (declared Inline); the HIGH-risk trust gate still requires its consent capsule on every call.
+   * Returns the full ExcludesService.ExcludesResult in structuredData.
    */
   public static final OperationRef APPLY_EXCLUDES =
       new OperationRef("core.apply-excludes");
@@ -971,10 +973,12 @@ public final class CoreOperationCatalog implements OperationCatalog {
     return new Operation(
         APPLY_EXCLUDES,
         Presentation.forId(APPLY_EXCLUDES, Optional.of("warning"), Optional.of("destructive")),
-        Interface.of("{\"type\":\"object\",\"properties\":{}}", EXCLUDES_RESULT_SCHEMA),
+        Interface.of("{\"type\":\"object\",\"properties\":{\"rules\":{\"type\":\"array\",\"maxItems\":512,"
+            + "\"items\":{\"type\":[\"string\",\"object\"]}}},\"additionalProperties\":false}", EXCLUDES_RESULT_SCHEMA),
         new OperationPolicy(
             RiskTier.HIGH,
-            ConfirmStrategy.typedForId(APPLY_EXCLUDES),
+            // The in-place ask is the consent; it is bound to the list it asked about through `rules`.
+            ConfirmStrategy.Inline.INSTANCE,
             AuditPolicy.METADATA_ONLY,
             RetryPolicy.noRetry(),
             Set.of(RequiredCapability.WorkerOnline.INSTANCE),
@@ -1039,7 +1043,11 @@ public final class CoreOperationCatalog implements OperationCatalog {
     return new Operation(SET_INDEXING_RULES, Presentation.forId(SET_INDEXING_RULES),
         Interface.of("{\"type\":\"object\",\"required\":[\"schedule\",\"pauseOnBattery\"],"
             + "\"properties\":{\"schedule\":{\"type\":[\"object\",\"null\"]},"
-            + "\"pauseOnBattery\":{\"type\":\"boolean\"}},\"additionalProperties\":false}",
+            + "\"pauseOnBattery\":{\"type\":\"boolean\"},"
+            + "\"witness\":{\"type\":\"object\",\"required\":[\"acceptedRevision\",\"lastCommittedOperationKey\"],"
+            + "\"properties\":{\"acceptedRevision\":{\"type\":\"integer\",\"minimum\":0},"
+            + "\"lastCommittedOperationKey\":{\"type\":[\"string\",\"null\"]}},\"additionalProperties\":false}},"
+            + "\"additionalProperties\":false}",
             "{\"type\":\"object\"}"),
         new OperationPolicy(RiskTier.MEDIUM, ConfirmStrategy.None.INSTANCE,
             AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false)

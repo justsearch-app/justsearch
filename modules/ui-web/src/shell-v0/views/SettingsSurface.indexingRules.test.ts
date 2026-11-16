@@ -19,6 +19,8 @@ import { setAuthorizationPresenter } from '../operations/authorizationBroker.js'
 type Mounted = HTMLElement & { updateComplete: Promise<unknown> };
 let fetchMock: ReturnType<typeof vi.fn>;
 const saved = { enabled: true, days: [1, 7], startMinute: 1320, endMinute: 360 };
+// Slice 6b-2: every rule write carries the settings revision its draft was based on.
+const witness = { acceptedRevision: 2, lastCommittedOperationKey: '0194f72c-0000-7000-8000-000000000002' };
 function status(reasons: string[], state = 'PAUSED', pendingJobs = 3): StatusSnapshot {
   return { operating: { indexing: { state, reasons, untilEpochMs: null, waitingForResume: pendingJobs > 0 } },
     worker: { core: { indexState: pendingJobs ? 'INDEXING' : 'IDLE', pendingJobs, indexHealthy: true },
@@ -63,7 +65,7 @@ beforeEach(() => {
   vi.stubEnv('TZ', 'UTC'); // Compute every locale/date expectation only after the TZ stub.
   __resetAiStateForTest();
   fetchMock = vi.fn(async (url: RequestInfo | URL) => String(url).endsWith('/api/settings/v2')
-    ? Response.json({ ui: { indexingPause: { schedule: saved, pauseOnBattery: true } } })
+    ? Response.json({ ui: { indexingPause: { schedule: saved, pauseOnBattery: true } }, witness })
     : Response.json({ success: true, message: 'Accepted' }));
   vi.stubGlobal('fetch', fetchMock); observe([], 'RUNNING');
 });
@@ -78,10 +80,11 @@ describe('WP3.8b rules editor', () => {
     expect([...el.shadowRoot!.querySelectorAll('.indexing-days label')].map(d => d.textContent?.trim())).toEqual(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']);
     expect(input(el, 'input[type=time]').value).toBe('22:00'); expect(input(el, '#indexing-battery').checked).toBe(true);
     expect(el.shadowRoot!.textContent).toContain("this computer's local time");
-    await edit(el, '#indexing-hours', false); await save(el);
-    expect(JSON.parse(String(ruleCalls()[0]![1].body)).args).toEqual({ schedule: { ...saved, enabled: false }, pauseOnBattery: true });
-    await edit(el, '#indexing-battery', false); await save(el);
-    expect(JSON.parse(String(ruleCalls()[1]![1].body)).args).toEqual({ schedule: { ...saved, enabled: false }, pauseOnBattery: false });
+    await edit(el, '#indexing-hours', false);
+    expect(JSON.parse(String(ruleCalls()[0]![1].body)).args).toEqual({ schedule: { ...saved, enabled: false }, pauseOnBattery: true, witness });
+    await edit(el, '#indexing-battery', false);
+    expect(JSON.parse(String(ruleCalls()[1]![1].body)).args).toEqual({ schedule: { ...saved, enabled: false }, pauseOnBattery: false, witness });
+    await save(el); expect(ruleCalls(), 'an unchanged draft is not sent again').toHaveLength(2);
     expect(el.shadowRoot!.textContent).toContain('Reading rules saved');
   });
   for (const [name, value, error] of [
@@ -97,23 +100,33 @@ describe('WP3.8b rules editor', () => {
   it('S38.2 refuses enabled hours without days and accepts the retained empty set when off', async () => {
     const el = await mount();
     await edit(el, '.indexing-days label:nth-child(1) input', false);
+    expect(JSON.parse(String(ruleCalls()[0]![1].body)).args.schedule.days, 'a valid change saves').toEqual([7]);
     await edit(el, '.indexing-days label:nth-child(7) input', false); await save(el);
     expect(el.shadowRoot!.querySelector('#indexing-rules-error[role=alert]')?.textContent).toContain('Choose at least one day');
-    expect(ruleCalls()).toHaveLength(0);
+    expect(ruleCalls(), 'the invalid combination is not sent').toHaveLength(1);
     expect([...el.shadowRoot!.querySelectorAll<HTMLInputElement>('.indexing-days input')].every(c => !c.checked)).toBe(true);
-    await edit(el, '#indexing-hours', false); await save(el);
-    expect(JSON.parse(String(ruleCalls()[0]![1].body)).args.schedule.days).toEqual([]);
+    await edit(el, '#indexing-hours', false);
+    expect(JSON.parse(String(ruleCalls()[1]![1].body)).args.schedule.days).toEqual([]);
   });
   for (const [code, errorCode] of [[400, 'BAD_REQUEST'], [409, 'VERSION_CONFLICT'], [200, 'VERSION_CONFLICT']] as const) {
     it(`S38.2 retains the draft and announces Engine ${code} without stale replay`, async () => {
       const el = await mount(); await edit(el, 'input[type=time]', '21:15');
-      fetchMock.mockImplementation(async () => Response.json({ success: false, errorClass: 'HANDLER_FAILURE', message: 'Rule field refused', errorCode }, { status: code }));
+      const elsewhere = { acceptedRevision: 3, lastCommittedOperationKey: '0194f72c-0000-7000-8000-000000000003' };
+      fetchMock.mockImplementation(async (url: RequestInfo | URL) => String(url).endsWith('/api/settings/v2')
+        // A conflict is checked against the saved rules: here another window turned the battery rule off.
+        ? Response.json({ ui: { indexingPause: { schedule: saved, pauseOnBattery: false } }, witness: elsewhere })
+        : Response.json({ success: false, errorClass: 'HANDLER_FAILURE', message: 'Rule field refused', errorCode }, { status: code }));
       await save(el);
-      expect(el.shadowRoot!.querySelector('#indexing-rules-error[role=alert]')?.textContent).toContain('Rule field refused');
-      if (errorCode === 'VERSION_CONFLICT') expect(el.shadowRoot!.textContent).toContain('Review your draft and save again');
+      if (errorCode === 'VERSION_CONFLICT') {
+        expect(el.shadowRoot!.querySelector('[aria-label="Saved reading rules"][role=alert]')?.textContent).toContain('Changed elsewhere');
+        expect(el.shadowRoot!.querySelector('[aria-label="Saved reading rules"]')?.textContent).toContain('Pause while on battery: off');
+      } else expect(el.shadowRoot!.querySelector('#indexing-rules-error[role=alert]')?.textContent).toContain('Rule field refused');
       expect(input(el, 'input[type=time]').value).toBe('21:15'); expect(ruleCalls()).toHaveLength(1);
-      fetchMock.mockResolvedValue(Response.json({ success: true, message: 'Accepted' })); await save(el);
+      fetchMock.mockResolvedValue(Response.json({ success: true, message: 'Accepted' }));
+      if (errorCode === 'VERSION_CONFLICT') action(el, 'Keep my draft').click(); else await save(el);
+      await settle(el);
       expect(ruleCalls()).toHaveLength(2); expect(JSON.parse(String(ruleCalls()[1]![1].body)).preparationNonce).toBeUndefined();
+      expect(JSON.parse(String(ruleCalls()[1]![1].body)).args.witness).toEqual(errorCode === 'VERSION_CONFLICT' ? elsewhere : witness);
     });
   }
   it('S38.7 waits for saved rules before editing or applying deferred rule focus', async () => {
@@ -134,17 +147,18 @@ describe('WP3.8b rules editor', () => {
     expect(input(el, '#indexing-hours').closest('fieldset')?.disabled).toBe(true);
     await save(el); expect(ruleCalls()).toHaveLength(0);
   });
-  it('S38.7 preserves Save focus while pending and sends one unchanged rule pair', async () => {
+  it('S38.7 keeps focus on the changed control while its save is pending and sends one rule pair', async () => {
     const el = await mount(); let release!: (response: Response) => void;
     fetchMock.mockImplementation(() => new Promise<Response>(resolve => { release = resolve; }));
-    const saveButton = action(el, 'Save reading rules'); saveButton.focus();
-    await save(el);
-    expect(el.shadowRoot!.activeElement).toBe(saveButton);
-    expect(saveButton.getAttribute('aria-disabled')).toBe('true');
-    expect(input(el, '#indexing-hours').closest('fieldset')?.disabled).toBe(true);
+    const battery = input(el, '#indexing-battery'); battery.focus();
+    await edit(el, '#indexing-battery', false);
+    expect(el.shadowRoot!.activeElement).toBe(battery);
+    expect(battery.closest('fieldset')?.disabled, 'a save never disables the controls').toBe(false);
     await save(el); expect(ruleCalls()).toHaveLength(1);
     release(Response.json({ success: true, message: 'Accepted' })); await settle(el);
-    expect(saveButton.getAttribute('aria-disabled')).toBe('false');
+    expect(ruleCalls()).toHaveLength(1);
+    expect(el.shadowRoot!.activeElement).toBe(battery);
+    expect(el.shadowRoot!.textContent).toContain('Reading rules saved');
   });
   it('D4 preserves both rules through approval and uses the approved preparation key', async () => {
     const el = await mount(); setAuthorizationPresenter(vi.fn().mockResolvedValue({ approved: true, allowAlways: false }));
@@ -153,25 +167,25 @@ describe('WP3.8b rules editor', () => {
       return JSON.parse(String(init?.body)).confirmationToken ? Response.json({ success: true, message: 'Accepted' })
         : Response.json({ success: false, errorClass: 'CONFIRMATION_REQUIRED', pendingId: 'p', operationKey: 'key', preparationNonce: 'nonce' }, { status: 428 });
     });
-    await save(el); const requests = ruleCalls().map(c => JSON.parse(String(c[1].body)));
+    await edit(el, '#indexing-battery', false); const requests = ruleCalls().map(c => JSON.parse(String(c[1].body)));
     expect(requests).toHaveLength(2); expect(requests[1].args).toEqual(requests[0].args);
     expect(requests[1]).toMatchObject({ preparationNonce: 'nonce', idempotencyKey: 'key', confirmationToken: 'yes' });
   });
   it('D4 changing battery preserves an absent schedule until the hours are edited', async () => {
     fetchMock.mockImplementation(async (url: RequestInfo | URL) => String(url).endsWith('/api/settings/v2')
-      ? Response.json({ ui: { indexingPause: { paused: true, reason: 'USER_PAUSED', pauseOnBattery: false } } })
+      ? Response.json({ ui: { indexingPause: { paused: true, reason: 'USER_PAUSED', pauseOnBattery: false } }, witness })
       : Response.json({ success: true, message: 'Accepted' }));
-    const el = await mount(); await edit(el, '#indexing-battery', true); await save(el);
-    expect(JSON.parse(String(ruleCalls()[0]![1].body)).args).toEqual({ schedule: null, pauseOnBattery: true });
-    await edit(el, '#indexing-hours', true); await save(el);
+    const el = await mount(); await edit(el, '#indexing-battery', true);
+    expect(JSON.parse(String(ruleCalls()[0]![1].body)).args).toEqual({ schedule: null, pauseOnBattery: true, witness });
+    await edit(el, '#indexing-hours', true);
     expect(JSON.parse(String(ruleCalls()[1]![1].body)).args.schedule).toMatchObject({ enabled: true, startMinute: 540, endMinute: 1020 });
   });
   it('D6 keeps battery available with unknown power and explains the rule', async () => {
     const el = await mount(); expect(input(el, '#indexing-battery').disabled).toBe(false);
     expect(input(el, '#indexing-battery').closest('fieldset')?.disabled).toBe(false);
     expect(el.shadowRoot!.textContent).toContain('known to run on battery'); expect(el.shadowRoot!.textContent).toContain('power source is unknown');
-    await edit(el, '#indexing-battery', false); await save(el);
-    expect(JSON.parse(String(ruleCalls()[0]![1].body)).args).toEqual({ schedule: saved, pauseOnBattery: false });
+    await edit(el, '#indexing-battery', false);
+    expect(JSON.parse(String(ruleCalls()[0]![1].body)).args).toEqual({ schedule: saved, pauseOnBattery: false, witness });
   });
   for (const destination of ['hours', 'battery'] as const) {
     it(`S38.7 focuses ${destination} on Library even from Browse`, async () => {

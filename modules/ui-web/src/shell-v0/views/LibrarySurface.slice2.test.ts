@@ -31,10 +31,21 @@ async function editBattery(el: IndexingRulesEditor, checked: boolean): Promise<v
   const field = el.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
   field.checked = checked; field.dispatchEvent(new Event('change')); await settle(el);
 }
+/** Slice 6b-2: rules save as they change; a time still being typed saves on submit or leaving its field. */
 async function saveRules(el: IndexingRulesEditor): Promise<void> {
-  el.shadowRoot!.querySelector<HTMLButtonElement>('button[type=submit]')!.focus();
   el.shadowRoot!.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true })); await settle(el);
 }
+/** Slice 6b-2: a skip-rule draft saves when its field is left. */
+function leaveSkip(el: LibrarySurface): void {
+  const field = el.shadowRoot!.querySelector<HTMLInputElement>('.skip-rule input');
+  expect(field, 'a skip-rule field').not.toBeNull(); field!.focus(); field!.blur();
+}
+async function saveSkip(el: LibrarySurface): Promise<void> { leaveSkip(el); await settle(el); }
+function checkBattery(el: IndexingRulesEditor, checked: boolean): void {
+  const field = el.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  field.checked = checked; field.dispatchEvent(new Event('change'));
+}
+const conflictText = (rules: IndexingRulesEditor) => rules.shadowRoot!.querySelector('[aria-label="Saved reading rules"]')?.textContent ?? '';
 function fixture(receipt: 'matching' | 'missing' | 'gap' | 'wrong key' = 'matching', schedule: typeof initialPolicy.schedule = null) {
   let revision = 0, lastKey: string | null = null;
   let ui = { excludePatterns: ['*.old'], indexingPause: { ...structuredClone(initialPolicy), schedule } };
@@ -61,6 +72,10 @@ function fixture(receipt: 'matching' | 'missing' | 'gap' | 'wrong key' = 'matchi
     const { args, idempotencyKey } = JSON.parse(String(init?.body));
     const operation = String(_path).split('/').at(-2);
     if (ruleWait) await ruleWait;
+    // The rule write carries the revision its draft was based on (B6').
+    if (operation === 'core.set-indexing-rules' && args.witness && args.witness.acceptedRevision !== revision) {
+      return Response.json({ success: false, message: 'Settings changed since rules were prepared', errorClass: 'HANDLER_FAILURE', errorCode: 'VERSION_CONFLICT' });
+    }
     if (operation === 'core.set-indexing-rules') ui = { ...ui, indexingPause: { ...ui.indexingPause, schedule: args.schedule, pauseOnBattery: args.pauseOnBattery } };
     else ui = { ...ui, indexingPause: { ...ui.indexingPause, paused: operation === 'core.indexing-pause',
       reason: operation === 'core.indexing-pause' ? 'USER_PAUSED' : null as unknown as string, untilEpochMs: args.untilEpochMs ?? null } };
@@ -73,6 +88,7 @@ function fixture(receipt: 'matching' | 'missing' | 'gap' | 'wrong key' = 'matchi
   const host = createMockHostApi({ data: { fetch: fetchSettings } });
   return { host, fetchSettings, operations,
     externalRules: () => { ui.indexingPause.pauseOnBattery = true; lastKey = key(++revision); },
+    externalHours: () => { ui.indexingPause = { ...ui.indexingPause, schedule: { enabled: true, days: [6], startMinute: 60, endMinute: 120 } }; lastKey = key(++revision); },
     unrelatedChange: () => { lastKey = key(++revision); },
     externalChange: () => { ui = { ...ui, excludePatterns: ['*.external'] }; lastKey = key(++revision); },
     read: () => structuredClone(ui),
@@ -85,9 +101,14 @@ async function mount(host: PluginHostApi): Promise<LibrarySurface> {
   Object.assign(el, { refresh: vi.fn().mockResolvedValue(true), loading: false });
   document.body.append(el); await settle(el); await settle(editor(el)); return el;
 }
-afterEach(() => { document.body.replaceChildren(); __resetAiStateForTest(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(async () => {
+  document.body.replaceChildren();
+  // Slice 6b-2: leaving Library saves a draft still being typed; let that settle on the stubs.
+  for (let i = 0; i < 5; i++) await new Promise(resolve => setTimeout(resolve, 0));
+  __resetAiStateForTest(); vi.unstubAllGlobals(); vi.restoreAllMocks();
+});
 
-it('B1 edits one rule per line, adds and removes a rule without implicitly saving', async () => {
+it('B1 edits one rule per line; typing saves nothing until a field is left; removing a rule saves', async () => {
   const f = fixture(); const el = await mount(f.host);
   const first = el.shadowRoot!.querySelector<HTMLInputElement>('.skip-rule input')!;
   first.value = 'node_modules/'; first.dispatchEvent(new Event('input')); await settle(el);
@@ -96,43 +117,47 @@ it('B1 edits one rule per line, adds and removes a rule without implicitly savin
   expect(inputs).toHaveLength(2); expect(el.shadowRoot!.activeElement).toBe(inputs[1]);
   inputs[1]!.value = '*.tmp'; inputs[1]!.dispatchEvent(new Event('input')); await settle(el);
   expect(f.read().excludePatterns).toEqual(['*.old']);
+  expect(el.shadowRoot!.querySelector('jf-button[label="Save patterns"]')).toBeNull();
   action(el, 'Remove skip rule 1').onActivate(); await settle(el);
   expect(el.excludesText).toBe('*.tmp');
-  action(el, 'Save patterns').onActivate(); await settle(el);
   expect(f.read().excludePatterns).toEqual(['*.tmp']);
 });
 
 it.each(['rules first', 'exclusions first'] as const)('L19 %s saves both editors without a local conflict and keeps edits after reload', async order => {
   const f = fixture(); const el = await mount(f.host); const rules = editor(el);
-  el.excludesText = '*.new'; await editBattery(rules, true);
+  el.excludesText = '*.new';
   if (order === 'rules first') {
-    await saveRules(rules); action(el, 'Save patterns').onActivate(); await settle(el);
+    await editBattery(rules, true); await saveSkip(el);
     expect(el.excludesText).toBe('*.new');
     expect(el.shadowRoot!.querySelector('#excludes-error')).toBeNull();
     expect(f.read().excludePatterns).toEqual(['*.new']);
   } else {
-    action(el, 'Save patterns').onActivate(); await settle(el); await saveRules(rules);
+    await saveSkip(el); await editBattery(rules, true);
   }
   const expected = { excludePatterns: ['*.new'], indexingPause: { ...initialPolicy, pauseOnBattery: true } };
   expect(rules.indexingRulesError).toBe('');
   expect(el.shadowRoot!.querySelector('#excludes-error')).toBeNull();
   expect(f.read()).toEqual(expected);
   // Both editors must adopt each local successor, including when exclusions saved first.
-  el.excludesText = '*.again'; action(el, 'Save patterns').onActivate(); await settle(el);
+  el.excludesText = '*.again'; await saveSkip(el);
   expect(el.shadowRoot!.querySelector('#excludes-error')).toBeNull();
   expect(f.read().excludePatterns).toEqual(['*.again']);
-  el.excludesText = '*.new'; action(el, 'Save patterns').onActivate(); await settle(el);
+  el.excludesText = '*.new'; await saveSkip(el);
   el.remove(); const reloaded = await mount(f.host);
   expect(reloaded.excludesText).toBe('*.new');
   expect(editor(reloaded).indexingRules.pauseOnBattery).toBe(true);
   expect(f.read().indexingPause).toEqual(expected.indexingPause);
-  expect(JSON.parse(String(f.operations.mock.calls[0]![1]?.body)).args).toEqual({ schedule: null, pauseOnBattery: true });
+  // Library hands its own successor revision to the hours editor: no refused round trip either way.
+  expect(f.operations).toHaveBeenCalledTimes(1);
+  expect(JSON.parse(String(f.operations.mock.calls[0]![1]?.body)).args).toEqual({ schedule: null, pauseOnBattery: true,
+    witness: order === 'rules first' ? { acceptedRevision: 0, lastCommittedOperationKey: null }
+      : { acceptedRevision: 1, lastCommittedOperationKey: expect.any(String) } });
 });
 
 it('L12 L19 concurrent saves and tab changes retain one rule request and both outcomes', async () => {
   const f = fixture(); const el = await mount(f.host); const rules = editor(el);
-  await editBattery(rules, true); f.holdRules(); await saveRules(rules); await saveRules(rules);
-  el.excludesText = '*.new'; action(el, 'Save patterns').onActivate(); await settle(el);
+  f.holdRules(); await editBattery(rules, true); await saveRules(rules); await saveRules(rules);
+  el.excludesText = '*.new'; await saveSkip(el);
   el.activeTab = 'core.browse-surface'; await settle(el);
   expect(f.operations).toHaveBeenCalledTimes(1); expect(rules.indexingRulesSaving).toBe(true);
   f.releaseRules(); await settle(rules); el.activeTab = 'folders'; await settle(el);
@@ -142,10 +167,9 @@ it('L12 L19 concurrent saves and tab changes retain one rule request and both ou
 
 it('L12 reload during a rule save reads its result while a second window keeps an edited draft', async () => {
   const f = fixture(); const first = await mount(f.host); const second = await mount(f.host);
-  await editBattery(editor(first), true);
   editor(second).shadowRoot!.querySelector<HTMLInputElement>('input[type=time]')!.value = '21:00';
   editor(second).shadowRoot!.querySelector<HTMLInputElement>('input[type=time]')!.dispatchEvent(new Event('input'));
-  await settle(editor(second)); f.holdRules(); await saveRules(editor(first)); first.remove();
+  await settle(editor(second)); f.holdRules(); await editBattery(editor(first), true); first.remove();
   f.releaseRules(); await settle(editor(first));
   const reloaded = await mount(f.host);
   expect(editor(reloaded).indexingRules.pauseOnBattery).toBe(true);
@@ -198,15 +222,14 @@ it('L14 drains only the latest pending request when Library connects', async () 
 
 it.each(['rules first', 'exclusions first'] as const)('V3 quick successive saves %s share only local witnesses', async order => {
   const f = fixture(); const el = await mount(f.host); const rules = editor(el);
-  el.excludesText = '*.quick'; await editBattery(rules, true);
-  const submit = () => rules.shadowRoot!.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
-  if (order === 'rules first') { submit(); action(el, 'Save patterns').onActivate(); }
-  else { action(el, 'Save patterns').onActivate(); submit(); }
-  await settle(el); await settle(rules);
+  el.excludesText = '*.quick'; await settle(el);
+  if (order === 'rules first') { checkBattery(rules, true); leaveSkip(el); }
+  else { leaveSkip(el); checkBattery(rules, true); }
+  await settle(el); await settle(rules); await settle(el);
   expect(el.shadowRoot!.querySelector('#excludes-error')).toBeNull();
   expect(rules.indexingRulesError).toBe('');
   expect(f.read()).toEqual({ excludePatterns: ['*.quick'], indexingPause: { ...initialPolicy, pauseOnBattery: true } });
-  el.excludesText = '*.after-quick'; action(el, 'Save patterns').onActivate(); await settle(el);
+  el.excludesText = '*.after-quick'; await saveSkip(el);
   expect(el.shadowRoot!.querySelector('#excludes-error')).toBeNull();
   expect(f.read().excludePatterns).toEqual(['*.after-quick']);
   el.remove(); const reloaded = await mount(f.host);
@@ -216,18 +239,20 @@ it.each(['rules first', 'exclusions first'] as const)('V3 quick successive saves
 
 it.each(['rules', 'exclusions'])('V3 genuine external change conflicts with %s and retains both drafts', async changed => {
   const f = fixture(); const el = await mount(f.host); const rules = editor(el);
-  el.excludesText = '*.mine'; await editBattery(rules, true);
-  if (changed === 'rules') f.externalRules(); else f.externalChange();
+  el.excludesText = '*.mine'; await settle(el);
+  if (changed === 'rules') f.externalHours(); else f.externalChange();
   if (changed === 'rules') {
-    await saveRules(rules);
-    expect(rules.indexingRulesError).toContain('Reading times changed elsewhere');
-    expect(f.operations).not.toHaveBeenCalled();
+    await editBattery(rules, true);
+    expect(conflictText(rules)).toContain('Changed elsewhere');
+    expect(f.operations, 'one write, refused on its stale revision').toHaveBeenCalledTimes(1);
   } else {
-    action(el, 'Save patterns').onActivate(); await settle(el);
-    expect(el.shadowRoot!.querySelector('#excludes-error')?.textContent).toContain('Settings changed elsewhere. Reload and review');
+    await saveSkip(el);
+    expect(el.shadowRoot!.querySelector('.skip-conflict')?.textContent).toContain('Changed elsewhere');
+    await editBattery(rules, true);
   }
   expect(f.read().excludePatterns).toEqual(changed === 'exclusions' ? ['*.external'] : ['*.old']);
-  expect(f.read().indexingPause.pauseOnBattery).toBe(changed === 'rules');
+  expect(f.read().indexingPause.pauseOnBattery).toBe(changed === 'exclusions');
+  expect(f.read().indexingPause.schedule?.days ?? null).toEqual(changed === 'rules' ? [6] : null);
   expect(el.excludesText).toBe('*.mine'); expect(rules.indexingRules.pauseOnBattery).toBe(true);
 });
 
@@ -244,11 +269,11 @@ async function manualPause(el: LibrarySurface, paused: boolean): Promise<void> {
 
 it('B own Pause then Resume then time save, and time save then Pause then skip save, chain committed witnesses', async () => {
   const f = fixture(); const el = await mount(f.host); const rules = editor(el);
-  el.excludesText = '*.after'; await editBattery(rules, true);
+  el.excludesText = '*.after';
   await manualPause(el, true); await manualPause(el, false);
-  await saveRules(rules); expect(rules.indexingRulesError).toBe('');
+  await editBattery(rules, true); expect(rules.indexingRulesError).toBe('');
   await manualPause(el, true);
-  action(el, 'Save patterns').onActivate(); await settle(el);
+  await saveSkip(el);
   expect(el.shadowRoot!.querySelector('#excludes-error')).toBeNull();
   expect(f.operations.mock.calls.map(([url]) => String(url).split('/').at(-2))).toEqual([
     'core.indexing-pause', 'core.indexing-resume', 'core.set-indexing-rules', 'core.indexing-pause',
@@ -258,32 +283,35 @@ it('B own Pause then Resume then time save, and time save then Pause then skip s
   expect(editor(reloaded).indexingRules.pauseOnBattery).toBe(true);
 });
 
-it('B unrelated external write conflicts with skip rules, keeps the draft until explicit review, and permits the baseline absolute time save', async () => {
+it('B an unrelated external write is not a conflict for either editor and loses no draft', async () => {
   const f = fixture(); const el = await mount(f.host); const rules = editor(el);
-  el.excludesText = '*.mine'; await editBattery(rules, true); f.unrelatedChange();
-  action(el, 'Save patterns').onActivate(); await settle(el);
-  expect(el.shadowRoot!.querySelector('#excludes-error')?.textContent).toContain('Settings changed elsewhere. Reload and review');
+  el.excludesText = '*.mine'; await settle(el); f.unrelatedChange();
+  await saveSkip(el);
+  expect(el.shadowRoot!.querySelector('.skip-conflict')).toBeNull();
   expect(el.excludesText).toBe('*.mine');
-  await saveRules(rules); expect(rules.indexingRulesError).toBe('');
-  // A successful absolute rules write cannot dismiss the other editor's conflict.
-  action(el, 'Save patterns').onActivate(); await settle(el);
-  expect(f.read().excludePatterns).toEqual(['*.old']);
-  action(el, 'Review latest settings, keep draft').onActivate(); await settle(el);
-  expect(el.excludesText).toBe('*.mine');
-  action(el, 'Save patterns').onActivate(); await settle(el);
   expect(f.read().excludePatterns).toEqual(['*.mine']);
+  f.unrelatedChange();
+  await editBattery(rules, true); expect(rules.indexingRulesError).toBe('');
+  expect(conflictText(rules)).toBe('');
   expect(f.read().indexingPause).toEqual({ ...initialPolicy, pauseOnBattery: true });
+  // Each refused write was based on the draft's revision and sent again only after the saved value was read.
+  const posts = f.fetchSettings.mock.calls.filter(([path, init]) => path === '/api/settings/v2' && init?.method === 'POST');
+  expect(posts.map(([, init]) => JSON.parse(String(init?.body)).witness.acceptedRevision)).toEqual([0, 1]);
 });
 
-it.each(['missing', 'gap', 'wrong key'] as const)('B %s operation witness never refreshes a skip-rule draft', async receipt => {
+it.each(['missing', 'gap', 'wrong key'] as const)('B %s operation witness never advances a skip-rule draft; its refused save reads before sending again', async receipt => {
   const f = fixture(receipt); const el = await mount(f.host); const rules = editor(el);
-  el.excludesText = '*.mine'; await editBattery(rules, true); await saveRules(rules);
+  el.excludesText = '*.mine'; await editBattery(rules, true);
   const reads = f.fetchSettings.mock.calls.filter(([path, init]) => path === '/api/settings/v2' && init?.method !== 'POST').length;
-  action(el, 'Save patterns').onActivate(); await settle(el);
-  expect(el.shadowRoot!.querySelector('#excludes-error')?.textContent).toContain('Settings changed elsewhere. Reload and review');
+  await saveSkip(el);
+  const posts = f.fetchSettings.mock.calls.filter(([path, init]) => path === '/api/settings/v2' && init?.method === 'POST')
+    .map(([, init]) => JSON.parse(String(init?.body)));
+  expect(posts[0]?.witness, 'the unverified receipt is not used').toEqual({ acceptedRevision: 0, lastCommittedOperationKey: null });
+  expect(f.fetchSettings.mock.calls.filter(([path, init]) => path === '/api/settings/v2' && init?.method !== 'POST')).toHaveLength(reads + 1);
+  expect(posts[1]?.witness.acceptedRevision).toBe(1);
+  expect(el.shadowRoot!.querySelector('.skip-conflict')).toBeNull();
   expect(el.excludesText).toBe('*.mine');
-  expect(f.read().excludePatterns).toEqual(['*.old']);
-  expect(f.fetchSettings.mock.calls.filter(([path, init]) => path === '/api/settings/v2' && init?.method !== 'POST')).toHaveLength(reads);
+  expect(f.read().excludePatterns).toEqual(['*.mine']);
 });
 
 it('L19 configured disabled schedule survives successive rule saves and skip save', async () => {
@@ -293,7 +321,7 @@ it('L19 configured disabled schedule survives successive rule saves and skip sav
   expect(rules.indexingRulesError).toBe('');
   await editBattery(rules, false); await saveRules(rules);
   expect(rules.indexingRulesError).toBe('');
-  el.excludesText = '*.configured'; action(el, 'Save patterns').onActivate(); await settle(el);
+  el.excludesText = '*.configured'; await saveSkip(el);
   expect(el.shadowRoot!.querySelector('#excludes-error')).toBeNull();
   el.remove(); const reloaded = await mount(f.host);
   expect(reloaded.excludesText).toBe('*.configured');
@@ -310,14 +338,14 @@ async function editStart(rules: IndexingRulesEditor, value: string): Promise<voi
   input.value = value; input.dispatchEvent(new Event('input')); await settle(rules);
 }
 
-it.each(['Save my draft', 'Discard my draft'])('R2 another window changes saved rules; %s recovers and later saves work', async choice => {
+it.each(['Keep my draft', 'Use the saved rules'])('R2 another window changes saved rules; %s recovers and later saves work', async choice => {
   const schedule = { enabled: false, days: [2, 4], startMinute: 1200, endMinute: 360 };
   const f = fixture('matching', schedule); const el = await mount(f.host); const other = await mount(f.host);
   const rules = editor(el); await editStart(rules, '21:00');
   await editBattery(editor(other), true); await saveRules(editor(other));
   await saveRules(rules);
   expect(rules.indexingRules.start).toBe('21:00');
-  expect(rules.indexingRulesError).toContain('Reading times changed elsewhere');
+  expect(conflictText(rules)).toContain('Changed elsewhere');
   const conflict = rules.shadowRoot!.querySelector('[aria-label="Saved reading rules"]');
   expect(conflict?.textContent).toContain('Any time');
   expect(conflict?.textContent).toContain('Tuesday, Thursday');
@@ -325,23 +353,23 @@ it.each(['Save my draft', 'Discard my draft'])('R2 another window changes saved 
   expect(conflict?.textContent).toContain('Pause while on battery: on');
   recoveryButton(rules, choice).click(); await settle(rules);
   expect(rules.indexingRulesError).toBe('');
-  expect(rules.indexingRules.start).toBe(choice === 'Save my draft' ? '21:00' : '20:00');
-  expect(f.read().indexingPause).toEqual({ ...initialPolicy, schedule: { ...schedule, startMinute: choice === 'Save my draft' ? 1260 : 1200 }, pauseOnBattery: choice === 'Discard my draft' });
+  expect(rules.indexingRules.start).toBe(choice === 'Keep my draft' ? '21:00' : '20:00');
+  expect(f.read().indexingPause).toEqual({ ...initialPolicy, schedule: { ...schedule, startMinute: choice === 'Keep my draft' ? 1260 : 1200 }, pauseOnBattery: choice === 'Use the saved rules' });
   await editBattery(rules, false); await saveRules(rules);
   expect(rules.indexingRulesError).toBe('');
   expect(f.read().indexingPause.pauseOnBattery).toBe(false);
   el.remove(); const loaded = await mount(f.host);
-  expect(editor(loaded).indexingRules.start).toBe(choice === 'Save my draft' ? '21:00' : '20:00');
+  expect(editor(loaded).indexingRules.start).toBe(choice === 'Keep my draft' ? '21:00' : '20:00');
 });
 
 it.each(['rules first', 'exclusions first'] as const)('R2 recovered draft and quick skip save (%s) retain both through reload', async order => {
   const f = fixture(); const el = await mount(f.host); const rules = editor(el);
   await editStart(rules, '22:00'); f.externalRules(); await saveRules(rules);
-  // Load the external witness explicitly, preserving the unrelated skip draft.
-  action(el, 'Reload saved patterns').onActivate(); await settle(el); el.excludesText = '*.recovered';
+  expect(conflictText(rules)).toContain('Changed elsewhere');
+  el.excludesText = '*.recovered'; await settle(el);
   f.holdRules();
-  if (order === 'rules first') { recoveryButton(rules, 'Save my draft').click(); action(el, 'Save patterns').onActivate(); }
-  else { action(el, 'Save patterns').onActivate(); recoveryButton(rules, 'Save my draft').click(); }
+  if (order === 'rules first') { recoveryButton(rules, 'Keep my draft').click(); leaveSkip(el); }
+  else { leaveSkip(el); recoveryButton(rules, 'Keep my draft').click(); }
   await settle(el); await settle(rules);
   el.activeTab = 'core.browse-surface'; await settle(el);
   f.releaseRules(); await settle(rules); await settle(el);
@@ -352,7 +380,7 @@ it.each(['rules first', 'exclusions first'] as const)('R2 recovered draft and qu
   expect(reloaded.excludesText).toBe('*.recovered'); expect(editor(reloaded).indexingRules.start).toBe('22:00');
 });
 
-it.each(['Save my draft', 'Discard my draft'])('R2b %s uses the displayed conflict rules despite a later second-window save', async choice => {
+it.each(['Keep my draft', 'Use the saved rules'])('R2b %s never overwrites a later second-window save it did not show', async choice => {
   const f = fixture(); const el = await mount(f.host); const other = await mount(f.host);
   const rules = editor(el), otherRules = editor(other);
   await editStart(rules, '21:00');
@@ -363,14 +391,15 @@ it.each(['Save my draft', 'Discard my draft'])('R2b %s uses the displayed confli
   await editStart(otherRules, '23:00'); await saveRules(otherRules); // C, after B was displayed
   const before = f.read(); const writes = f.operations.mock.calls.length;
   recoveryButton(rules, choice).click(); recoveryButton(rules, choice).click(); await settle(rules);
-  expect(f.operations).toHaveBeenCalledTimes(writes);
+  // Keep my draft writes on the revision shown (B), which C replaced: refused, so C is not overwritten.
+  expect(f.operations).toHaveBeenCalledTimes(choice === 'Keep my draft' ? writes + 1 : writes);
   expect(f.read()).toEqual(before);
-  if (choice === 'Save my draft') {
+  if (choice === 'Keep my draft') {
     expect(rules.indexingRules.start).toBe('21:00');
     expect(review()).toContain('23:00');
-    expect(rules.indexingRulesError).toContain('Reading times changed elsewhere');
+    expect(review()).toContain('Changed elsewhere');
     recoveryButton(rules, choice).click(); await settle(rules);
-    expect(f.operations).toHaveBeenCalledTimes(writes + 1);
+    expect(f.operations).toHaveBeenCalledTimes(writes + 2);
     expect(f.read().indexingPause).toEqual({ ...initialPolicy, schedule: {
       enabled: false, days: [1, 2, 3, 4, 5, 6, 7], startMinute: 1260, endMinute: 1020,
     } });
@@ -380,17 +409,20 @@ it.each(['Save my draft', 'Discard my draft'])('R2b %s uses the displayed confli
   }
   expect(rules.indexingRulesError).toBe('');
   el.remove(); const reloaded = await mount(f.host);
-  expect(editor(reloaded).indexingRules.start).toBe(choice === 'Save my draft' ? '21:00' : '23:00');
+  expect(editor(reloaded).indexingRules.start).toBe(choice === 'Keep my draft' ? '21:00' : '23:00');
   expect(f.read().indexingPause.reason).toBe('SETTINGS_RECOVERY');
 });
 
-it('R2 reconnect keeps a dirty battery-only draft and provides a current baseline for recovery', async () => {
+it('R2 reconnect keeps an hours draft still being typed and offers the current saved rules', async () => {
   const f = fixture(); const el = await mount(f.host); const rules = editor(el);
-  await editBattery(rules, true); f.externalRules();
-  el.remove(); document.body.append(el); await settle(el); await settle(rules);
-  expect(rules.indexingRules.pauseOnBattery).toBe(true);
-  await saveRules(rules); recoveryButton(rules, 'Save my draft').click(); await settle(rules);
-  expect(rules.indexingRulesError).toBe(''); expect(f.read().indexingPause.schedule).toBeNull();
-  await editBattery(rules, false); await saveRules(rules);
-  expect(rules.indexingRulesError).toBe(''); expect(f.read().indexingPause).toEqual(initialPolicy);
+  await editStart(rules, '21:00'); f.externalRules();
+  // Leaving Library leaves the time field: its save finds the change made elsewhere.
+  el.remove(); await settle(rules); document.body.append(el); await settle(el); await settle(rules);
+  expect(rules.indexingRules.start).toBe('21:00');
+  expect(conflictText(rules)).toContain('Pause while on battery: on');
+  expect(f.read().indexingPause.pauseOnBattery, 'nothing overwritten').toBe(true);
+  recoveryButton(rules, 'Keep my draft').click(); await settle(rules);
+  expect(rules.indexingRulesError).toBe('');
+  expect(f.read().indexingPause).toEqual({ ...initialPolicy,
+    schedule: { enabled: false, days: [1, 2, 3, 4, 5, 6, 7], startMinute: 1260, endMinute: 1020 } });
 });

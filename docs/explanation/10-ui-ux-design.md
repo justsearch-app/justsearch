@@ -358,8 +358,15 @@ Reversible beats confirmed. The person's own risky actions follow three tiers:
   control that asked. The verb answers once: a double-click or an auto-repeating key cannot
   run the action twice. Catalog operations with an inline confirmation use the same band,
   with a consequence sentence per operation.
+- **Asked in place after a change.** Adding a skip rule saves it and then asks, in the
+  page, whether files already read that match the skip rules should leave search (“Remove
+  from search” / “Keep them”); it takes no focus and is announced politely. The answer is
+  the consent, and it covers the saved list it asked about: `core.apply-excludes` receives
+  that list and removes nothing when the rules in effect differ from it (a list saved in
+  another window since, or an override), and the page then asks again for the list now
+  saved. The operation declares an inline confirmation; no typed word is asked.
 - **Typed confirmation in a dialog, for wide, irreversible acts.** Delete all local data,
-  applying exclusions to the index, forgetting an exact item and typed operation approvals
+  forgetting an exact item and typed operation approvals
   show the exact phrase to type. Delete all local data is a centred dialog that says who
   asked, what is deleted, what stays and that it cannot be undone, with Cancel on the left
   and the verb on the right; its statechart (`CONFIRM_CEREMONY`) remains the presentation
@@ -405,7 +412,8 @@ answer the same request through one decision: it executes at most once, and an e
 withdrawn or already answered request cannot execute.
 
 Requests that need typing (high-risk operations, and agent suggestions that need typed
-confirmation) are listed the same way, but answering them opens the protected security
+confirmation) are listed the same way (removing files that match the skip rules is Library's
+own in-place ask, not one of these), but answering them opens the protected security
 dialog (Review, or Allow suggestion for a suggestion). Plugin permission requests that the
 reader's own action started (installing or enabling a plugin) open it at once. That dialog is a native modal `<dialog>` in the
 browser's top layer, headed “JustSearch security check”, with a teal border. This border is

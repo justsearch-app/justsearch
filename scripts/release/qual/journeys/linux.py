@@ -506,6 +506,12 @@ print(json.dumps({'files':rows}))
 
 
 SKIP_RULE = 'justsearch-journey-skip-1.tmp'
+# Reading hours authored in Library and then turned off: days and times are kept, reading is not held.
+READING_HOURS = {'enabled': False, 'days': [1, 2, 3, 4, 5, 6, 7], 'startMinute': 540, 'endMinute': 1020}
+
+
+def reading_schedule(run):
+    return run.api('/api/settings/v2').get('ui', {}).get('indexingPause', {}).get('schedule')
 
 
 def author_state(run):
@@ -517,11 +523,22 @@ def author_state(run):
         run.nav('Library')
         run.wd.click('button[role="tab"][data-tab-id="folders"]')
         run.wd.click('button[aria-label="Add a rule"]:not(:disabled)')
-        run.wd.keys('.skip-rule:last-of-type input[aria-label^="Skip rule "]', SKIP_RULE)
-        run.wd.click('button[aria-label="Save patterns"]:not(:disabled)')
+        # Slice 6b-2: a rule saves when its field is left; Tab (U+E004) leaves it.
+        run.wd.keys('.skip-rule:last-of-type input[aria-label^="Skip rule "]', SKIP_RULE + '\ue004')
         wait_for(lambda: SKIP_RULE in run.api('/api/settings/v2').get('ui', {}).get('excludePatterns', []),
                  'UI-authored skip rule persisted', seconds=20)
+        # Adding a rule asks in place whether to remove matching read files; keep them (the fixture stays).
+        run.wd.click('button', 'Keep them')
         run.facts['skipRule'] = SKIP_RULE
+        # Reading hours save on change: Only between saves the default hours, Any time turns them off
+        # and keeps them, so the rest of the run is never held by the schedule.
+        run.wd.click('input#indexing-hours')
+        wait_for(lambda: (reading_schedule(run) or {}).get('enabled') is True,
+                 'UI-authored reading hours persisted', seconds=20)
+        run.wd.click('input[name="indexing-hours"]:not(#indexing-hours)')
+        wait_for(lambda: reading_schedule(run) == READING_HOURS,
+                 'UI-authored reading hours turned off and kept', seconds=20)
+        run.facts['readingHours'] = READING_HOURS
         skip_rule_entry(run, SKIP_RULE)
         run.native.shot('J4-authored-skip-rule')
     run.nav('Settings')
@@ -543,6 +560,8 @@ def assert_state(run):
     assert ui.get('theme') == 'dark', 'UI-authored Dark theme disappeared'
     if run.args.phase != 'predecessor':
         assert run.require('skipRule') in ui.get('excludePatterns', []), 'UI-authored skip rule disappeared'
+        assert ui.get('indexingPause', {}).get('schedule') == run.require('readingHours'), \
+            'UI-authored reading hours disappeared'
     assert json.dumps(run.require('corpus')) in json.dumps(after['roots']), 'Watched folder disappeared'
     assert fixture_present(run, after['search']['results']), 'Indexed fixture disappeared'
     return after
@@ -560,7 +579,8 @@ def restart(run):
         run.wd.click('button[role="tab"][data-tab-id="folders"]')
         entry = skip_rule_entry(run, run.require('skipRule'))
         run.evidence('J4-restarted-skip-rule', {'domEntry': entry,
-                     'savedPatterns': state['settings']['ui']['excludePatterns']})
+                     'savedPatterns': state['settings']['ui']['excludePatterns'],
+                     'readingHours': state['settings']['ui'].get('indexingPause', {}).get('schedule')})
         run.native.shot('J4-restarted-skip-rule')
     return state
 

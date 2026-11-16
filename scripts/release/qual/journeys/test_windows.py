@@ -671,9 +671,11 @@ class WindowsOperationalTests(unittest.TestCase):
         run = Mock(platform='windows', facts={'windowShownAt': 1}, args=SimpleNamespace(phase='candidate'))
         rule = linux.SKIP_RULE
         before = {'savedFiles': {'files': {'model': 'sha'}},
-                  'settings': {'ui': {'theme': 'dark', 'excludePatterns': [rule]}},
+                  'settings': {'ui': {'theme': 'dark', 'excludePatterns': [rule],
+                                      'indexingPause': {'schedule': dict(linux.READING_HOURS)}}},
                   'roots': {'path': r'C:\corpus'}, 'search': {'results': ['JustSearch-journey-orchid-open.txt']}}
-        run.require.side_effect = lambda k: {'beforeState': before, 'skipRule': rule, 'corpus': r'C:\corpus'}[k]
+        run.require.side_effect = lambda k: {'beforeState': before, 'skipRule': rule, 'readingHours': linux.READING_HOURS,
+                                             'corpus': r'C:\corpus'}[k]
         run.state_snapshot.return_value = before
         with patch.object(linux, 'skip_rule_entry', return_value={'pattern': rule}) as entry, patch.object(linux, 'interaction_observation'):
             self.assertEqual(linux.restart(run), before)

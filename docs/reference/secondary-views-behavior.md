@@ -67,13 +67,49 @@ and **Cancel** or Escape starts nothing and returns focus to the action. While a
 is in flight the action stays focused but does nothing. Library has no more menu or
 waiting-work action. Operation acceptance and completion are distinct.
 
-**Skip these files** and **When to read files** retain explicit Save behaviour in this intermediate
-slice. Save patterns affects future reading; Preview examines the effective saved policy without
-removing anything; Apply asks for confirmation and can remove existing search entries. Their draft,
-conflict, uncertain-save and partial-removal feedback remains visible. Exact-path keep-outs stay
-reachable. An override note explains when the saved patterns have no effect. Hidden weekdays remain
-saved, with a concise days line beside restricted hours. Their editor, collection/diagnostic facts,
-and routine removal history are behind **Settings → Advanced → Show developer tools**.
+**Skip these files** and **When to read files** save as you change them; there is no Save, Reload,
+Preview or Apply row. A skip rule saves when its field is left (Tab, a click elsewhere, switching
+tabs or leaving Library); removing a rule or an exact-path keep-out saves at once, and deleting the
+last rule saves an empty list. A rule that is not complete yet (such as `[a`) is never saved: its
+field says why, and fixing it saves. Reading hours and the battery rule save on change (a time when
+its field is left); an invalid combination is not sent and says why. A save never disables the field
+being typed in; what is saved is the text as it was when its field was left, so text typed during a
+save is saved when its field is left again, and is not called saved before it is. Each editor saves
+its changes one at a time, in the order they were made (leaving a field, a reading-hours choice,
+**Try again**, **Undo**). An unknown outcome (of a skip-rule or a reading-hours save) reads **Not sure
+this saved** with **Try again**, which checks the same save, with its same key and contents, before
+any newer change is sent; newer changes wait and read as not saved yet, also after leaving Library and
+coming back. Changes already made still save after leaving Library. A reload of the window (the app
+reloads itself after an Engine restart) keeps them: the window keeps its unsettled changes in its
+session storage, sends a save whose answer was lost again with its same key and contents, and shows
+the rest as **Your changes are not saved yet** with **Try again**; nothing kept is sent before that
+save is settled. When the session storage is full or unavailable, the editor says **Your changes may
+be lost if this window reloads** until its changes are saved or they can be kept again (tried on
+each new change); it never keeps an older part of them in place of the whole. When another window changed the same rules, the draft is kept and **Changed
+elsewhere** offers **Use the saved rules** or **Keep my draft** (which saves the draft as it is then);
+a save elsewhere of other settings is not a conflict.
+After **Use the saved rules** focus goes to the first rule field (or **Add a rule** when there are
+none); after **Keep my draft** it goes back to the field being edited. **Add a rule** adds one empty
+field and focuses it; a list read again or an **Undo** completing keeps that field.
+Each reading-rules write carries the revision its draft was based on.
+
+Adding a skip rule asks in place, without moving focus: **Remove files already read that match your
+skip rules from search? Files on disk are not touched.** **Keep them** leaves them searchable;
+**Remove from search** applies all saved rules: the answer is consent for the saved list it asked
+about, and the removal carries that list. If the saved list changes while the ask is open, or between
+the answer and the removal (another window, an override), nothing is removed and the ask is withdrawn
+and asked again for the new list. The outcome is plain and names no number of files (the engine
+confirms deletion requests, one per matching folder, not documents): done, partly done (naming
+offline or missing folders, unreadable files and files that couldn't be removed) with **Try again**,
+or not sure with **Try again**. An outcome is about the list its answer was for: if a rule is saved
+while a removal runs, the new ask stays, and the outcome names the rules it was for. Files no longer
+on disk are not checked and may stay searchable.
+While an override is set nothing is asked; the note explains the saved list takes effect when the
+override is removed. The latest skip-rule glob change offers **Undo** until another settings save
+(an Undo waits for an earlier change still being saved, and closes if that change was saved); it restores the rule list only (removed files come back when read again). Hidden weekdays remain
+saved, with a concise days line beside restricted hours. Their editor, per-rule match counts
+(**Count matching files**), collection/diagnostic facts and routine removal history are behind
+**Settings → Advanced → Show developer tools**.
 
 Unfinished and unavailable removal outcomes, pending withdrawals, rebuild decisions, interrupted
 imports, missing folders and unreadable-folder recovery remain visible. A line for **1 document from other apps**
@@ -353,7 +389,7 @@ User preferences panel with 6 glass sections that animate in with staggered entr
 
 #### 1. Interface (Layers icon)
 
-**Advanced › Show developer tools** reveals diagnostic facts and controls. Library keeps its folder rules and reading-hours editors in the default view, with explicit Save, Reload, Preview and Apply behavior in this intermediate presentation slice.
+**Advanced › Show developer tools** reveals diagnostic facts and controls. Library keeps its skip rules and reading-hours editors in the default view; they save as you change them, and per-rule match counts appear only here.
 
 #### 2. Appearance (Palette icon)
 
