@@ -53,6 +53,7 @@ import { completedForget, createForgetAttempt, executeForget, forgetContainsPath
 import { describeExactPath } from '../../../api/exclusionPolicy.js';
 import type { Sv3DraftDomain } from './sv3-draft-domain.js';
 import { SV3_RESULT_NO_DOCUMENT } from './fixtures.js';
+import { SV3_SOURCE_INDEX_ABSENT } from './sv3-citation-anchor.js';
 
 type SearchDraft = Pick<Sv3DraftDomain, 'draftMayIssue' | 'enterResults' | 'humanTask' | 'draftReview'
   | 'revokeHumanTask' | 'tier' | 'prepareAsk' | 'applyPreparation' | 'reconcileForgotten'>;
@@ -704,6 +705,18 @@ export class Sv3SearchController implements ReactiveController {
     const snapshot = this.snapshot;
     if (!this.showing || docPath === null || snapshot === null || snapshot.query.trim() === '') return null;
     return snapshot.results.some((hit) => hit.path === docPath) ? snapshot.query.trim() : null;
+  }
+
+  /**
+   * What the pane is told about the search result it shows: null when it shows no search result, else
+   * the query whose found words it marks — '' once a later search has left the file out of the list,
+   * so the pane is still closed by the file's name but marks nothing. A search result is opened with
+   * no turn; a document a turn opened (a citation, an agent's evidence row) is not one, even where its
+   * file is also in the list.
+   */
+  paneQuery(source: { readonly turnId: string; readonly sourceIndex: number } | null, docPath: string | null): string | null {
+    if (source === null || source.turnId !== '' || source.sourceIndex !== SV3_SOURCE_INDEX_ABSENT) return null;
+    return this.resultQuery(docPath) ?? '';
   }
 
   view(askAvailability: Availability): Sv3ResultsView {

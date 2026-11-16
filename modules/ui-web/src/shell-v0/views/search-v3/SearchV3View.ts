@@ -2092,19 +2092,6 @@ export class SearchV3View extends JfElement {
     this.details.focusPane();
   }
 
-  /**
-   * What the pane is told about the search result it shows: null when it shows no search result, else
-   * the query whose found words it marks — '' once a later search has left the file out of the list,
-   * so the pane is still closed by the file's name but marks nothing. A search result is opened with
-   * no turn; a document a turn opened (a citation, an agent's evidence row) is not one, even where its
-   * file is also in the list.
-   */
-  private paneResultQuery(): string | null {
-    const source = this.paneSource;
-    if (source === null || source.turnId !== '' || source.sourceIndex !== SV3_SOURCE_INDEX_ABSENT) return null;
-    return this.search.resultQuery(this.paneDocPath) ?? '';
-  }
-
   /** The box the pane opens into: re-clamped on every open, since the window or sidebar may have moved. */
   private preparePaneBox(): void {
     const available = this.availableWidth();
@@ -2704,7 +2691,7 @@ export class SearchV3View extends JfElement {
         .contextView=${this.paneTab === SV3_PANE_CONTEXT_TAB ? this.contextDomain.buildContextInspectorView() : null}
         .selectedItem=${this.details.selection()}
         .sourceControl=${this.details.sourceControl()}
-        .resultQuery=${this.paneResultQuery()}
+        .resultQuery=${this.search.paneQuery(this.paneSource, this.paneDocPath)}
         ?overlay=${this.paneOverlay}
         api-base=${this.apiBase}
         @sv3-pane-close=${this.dismissPane}
