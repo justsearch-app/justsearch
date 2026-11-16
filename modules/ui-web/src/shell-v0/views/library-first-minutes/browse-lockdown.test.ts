@@ -47,7 +47,7 @@ async function open(failed = false): Promise<Page> {
     ] } });
   });
   page.on('pageerror', error => { throw error; });
-  await page.goto(origin + 'browse.html');
+  await page.goto(origin + 'browse.html', { timeout: 45_000 });
   await expect.poll(() => page.getByRole('treeitem').first().isVisible(), { timeout: 3000 }).toBe(true); return page;
 }
 it('the browser tree has real roving focus, stable row geometry, reachable actions and a shared keyboard menu', async () => {

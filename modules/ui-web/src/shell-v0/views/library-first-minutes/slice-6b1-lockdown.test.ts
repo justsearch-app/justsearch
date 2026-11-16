@@ -61,7 +61,7 @@ async function open(): Promise<Page> {
   page.setDefaultTimeout(3000);
   const errors: Error[] = [];
   page.on('pageerror', error => { errors.push(error); });
-  await page.goto(origin + 'slice-6b1.html');
+  await page.goto(origin + 'slice-6b1.html', { timeout: 45_000 });
   await page.waitForFunction(() => typeof Reflect.get(window, 'settle') === 'function');
   await settle(page);
   expect(errors).toEqual([]);
@@ -92,7 +92,7 @@ it('after confirming with the keyboard, focus stays on Read everything again thr
     await page.keyboard.press('Enter'); await settle(page);
     expect(await ask.count()).toBe(1);
   } finally { await page.close(); }
-});
+}, 60_000);
 it('Escape on either answer closes the ask, runs nothing and returns focus to Read everything again', async () => {
   const page = await open();
   try {
@@ -110,7 +110,7 @@ it('Escape on either answer closes the ask, runs nothing and returns focus to Re
     }
     expect(await invocations(page)).toBe(0);
   } finally { await page.close(); }
-});
+}, 60_000);
 it('Escape right after opening, with focus still on Read everything again, closes the ask and runs nothing', async () => {
   const page = await open();
   try {
@@ -125,4 +125,4 @@ it('Escape right after opening, with focus still on Read everything again, close
     expect(await action.getAttribute('aria-expanded')).toBe('false');
     expect(await invocations(page)).toBe(0);
   } finally { await page.close(); }
-});
+}, 60_000);

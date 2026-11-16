@@ -254,11 +254,38 @@ hours, skip rules, settings persistence and operation implementations are outsid
           "label": "agent choice"
         }
       ],
-      "behaviour": "Three Chromium cases mount Library over a stubbed backend with one watched folder and a held read-again request. One confirms with the keyboard and asserts focus is on Read everything again while the request is held and after it settles, that it is aria-disabled meanwhile and that Enter/Space neither reopen the ask nor invoke again. The other presses Escape on Read again and on Cancel and asserts the ask closes, focus returns to the action and nothing is invoked. A third opens the ask with Enter and, with focus still on Read everything again, presses Escape: the ask closes, focus stays on the action, aria-expanded is false and nothing is invoked; on 09a4115459 it fails by assertion (the ask stays open: the Escape handler was only inside the ask). On 5a21ba3003 the first two fail by assertion (focus is on the page body; the ask stays open after Escape). On baseline 777b598043 all three fail by assertion because there is no Read everything again button.",
+      "behaviour": "Three Chromium cases mount Library over a stubbed backend with one watched folder and a held read-again request. One confirms with the keyboard and asserts focus is on Read everything again while the request is held and after it settles, that it is aria-disabled meanwhile and that Enter/Space neither reopen the ask nor invoke again. The other presses Escape on Read again and on Cancel and asserts the ask closes, focus returns to the action and nothing is invoked. A third opens the ask with Enter and, with focus still on Read everything again, presses Escape: the ask closes, focus stays on the action, aria-expanded is false and nothing is invoked; on 09a4115459 it fails by assertion (the ask stays open: the Escape handler was only inside the ask). On 5a21ba3003 the first two fail by assertion (focus is on the page body; the ask stays open after Escape). On baseline 777b598043 all three fail by assertion because there is no Read everything again button. Its page navigation uses the repository's 45 s budget and each case a 60 s test budget (CI shard load, PR #1269); assertions unchanged.",
       "repaired": true,
       "evidence": "gates/test-intent/evidence/fm-library-6b1.json",
       "newChecks": [
         "modules/ui-web/src/shell-v0/views/library-first-minutes/slice-6b1-lockdown.test.ts"
+      ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/browse-lockdown.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Adaptation",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Give the Browse page load the repository's usual 45 s navigation budget: with slice 6b-1's second Library lockdown file in the same CI shard, the cold Vite compile of the Library page exceeded the 3 s default in two CI runs of PR #1269.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "Unchanged: the browser tree's roving focus, stable row geometry, reachable actions, shared keyboard menu and recoverable failure. Only the page navigation timeout changed (3 s default -> 45 s, the convention used by 8 other lockdown files).",
+      "conflictSearch": "Decision records searched for lockdown timeouts; none sets a navigation budget. No private records were read.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "page.goto(origin + 'browse.html') under the page default 3 s timeout.",
+          "newAssertion": "page.goto(origin + 'browse.html', { timeout: 45_000 }); every assertion unchanged.",
+          "reason": "Setup budget only; the cold compile under a loaded CI shard took over 3 s (PR #1269 runs 43782755256 twice)."
+        }
       ]
     }
   ]
