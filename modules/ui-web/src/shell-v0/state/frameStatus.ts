@@ -534,10 +534,10 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
       if (input.rootsLive && state.state !== 'unknown' && seen?.ready !== ready) {
         folders.set(root.pathHash, ready && seen ? { ready, since: now } : { ready });
       }
-      // RV8-2 — shown only while searchable now; an unconfirmed moment (a rebuild, a failed count) keeps
-      // the witnessed time but not the row.
+      // RV8-2/RV8-5 — shown only while searchable now on live folder evidence; an unconfirmed moment (a
+      // rebuild, a failed count, a failed roots refresh) keeps the witnessed time but not the row.
       const since = folders.get(root.pathHash)?.since;
-      if (since !== undefined && ready) add({ id: `folder-searchable:${root.pathHash}`, section: 'earlier', tone: 'success',
+      if (since !== undefined && ready && input.rootsLive) add({ id: `folder-searchable:${root.pathHash}`, section: 'earlier', tone: 'success',
         title: path ? `Your ${name} folder is searchable` : 'A watched folder is searchable',
         occurredAt: new Date(since).toISOString(), age: ageWords(now - since), actions: [] });
     }
@@ -549,7 +549,9 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
       id: `folder-work:${root.pathHash}`, section: 'running', title: `${name}: ${state.metaText.replace(`${root.collection ?? 'default'} · `, '')}`, ...(path ? { detail: path } : {}),
       stale: !input.rootsLive, percent: state.state === 'enriching' ? rootCoverage(root, progress.stages)?.percent ?? null : null, actions });
   }
-  if (input.rootsLive) for (const hash of folders.keys()) if (!listed.has(hash)) folders.delete(hash);
+  // RV8-6 — the list drops a folder only on a confirmed removal (a successful read, forgetIndexedRoots) or
+  // a reset; a failed read keeps the last list. So an unlisted folder is forgotten however fresh the list is.
+  for (const hash of folders.keys()) if (!listed.has(hash)) folders.delete(hash);
   // Deduplicate the broadcast and request-scoped representations by the engine-issued identity.
   for (const request of input.authorizations ?? []) {
     if (terminal.has(request.pendingId) || request.expiresAt && Date.parse(request.expiresAt) <= now) continue;

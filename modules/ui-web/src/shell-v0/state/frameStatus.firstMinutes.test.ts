@@ -239,6 +239,22 @@ describe('H3\'\' one row per folder; Earlier only for what this window witnessed
     expect(searchableRow(unknown!)).toBeUndefined();
     expect(searchableRow(back!)).toMatchObject({ title: 'Your Documents folder is searchable', age: '10 min' });
   });
+  // RV8-5 — a failed roots refresh keeps the last list (rootsLive false): the row needs live folder evidence.
+  it('witnessed searchable, then a failed folder refresh: no row; live again: the row with its first age', () => {
+    const [, ready, failed, live] = observe([{ at: now, roots: [READING] }, { at: now + MIN, roots: [READY] },
+      { at: now + 3 * MIN, roots: [READY], live: false }, { at: now + 7 * MIN, roots: [READY] }]);
+    expect(searchableRow(ready!)).toMatchObject({ age: 'just now' });
+    expect(searchableRow(failed!)).toBeUndefined();
+    expect(searchableRow(live!)).toMatchObject({ title: 'Your Documents folder is searchable', age: '6 min' });
+  });
+  // RV8-6 — a confirmed removal (forgetIndexedRoots drops the folder, the list stays unconfirmed) forgets it.
+  it('witnessed searchable, failed refresh, then removed: adding it back already searchable shows no old row', () => {
+    const [, , , removed, readded] = observe([{ at: now, roots: [READING] }, { at: now + MIN, roots: [READY] },
+      { at: now + 2 * MIN, roots: [READY], live: false }, { at: now + 3 * MIN, roots: [], live: false },
+      { at: now + 4 * MIN, roots: [READY] }]);
+    expect(searchableRow(removed!)).toBeUndefined();
+    expect(searchableRow(readded!)).toBeUndefined();
+  });
   it('the retained failure count still reaches the folder\'s problem row while it is read again', () => {
     const model = derive({ roots: [READING], rootPaths: PATHS, rootsLive: true, lastKnownFailed: { 'h-docs': 3 } });
     expect(model.sections.problems.map(row => row.title)).toContain('3 files need review · Documents · last known');

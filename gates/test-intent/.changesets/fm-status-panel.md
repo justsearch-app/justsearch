@@ -15,13 +15,14 @@ challenger (H2', H2'', H3', H3'', H4', H5', S8-7', S8-8', S8-9'). Frontend only.
 The three new checks were run by run-evidence with --before e94eb4098f (the base; origin/main is not
 valid in this clone), one --check per file, no overlays; gates/test-intent/evidence/fm-status-panel.json. Every file passes on the candidate
 and fails on the base by assertion. Per case on the base (a shared clone with the new files copied in):
-frameStatus.firstMinutes 28 of 47 fail; the 19 that hold guard the change (unknown amounts, a failed
+frameStatus.firstMinutes 29 of 49 fail; the 20 that hold guard the change (unknown amounts, a failed
 stage without a reason keeps its row, the four non-operational, non-degraded verdicts, 0 and unknown
 files and a stale observation under H2' and again under H2'' in the install state, a stale worker RPC
 and a stale indexing source under H2' (RV8-1), a folder searchable at the first snapshot, no id, an
-unconfirmed observation, a denial, S8-5). StatusPanel.firstMinutes 7 of 9 fail; the developer-tools
+unconfirmed observation, a removal after a failed refresh and a re-add already searchable (RV8-6), a denial, S8-5). StatusPanel.firstMinutes 7 of 9 fail; the developer-tools
 view (today's panel) and the hidden notification row hold. StatusPanel.firstMinutes-lockdown 6 of 8 fail; the two "preserved" focus and re-arming cases hold. The five RV8 checks (two RV8-1 stale cases,
-RV8-2, RV8-3, RV8-4) also fail by assertion on the first slice-8 candidate 9e35771878.
+RV8-2, RV8-3, RV8-4) also fail by assertion on the first slice-8 candidate 9e35771878; the RV8-5 and RV8-6
+checks fail by assertion on the second candidate 558a9ed7af.
 
 H2'' (after the first evidence run): the pictured install state now carries the search verdict a real
 Engine without AI models reports (degraded, warn: index.dense_unavailable, lambdamart.not_configured,
@@ -46,6 +47,12 @@ indexing observation (RV8-1); the folder Earlier row shows only while the folder
 witnessed time kept through a rebuild or a failed count (RV8-2); withdrawn and expired permission rows
 stay in the default view (RV8-3, reverses part of frameStatus.test.ts R3's Obsolete removal); Details a
 developer tool opened close when developer tools turn off, failure rows keep theirs (RV8-4).
+Second review repairs (orchestrator's decisions on RV8-5..6, 2026-11-16): the folder Earlier row also
+needs live folder evidence, the witnessed time kept for recovery (RV8-5); a confirmed removal forgets the
+folder's witnessed time whatever the list's freshness, so a re-add already searchable shows no old row
+(RV8-6). The list drops a folder only on a confirmed removal or a reset (profile switch, new Engine
+process, both of which already clear the panel's folder memory), so the memory now forgets every
+unlisted folder without asking whether the list is live.
 
 ```json
 {
@@ -62,7 +69,7 @@ developer tool opened close when developer tools turn off, failure rows keep the
       "newChecks": [
         "modules/ui-web/src/shell-v0/state/frameStatus.firstMinutes.test.ts"
       ],
-      "behaviour": "The status panel's model in the first minutes. One \"Installing AI\" row with \"1.3 of 2.6 GB · about 24 min left\" and Pause, Resume and \"· Paused\" while paused, no time left while paused, preparing, verifying or setting up or without an estimate, no \"of\" without amounts; the AI install's stage rows folded into it, a blocked stage's reason on the row, a failed stage without a reason keeps its own row; one install entry after a reload (S8-1, H3', S8-7'). \"Search works\" only from a fresh verdict with own searchable files, operational or degraded with no search-unavailable cause: shown in the pictured install, AI not installed or installing with only the AI-absent reasons a real Engine reports; never while checking, connecting, transitioning, unreachable, stale or with 0 or unknown files, nor with a search-unavailable cause (index.failed, index.corrupt, component.start_deadline) or a reindex cause (index.embedding_mismatch), nor while the worker RPC or the indexing source is stale even with a positive searchable count (RV8-1); an outage says \"Can't reach the engine\" / \"Search limited\" instead (H2', H2'', S8-6). A folder: reading while it runs; \"Your Documents folder is searchable\" in Earlier only when this window saw it go from reading to searchable, aged \"just now\", \"12 min\", \"3 h\" from that moment, no file count; none for a folder searchable at the first observation, an unconfirmed observation, a folder without an id or a rebuild; the age survives path resolution; leaving searchable or removal takes the row away and a later searchable or re-add is new; a rebuild or a failed count after it was witnessed hides the row and searchable again shows it with its first age (RV8-2); during a rebuild the folder row does not claim reading; the retained failure count reaches the problem row (H3'', H6). Successful add-folder outcomes, \"Allowed\" history (gate, grant, retained request notice) and \"Draft kept\" are out of the default view and back with developer tools; an allowed operation that failed or finished incomplete becomes its own row in today's words; a denial keeps its row; withdrawn and expired permissions keep theirs, issued and used ones leave the default view (H4', RV8-3). Approvals keep target, risk and no-undo lines; a folder needing attention and reduced search keep their rows and actions (S8-5).",
+      "behaviour": "The status panel's model in the first minutes. One \"Installing AI\" row with \"1.3 of 2.6 GB · about 24 min left\" and Pause, Resume and \"· Paused\" while paused, no time left while paused, preparing, verifying or setting up or without an estimate, no \"of\" without amounts; the AI install's stage rows folded into it, a blocked stage's reason on the row, a failed stage without a reason keeps its own row; one install entry after a reload (S8-1, H3', S8-7'). \"Search works\" only from a fresh verdict with own searchable files, operational or degraded with no search-unavailable cause: shown in the pictured install, AI not installed or installing with only the AI-absent reasons a real Engine reports; never while checking, connecting, transitioning, unreachable, stale or with 0 or unknown files, nor with a search-unavailable cause (index.failed, index.corrupt, component.start_deadline) or a reindex cause (index.embedding_mismatch), nor while the worker RPC or the indexing source is stale even with a positive searchable count (RV8-1); an outage says \"Can't reach the engine\" / \"Search limited\" instead (H2', H2'', S8-6). A folder: reading while it runs; \"Your Documents folder is searchable\" in Earlier only when this window saw it go from reading to searchable, aged \"just now\", \"12 min\", \"3 h\" from that moment, no file count; none for a folder searchable at the first observation, an unconfirmed observation, a folder without an id or a rebuild; the age survives path resolution; leaving searchable or removal takes the row away and a later searchable or re-add is new; a rebuild, a failed count or a failed folder refresh after it was witnessed hides the row and searchable again on live folder evidence shows it with its first age (RV8-2, RV8-5); a folder removed after a failed refresh and added back already searchable has no old row (RV8-6); during a rebuild the folder row does not claim reading; the retained failure count reaches the problem row (H3'', H6). Successful add-folder outcomes, \"Allowed\" history (gate, grant, retained request notice) and \"Draft kept\" are out of the default view and back with developer tools; an allowed operation that failed or finished incomplete becomes its own row in today's words; a denial keeps its row; withdrawn and expired permissions keep theirs, issued and used ones leave the default view (H4', RV8-3). Approvals keep target, risk and no-undo lines; a folder needing attention and reduced search keep their rows and actions (S8-5).",
       "sources": [
         {
           "kind": "owner-words",
@@ -144,6 +151,14 @@ developer tool opened close when developer tools turn off, failure rows keep the
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "Orchestrator decisions on review findings (2026-11-16, verbatim, delegated, reversible): \"RV8-1 accepted: \\\"Search works\\\" also requires fresh indexing evidence (not workerRpcStale, staleSources without indexing).\" \"RV8-2 accepted: the folder Earlier row shows only while folderStatus is 'ready' now; memory of the witnessed time may stay, row suppressed while unknown/rebuilding/count failed.\" \"RV8-3 accepted (H4' says successful history only): withdrawn and expired permission rows stay in the default view; only successful issuance/consumption hidden.\"",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "Orchestrator decisions on review findings (2026-11-16, verbatim, delegated, reversible): \"RV8-5 the folder Earlier row needs live folder evidence (rootsLive) to show; witnessed time kept for recovery. RV8-6 confirmed removal (forgetIndexedRoots) clears the folder's witnessed memory regardless of observation freshness; re-add already ready shows no old row.\"",
           "label": "agent choice"
         }
       ]
