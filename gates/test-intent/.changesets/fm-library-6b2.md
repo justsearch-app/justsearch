@@ -744,3 +744,13 @@ The scripts are out of the gate's scope by design.
   "digest": "sha256:b9f3b0bde1d106f3a5804c17d63c0917efdbee6c8d6ea316f40cc3622e932b79"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "8a3357fe-eb2f-4c5a-a33e-cbc3746836d6",
+  "verdict": "accept",
+  "digest": "sha256:dfe75b9c6a0da072b89cb206e23277af9dc2b9ff198761db9f17496b3ffb4a40"
+}
+```
