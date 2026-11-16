@@ -119,6 +119,7 @@ export class IndexingRulesEditor extends JfElement {
   /** The observation held when the Engine answered; the next different one is newer than the click. */
   private readNowAnsweredAt: unknown = null;
   private readNowHadFocus = false;
+  private readNowLineHadFocus = false;
   declare developer: boolean;
   declare apiBase: string;
   declare host_: PluginHostApi | undefined;
@@ -496,6 +497,7 @@ export class IndexingRulesEditor extends JfElement {
   protected override willUpdate(changed: PropertyValues): void {
     super.willUpdate(changed);
     this.readNowHadFocus = this.shadowRoot?.activeElement?.matches('[data-read-now]') ?? false;
+    this.readNowLineHadFocus = this.shadowRoot?.activeElement?.id === 'read-now-status';
     if (!changed.has('readWaiting') && !changed.has('statusObservation')) return;
     // The first observation newer than the answer decides; from then on status alone shows the release.
     const newer = this.statusObservation !== this.readNowAnsweredAt;
@@ -513,6 +515,10 @@ export class IndexingRulesEditor extends JfElement {
     if (this.readNowHadFocus && !this.shadowRoot?.querySelector('[data-read-now]')) {
       const line = this.shadowRoot?.getElementById('read-now-status');
       (line?.textContent?.trim() ? line : this.shadowRoot?.getElementById('when-to-index'))?.focus();
+    }
+    // S6c-8 — the focused line empties when the release ends: focus goes to the group's heading.
+    if (this.readNowLineHadFocus && !this.shadowRoot?.getElementById('read-now-status')?.textContent?.trim()) {
+      this.shadowRoot?.getElementById('when-to-index')?.focus();
     }
   }
 

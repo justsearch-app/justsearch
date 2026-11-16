@@ -170,6 +170,17 @@ it('C4\': when the action disappears while focused, focus moves to the "When to 
   expect(editor.shadowRoot!.activeElement?.id).toBe('when-to-index');
 });
 
+it('S6c-8: when the focused line empties at the release end, focus moves to the "When to read files" heading', async () => {
+  answer('started');
+  const { el, editor } = await library();
+  const button = offered(editor);
+  button.focus(); button.click(); await settle(el); await settle(editor);
+  expect(editor.shadowRoot!.activeElement?.id).toBe('read-now-status');
+  await feed({ waiting: false }, el, editor);
+  expect(line(editor)).toBe('');
+  expect(editor.shadowRoot!.activeElement?.id).toBe('when-to-index');
+});
+
 it('C3\': the shared projection never says "Reading paused" while released and offers only on fresh status', () => {
   const released = selectIndexingProgress(status({ active: true }) as unknown as StatusResponse, true, 0, []);
   expect(released.pause).toBeNull();
