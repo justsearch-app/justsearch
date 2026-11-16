@@ -644,3 +644,14 @@ The scripts are out of the gate's scope by design.
   "note": "Two Obsolete entries drop checks no quoted source contradicts: LibrarySurface.excludes.test.ts S32.7 (polite progress status while a removal runs; fm-07/B2'/B4' do not remove it) and LibrarySurface.refresh-lockdown.test.ts L3 exact-path variant (stale second window's exact-path change refused, no overwrite; RF55 has one window and no conflict). Restore both or cite a source."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-fbx034v4",
+  "verdict": "reject",
+  "digest": "sha256:ce805bf91a43c9c3673c1f07d191bea7b5f9b3468fcf669b41854e2dea99827e",
+  "note": "S32.7 drops main's check that a Preview started while a removal runs does nothing; the candidate invokes core.preview-excludes (developer-tools Count matching files) while core.apply-excludes is pending. No source removes that guard. Restore the assertion and make the count wait, or cite a source."
+}
+```
