@@ -3,7 +3,8 @@
 // drawn by the app (ring or box readable at 3:1 in dark and light, teal only when on, a visible keyboard
 // focus, system controls in forced colours); the two disclosures show the app's own chevron, never the
 // browser's triangle; the helper sentence is gone from view but kept as the rule field's description;
-// with no rules only "Add a rule" shows, and an added field left empty goes without a save; "and"
+// with no rules only "Add a rule" shows, an added field left empty goes without a save, and a field
+// cleared of its rule keeps its row and cross so no row moves under a press (PD4''); "and"
 // between the two times is 13 px body like the words around it.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createServer, type ViteDevServer } from 'vite';
@@ -298,7 +299,7 @@ describe('PD4: with no rules only "Add a rule" shows', () => {
     } finally { await page.close(); }
   }, 60_000);
 
-  it('existing rules stay; an added field left empty goes without a save, and removing the last rule leaves only Add a rule', async () => {
+  it('existing rules stay; an added field left empty goes without a save; the only rule cleared and left keeps its row', async () => {
     const page = await open('dark', ['*.log']);
     try {
       expect(await ruleFields(page).count()).toBe(1);
@@ -308,10 +309,12 @@ describe('PD4: with no rules only "Add a rule" shows', () => {
       await page.mouse.click(5, 690); await settle(page);
       expect(await ruleFields(page).count(), 'left by a click elsewhere').toBe(1);
       expect(await posts(page)).toEqual([]);
+      // PD4'' — a field cleared of its rule keeps its row and cross; leaving it saves the list without it.
       await ruleFields(page).first().fill(''); await page.keyboard.press('Tab'); await settle(page);
-      expect(await posts(page), 'an existing rule emptied and left is removed and saved as before').toEqual([[]]);
-      expect(await ruleFields(page).count()).toBe(0);
-      expect(await focused(page)).toBe('Add a rule');
+      expect(await posts(page), 'an existing rule emptied and left is saved as before').toEqual([[]]);
+      expect(await ruleFields(page).count(), 'the cleared field keeps its row').toBe(1);
+      expect(await removeButtons(page).count(), 'and its cross').toBe(1);
+      expect(await focused(page)).toBe('Remove skip rule 1');
     } finally { await page.close(); }
   }, 60_000);
 
@@ -326,42 +329,84 @@ describe('PD4: with no rules only "Add a rule" shows', () => {
     } finally { await page.close(); }
   }, 60_000);
 
-  // PD4' — a field cleared of an existing rule counts as an empty field, whatever its position.
-  it('a middle rule cleared, then Add a rule: still one empty field, the focused one', async () => {
-    const page = await open('dark', ['*.a', '*.b', '*.c']);
+  // PD4'' — a field cleared of a rule keeps its row and its cross, so rows never move under a press in
+  // progress; only a new field from Add a rule, left empty, goes (the last row, after the press has ended).
+  const values = (page: Page) => ruleFields(page).evaluateAll(nodes => nodes.map(node => (node as HTMLInputElement).value));
+  /** Rules *.b, *.a, *.c with *.a cleared (still focused), or with a new empty field from Add a rule. */
+  async function withEmptyField(kind: 'cleared' | 'new'): Promise<Page> {
+    const page = await open('dark', ['*.b', '*.a', '*.c']);
+    if (kind === 'cleared') await ruleFields(page).nth(1).fill('');
+    else await page.getByRole('button', { name: 'Add a rule', exact: true }).click();
+    await settle(page);
+    expect(await focused(page)).toBe(kind === 'cleared' ? 'Skip rule 2' : 'Skip rule 4');
+    return page;
+  }
+
+  it('X1: a pointer press on a later rule\'s cross while an earlier field is cleared removes that rule; the cleared row stays with its cross', async () => {
+    const page = await withEmptyField('cleared');
     try {
-      await ruleFields(page).nth(1).fill(''); await settle(page);
-      await page.getByRole('button', { name: 'Add a rule', exact: true }).click(); await settle(page);
-      const values = await ruleFields(page).evaluateAll(nodes => nodes.map(node => (node as HTMLInputElement).value));
-      expect(values.filter(value => value === ''), 'one empty field, not a second').toEqual(['']);
-      expect(values.filter(Boolean)).toEqual(['*.a', '*.c']);
-      expect(await focused(page)).toBe(`Skip rule ${values.indexOf('') + 1}`);
+      await page.getByRole('button', { name: 'Remove skip rule 3', exact: true }).click(); await settle(page);
+      expect(await values(page), '*.c is removed, the cleared row stays').toEqual(['*.b', '']);
+      expect(await removeButtons(page).count(), 'the cleared row keeps its cross').toBe(2);
+      expect(await posts(page)).toEqual([['*.b', '*.c'], ['*.b']]);
+      expect(await focused(page), 'focus is not on the page').not.toBe('body');
     } finally { await page.close(); }
   }, 60_000);
 
-  it('the empty field left after that goes; no blank field without a cross remains', async () => {
-    const page = await open('dark', ['*.a', '*.b', '*.c']);
-    try {
-      await ruleFields(page).nth(1).fill(''); await settle(page);
-      await page.getByRole('button', { name: 'Add a rule', exact: true }).click(); await settle(page);
-      await page.mouse.click(5, 690); await settle(page);
-      expect(await ruleFields(page).evaluateAll(nodes => nodes.map(node => (node as HTMLInputElement).value))).toEqual(['*.a', '*.c']);
-      expect(await removeButtons(page).count(), 'every field shown has its cross').toBe(2);
-      expect((await posts(page)).at(-1)).toEqual(['*.a', '*.c']);
-    } finally { await page.close(); }
-  }, 60_000);
+  for (const kind of ['cleared', 'new'] as const) {
+    const stays = kind === 'cleared' ? ['*.b', '', '*.c'] : ['*.b', '*.a', '*.c'];
+    it(`${kind} empty field: a pointer press on a radio selects it; ${kind === 'cleared' ? 'the cleared row stays' : 'the new field goes'}`, async () => {
+      const page = await withEmptyField(kind);
+      try {
+        await between(page).click(); await settle(page);
+        expect(await between(page).isChecked(), 'the press is not lost').toBe(true);
+        expect(await values(page)).toEqual(stays);
+        expect(await removeButtons(page).count(), 'every row shown has its cross').toBe(3);
+        expect(await posts(page)).toEqual(kind === 'cleared' ? [['*.b', '*.c']] : []);
+      } finally { await page.close(); }
+    }, 60_000);
 
-  it('a press on Add a rule released elsewhere leaves no blank field', async () => {
-    const page = await open('dark', ['*.a', '*.b', '*.c']);
-    try {
-      await ruleFields(page).nth(1).fill(''); await settle(page);
-      const add = await page.getByRole('button', { name: 'Add a rule', exact: true }).boundingBox();
-      await page.mouse.move(add!.x + 5, add!.y + 5); await page.mouse.down();
-      await page.mouse.move(5, 690); await page.mouse.up(); await settle(page);
-      expect(await ruleFields(page).evaluateAll(nodes => nodes.map(node => (node as HTMLInputElement).value))).toEqual(['*.a', '*.c']);
-      expect(await removeButtons(page).count()).toBe(2);
-    } finally { await page.close(); }
-  }, 60_000);
+    it(`${kind} empty field: a pointer press on Add a rule focuses that field; still one empty field`, async () => {
+      const page = await withEmptyField(kind);
+      try {
+        await page.getByRole('button', { name: 'Add a rule', exact: true }).click(); await settle(page);
+        const shown = await values(page);
+        expect(shown, 'no second empty field; no row moved').toEqual(kind === 'cleared' ? ['*.b', '', '*.c'] : ['*.b', '*.a', '*.c', '']);
+        expect(await focused(page)).toBe(`Skip rule ${shown.indexOf('') + 1}`);
+      } finally { await page.close(); }
+    }, 60_000);
+
+    it(`${kind} empty field: a pointer press on an earlier rule's cross removes that rule`, async () => {
+      const page = await withEmptyField(kind);
+      try {
+        await page.getByRole('button', { name: 'Remove skip rule 1', exact: true }).click(); await settle(page);
+        expect(await values(page)).toEqual(kind === 'cleared' ? ['', '*.c'] : ['*.a', '*.c']);
+        expect(await removeButtons(page).count()).toBe(2);
+        expect((await posts(page)).at(-1)).toEqual(kind === 'cleared' ? ['*.c'] : ['*.a', '*.c']);
+        expect(await focused(page)).not.toBe('body');
+      } finally { await page.close(); }
+    }, 60_000);
+
+    it(`${kind} empty field: a pointer press on a later rule's cross removes that rule`, async () => {
+      const page = await withEmptyField(kind);
+      try {
+        await page.getByRole('button', { name: 'Remove skip rule 3', exact: true }).click(); await settle(page);
+        expect(await values(page)).toEqual(kind === 'cleared' ? ['*.b', ''] : ['*.b', '*.a']);
+        expect((await posts(page)).at(-1)).toEqual(kind === 'cleared' ? ['*.b'] : ['*.b', '*.a']);
+      } finally { await page.close(); }
+    }, 60_000);
+
+    it(`${kind} empty field: a press on Add a rule released elsewhere ${kind === 'cleared' ? 'keeps the cleared row' : 'removes the new field'}`, async () => {
+      const page = await withEmptyField(kind);
+      try {
+        const add = await page.getByRole('button', { name: 'Add a rule', exact: true }).boundingBox();
+        await page.mouse.move(add!.x + 5, add!.y + 5); await page.mouse.down();
+        await page.mouse.move(5, 690); await page.mouse.up(); await settle(page);
+        expect(await values(page)).toEqual(stays);
+        expect(await removeButtons(page).count(), 'no blank field without a cross').toBe(3);
+      } finally { await page.close(); }
+    }, 60_000);
+  }
 
   it('by keyboard: removing the only rule moves focus to Add a rule, never to the page', async () => {
     const page = await open('dark', ['*.log']);

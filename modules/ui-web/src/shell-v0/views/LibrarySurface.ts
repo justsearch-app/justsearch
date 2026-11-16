@@ -411,8 +411,20 @@ export class LibrarySurface extends JfElement {
   declare private removalBusy: boolean;
   private removalAskSerial = 0;
   private lastEditedRule = 0;
-  /** fm-07 — a pointer is pressing Add a rule (from pointerdown until its pointerup). */
-  private addRulePressed = false;
+  /** PD4'' — the last rule field is a new one from Add a rule, not yet left with a rule in it. */
+  private addedRuleOpen = false;
+  /** PD4'' — a pointer press is in progress (from pointerdown until its pointerup). */
+  private pointerPressing = false;
+  /** PD4'' — the new field was left empty during a pointer press: it goes once the press has ended. */
+  private addedRuleLeft = false;
+  private readonly onPointerDown = () => { this.pointerPressing = true; };
+  private readonly onPointerUp = () => {
+    this.pointerPressing = false;
+    if (!this.addedRuleLeft) return;
+    this.addedRuleLeft = false;
+    // After the press's own click: its target has not moved from under the pointer.
+    setTimeout(() => this.dropAddedRule());
+  };
   /**
    * R7/R11 — the drafts captured when their field was left (or by Try again or Undo), saved in order.
    * Only these bytes are ever sent: text typed after returning to a field stays a draft until it is left.
@@ -991,6 +1003,9 @@ export class LibrarySurface extends JfElement {
     if (!this.excludesLoadStarted) void this.loadExcludes();
     else void this.refreshExcludes();
     window.addEventListener('focus', this.onWindowFocus);
+    window.addEventListener('pointerdown', this.onPointerDown, true);
+    window.addEventListener('pointerup', this.onPointerUp, true);
+    window.addEventListener('pointercancel', this.onPointerUp, true);
     this.presentationUnsub = subscribePresentation(() => this.requestUpdate());
     // Keep empty roots provisional during transitions, but only call a real
     // rebuild/migration "Rebuilding". Other transitions use the status bar's wording.
@@ -1090,6 +1105,9 @@ export class LibrarySurface extends JfElement {
     this.rootArrivalUnsub?.();
     this.rootArrivalSerial++;
     window.removeEventListener('focus', this.onWindowFocus);
+    window.removeEventListener('pointerdown', this.onPointerDown, true);
+    window.removeEventListener('pointerup', this.onPointerUp, true);
+    window.removeEventListener('pointercancel', this.onPointerUp, true);
     this.excludesRefreshRead = null;
     this.indexingRuleUnsub?.();
     this.indexingRuleUnsub = undefined;
@@ -1791,6 +1809,8 @@ export class LibrarySurface extends JfElement {
     const active = deepActiveElement();
     const at = inputs.findIndex(input => input === active);
     this.setSkipFields(next);
+    // PD4'' — with no empty field kept at the end, no new field from Add a rule is open.
+    if (open === 0) this.addedRuleOpen = false;
     if (open === 0 || at < fields.length - open) return;
     const target = next.length - (fields.length - at);
     void this.updateComplete.then(() => {
@@ -2468,31 +2488,32 @@ export class LibrarySurface extends JfElement {
   }
 
   /**
-   * Leaving a skip-rule field saves the draft (below). fm-07 — a field left empty goes first, so an added
-   * rule never typed leaves no field and changes nothing saved; leaving the window keeps it.
+   * Leaving a skip-rule field saves the draft (below). PD4'' — a field cleared of a rule keeps its row, so
+   * rows never move under a press; only the new field from Add a rule, left empty, goes (without a save),
+   * after any pointer press in progress has ended. Leaving the window keeps it.
    */
   private leaveSkipRule(event: FocusEvent): void {
     const field = event.target as HTMLElement;
     if (!field.matches('.skip-rule input')) return;
-    const rows = [...(this.shadowRoot?.querySelectorAll('.skip-rule') ?? [])];
-    const index = rows.findIndex(row => row.contains(field));
-    const fields = this.skipFields;
-    const to = event.relatedTarget instanceof Element ? event.relatedTarget : null;
-    // A pointer press on Add a rule keeps the field (Add focuses it): removing it would move the button
-    // from under the pointer and lose the press.
-    const adding = this.addRulePressed && !!to?.closest('.add-rule');
-    if (index >= 0 && !fields[index]?.trim() && !adding && (to || document.hasFocus())) {
-      // Fields are rendered by position: focus moving to a later row stays on that row after the removal.
-      const toRow = to ? rows.findIndex(row => row.contains(to)) : -1;
-      const toPart = toRow > index && to?.matches('input') ? 'input' : null;
-      this.dropSkipFields((_, i) => i === index);
-      if (toPart) {
-        void this.updateComplete.then(() => {
-          this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input')[toRow - 1]?.focus();
-        });
+    const inputs = [...(this.shadowRoot?.querySelectorAll('.skip-rule input') ?? [])];
+    // A field leaving the page while the shown rules are replaced (a completed Undo) is not a person leaving it.
+    if (this.addedRuleOpen && field === inputs.at(-1) && inputs.length === this.skipFields.length) {
+      if (this.skipFields.at(-1)?.trim()) this.addedRuleOpen = false;
+      else if (event.relatedTarget || document.hasFocus()) {
+        if (this.pointerPressing) this.addedRuleLeft = true;
+        else this.dropAddedRule();
       }
     }
     void this.handleSaveExcludes();
+  }
+
+  /** PD4'' — the new field from Add a rule goes while it is empty and not focused. */
+  private dropAddedRule(): void {
+    const fields = this.skipFields;
+    const inputs = this.shadowRoot?.querySelectorAll('.skip-rule input');
+    if (!this.addedRuleOpen || fields.at(-1)?.trim() || (inputs && inputs[inputs.length - 1] === deepActiveElement())) return;
+    this.addedRuleOpen = false;
+    this.dropSkipFields((_, i) => i === fields.length - 1);
   }
 
   /**
@@ -3062,7 +3083,7 @@ export class LibrarySurface extends JfElement {
         </section>` : nothing}
         <div class="skip-rules" role="group" aria-label="Exclude patterns" @focusout=${this.leaveSkipRule}>
           <span id="excludes-saving" class="visually-hidden">A rule is saved when you leave its field.</span>
-          ${this.skipFields.map((rule, index) => {
+          ${this.skipFields.map((rule, index, fields) => {
             const problem = this.excludesRuleProblem?.index === index ? this.excludesRuleProblem : null;
             return html`<div class="skip-rule">
             <input type="text" aria-label=${`Skip rule ${index + 1}`}
@@ -3074,7 +3095,7 @@ export class LibrarySurface extends JfElement {
                 this.setSkipFields(rules);
                 this.lastEditedRule = index;
               }}>
-            ${!rule.trim() ? nothing : html`<jf-button variant="ghost" label=${`Remove skip rule ${index + 1}`}
+            ${this.addedRuleOpen && index === fields.length - 1 && !rule.trim() ? nothing : html`<jf-button variant="ghost" label=${`Remove skip rule ${index + 1}`}
               .disabled=${!this.excludesLoaded}
               .onActivate=${() => {
                 const fromRow = !!this.shadowRoot?.activeElement?.closest('.skip-rule');
@@ -3082,11 +3103,12 @@ export class LibrarySurface extends JfElement {
                 this.lastEditedRule = Math.max(0, index - 1);
                 void this.handleSaveExcludes();
                 // PD4' — the keyboard never falls to the page: the next rule's field, else the previous one,
-                // else Add a rule.
+                // else Add a rule. A new empty field from Add a rule is not a rule (it goes when left).
                 if (fromRow) {
                   void this.updateComplete.then(() => {
-                    const inputs = this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input');
-                    (inputs?.[index] ?? inputs?.[index - 1] ?? this.shadowRoot?.querySelector<HTMLElement>('.add-rule'))?.focus();
+                    const inputs = [...(this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input') ?? [])];
+                    if (this.addedRuleOpen && !this.skipFields.at(-1)?.trim()) inputs.pop();
+                    (inputs[index] ?? inputs[index - 1] ?? this.shadowRoot?.querySelector<HTMLElement>('.add-rule'))?.focus();
                   });
                 }
               }}
@@ -3095,29 +3117,18 @@ export class LibrarySurface extends JfElement {
           })}
           <jf-button class="add-rule" variant="ghost" label="Add a rule"
             .disabled=${!this.excludesLoaded}
-            @pointerdown=${() => {
-              this.addRulePressed = true;
-              window.addEventListener('pointerup', () => {
-                this.addRulePressed = false;
-                // PD4' — a press that ends in no click (released elsewhere) leaves no empty field behind.
-                setTimeout(() => {
-                  const active = this.shadowRoot?.activeElement;
-                  const inputs = [...this.shadowRoot?.querySelectorAll('.skip-rule input') ?? []];
-                  if (this.skipFields.some((rule, i) => !rule.trim() && inputs[i] !== active)) {
-                    this.dropSkipFields((rule, i) => !rule.trim() && inputs[i] !== active);
-                  }
-                });
-              }, { once: true });
-            }}
             .onActivate=${() => {
               // R26 — one empty focused field per press; nothing is awaited, so no press is refused as busy.
-              // fm-07/PD4' — never a second empty field: an empty one anywhere (added, or cleared of its
-              // rule) goes first, and the press ends with one empty field, the last.
-              this.dropSkipFields(rule => !rule.trim());
-              this.setSkipFields([...this.skipFields, '']);
+              // PD4'' — never a second empty field: an empty one (cleared of its rule, or new) is focused instead.
+              const fields = this.skipFields;
+              let at = fields.findIndex(rule => !rule.trim());
+              if (at < 0) {
+                at = fields.length;
+                this.setSkipFields([...fields, '']);
+                this.addedRuleOpen = true;
+              }
               void this.updateComplete.then(() => {
-                const inputs = this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input');
-                inputs?.[inputs.length - 1]?.focus();
+                this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input')[at]?.focus();
               });
             }}><span aria-hidden="true">+</span> Add a rule</jf-button>
         </div>
