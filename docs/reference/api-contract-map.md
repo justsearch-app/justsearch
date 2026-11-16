@@ -1628,8 +1628,9 @@ executors. Generic Settings exposes `indexingPause` read-only.
   battery); enrichment, picture reading and GPL stay held and the rules are unchanged. Files arriving
   during the release are read too. It ends at the first file-reading poll under it that claims
   nothing, on manual Pause or settings recovery, on an accepted change of the reading rules, when a
-  rule reason that did not hold at its start begins to hold or no rule holds any more, and on Engine
-  restart. MEDIUM risk, no confirmation, metadata audit. `structuredData.outcome` is `started`
+  rule reason that did not hold at its start begins to hold or no rule holds any more (also when
+  reading hours opened unobserved; an ended release never revives), and on Engine restart. Pause,
+  recovery and a rule change wait for a claim in progress under it; no claim starts after they return. MEDIUM risk, no confirmation, metadata audit. `structuredData.outcome` is `started`
   (installed; not "files read"), `joined` (already active), `nothing-waiting` or `not-held` with
   `reason` `paused`, `recovery` or `not-held`. A keyed replay returns the recorded receipt and never
   installs it again.

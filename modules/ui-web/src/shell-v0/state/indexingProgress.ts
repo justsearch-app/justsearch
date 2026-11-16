@@ -484,9 +484,12 @@ const PAUSE_REASON_WORDING: ReadonlyMap<string, string> = new Map([
 function policyPause(status: StatusResponse | null | undefined): IndexingProgress['pause'] {
   const indexing = status?.operating?.indexing;
   if (!indexing || (indexing.state !== 'PAUSING' && indexing.state !== 'PAUSED')) return null;
+  // Slice 6c — while "read waiting files now" releases them, the reading rules do not hold file reading.
+  const holding = indexing.release?.active === true
+    ? indexing.reasons.filter(r => r !== 'schedule' && r !== 'on_battery') : indexing.reasons;
   const ordered = ['settings_recovery', 'user_paused', 'schedule', 'on_battery'];
-  const reasons = ordered.filter(r => indexing.reasons.includes(r as typeof indexing.reasons[number]));
-  const reason = reasons[0] ?? indexing.reasons.find(r => !AUTOMATIC_REASONS.has(r));
+  const reasons = ordered.filter(r => holding.includes(r as typeof indexing.reasons[number]));
+  const reason = reasons[0] ?? holding.find(r => !AUTOMATIC_REASONS.has(r));
   if (!reason) return null;
   return { state: indexing.state === 'PAUSING' ? 'pausing' : 'paused', reason: reason ?? '', reasons,
     untilEpochMs: indexing.untilEpochMs, waiting: indexing.waitingForResume };

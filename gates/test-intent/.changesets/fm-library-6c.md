@@ -12,6 +12,18 @@ covered by isolated new test files (exempt) and by the existing files listed her
 list, the recaptured operation-wire golden, the regenerated status fixture, the narrowed 6b1-7 and
 the dead-code pin. Evidence: gates/test-intent/evidence/fm-library-6c.json (candidate and before-state 30f367f53c, one check per file).
 
+Review repairs RV6c-1..5 (reviewer-s6c on 0a1023dc2a, accepted by the orchestrator) add cases to the
+same new files only: a claim of file jobs under a release is serialized with revocation, so Pause,
+recovery, a rule edit and battery starting wait for a claim in progress and no claim starts after
+they complete, while status and the other lanes keep reading the hold meanwhile (RV6c-1); a release ends
+with its hold episode, also when nothing observed the hold while reading hours were open, and never
+revives (RV6c-2); the shared pause derivation drops the released reading-rule reasons, so schedule
+or battery with Game Mode, energy saver or external GPU pressure is never "Reading paused" while
+released (RV6c-3); "Nothing is waiting to be read." clears on the next fresh observation, which
+offers the action again when files wait (RV6c-4); the real Engine keeps a new skip rule, a removed
+folder, a cancelled import and a deleted file in effect while a release reads, and keeps content
+indexed before (RV6c-5; this case also passes on 867670406a and is preservation evidence there).
+
 ```json
 {
   "entries": [

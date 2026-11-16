@@ -200,6 +200,48 @@ final class IndexingLoopReadNowTest {
   }
 
   @Test
+  void revocationDuringTheClaimWaitsForItSoNoBatchStartsAfterRevocationCompletes() throws Exception {
+    for (var revoke : List.<java.util.function.Consumer<IndexingHold>>of(
+        hold -> hold.pause(null, "USER_PAUSED"),
+        hold -> hold.setPolicy(false, null, null, new IndexingSchedule(true, List.of(1, 2), 600, 660), false))) {
+      var hold = outsideHours();
+      var queue = mock(JobQueue.class);
+      var polls = new AtomicInteger();
+      var claimed = job("claimed-while-revoking.txt");
+      var revoker = new java.util.concurrent.atomic.AtomicReference<Thread>();
+      var completedDuringClaim = new AtomicBoolean();
+      // The queue is claiming the batch (the hold was checked just before): revocation arrives now.
+      when(queue.pollPending(anyInt())).thenAnswer(ignored -> {
+        if (polls.incrementAndGet() != 1) return List.of();
+        var thread = new Thread(() -> revoke.accept(hold), "revoker");
+        revoker.set(thread);
+        thread.start();
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (thread.getState() != Thread.State.BLOCKED && thread.getState() != Thread.State.TERMINATED
+            && System.nanoTime() < deadline) {
+          Thread.onSpinWait();
+        }
+        completedDuringClaim.set(thread.getState() == Thread.State.TERMINATED);
+        return List.of(claimed);
+      });
+      var loop = loop(queue, hold, () -> null);
+      try {
+        loop.start();
+        readNow(hold);
+        await(() -> revoker.get() != null && !revoker.get().isAlive(), "the revocation completes");
+        assertFalse(completedDuringClaim.get(),
+            "revocation cannot complete while a batch is being admitted: it waits for that claim");
+        await(() -> published(queue).contains(claimed.path()), "the batch admitted first finishes");
+        await(() -> hold.snapshot().state() == IndexingHold.State.PAUSED, "then the loop is quiet");
+        Thread.sleep(200);
+        assertEquals(1, polls.get(), "no batch is claimed after the revocation completed");
+      } finally {
+        loop.close();
+      }
+    }
+  }
+
+  @Test
   void revocationAfterTheClaimFinishesTheBatchAndClaimsNoMore() throws Exception {
     var hold = outsideHours();
     var queue = mock(JobQueue.class);

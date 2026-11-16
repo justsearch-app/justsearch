@@ -13,6 +13,8 @@ import { refreshStatusNow } from '../state/aiStateStore.js';
 import type { IndexingProgress } from '../state/indexingProgress.js';
 import { z } from 'zod';
 
+const NOTHING_WAITING = 'Nothing is waiting to be read.';
+
 export type SavedIndexingRules = {
   schedule: NonNullable<NonNullable<NonNullable<SettingsV2['ui']>['indexingPause']>['schedule']> | null;
   pauseOnBattery: boolean;
@@ -495,7 +497,8 @@ export class IndexingRulesEditor extends JfElement {
     const status = this.readWaiting;
     if (status?.active) this.readNowSawActive = true;
     else if (this.readNowStarted && (this.readNowSawActive || ++this.readNowQuietUpdates >= 2)) this.readNowStarted = false;
-    if (this.readNowNote && !status?.offered) this.readNowNote = '';
+    // "Nothing is waiting" answers one click: the next fresh observation replaces it.
+    if (this.readNowNote && (!status?.offered || this.readNowNote === NOTHING_WAITING)) this.readNowNote = '';
   }
 
   protected override updated(changed: PropertyValues): void {
@@ -522,7 +525,7 @@ export class IndexingRulesEditor extends JfElement {
         this.readNowSawActive = false;
         this.readNowQuietUpdates = 0;
       } else if (outcome === 'nothing-waiting') {
-        this.readNowNote = 'Nothing is waiting to be read.';
+        this.readNowNote = NOTHING_WAITING;
       } else {
         void refreshStatusNow();
       }
@@ -536,7 +539,7 @@ export class IndexingRulesEditor extends JfElement {
 
   private renderReadWaiting() {
     const reading = this.readWaiting?.active || this.readNowStarted;
-    const offer = !reading && this.readWaiting?.offered && !this.readNowNote.startsWith('Nothing');
+    const offer = !reading && this.readWaiting?.offered && this.readNowNote !== NOTHING_WAITING;
     return html`<div class="read-now">
       ${offer ? html`<button type="button" class="text-action" data-read-now
         aria-disabled=${this.readNowSending ? 'true' : 'false'}

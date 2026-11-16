@@ -86,6 +86,88 @@ final class ReadWaitingFilesIntegrationTest {
     }
   }
 
+  /**
+   * RV6c-5 on the real Engine: while a release reads a long backlog, a new skip rule, a removed
+   * folder, a cancelled import and a deleted file all keep their effect. The changed items queue
+   * after the backlog (claims follow queue age), so each change lands while reading is in flight;
+   * content indexed before the rules held is kept.
+   */
+  @Test
+  @Timeout(420)
+  void changesDuringTheReleaseKeepTheirEffectAndExistingContentStays() throws Exception {
+    Path kept = Files.createDirectories(directory.resolve("kept"));
+    Files.writeString(kept.resolve("keep.txt"), "readnowkeptmarker indexed before the rules held");
+    Path stale = Files.writeString(kept.resolve("stale.txt"), "readnowstalemarker indexed before the rules held");
+    Path backlog = Files.createDirectories(directory.resolve("backlog"));
+    int backlogFiles = 1500;
+    for (int i = 0; i < backlogFiles; i++) {
+      Files.writeString(backlog.resolve("backlog-" + i + ".txt"), "readnowbacklogmarker file " + i);
+    }
+    Path removed = Files.createDirectories(directory.resolve("removed"));
+    for (int i = 0; i < 20; i++) Files.writeString(removed.resolve("gone-" + i + ".txt"), "readnowremovedmarker " + i);
+    Path skipped = Files.createDirectories(directory.resolve("skipped"));
+    Files.writeString(skipped.resolve("normal.txt"), "readnowskippedrootmarker read as usual");
+    Files.createDirectories(skipped.resolve("private"));
+    Files.writeString(skipped.resolve("private/secret.txt"), "readnowprivatemarker excluded during the release");
+    Path imported = Files.writeString(Files.createDirectories(directory.resolve("imports")).resolve("imported.txt"),
+        "readnowimportmarker cancelled during the release");
+    int now = LocalDateTime.now().getHour() * 60 + LocalDateTime.now().getMinute();
+    var rules = new java.util.HashMap<String, Object>();
+    rules.put("schedule", Map.of("enabled", true, "days", List.of(1, 2, 3, 4, 5, 6, 7),
+        "startMinute", (now + 120) % 1440, "endMinute", (now + 180) % 1440));
+    rules.put("pauseOnBattery", false);
+    try (var engine = new Engine("changes")) {
+      engine.awaitStatus(s -> s.path("indexAvailable").asBoolean());
+      engine.operation("core.add-watched-root", Map.of("path", kept.toString()));
+      engine.awaitSearch("readnowkeptmarker");
+      engine.awaitSearch("readnowstalemarker");
+      engine.operation("core.set-indexing-rules", rules);
+      engine.awaitStatus(s -> "PAUSED".equals(indexing(s).path("state").asText()));
+
+      // The backlog queues first; the items the changes concern queue after it.
+      engine.operation("core.add-watched-root", Map.of("path", backlog.toString()));
+      engine.awaitStatus(s -> indexing(s).path("pendingJobs").asLong() >= backlogFiles);
+      engine.operation("core.add-watched-root", Map.of("path", removed.toString()));
+      engine.awaitStatus(s -> indexing(s).path("pendingJobs").asLong() >= backlogFiles + 20);
+      engine.operation("core.add-watched-root", Map.of("path", skipped.toString()));
+      engine.awaitStatus(s -> indexing(s).path("pendingJobs").asLong() >= backlogFiles + 22);
+      String importKey = engine.ingest(imported);
+      Files.writeString(stale, "readnowstaleupdatedmarker changed while held");
+      var held = engine.awaitStatus(s -> indexing(s).path("pendingJobs").asLong() >= backlogFiles + 24
+          && indexing(s).path("heldFilesWaiting").asBoolean());
+      assertEquals("PAUSED", indexing(held).path("state").asText(), "nothing is read before the request");
+      assertEquals(0, engine.search("readnowbacklogmarker"));
+
+      assertEquals("started", engine.operation("core.indexing-read-now", Map.of()).path("outcome").asText());
+      // Each change is made while the release is reading the backlog.
+      var excludes = engine.settings();
+      engine.saveSettings(Map.of("ui", Map.of("excludePatterns", List.of("private/")),
+          "witness", excludes.path("witness")));
+      engine.operationConfirmed("core.apply-excludes", Map.of("rules", List.of("private/")));
+      engine.operationConfirmed("core.remove-watched-root", Map.of("path", removed.toString()));
+      engine.operationConfirmed("core.cancel-import", Map.of("operationKey", importKey));
+      Files.delete(stale);
+      var during = engine.awaitStatus(s -> true);
+      assertTrue(indexing(during).path("release").path("active").asBoolean(),
+          "the changes landed while the release was still reading: " + indexing(during));
+      assertEquals(0, engine.search("readnowprivatemarker"), "a skipped file is never read");
+
+      var after = engine.awaitStatus(s -> !indexing(s).path("release").path("active").asBoolean(true)
+          && indexing(s).path("pendingJobs").asLong(-1) == 0
+          && "PAUSED".equals(indexing(s).path("state").asText()), 240);
+      assertEquals("[\"schedule\"]", indexing(after).path("readingRuleReasons").toString(),
+          "the reading-hours rule holds again");
+      assertTrue(engine.search("readnowbacklogmarker") > 0, "the backlog was read");
+      engine.awaitSearch("readnowskippedrootmarker");
+      assertEquals(0, engine.search("readnowprivatemarker"), "the skip rule kept its file unread");
+      assertEquals(0, engine.search("readnowremovedmarker"), "a removed folder's files are not read");
+      assertEquals(0, engine.search("readnowimportmarker"), "a cancelled import's file is not read");
+      engine.awaitNoSearch("readnowstalemarker");
+      assertEquals(0, engine.search("readnowstaleupdatedmarker"), "a deleted file's change is not read");
+      assertTrue(engine.search("readnowkeptmarker") > 0, "content indexed before is kept");
+    }
+  }
+
   private static JsonNode indexing(JsonNode status) {
     return status.path("operating").path("indexing");
   }
@@ -162,7 +244,11 @@ final class ReadWaitingFilesIntegrationTest {
     }
 
     JsonNode awaitStatus(Predicate<JsonNode> matches) throws Exception {
-      long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+      return awaitStatus(matches, 60);
+    }
+
+    JsonNode awaitStatus(Predicate<JsonNode> matches, int seconds) throws Exception {
+      long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(seconds);
       JsonNode latest = null;
       do {
         var response = send("/api/status?fresh=true", null);
@@ -185,14 +271,45 @@ final class ReadWaitingFilesIntegrationTest {
       return result.path("structuredData");
     }
 
+    /** An operation the trust gate asks about, approved in place as the app window does. */
+    JsonNode operationConfirmed(String id, Map<String, Object> args) throws Exception {
+      String key = OperationKeys.generate(Clock.systemUTC());
+      var response = send("/api/operations/" + id + "/invoke", JSON.writeValueAsString(Map.of("args", args, "idempotencyKey", key)));
+      if (response.statusCode() == 428) {
+        String pending = JSON.readTree(response.body()).path("pendingId").asText();
+        var approved = send("/api/authorizations/approve", JSON.writeValueAsString(Map.of("pendingId", pending)));
+        assertEquals(200, approved.statusCode(), id + " approval " + approved.body());
+        response = send("/api/operations/" + id + "/invoke", JSON.writeValueAsString(Map.of("args", args,
+            "idempotencyKey", key, "confirmationToken", JSON.readTree(approved.body()).path("capsule").asText())));
+      }
+      assertEquals(200, response.statusCode(), id + " " + response.body());
+      var result = JSON.readTree(response.body());
+      assertTrue(result.path("success").asBoolean(), response.body());
+      return result.path("structuredData");
+    }
+
+    JsonNode settings() throws Exception {
+      var response = send("/api/settings/v2", null);
+      assertEquals(200, response.statusCode(), response.body());
+      return JSON.readTree(response.body());
+    }
+
+    void saveSettings(Map<String, Object> change) throws Exception {
+      var body = new java.util.HashMap<String, Object>(change);
+      body.put("operationKey", OperationKeys.generate(Clock.systemUTC()));
+      var response = send("/api/settings/v2", JSON.writeValueAsString(body));
+      assertEquals(200, response.statusCode(), response.body());
+    }
+
     /** The serving generation may become available just after the index reports available. */
-    void ingest(Path file) throws Exception {
+    String ingest(Path file) throws Exception {
       long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
       while (true) {
+        String key = OperationKeys.generate(Clock.systemUTC());
         var body = JSON.writeValueAsString(Map.of("args", Map.of("paths", List.of(file.toString()), "collection", "default"),
-            "idempotencyKey", OperationKeys.generate(Clock.systemUTC())));
+            "idempotencyKey", key));
         var response = send("/api/operations/core.ingest-files/invoke", body);
-        if (response.statusCode() == 200 && JSON.readTree(response.body()).path("success").asBoolean()) return;
+        if (response.statusCode() == 200 && JSON.readTree(response.body()).path("success").asBoolean()) return key;
         if (!response.body().contains("Serving generation authority is unavailable") || System.nanoTime() > until) {
           fail("core.ingest-files " + response.statusCode() + " " + response.body());
         }
@@ -213,6 +330,15 @@ final class ReadWaitingFilesIntegrationTest {
         Thread.sleep(200);
       }
       fail("search never found " + query + "\n" + Files.readString(log));
+    }
+
+    void awaitNoSearch(String query) throws Exception {
+      long until = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
+      while (System.nanoTime() < until) {
+        if (search(query) == 0) return;
+        Thread.sleep(200);
+      }
+      fail("search still finds " + query + "\n" + Files.readString(log));
     }
 
     @Override public void close() throws Exception {

@@ -74,7 +74,8 @@ arriving meanwhile are read too, while picture reading and other background work
 The action is replaced in place by **Reading the waiting files. Your reading rules are unchanged.**
 (announced politely, with focus) until the Engine reports the release ended; the folder rows then
 show the results as usual. Pause, a rule change, a new hold (such as battery starting) or a restart
-ends it. A click that finds nothing says **Nothing is waiting to be read.** If the action disappears
+ends it. A click that finds nothing says **Nothing is waiting to be read.** until the next status
+sample; if files are waiting by then, the action is back. If the action disappears
 while focused, focus moves to the **When to read files** heading.
 
 **Skip these files** and **When to read files** save as you change them; there is no Save, Reload,

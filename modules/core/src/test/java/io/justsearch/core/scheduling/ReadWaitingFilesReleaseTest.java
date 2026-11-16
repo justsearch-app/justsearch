@@ -179,6 +179,78 @@ final class ReadWaitingFilesReleaseTest {
   }
 
   @Test
+  void aReleaseEndsWithItsHoldEpisodeEvenWhenNothingHoldsAndNeverRevives() {
+    var minute = new AtomicInteger(500);
+    var hold = outsideHours(minute);
+    assertEquals("STARTED", readNow(hold, true), "released outside reading hours");
+    minute.set(620);
+    assertEquals(IndexingHold.State.RUNNING, hold.snapshot().state(), "inside reading hours nothing holds");
+    minute.set(700);
+    assertFalse(released(hold), "the hours closing again starts a new hold episode, not the old release");
+    assertTrue(ingestionHeld(hold), "the expired release does not revive");
+
+    var battery = new IndexingHold();
+    battery.setPolicy(false, null, null, null, true);
+    battery.setOnBattery(true);
+    assertEquals("STARTED", readNow(battery, true), "released on battery");
+    battery.setOnBattery(false);
+    assertFalse(battery.held(), "on mains nothing holds");
+    battery.setOnBattery(true);
+    assertTrue(ingestionHeld(battery), "battery again is a new episode: the release does not revive");
+  }
+
+  @Test
+  void aReleaseEndsWithItsHoldEpisodeEvenWhenNobodyLookedDuringTheReadingHours() {
+    // Monday 08:20 UTC; the hours open at 10:00 and close at 11:00. Nothing observes the hold in between,
+    // as when one long batch or a service wait spans the permitted interval.
+    var now = new java.util.concurrent.atomic.AtomicLong(
+        java.time.Instant.parse("2026-11-16T08:20:00Z").toEpochMilli());
+    var clock = new java.time.Clock() {
+      @Override public java.time.ZoneId getZone() { return java.time.ZoneOffset.UTC; }
+      @Override public java.time.Clock withZone(java.time.ZoneId zone) { return this; }
+      @Override public java.time.Instant instant() { return java.time.Instant.ofEpochMilli(now.get()); }
+    };
+    var hold = new IndexingHold(clock);
+    hold.setLocalTime(() -> {
+      var local = clock.instant().atZone(java.time.ZoneOffset.UTC);
+      return new IndexingHold.LocalMinute(local.getDayOfWeek().getValue(), local.getHour() * 60 + local.getMinute());
+    });
+    hold.setPolicy(false, null, null, HOURS, false);
+    assertEquals("STARTED", readNow(hold, true));
+    now.addAndGet(java.time.Duration.ofMinutes(99).toMillis());
+    assertFalse(ingestionHeld(hold), "09:59: still the same hold episode");
+    now.addAndGet(java.time.Duration.ofMinutes(71).toMillis());
+    assertTrue(ingestionHeld(hold), "11:10: the hours opened and closed unobserved, so the release ended");
+    assertFalse(released(hold));
+  }
+
+  @Test
+  void aClaimUnderTheReleaseHoldsBackRevocationButNotObservers() throws Exception {
+    var hold = outsideHours(new AtomicInteger(500));
+    assertEquals("STARTED", readNow(hold, true));
+    var claiming = new java.util.concurrent.CountDownLatch(1);
+    var finish = new java.util.concurrent.CountDownLatch(1);
+    var claim = CompletableFuture.supplyAsync(() -> call(hold, "claimIngestion",
+        (java.util.function.Supplier<String>) () -> {
+          claiming.countDown();
+          try { assertTrue(finish.await(5, TimeUnit.SECONDS)); }
+          catch (InterruptedException failure) { throw new AssertionError(failure); }
+          return "claimed";
+        }));
+    assertTrue(claiming.await(5, TimeUnit.SECONDS), "the claim is being made");
+    var observed = CompletableFuture.supplyAsync(() -> released(hold) && hold.held());
+    assertTrue(observed.get(2, TimeUnit.SECONDS), "status and other lanes read the hold meanwhile");
+    var pause = CompletableFuture.runAsync(() -> hold.pause(null, "USER_PAUSED"));
+    assertThrows(TimeoutException.class, () -> pause.get(300, TimeUnit.MILLISECONDS),
+        "Pause waits for the claim in progress");
+    finish.countDown();
+    assertEquals("claimed", call(claim.get(5, TimeUnit.SECONDS), "claimed"));
+    pause.get(5, TimeUnit.SECONDS);
+    assertNull(call(hold, "claimIngestion", (java.util.function.Supplier<String>) () -> "late"),
+        "after Pause no claim is made");
+  }
+
+  @Test
   void aRestartedEngineHasNoRelease() {
     var hold = outsideHours(new AtomicInteger(500));
     assertEquals("STARTED", readNow(hold, true));

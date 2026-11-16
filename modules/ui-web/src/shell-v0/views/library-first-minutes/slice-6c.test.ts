@@ -130,6 +130,7 @@ it('S6c-5: another window that sees the release shows the line, not the action; 
 
 it('S6c-4: Pause during the release removes the line; the hold is said as before', async () => {
   const { el, editor } = await library({ active: true });
+  expect(line(editor)).toBe(LINE);
   await feed({ reasons: ['user_paused', 'schedule'] }, el, editor);
   expect(line(editor)).toBe('');
   expect(action(editor)).toBeUndefined();
@@ -178,4 +179,33 @@ it('C3\': the shared projection never says "Reading paused" while released and o
     .toEqual({ offered: true, active: false });
   expect(selectIndexingProgress(status() as unknown as StatusResponse, false, 0, []).readWaiting)
     .toEqual({ offered: false, active: false });
+});
+
+it.each([
+  ['hours', 'game_mode'], ['hours', 'energy_saver'], ['hours', 'gpu_busy_external'],
+  ['battery', 'game_mode'], ['battery', 'energy_saver'], ['battery', 'gpu_busy_external'],
+])('RV6c-3: released under %s with %s, the shared pause derivation never says "Reading paused"', async (rule, bulk) => {
+  const hold = { active: true, reasons: [rule === 'hours' ? 'schedule' : 'on_battery', bulk], state: 'PAUSED' };
+  const released = selectIndexingProgress(status(hold) as unknown as StatusResponse, true, 0, []);
+  expect(released.pause, 'no reading-rule pause while released').toBeNull();
+  expect(released.activity.summary).not.toBe('Reading paused');
+  expect(released.readWaiting).toEqual({ offered: false, active: true });
+  const { el, editor } = await library(hold);
+  expect(line(editor)).toBe(LINE);
+  expect(el.shadowRoot!.textContent).not.toContain('Reading paused');
+});
+
+it('RV6c-4: after "Nothing is waiting", the next fresh status offering waiting work shows the action again', async () => {
+  const invoke = answer('nothing-waiting');
+  const { el, editor } = await library();
+  offered(editor).click(); await settle(el); await settle(editor);
+  expect(line(editor)).toBe('Nothing is waiting to be read.');
+  expect(action(editor)).toBeUndefined();
+  // New files arrived before the next sample: fresh status keeps offering, so the action returns.
+  await feed({}, el, editor);
+  expect(line(editor)).toBe('');
+  invoke.mockResolvedValue({ success: true, message: 'started', structuredData: { outcome: 'started' } } as never);
+  offered(editor).click(); await settle(el); await settle(editor);
+  expect(invoke).toHaveBeenCalledTimes(2);
+  expect(line(editor)).toBe(LINE);
 });

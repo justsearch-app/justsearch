@@ -779,12 +779,20 @@ public class IndexingLoop implements Closeable {
           continue;
         }
 
-        // Poll for pending jobs. A hold or a revoked release since admission claims nothing more;
-        // the next pass publishes and acknowledges as for any hold.
+        // Poll for pending jobs. The claim is made under the hold, so a hold or a revoked release
+        // since admission claims nothing more and revocation waits for a claim in progress; the
+        // next pass publishes and acknowledges as for any hold.
         int pollBatchSize = pacing().pollBatchSize();
-        if (hold != null && hold.ingestionHeld()) continue;
-        Object release = hold == null ? null : hold.activeRelease();
-        List<JobQueue.IndexJob> jobs = jobQueue.pollPending(pollBatchSize);
+        Object release = null;
+        List<JobQueue.IndexJob> jobs;
+        if (hold == null) {
+          jobs = jobQueue.pollPending(pollBatchSize);
+        } else {
+          var claim = hold.claimIngestion(() -> jobQueue.pollPending(pollBatchSize));
+          if (claim == null) continue;
+          jobs = claim.claimed();
+          release = claim.release();
+        }
         if (journal.commitWriteFailure() == null) queueFailures.success();
 
         if (jobs.isEmpty()) {
