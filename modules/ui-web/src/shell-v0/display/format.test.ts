@@ -49,6 +49,7 @@ describe('formatBytes', () => {
 describe('formatBytesOf', () => {
   // PE2 — install progress "X of Y": both amounts in the unit of the whole, each in the one format.
   it('writes both amounts in the unit of the whole, each with at most three figures (PE1, PE2)', () => {
+    expect(formatBytesOf).toBeTypeOf('function');
     expect(formatBytesOf(Math.round(1.3 * GiB), Math.round(2.6 * GiB))).toBe('1.3 of 2.6 GB');
     expect(formatBytesOf(Math.round(120 * MiB), Math.round(956 * MiB))).toBe('120 of 956 MB');
     expect(formatBytesOf(0, Math.round(1.19 * GiB))).toBe('0 of 1.2 GB');
@@ -59,6 +60,7 @@ describe('formatBytesOf', () => {
     expect(formatBytesOf(40, 157)).toBe('40 of 157 B');
   });
   it('keeps the amount between zero and the whole', () => {
+    expect(formatBytesOf).toBeTypeOf('function');
     expect(formatBytesOf(-5, 2 * GiB)).toBe('0 of 2 GB');
     expect(formatBytesOf(3 * GiB, 2 * GiB)).toBe('2 of 2 GB');
   });
