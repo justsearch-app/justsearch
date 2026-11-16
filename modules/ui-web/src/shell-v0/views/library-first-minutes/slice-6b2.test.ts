@@ -38,6 +38,8 @@ function backend(initial: { patterns?: unknown[]; pause?: Partial<Pause>; overri
   let onRead: (() => void) | null = null;
   /** The next settings read answers what it found when asked, but only once released (a slow read). */
   let readHold: Promise<void> | null = null, releaseRead = () => {};
+  /** Answers settings writes instead of the owner while it returns a Response (undefined: the owner answers). */
+  let answerPosts: ((attempt: { operationKey: string }, init: RequestInit) => Promise<Response> | Response | undefined) | null = null;
   /** Answers given instead of running the operation, in order; 'lost' commits nothing and loses the answer. */
   const scripted: unknown[] = [];
   const opReceipts = new Map<string, unknown>();
@@ -61,6 +63,8 @@ function backend(initial: { patterns?: unknown[]; pause?: Partial<Pause>; overri
     const body = String(init.body);
     const attempt = JSON.parse(body) as { operationKey: string; witness: Witness; ui?: { excludePatterns?: unknown[] } };
     posts.push({ body, parsed: attempt });
+    const answered = answerPosts?.(attempt, init as RequestInit);
+    if (answered) return answered;
     if (hang) return new Promise<Response>(() => {});
     if (hold) await hold;
     const replay = receipts.get(attempt.operationKey);
@@ -143,6 +147,10 @@ function backend(initial: { patterns?: unknown[]; pause?: Partial<Pause>; overri
      * answers with the Response it returns for the request's init).
      */
     scriptOpAnswers(...answers: unknown[]) { scripted.push(...answers); },
+    /** Settings writes are answered by `answer` while it returns a Response. */
+    answerSettingsPosts(answer: typeof answerPosts) { answerPosts = answer; },
+    /** The exclusion override in effect from the next observation of it on. */
+    setOverride(policy: Policy) { initial.override = policy; },
     /** The next operation commits, but its answer is lost on the way back. */
     loseNextOpAnswer() { loseNextOpAnswer = true; },
     /** Another window (or an unrelated owner) commits through the same settings owner. */
@@ -1220,4 +1228,137 @@ it('R20 (acceptor): Count matching files is unavailable while a removal runs and
   expect(f.invoke.mock.calls.map(c => c[0])).toEqual(['core.apply-excludes']);
   finish(); await settle(el); await settle(el);
   expect(count.disabled).toBe(false);
+});
+
+const conflictRefusal = { success: false, message: 'Settings changed since rules were prepared', errorClass: 'HANDLER_FAILURE',
+  errorCode: 'VERSION_CONFLICT' };
+const statusOf = (root: ParentNode | null | undefined) => [...(root?.querySelectorAll('[role="status"]') ?? [])]
+  .map(node => node.textContent?.trim() ?? '');
+
+it('R22 (review 7): a stalled first reading-rule send ends at the bound: Not sure this saved, same key kept, chain freed, a late answer settles nothing', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const f = backend(); const el = await mount(f); const rules = editor(el);
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  let abandoned: AbortSignal | null | undefined;
+  let answerLate!: (response: Response) => void;
+  f.scriptOpAnswers((init?: RequestInit) => {
+    abandoned = init?.signal;
+    return new Promise<Response>(resolve => { answerLate = resolve; });
+  });
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules); await settle(el);
+  expect(f.ops, 'the change was sent once').toHaveLength(1);
+  const sentKey = f.ops[0]!.key!;
+  await vi.advanceTimersByTimeAsync(1_000); await settle(rules); await settle(el);
+  expect(statusOf(rules.shadowRoot)).toContain('Saving…');
+  await vi.advanceTimersByTimeAsync(9_500); await settle(rules); await settle(el);
+  expect(text(rules.shadowRoot), 'the bound ends the stalled first send').toContain('Not sure this saved');
+  expect(named(rules.shadowRoot, 'Try again'), 'with Try again').toBeDefined();
+  expect(statusOf(rules.shadowRoot)).not.toContain('Saving…');
+  expect(abandoned?.aborted, 'the stalled request is cancelled').toBe(true);
+  // Library's shared settings chain is free: a skip-rule save goes through.
+  await addRule(el, '*.tmp');
+  expect(f.s.ui.excludePatterns).toEqual(['*.log', '*.tmp']);
+  answerLate(Response.json({ success: true, message: 'Committed', structuredData: { witness: { acceptedRevision: 99, lastCommittedOperationKey: sentKey } } }));
+  await settle(rules); await settle(el);
+  expect(text(rules.shadowRoot), 'a late answer settles nothing').toContain('Not sure this saved');
+  expect(text(rules.shadowRoot)).not.toContain('Reading rules saved');
+  // Try again settles the same write (same key and bytes) first; refused on the moved revision, it is rebased (B11).
+  await press(rules, control(rules.shadowRoot, 'Try again')); await settle(el);
+  expect(f.ops[1]!.key).toBe(sentKey);
+  expect(f.ops[1]!.args).toEqual(f.ops[0]!.args);
+  expect(f.ops).toHaveLength(3);
+  expect(text(rules.shadowRoot)).toContain('Reading rules saved');
+  expect(f.s.ui.indexingPause.pauseOnBattery).toBe(true);
+  expect(f.s.ui.excludePatterns).toEqual(['*.log', '*.tmp']);
+});
+
+it('R22 (review 7): RUNNING, then VERSION_CONFLICT, then a stalled re-read ends at the bound for reading rules; the late read changes nothing', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const f = backend(); const el = await mount(f); const rules = editor(el);
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  let releaseRead: () => void = () => {};
+  f.scriptOpAnswers(
+    (init?: RequestInit) => Promise.resolve(Response.json(running(JSON.parse(String(init?.body)).idempotencyKey))),
+    () => {
+      // Another window saves the same moment; this write is refused and its re-read stalls.
+      f.elsewhere(ui => ({ ...ui, indexingPause: { ...ui.indexingPause, pauseOnBattery: false, schedule: { enabled: true, days: [6], startMinute: 60, endMinute: 120 } } }));
+      releaseRead = f.holdNextRead();
+      return Promise.resolve(Response.json(conflictRefusal));
+    });
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules); await settle(el);
+  await vi.advanceTimersByTimeAsync(1_000); await settle(rules); await settle(el);
+  expect(f.ops, 'sent, followed once, refused').toHaveLength(2);
+  const reads = f.fetchSettings.mock.calls.filter(([path, init]) => path === '/api/settings/v2' && (init as RequestInit | undefined)?.method !== 'POST');
+  const reread = reads.at(-1)![1] as RequestInit | undefined;
+  expect(statusOf(rules.shadowRoot)).toContain('Saving…');
+  await vi.advanceTimersByTimeAsync(9_500); await settle(rules); await settle(el);
+  expect(text(rules.shadowRoot), 'the bound ends the stalled re-read').toContain('Not sure this saved');
+  expect(named(rules.shadowRoot, 'Try again')).toBeDefined();
+  expect(statusOf(rules.shadowRoot)).not.toContain('Saving…');
+  expect(reread?.signal?.aborted, 'the stalled re-read is cancelled').toBe(true);
+  await addRule(el, '*.tmp');
+  expect(f.s.ui.excludePatterns, 'the shared settings chain is free').toEqual(['*.log', '*.tmp']);
+  releaseRead(); await settle(rules); await settle(el);
+  expect(text(rules.shadowRoot), 'the late read decides nothing').not.toContain('Changed elsewhere');
+  expect(text(rules.shadowRoot)).toContain('Not sure this saved');
+  expect(battery.checked, 'the draft is kept').toBe(true);
+  // Try again sends the kept change again; the other window's change is shown, not overwritten.
+  await press(rules, control(rules.shadowRoot, 'Try again')); await settle(el);
+  expect(text(rules.shadowRoot)).toContain('Changed elsewhere');
+  expect(f.s.ui.indexingPause.schedule).toEqual({ enabled: true, days: [6], startMinute: 60, endMinute: 120 });
+  expect(f.s.ui.indexingPause.pauseOnBattery).toBe(false);
+});
+
+it('R22 (review 7): RUNNING, then VERSION_CONFLICT, then a stalled re-read ends at one bound per skip-rule write', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const f = backend(); const el = await mount(f); const rules = editor(el);
+  let started = 0;
+  let releaseRead: () => void = () => {};
+  f.answerSettingsPosts((attempt) => {
+    started ||= Date.now();
+    if (Date.now() - started < 3_000) {
+      return Response.json({ state: 'RUNNING', operationKey: attempt.operationKey }, { status: 202 });
+    }
+    f.answerSettingsPosts(null);
+    // Another setting is saved elsewhere meanwhile; the refused write's re-read stalls.
+    f.elsewhere(ui => ({ ...ui, theme: 'light' }));
+    releaseRead = f.holdNextRead();
+    return Response.json({ state: 'FAILED', errorCode: 'VERSION_CONFLICT' }, { status: 409 });
+  });
+  await addRule(el, '*.tmp');
+  await vi.advanceTimersByTimeAsync(4_000); await settle(el);
+  expect(f.s.ui.excludePatterns, 'refused: nothing saved').toEqual(['*.log']);
+  expect(text(el.shadowRoot)).not.toContain('Not sure this saved');
+  await vi.advanceTimersByTimeAsync(6_500); await settle(el);
+  expect(text(el.shadowRoot), 'the bound covers the whole write, not each step').toContain('Not sure this saved');
+  expect(named(el.shadowRoot, 'Try again')).toBeDefined();
+  expect(rule(el, 2).value, 'the draft is kept').toBe('*.tmp');
+  // The shared settings chain is free: a reading-rule change saves.
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules); await settle(el);
+  expect(f.s.ui.indexingPause.pauseOnBattery).toBe(true);
+  releaseRead(); await settle(el);
+  expect(text(el.shadowRoot), 'the late read decides nothing').toContain('Not sure this saved');
+  expect(text(el.shadowRoot)).not.toContain('Skip rules saved');
+  await press(el, control(el.shadowRoot, 'Try again'));
+  expect(f.s.ui.excludePatterns, 'only other settings moved: rebased and saved (B11)').toEqual(['*.log', '*.tmp']);
+  expect(f.s.ui.theme).toBe('light');
+  expect(f.s.ui.indexingPause.pauseOnBattery).toBe(true);
+  expect(text(el.shadowRoot)).not.toContain('Not sure this saved');
+});
+
+it('R19 (review 6): Try again on a removal outcome while an override is now in effect says why nothing runs', async () => {
+  const f = backend(); const el = await mount(f);
+  f.invoke.mockResolvedValueOnce({ success: true, structuredData: { ...doneResult, uncheckedScopes: [
+    { path: '/offline', status: 'not_checked', reason: 'Watched folder is offline or missing' }] } } as never);
+  await addRule(el, '*.tmp');
+  await press(el, control(askRegion(el)[0], 'Remove from search'));
+  expect(text(el.shadowRoot)).toContain('Partly done');
+  f.setOverride({ source: 'env_var', sourceDetail: 'JUSTSEARCH_UI_EXCLUDE_PATTERNS', patterns: ['env-only.txt'] });
+  window.dispatchEvent(new Event('focus')); await settle(el); await settle(el);
+  expect(el.shadowRoot!.querySelector('[data-testid="excludes-override"]'), 'the override is observed').toBeTruthy();
+  const calls = f.invoke.mock.calls.length;
+  await press(el, control(el.shadowRoot!.querySelector('.removal-slot'), 'Try again'));
+  expect(f.invoke.mock.calls.length, 'nothing runs under the override').toBe(calls);
+  expect(text(el.shadowRoot!.querySelector('.removal-slot'))).toContain('Skip rules set by an override are in effect, so files can\'t be removed from here.');
 });

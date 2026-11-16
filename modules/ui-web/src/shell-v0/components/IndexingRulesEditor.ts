@@ -22,8 +22,23 @@ function sameRules(a: SavedIndexingRules, b: SavedIndexingRules): boolean {
   return key(a) === key(b);
 }
 
-/** How long a write still running is followed before its outcome is called unknown. */
-const FOLLOW_MS = 10_000;
+/** R18/R22 — how long one write, every network step of it, runs before its outcome is called unknown. */
+const WRITE_BOUND_MS = 10_000;
+
+/** The bound reached: the write's outcome is unknown. */
+class WriteBoundReached extends OperationError {
+  constructor() { super('The reading rules were not confirmed saved yet.', 'UNKNOWN'); }
+}
+
+/** `work`, or a rejection once `signal` aborts: a step past the bound settles nothing. */
+function withinBound<T>(signal: AbortSignal, work: Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => reject(new WriteBoundReached());
+    if (signal.aborted) { abort(); return; }
+    signal.addEventListener('abort', abort, { once: true });
+    work.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+  });
+}
 
 /** A sent write whose answer was lost: it may or may not have been saved. */
 function outcomeUnknown(error: unknown): boolean {
@@ -184,9 +199,26 @@ export class IndexingRulesEditor extends JfElement {
    * One captured rule pair, written on the revision the saved rules were observed at; a revision moved
    * only by other settings is taken up and the same pair tried again (B11). A retained write whose answer
    * was lost is sent again with its own key and base revision (same bytes).
+   *
+   * R22 — every network step of it (the send, retries, admission waits, follow-up polls, the re-read
+   * after a refusal) runs under one bound, started when the write first goes out. At the bound the
+   * steps are cancelled, the shared settings chain is freed, and the outcome is unknown: the snapshot
+   * stays queued, a sent write keeps its key and bytes, and a late answer settles nothing.
    */
   private async sendRules(next: SavedIndexingRules): Promise<SendOutcome> {
     if (this.conflictingRules) return 'stopped';
+    const bound = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const startBound = () => { timer ??= setTimeout(() => bound.abort(), WRITE_BOUND_MS); };
+    try {
+      return await this.sendRulesWithin(next, bound.signal, startBound);
+    } finally {
+      clearTimeout(timer);
+      bound.abort();
+    }
+  }
+
+  private async sendRulesWithin(next: SavedIndexingRules, signal: AbortSignal, startBound: () => void): Promise<SendOutcome> {
     for (let attempt = 0; attempt < 3; attempt++) {
       const same = this.retained;
       const witness = same?.witness ?? this.savedWitness;
@@ -194,17 +226,18 @@ export class IndexingRulesEditor extends JfElement {
       const operationKey = same?.key ?? createOperationKey();
       let sent = false;
       const request = { idempotencyKey: operationKey, args: { ...next, witness } };
-      const invoke = (signal?: AbortSignal) => getOperationClient(this.apiBase).invokeWithConsent('core.set-indexing-rules', request,
-        { requestConsent: requestAuthorization, ...(signal ? { signal } : {}) });
+      const invoke = () => withinBound(signal, getOperationClient(this.apiBase).invokeWithConsent('core.set-indexing-rules', request,
+        { requestConsent: requestAuthorization, signal }));
       // R14 — a replay of an attempt not finished yet (ACCEPTED, RUNNING) carries no witness and is not a save.
       const finished = (result: OperationInvocationSuccess) => {
         const state = result.structuredData?.['state'];
         return typeof state !== 'string' || state === 'COMPLETE';
       };
       const write = async (): Promise<OperationInvocationSuccess> => {
+        startBound();
         sent = true;
         const first = await invoke();
-        return finished(first) ? first : this.followRunning(invoke, finished);
+        return finished(first) ? first : this.followRunning(invoke, finished, signal);
       };
       try {
         let receipt: unknown;
@@ -238,7 +271,8 @@ export class IndexingRulesEditor extends JfElement {
         }
         // Refused on its revision: that write was not saved.
         this.retained = null;
-        const observed = await this.observeSaved();
+        const observed = await this.observeSaved(signal);
+        if (observed === 'bound') { this.indexingRulesError = ''; return 'uncertain'; }
         if (!observed) return 'stopped';
         if (sameRules(observed.rules, next)) { this.savedRules = next; this.savedWitness = observed.witness; return 'saved'; }
         if (sameRules(observed.rules, this.savedRules)) { this.savedWitness = observed.witness; continue; }
@@ -253,26 +287,16 @@ export class IndexingRulesEditor extends JfElement {
   }
 
   /**
-   * R14/R18 — the same key and bytes are sent again until the attempt completes or is refused, bounded
-   * as a whole: a stalled call or an admission wait is abandoned at the bound, and the write's outcome is
+   * R14/R18 — the same key and bytes are sent again until the attempt completes or is refused, within
+   * the write's bound: a stalled call or an admission wait is abandoned at it, and the write's outcome is
    * then unknown (its queue head keeps key and bytes). An answer arriving after the bound is ignored.
    */
-  private async followRunning(invoke: (signal: AbortSignal) => Promise<OperationInvocationSuccess>,
-      finished: (result: OperationInvocationSuccess) => boolean): Promise<OperationInvocationSuccess> {
-    const follow = new AbortController();
-    const timer = setTimeout(() => follow.abort(), FOLLOW_MS);
-    const bound = new Promise<never>((_, reject) => follow.signal.addEventListener('abort',
-      () => reject(new OperationError('The reading rules were not confirmed saved yet.', 'UNKNOWN')), { once: true }));
-    bound.catch(() => {});
-    try {
-      for (;;) {
-        await Promise.race([new Promise(resolve => setTimeout(resolve, 250)), bound]);
-        const result = await Promise.race([invoke(follow.signal), bound]);
-        if (finished(result)) return result;
-      }
-    } finally {
-      clearTimeout(timer);
-      follow.abort();
+  private async followRunning(invoke: () => Promise<OperationInvocationSuccess>,
+      finished: (result: OperationInvocationSuccess) => boolean, signal: AbortSignal): Promise<OperationInvocationSuccess> {
+    for (;;) {
+      await withinBound(signal, new Promise(resolve => setTimeout(resolve, 250)));
+      const result = await invoke();
+      if (finished(result)) return result;
     }
   }
 
@@ -286,17 +310,22 @@ export class IndexingRulesEditor extends JfElement {
         && after.acceptedRevision === before.acceptedRevision + 1) this.savedWitness = after;
   }
 
-  private async observeSaved(): Promise<{ rules: SavedIndexingRules; witness: SettingsWitness } | null> {
+  /** The saved rules and their revision, read within the write's bound ('bound' once it is reached). */
+  private async observeSaved(signal: AbortSignal): Promise<{ rules: SavedIndexingRules; witness: SettingsWitness } | 'bound' | null> {
     try {
-      const res = this.host_ ? await this.host_.data.fetch('/api/settings/v2') : await authorizedFetch(`${this.apiBase}/api/settings/v2`);
-      if (!res.ok) throw new Error(`Could not load reading rules (${res.status}).`);
-      const data = settingsV2Schema.parse(await res.json());
+      const data = await withinBound(signal, (async () => {
+        const res = this.host_ ? await this.host_.data.fetch('/api/settings/v2', { signal })
+          : await authorizedFetch(`${this.apiBase}/api/settings/v2`, { signal });
+        if (!res.ok) throw new Error(`Could not load reading rules (${res.status}).`);
+        return settingsV2Schema.parse(await res.json());
+      })());
       if (!data.witness) throw new Error('Saved reading rules did not include a revision.');
       const policy = data.ui?.indexingPause;
       return { rules: { schedule: policy?.schedule ? { enabled: policy.schedule.enabled ?? false, days: [...(policy.schedule.days ?? [])],
         startMinute: policy.schedule.startMinute ?? 540, endMinute: policy.schedule.endMinute ?? 1020 } : null,
         pauseOnBattery: policy?.pauseOnBattery ?? false }, witness: data.witness };
     } catch (error) {
+      if (signal.aborted) return 'bound';
       this.indexingRulesError = `Could not check the saved reading rules. ${error instanceof Error ? error.message : String(error)}`;
       return null;
     }
@@ -348,11 +377,18 @@ export class IndexingRulesEditor extends JfElement {
     const shown = JSON.stringify(this.indexingRules);
     // R17 — a revision taken up meanwhile (Library's own successor write) is newer than this read.
     const witnessAtStart = this.savedWitness;
+    // R22 — this read also settles "Use the saved rules": it is bounded like a write's re-read, and
+    // that reconciliation read is cancelled at the bound. The passive load's late answer is ignored.
+    const bound = new AbortController();
+    const timer = setTimeout(() => bound.abort(), WRITE_BOUND_MS);
+    const init = mode === 'discard' ? { signal: bound.signal } : undefined;
     try {
-      const res = this.host_ ? await this.host_.data.fetch('/api/settings/v2')
-        : await authorizedFetch(`${this.apiBase}/api/settings/v2`);
-      if (!res.ok) throw new Error(`Could not load reading rules (${res.status}).`);
-      const data = settingsV2Schema.parse(await res.json());
+      const data = await withinBound(bound.signal, (async () => {
+        const res = this.host_ ? await this.host_.data.fetch('/api/settings/v2', init)
+          : await authorizedFetch(`${this.apiBase}/api/settings/v2`, init);
+        if (!res.ok) throw new Error(`Could not load reading rules (${res.status}).`);
+        return settingsV2Schema.parse(await res.json());
+      })()).finally(() => clearTimeout(timer));
       if (serial !== this.loadSerial || !this.isConnected) return false;
       this.readOnly = data.settingsMode === 'in_memory';
       const policy = data.ui?.indexingPause;
@@ -389,7 +425,8 @@ export class IndexingRulesEditor extends JfElement {
       return true;
     } catch (error) {
       if (serial === this.loadSerial) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = bound.signal.aborted ? 'Could not load reading rules: no answer in time.'
+          : error instanceof Error ? error.message : String(error);
         this.indexingRulesError = message;
       }
       return false;

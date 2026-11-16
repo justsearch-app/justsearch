@@ -155,6 +155,8 @@ type RemovalAsk = { readonly serial: number; readonly list: string; readonly bas
  */
 type RemovalOutcome = { readonly kind: 'done' | 'partly' | 'unsure' | 'unavailable' | 'kept' | 'nothing'; readonly serial: number;
   readonly capped: boolean; readonly scopes: ExcludesResult['uncheckedScopes']; readonly list: string; readonly detail: string };
+/** R22 — how long one skip-rule write, every network step of it, runs before its outcome is unknown. */
+const SKIP_WRITE_BOUND_MS = 10_000;
 const OVERRIDE_NO_REMOVAL = 'Skip rules set by an override are in effect, so files can\'t be removed from here.';
 /** A skip-rule draft: its glob rules as one text, and the exact-path entries kept with them. */
 type SkipDraft = { readonly text: string; readonly literals: readonly ExactPathExclusion[] };
@@ -1772,16 +1774,29 @@ export class LibrarySurface extends JfElement {
    * reading the saved list: still this snapshot's base (the list saved before it) means another
    * setting was saved, so the same snapshot is sent again on the new revision (B11); changed means
    * "Changed elsewhere", and the queue waits for the person's choice.
+   *
+   * R22 — the whole write (every send, retry, admission wait and the re-read after a refusal) runs under
+   * one bound; at it the write is cancelled, the chain is freed and its outcome is unknown: the snapshot
+   * stays queued and a sent attempt keeps its key and bytes. A late answer settles nothing.
    */
   private async sendSkipRules(next: SkipSnapshot): Promise<SendOutcome> {
-    if (next.undo) return this.sendSkipUndo(next, next.undo);
+    const bound = new AbortController();
+    const timer = setTimeout(() => bound.abort(new Error('Settings request timed out.')), SKIP_WRITE_BOUND_MS);
+    try {
+      return await (next.undo ? this.sendSkipUndo(next, next.undo, bound.signal) : this.sendSkipList(next, bound.signal));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  private async sendSkipList(next: SkipSnapshot, bound: AbortSignal): Promise<SendOutcome> {
     if (!this.excludesLoaded || !this.excludesWitness || this.excludesConflict) return 'stopped';
     for (let rebase = 0; rebase < 3; rebase++) {
       this.excludesAttempt ??= createSettingsAttempt({ ui: { excludePatterns: [...globRules(next.text), ...next.literals] } }, this.excludesWitness);
       const attempt = this.excludesAttempt;
       const before = { text: this.excludesSavedText ?? '', literals: [...this.excludesSavedLiterals] };
       try {
-        const result = await executeSettingsAttempt((path, init) => this.doFetch(path, init), attempt);
+        const result = await executeSettingsAttempt((path, init) => this.doFetch(path, init), attempt, { signal: bound });
         this.ownSuccessor(attempt.witness, result.witness);
         this.excludesWitness = result.witness;
         this.excludesAttempt = null;
@@ -1798,7 +1813,8 @@ export class LibrarySurface extends JfElement {
         if (!terminal) return 'uncertain';
         this.excludesAttempt = null;
         if (code === 'VERSION_CONFLICT') {
-          const observed = await this.observeSavedList();
+          const observed = await this.observeSavedList(bound);
+          if (!observed && bound.aborted) return 'uncertain';
           if (!observed) return 'stopped';
           if (observed.key === this.savedListKey(next.text, [...next.literals])) {
             this.excludesWitness = observed.witness;
@@ -1841,7 +1857,7 @@ export class LibrarySurface extends JfElement {
    * it and the Undo closes. One that waited behind a later skip-rule change closes without a write; one
    * whose answer was lost is sent again with its same key and bytes before anything newer.
    */
-  private async sendSkipUndo(next: SkipSnapshot, undo: NonNullable<SkipSnapshot['undo']>): Promise<SendOutcome> {
+  private async sendSkipUndo(next: SkipSnapshot, undo: NonNullable<SkipSnapshot['undo']>, bound: AbortSignal): Promise<SendOutcome> {
     const waiter = this.undoWaiter?.serial === undo.serial ? this.undoWaiter : null;
     const answer = (error?: Error) => {
       if (!waiter || this.undoWaiter !== waiter) return;
@@ -1858,7 +1874,7 @@ export class LibrarySurface extends JfElement {
     const attempt = this.excludesAttempt;
     const before = { text: this.excludesSavedText ?? '', literals: [...this.excludesSavedLiterals] };
     try {
-      const result = await executeSettingsAttempt((path, init) => this.doFetch(path, init), attempt);
+      const result = await executeSettingsAttempt((path, init) => this.doFetch(path, init), attempt, { signal: bound });
       this.ownSuccessor(attempt.witness, result.witness);
       this.excludesWitness = result.witness;
       this.excludesAttempt = null;
@@ -1906,9 +1922,9 @@ export class LibrarySurface extends JfElement {
     }
   }
 
-  private async observeSavedList(): Promise<{ key: string; text: string; literals: ExactPathExclusion[]; witness: SettingsWitness } | null> {
+  private async observeSavedList(signal: AbortSignal): Promise<{ key: string; text: string; literals: ExactPathExclusion[]; witness: SettingsWitness } | null> {
     try {
-      const body = await readSettingsObservation((path, init) => this.doFetch(path, init));
+      const body = await readSettingsObservation((path, init) => this.doFetch(path, init), { signal });
       const entries = body.ui?.excludePatterns ?? [];
       const text = entries.filter((entry): entry is string => typeof entry === 'string').join('\n');
       const literals = entries.filter((entry): entry is ExactPathExclusion => typeof entry !== 'string');
