@@ -29,7 +29,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
   declare message: string;
   declare saveWithSettings: ((write: (operationKey: string) => Promise<OperationInvocationSuccess>) => Promise<void>) | undefined;
 
-  // Retain the last observed action through uncertain polls and while it has focus.
+  // Retain the last observed action through uncertain polls; page controls also retain it while focused.
   // This is control identity, never a claim that indexing is paused or running.
   private action: 'pause' | 'resume' | 'settings' | 'hours' | 'battery' | null = null;
   private awaitingStatus = false;
@@ -90,8 +90,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
 
   protected override willUpdate(changed: PropertyValues): void {
     if (this.toolbar) {
-      if (!this.action || !this.pending && this.progress.activity.confirmed
-        && (!this.focused || this.action === 'pause' && this.reasons.includes('user_paused'))) {
+      if (!this.action || !this.pending && this.progress.activity.confirmed) {
         this.action = this.reasons.includes('user_paused') ? 'resume' : 'pause';
       }
     } else if (!this.toolbar && this.progress.activity.confirmed && this.progress.pause?.reason === 'settings_recovery') {

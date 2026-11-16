@@ -85,29 +85,11 @@ it('M3: no current observation of zero failures says none reported', () => {
   render(renderFolderRow({ failed: 0 }, { expanded: true, enabled: true, toggle() {}, invoke() {} }), container);
   expect(must(container, '.folder-details').textContent).toContain('None reported');
 });
-it('K4/M2: shared Library menu says what runs; empty and uncertain waiting differ', async () => {
+it('K4/M2: Library offers rereading at the foot and omits the waiting-work action', async () => {
   const el = await library();
-  const trigger = must<HTMLButtonElement>(el.shadowRoot, '[aria-label="More Library actions"]');
-  trigger.click(); await settle(el);
-  const menu = must(el.shadowRoot, 'jf-menu');
-  if (menu) await settle(menu as unknown as { updateComplete: Promise<unknown> });
-  expect(menu!.textContent).toContain('Read everything again'); expect(menu!.textContent).toContain('Read waiting files now');
-  const waiting = () => {
-    const item = [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(item => item.textContent?.includes('Read waiting files now'));
-    expect(item, 'Read waiting files now menu item').toBeDefined();
-    return item!;
-  };
-  expect(waiting().disabled).toBe(false); expect(menu!.textContent).not.toContain('Nothing is waiting');
-  expect(menu!.textContent).not.toContain('All 8 files');
-  const snapshot = { worker: { core: { pendingVduCount: 0, indexedDocuments: 8, ownSearchableDocuments: 8, indexState: 'IDLE', indexHealthy: true },
-    enrichment: { embeddingPendingCount: 0, spladePendingCount: 0, pendingNerCount: 0, chunk: { chunkEmbeddingPendingCount: 0, chunkSpladePendingCount: 0 } },
-    migration: { migrationState: 'IDLE' } } } as unknown as StatusSnapshot;
-  __feedForTest({ status: snapshot }); await settle(el); await settle(menu as unknown as { updateComplete: Promise<unknown> });
-  expect(waiting().disabled).toBe(true); expect(menu!.textContent).toContain('Nothing is waiting');
-  __feedForTest({ status: { ...snapshot, meta: { workerRpcStale: true } } as StatusSnapshot });
-  await settle(el); await settle(menu as unknown as { updateComplete: Promise<unknown> });
-  expect(waiting().disabled).toBe(false); expect(menu!.textContent).not.toContain('Nothing is waiting');
-  key(menu!, 'Escape'); await settle(el); expect(el.shadowRoot!.querySelector('jf-menu')).toBeNull();
+  expect(must(el.shadowRoot, '.bottom-links [data-reread]').textContent).toBe('Read everything again');
+  expect(el.shadowRoot!.querySelector('jf-menu')).toBeNull();
+  expect(el.shadowRoot!.textContent).not.toContain('Read waiting files now');
 });
 it('K5/M1/M7/M11: expert history and activity are opt-in, unavailable removals and other sources stay reachable', async () => {
   const el = await library();
@@ -130,7 +112,7 @@ it('K6/M5: Browse column heads, stable root count, byte and shared date presenta
 });
 it('M8: failed Browse children provide Retry and never say empty', async () => {
   const { el } = await browse(true); must<HTMLElement>(el.shadowRoot, '[role="treeitem"]').click(); await settle(el);
-  expect(el.shadowRoot!.textContent).toContain('Could not load'); expect(el.shadowRoot!.textContent).toContain('Retry');
+  expect(el.shadowRoot!.textContent).toContain("Couldn't load this folder"); expect(el.shadowRoot!.querySelector('jf-button[label="Retry Documents"]')?.textContent?.trim()).toBe('Retry Documents');
   expect(el.shadowRoot!.textContent).not.toContain('Folder is empty');
 });
 it('M8: truncated, filtered-empty and confirmed-empty are distinct', async () => {
@@ -177,16 +159,18 @@ it('M6/M12: hidden weekday restrictions stay effective across developer visibili
   expect(editor.indexingRules.start).toBe('22:00'); expect(editor.indexingRules.end).toBe('07:00');
 });
 
-it('K4/M10: opening the Library menu closes the bar menu, and outside clicks inside Library dismiss', async () => {
+it('K4/M10: the top-bar menu still dismisses on outside clicks inside Library and Escape', async () => {
   const el = await library();
   const bar = document.createElement('jf-top-bar') as HTMLElement & { updateComplete: Promise<unknown> };
   document.body.append(bar); await settle(bar);
-  must<HTMLButtonElement>(bar.shadowRoot, '.more-trigger').click(); await settle(bar);
+  const trigger = must<HTMLButtonElement>(bar.shadowRoot, '.more-trigger');
+  trigger.click(); await settle(bar);
   expect(bar.shadowRoot!.querySelector('[role="menu"]')).not.toBeNull();
-  must<HTMLButtonElement>(el.shadowRoot, '.more-trigger').click(); await settle(el); await settle(bar);
-  expect(bar.shadowRoot!.querySelector('[role="menu"]')).toBeNull();
   must(el.shadowRoot, '.header').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, composed: true }));
-  await settle(el); expect(el.shadowRoot!.querySelector('[role="menu"]')).toBeNull();
+  await settle(bar); expect(bar.shadowRoot!.querySelector('[role="menu"]')).toBeNull();
+  trigger.click(); await settle(bar);
+  const menu = must(bar.shadowRoot, '[role="menu"]'); key(menu, 'Escape'); await settle(bar);
+  expect(bar.shadowRoot!.querySelector('[role="menu"]')).toBeNull();
 });
 
 it('M9: file action Enter cannot open the row, and disappearing focused descendants recover to their parent', async () => {
@@ -204,12 +188,12 @@ it('M9: file action Enter cannot open the row, and disappearing focused descenda
 });
 
 
-it('K4: a hidden Library closes its transient menu before it is shown again', async () => {
+it('K4: a hidden Library closes its in-place reread ask before it is shown again', async () => {
   const el = await library();
-  must<HTMLButtonElement>(el.shadowRoot, '.more-trigger').click(); await settle(el);
-  expect(el.shadowRoot!.querySelector('jf-menu')).not.toBeNull();
+  must<HTMLButtonElement>(el.shadowRoot, '[data-reread]').click(); await settle(el);
+  expect(el.shadowRoot!.querySelector('[aria-label="Read every watched folder again?"]')).not.toBeNull();
   el.remove(); document.body.append(el); await settle(el);
-  expect(el.shadowRoot!.querySelector('jf-menu')).toBeNull();
+  expect(el.shadowRoot!.querySelector('[aria-label="Read every watched folder again?"]')).toBeNull();
 });
 
 it('M4: paused meaning work never claims Reading now and shows no read time', async () => {

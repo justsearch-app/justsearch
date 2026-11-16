@@ -24,8 +24,10 @@ it('text, corners and bundled variable Inter follow the type ladder under the de
     // Slice 7a: AI Brain draws no tab row until answers work (D1: −1 view per theme) and its eight
     // "You get / It costs" openers are developer tools (D5: −8 per theme; audited in
     // BrainOverview.layout-lockdown), so the fixture's Brain contributes 5 views per theme, not 14
-    // (164 on main after slice 6a, minus 18).
-    expect(summary.surfaces).toBe(146);
+    // (164 on main after slice 6a, minus 18 = 146 on main after 7a).
+    // Slice 6b-1: the fixture's one watched folder adds its Library row disclosure and the Read
+    // everything again ask, each in dark and light (+4): 150.
+    expect(summary.surfaces).toBe(150);
     const inventory = JSON.parse(await readFile(path.join(evidence, 'results.json'), 'utf8')) as {
       checks: { id: string; result: string; textElements?: number }[];
     };

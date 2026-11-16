@@ -1228,9 +1228,9 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
             await page.set_viewport_size({"width": 1024, "height": 700})
             await _view_setup("library", theme)(page)
             await _library_appearance(page)
-            if state == "menu":
-                await page.get_by_role("button", name="More Library actions", exact=True).click()
-                await page.get_by_role("menu", name="More Library actions", exact=True).wait_for()
+            if state == "reread":
+                await page.get_by_role("button", name="Read everything again", exact=True).click()
+                await page.get_by_role("region", name="Read every watched folder again?", exact=True).wait_for()
             else:
                 await page.get_by_role("tab", name="Browse", exact=True).click()
                 tree = page.locator('jf-browse-surface [role="tree"]')
@@ -2400,7 +2400,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
         Step("library-ingestion", setup=setup_library_ingestion, isolated=True),
         *[Step(f"library-{name}{'-light' if theme == 'light' else ''}", setup=setup_library_first_minutes(state, theme),
                isolated=True, fixtures_variant="enriching", color_scheme=theme)
-          for state, name in (("menu", "menu"), ("populated", "browse"), ("failure", "browse-failure"))
+          for state, name in (("reread", "reread"), ("populated", "browse"), ("failure", "browse-failure"))
           for theme in ("dark", "light")],
         Step("library-gap-decision", setup=setup_library_gap_decision, isolated=True,
              fixtures_variant="gap-decision"),

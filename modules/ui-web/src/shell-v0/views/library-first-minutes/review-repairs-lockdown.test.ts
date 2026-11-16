@@ -212,7 +212,7 @@ async function browseInLibrary(theme: string): Promise<Page> {
   await expect.poll(() => page.locator('jf-indexing-controls #pause-toggle').getAttribute('aria-disabled'), { timeout: 10_000 }).toBe('false');
   return page;
 }
-it.each(['light', 'dark'])('P2: on Browse, the Pause dropdown and the More menu open above the column heads (%s)', async theme => {
+it.each(['light', 'dark'])('P2: on Browse, the Pause dropdown opens above the column heads and Library has no More menu (%s)', async theme => {
   const page = await browseInLibrary(theme);
   try {
     await page.locator('jf-indexing-controls #pause-toggle').click();
@@ -234,21 +234,8 @@ it.each(['light', 'dark'])('P2: on Browse, the Pause dropdown and the More menu 
     }, { hitPathSource: hitPath.toString(), box: box!, head: head! });
     expect(over.filter(point => point.owner !== 'dropdown'), JSON.stringify(over)).toEqual([]);
     await page.keyboard.press('Escape');
-    await page.locator('jf-library-surface .more-trigger').click();
-    const menu = page.locator('jf-library-surface jf-menu [role="menu"]');
-    expect(await menu.count()).toBe(1);
-    const menuBox = await menu.boundingBox();
-    expect(menuBox, 'menu box').not.toBeNull();
-    const menuHit = await page.evaluate(({ hitPathSource, x, y }) => {
-      const hit = new Function(`return (${hitPathSource})`)() as (x: number, y: number) => Element[];
-      // The menu's items are its light-DOM children: walk the composed ancestors of the innermost hit.
-      const path = hit(x, y);
-      for (let node: Node | null = path[path.length - 1] ?? null; node; node = node.parentNode ?? (node as ShadowRoot).host ?? null) {
-        if ((node as Element).localName === 'jf-menu') return 'menu';
-      }
-      return path.map(el => `${el.localName}.${el.className}`).join(' > ');
-    }, { hitPathSource: hitPath.toString(), x: menuBox!.x + menuBox!.width / 2, y: menuBox!.y + menuBox!.height / 2 });
-    expect(menuHit, 'the More menu is above the Browse tree').toBe('menu');
+    expect(await page.locator('jf-library-surface .more-trigger').count()).toBe(0);
+    expect(await page.locator('jf-library-surface jf-menu').count()).toBe(0);
   } finally { await page.close(); }
 }, 120_000);
 it.each(['light', 'dark'])('P2: a scrolled Browse tree shows no row above the bottom of its column heads (%s)', async theme => {

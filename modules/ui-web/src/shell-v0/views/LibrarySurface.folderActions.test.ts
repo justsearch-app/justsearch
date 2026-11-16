@@ -315,8 +315,12 @@ it('distinguishes accepted reindex from the recorded completion and failure', as
   const { el, setOutcome } = await mount();
   vi.spyOn(getOperationClient(el.apiBase), 'invokeWithConsent').mockResolvedValue({ success: true, message: 'Reading accepted', structuredData: { operationKey: key } });
   const reindex = async () => {
-    el.shadowRoot!.querySelector<HTMLButtonElement>('.more-trigger')!.click(); await pump(el);
-    [...el.shadowRoot!.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')].find(item => item.textContent?.includes('Read everything again'))!.click();
+    const action = el.shadowRoot!.querySelector<HTMLButtonElement>('[data-reread]');
+    expect(action).not.toBeNull(); action!.click(); await pump(el);
+    const ask = el.shadowRoot!.querySelector('[aria-label="Read every watched folder again?"]');
+    expect(ask).not.toBeNull();
+    const confirm = [...ask!.querySelectorAll<HTMLButtonElement>('button')].find(item => item.textContent === 'Read again');
+    expect(confirm).toBeDefined(); confirm!.click();
     await pump(el);
   };
   await reindex();
@@ -337,9 +341,7 @@ it('distinguishes accepted reindex from the recorded completion and failure', as
 it('explains an empty reindex scope and offline folders without claiming a full reindex', async () => {
   const { el } = await mount();
   el.roots = []; await pump(el);
-  el.shadowRoot!.querySelector<HTMLButtonElement>('.more-trigger')!.click(); await pump(el);
-  const action = el.shadowRoot!.querySelector<HTMLButtonElement>('[role="menuitem"]')!;
-  expect(action.textContent).toContain('No folders yet'); expect(action.disabled).toBe(true);
+  expect(el.shadowRoot!.querySelector('[data-reread]')).toBeNull();
   el.roots = [{ ...root('a'), status: 'unavailable' }]; await pump(el);
   expect(el.shadowRoot!.textContent).toContain('offline');
 });

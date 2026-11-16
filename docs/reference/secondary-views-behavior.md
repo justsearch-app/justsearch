@@ -48,8 +48,8 @@ Forward), layouts and addresses are described in
 
 **Source:** `shell-v0/views/LibrarySurface.ts`
 
-Library has **Folders** and **Browse** tabs, with shared **Pause reading**, **More Library actions**
-and **Add a folder** controls. The headline states readiness, reading, pause, attention or uncertainty;
+Library has **Folders** and **Browse** tabs, with shared **Pause reading** and **Add a folder**
+controls. The headline states readiness, reading, pause, attention or uncertainty;
 it does not repeat the folder counts. Other-app-only content can also make files searchable.
 
 Each folder row shows its name, full path, state and last observed disk-file count. A bounded count
@@ -61,10 +61,11 @@ write, not proof that all files finished; work in progress says **Reading now**.
 warnings and recovery actions remain visible even without a verification timestamp.
 **Open in Files** is available on desktop; **Remove from library** asks in place and leaves originals.
 
-The shared menu runs **Read everything again** with unchanged files included. Its optional
-**All N files** detail requires a current uncapped count for every root. **Read waiting files now**
-starts one enrichment pass, which may leave work waiting. Only a current zero observation says
-**Nothing is waiting**. Operation acceptance and completion are distinct.
+**Read everything again** is a quiet text action at the foot of **Folders**, beside **Activity**.
+It asks **Read every watched folder again?** in the page; **Read again** includes unchanged files,
+and **Cancel** or Escape starts nothing and returns focus to the action. While a confirmed request
+is in flight the action stays focused but does nothing. Library has no more menu or
+waiting-work action. Operation acceptance and completion are distinct.
 
 **Skip these files** and **When to read files** retain explicit Save behaviour in this intermediate
 slice. Save patterns affects future reading; Preview examines the effective saved policy without
@@ -75,8 +76,8 @@ saved, with a concise days line beside restricted hours. Their editor, collectio
 and routine removal history are behind **Settings → Advanced → Show developer tools**.
 
 Unfinished and unavailable removal outcomes, pending withdrawals, rebuild decisions, interrupted
-imports, missing folders and unreadable-folder recovery remain visible. A line for **N documents
-from other apps** reveals their management section. **Activity** reveals retained reading outcomes;
+imports, missing folders and unreadable-folder recovery remain visible. A line for **1 document from other apps**
+(or **N documents from other apps**) reveals their management section. **Activity** reveals retained reading outcomes;
 event counts describe history, not current readiness. Errors and unknown observations remain stated.
 
 Browse shows search-backed folder contents, not every file on disk. Its columns are **Name**, **Size**,
@@ -86,7 +87,11 @@ other sizes and dates use the shared formatters. Row actions **Open file** and s
 **Show in folder** appear on hover/focus without changing row height, and also use the shared menu.
 The tree has one tab stop, Up/Down movement, Right expand/first-child, Left collapse/parent and
 Enter open. Row actions are reachable by Tab; Shift+F10 or the Menu key opens a file's context menu.
-Loading, failed-with-Retry, partial, filtered-empty and confirmed-empty observations stay distinct.
+Loading and failure lines sit in the list area below the column heads. A failure says
+**Couldn't load this folder** after the folder's name with a Retry naming the folder (**Retry Documents**),
+or **Couldn't load folders** with **Retry loading folders**, without browser error text. Two failed folders
+of one name show enough of their paths to tell them apart. Loading, failed-with-Retry, partial,
+filtered-empty and confirmed-empty observations stay distinct.
 
 ---
 
@@ -438,7 +443,7 @@ Two-column layout on large screens (single column on small).
 Expanded answers show below the question with a chevron rotation animation.
 
 **Quick troubleshooting** — Glass card with 3 bullet points:
-- Stale results → Library’s more menu › Read everything again; this reads all files again, including unchanged files.
+- Stale results → Library’s Folders page foot › Read everything again › Read again; this reads all files again, including unchanged files.
 - Stuck reading → Restart worker in Health
 - Bug report → Copy diagnostic summary, review it, then paste it into the optional issue field
 
@@ -472,7 +477,7 @@ The `ui.mode` setting (`'simple'` default / `'advanced'`) gates features across 
 
 | View | Simple mode | Detailed mode adds |
 |------|-------------|-------------------|
-| Library | Folders and Browse; Add a folder; reading state; skip rules and reading hours; more menu › Read everything again | Diagnostic folder facts, removal history, weekday editor and activity summary |
+| Library | Folders and Browse; Add a folder; reading state; skip rules and reading hours; page foot › Read everything again (asks in place) | Diagnostic folder facts, removal history, weekday editor and activity summary |
 | Brain | BrainSimplePanel (state machine) | Full configuration: compatibility cards, policy, GPU booster, model slots, inference settings |
 | Settings | All 6 sections visible | _(no difference)_ |
 | Health | Full dashboard | _(no difference)_ |

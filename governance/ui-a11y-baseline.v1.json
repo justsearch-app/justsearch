@@ -567,12 +567,12 @@
     },
     {
       "surface": "library",
-      "uiShotStep": "library-menu",
+      "uiShotStep": "library-reread",
       "knownRules": []
     },
     {
       "surface": "library",
-      "uiShotStep": "library-menu-light",
+      "uiShotStep": "library-reread-light",
       "knownRules": []
     },
     {

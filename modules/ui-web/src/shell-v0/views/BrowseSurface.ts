@@ -29,6 +29,22 @@ interface BrowseFile { path: string; name: string; size?: number; fileKind?: str
 type TreeRow = { id: string; path: string; parent?: string; level: number; position: number; size: number; folder?: BrowseFolder; file?: BrowseFile };
 const lastSeg = (path: string): string => path.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || path;
 const samePath = (a: string, b: string): boolean => a.replace(/(.)[\\/]+$/, '$1') === b.replace(/(.)[\\/]+$/, '$1');
+/** The last `count` segments of a path, as written (fewer when the path has fewer). */
+const tailSegs = (path: string, count: number): string => {
+  const trimmed = path.replace(/(.)[\\/]+$/, '$1');
+  let at = trimmed.length;
+  for (let i = 0; i < count && at > 0; i++) at = Math.max(trimmed.lastIndexOf('/', at - 1), trimmed.lastIndexOf('\\', at - 1));
+  return trimmed.slice(at + 1);
+};
+/** A folder's name, or as much of its path's end as tells it apart from the other paths named beside it. */
+const distinctName = (path: string, beside: string[]): string => {
+  const others = beside.filter(other => !samePath(other, path));
+  for (let count = 1; count <= path.split(/[\\/]/).length; count++) {
+    const tail = tailSegs(path, count);
+    if (tail && !others.some(other => tailSegs(other, count) === tail)) return tail;
+  }
+  return path;
+};
 /** Folders, then files, each by name, the order the Engine already gives folders (case-insensitive). */
 const NAMES = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true });
 const byName = <T extends { name: string; path: string }>(rows: T[]): T[] =>
@@ -56,7 +72,7 @@ export class BrowseSurface extends JfElement {
   declare error: string | null;
   declare provisional: boolean;
   declare aiState: AiState | null;
-  declare folderErrors: Record<string, string>;
+  declare folderErrors: Record<string, boolean>;
   declare partial: Record<string, boolean>;
   declare activeRowId: string;
   private aiUnsub: (() => void) | null = null;
@@ -106,7 +122,6 @@ export class BrowseSurface extends JfElement {
     .level-8 .row-name { padding-inline-start: 14rem; }
     .notice, .empty-state { padding: .5rem; }
     .notice:empty { padding: 0; }
-    .browse-error { margin: .5rem 1.5rem; }
     @media (max-width: 640px) {
       .row, .column-heads { grid-template-columns: minmax(0, 1fr) 4.5rem 6rem 3.75rem; }
       .body, .header, .search-bar { padding-inline: .75rem; }
@@ -149,14 +164,14 @@ export class BrowseSurface extends JfElement {
       if (generation !== this.generation) return;
       recordRootCounts(data.roots);
       this.roots = byName(data.roots.map(root => ({ ...root, ...rootCount(undefined, root.path), name: lastSeg(root.path) })));
-    } catch (error) { if (generation === this.generation) this.error = `Could not load folders. ${error instanceof Error ? error.message : String(error)}`;
+    } catch { if (generation === this.generation) this.error = "Couldn't load folders";
     } finally { if (generation === this.generation) this.refreshing = false; }
   }
   private async loadFolder(path: string): Promise<void> {
     if (this.inflight[path]) return;
     const generation = this.generation;
     this.inflight = { ...this.inflight, [path]: true };
-    this.folderErrors = { ...this.folderErrors, [path]: '' };
+    this.folderErrors = { ...this.folderErrors, [path]: false };
     try {
       const [foldersRes, filesRes] = await Promise.all([
         this.doFetch('/api/knowledge/folders', { parentPath: path, maxFolders: 500 }),
@@ -175,8 +190,8 @@ export class BrowseSurface extends JfElement {
         fileKind: row.fields?.file_kind, mimeBase: row.fields?.mime_base, size: numeric(row.fields?.size_bytes), modifiedAt: numeric(row.fields?.modified_at),
       }))) };
       this.partial = { ...this.partial, [path]: folders.truncated === true || (files.totalCount ?? 0) > (files.files?.length ?? 0) };
-    } catch (error) {
-      if (generation === this.generation) this.folderErrors = { ...this.folderErrors, [path]: `Could not load ${lastSeg(path)}. ${error instanceof Error ? error.message : String(error)}` };
+    } catch {
+      if (generation === this.generation) this.folderErrors = { ...this.folderErrors, [path]: true };
     } finally { if (generation === this.generation) { const next = { ...this.inflight }; delete next[path]; this.inflight = next; } }
   }
   private async toggle(row: TreeRow): Promise<void> {
@@ -303,7 +318,10 @@ export class BrowseSurface extends JfElement {
   }
   /** One status line per open folder; an open folder with nothing to say adds no band above the tree. */
   private renderNotices(): TemplateResult {
-    return html`${this.rows().filter(row => row.folder && this.expanded[row.id]).map(({ path }) => {
+    const open = this.rows().filter(row => row.folder && this.expanded[row.id]);
+    // Failure lines name their folder; two failed folders of one name show enough of the path to tell apart.
+    const failed = open.filter(({ path }) => this.folderErrors[path] && !this.inflight[path]).map(({ path }) => path);
+    return html`${open.map(({ path }) => {
       const folders = this.folderChildren[path], files = this.fileChildren[path];
       const count = (folders?.length ?? 0) + (files?.length ?? 0);
       const empty = folders !== undefined && files !== undefined && (this.activeFilter && ![...folders, ...files].some(item => this.matchesFilter(item.name))
@@ -311,8 +329,8 @@ export class BrowseSurface extends JfElement {
       const partial = folders !== undefined && files !== undefined && this.partial[path] ? `${lastSeg(path)}: Showing first ${formatCount(count)} entries.` : '';
       // The live region stays so a later message is announced; with nothing to say it takes no room.
       return html`<div class="notice" role="status">${this.inflight[path] ? `Loading ${lastSeg(path)}…`
-        : this.folderErrors[path] ? html`${this.folderErrors[path]} <jf-button variant="ghost" label=${`Retry ${lastSeg(path)}`}
-          .onActivate=${() => void this.loadFolder(path)}>Retry</jf-button>`
+        : this.folderErrors[path] ? (name => html`${name}: Couldn't load this folder <jf-button variant="ghost" label=${`Retry ${name}`}
+          .onActivate=${() => void this.loadFolder(path)}>Retry ${name}</jf-button>`)(distinctName(path, failed))
         : [partial, empty].filter(Boolean).join(' ') || nothing}</div>`;
     })}`;
   }
@@ -327,9 +345,9 @@ export class BrowseSurface extends JfElement {
       ${icon({ name: 'refresh-cw', size: 14, spin: this.refreshing })}</jf-button></div>
       <div class="search-bar"><input class="filter-input" type="search" aria-label="Filter files" placeholder="Filter files…"
         .value=${this.filter} @input=${(event: Event) => { this.filter = (event.target as HTMLInputElement).value; }}></div>` : nothing}
-      ${this.error ? html`<jf-error-alert class="browse-error">${this.error}<jf-button label="Retry loading folders" .onActivate=${() => void this.refresh()}>Retry</jf-button></jf-error-alert>` : nothing}
       <div class="body">
         <div class="column-heads" aria-hidden="true"><span>Name</span><span>Size</span><span>Changed</span><span></span></div>
+        ${this.error ? html`<jf-error-alert class="browse-error">${this.error}<jf-button label="Retry loading folders" .onActivate=${() => void this.refresh()}>Retry loading folders</jf-button></jf-error-alert>` : nothing}
         ${this.renderNotices()}
         ${rows.length ? html`<div role="tree" aria-label="Browse searchable files">${repeat(rows, row => row.id, row => this.renderRow(row))}</div>`
           : html`<div class="empty-state" tabindex="-1" role="status">${this.refreshing ? 'Loading folders…' : this.error ? ''

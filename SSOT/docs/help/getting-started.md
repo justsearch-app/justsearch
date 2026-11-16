@@ -16,6 +16,13 @@ update checks, optional trace export, and external integrations.
 Supported formats include plain text, Markdown, PDF, Word documents (DOCX),
 HTML, and source code files.
 
+## Reading files again
+
+At the foot of **Library → Folders**, beside **Activity**, choose **Read everything again**.
+The page asks **Read every watched folder again?** Choose **Read again** to include unchanged
+files in every watched folder, or **Cancel** to start nothing. Acceptance and completion are
+reported separately.
+
 ## Searching
 
 Open the **Search** view from the top bar and type your query in the search
