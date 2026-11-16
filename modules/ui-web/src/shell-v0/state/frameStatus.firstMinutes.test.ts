@@ -272,6 +272,40 @@ describe('H3\'\' one row per folder; Earlier only for what this window witnessed
   });
 });
 
+describe('H3\'\'\' the folder counts searchable as Library does: ready, keyword-only or enriching', () => {
+  const engine = (enrichment: Record<string, unknown>) => ai({ status: { worker: { core: { indexState: 'IDLE', pendingJobs: 0 }, enrichment } } as unknown as AiState['status'] });
+  /** A fresh install without AI (frameStatus.optionalAi.test.ts): meaning work cannot run, a folder that finished reading is keyword-only. */
+  const NO_AI = engine({ embeddingEnabled: false, spladeEnabled: false, nerEnabled: false, embeddingDocCount: 8, embeddingPendingCount: 8,
+    chunk: { chunkDocCount: 3, chunkEmbeddingPendingCount: 3, chunkVectorsReady: false } });
+  /** Meaning work catching up: a folder that finished reading is enriching. */
+  const CATCHING_UP = engine({ embeddingEnabled: true, embeddingDocCount: 8, embeddingPendingCount: 3 });
+  const FAILED = { ...READY, failedCount: 2 } as IndexedRootView;
+  const EMPTY = { ...READY, status: 'scanning', lastIndexedIsoTime: undefined, fileCount: 0 } as IndexedRootView;
+  const COUNT_FAILED = { ...READY, inFlightCount: null } as unknown as IndexedRootView;
+  it.each([['keyword-only (no AI yet)', NO_AI], ['enriching', CATCHING_UP]])('reading, then %s: the Earlier row, aged from that moment', (_case, engineState) => {
+    const [reading, searchable, later] = observe([{ at: now, roots: [READING], ai: engineState },
+      { at: now + MIN, roots: [READY], ai: engineState }, { at: now + 13 * MIN, roots: [READY], ai: engineState }]);
+    expect(searchableRow(reading!)).toBeUndefined();
+    expect(searchableRow(searchable!)).toMatchObject({ title: 'Your Documents folder is searchable', age: 'just now' });
+    expect(searchableRow(later!)).toMatchObject({ age: '12 min' });
+  });
+  it.each([['keyword-only (AI removed)', NO_AI], ['enriching (meaning work starts)', CATCHING_UP]])('ready, then %s: not a new transition, the original age stays', (_case, engineState) => {
+    const [, , after] = observe([{ at: now, roots: [READING] }, { at: now + MIN, roots: [READY] },
+      { at: now + 13 * MIN, roots: [READY], ai: engineState }]);
+    expect(searchableRow(after!)).toMatchObject({ title: 'Your Documents folder is searchable', age: '12 min' });
+  });
+  it('keyword-only at the first snapshot gets no row, nor when it later turns ready', () => {
+    const models = observe([{ at: now, roots: [READY], ai: NO_AI }, { at: now + MIN, roots: [READY], ai: NO_AI }, { at: now + 2 * MIN, roots: [READY] }]);
+    for (const model of models) expect(searchableRow(model)).toBeUndefined();
+  });
+  it.each([['failed', FAILED], ['empty', EMPTY], ['unknown (a failed count)', COUNT_FAILED]])('reading, then %s: no row; then keyword-only: the row from that moment', (_case, root) => {
+    const [, notSearchable, searchable] = observe([{ at: now, roots: [READING], ai: NO_AI },
+      { at: now + MIN, roots: [root], ai: NO_AI }, { at: now + 5 * MIN, roots: [READY], ai: NO_AI }]);
+    expect(searchableRow(notSearchable!)).toBeUndefined();
+    expect(searchableRow(searchable!)).toMatchObject({ age: 'just now' });
+  });
+});
+
 function operationAdvisory(operationId: string, outcome: string): AdvisoryRecord {
   return { key: `op-${outcome}`, origin: 'stream', acknowledged: false, sourceRenderHint: 'PERSISTED', event: {
     id: `op-${outcome}`, classId: 'operation.completed', occurredAt: '2026-11-16T09:59:00Z', renderHint: 'PERSISTED',

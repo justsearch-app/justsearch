@@ -530,14 +530,16 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     if (root.pathHash) {
       listed.add(root.pathHash);
       const seen = folders.get(root.pathHash);
-      const ready = state.state === 'ready';
-      if (input.rootsLive && state.state !== 'unknown' && seen?.ready !== ready) {
-        folders.set(root.pathHash, ready && seen ? { ready, since: now } : { ready });
+      // H3''' — searchable as Library's "Your files are searchable" counts it: exact-word search finds the
+      // folder's files once it is ready, keyword-only (no AI yet) or enriching (meaning work catching up).
+      const searchable = ['ready', 'keyword-only', 'enriching'].includes(state.state);
+      if (input.rootsLive && state.state !== 'unknown' && seen?.ready !== searchable) {
+        folders.set(root.pathHash, searchable && seen ? { ready: true, since: now } : { ready: searchable });
       }
       // RV8-2/RV8-5 — shown only while searchable now on live folder evidence; an unconfirmed moment (a
       // rebuild, a failed count, a failed roots refresh) keeps the witnessed time but not the row.
       const since = folders.get(root.pathHash)?.since;
-      if (since !== undefined && ready && input.rootsLive) add({ id: `folder-searchable:${root.pathHash}`, section: 'earlier', tone: 'success',
+      if (since !== undefined && searchable && input.rootsLive) add({ id: `folder-searchable:${root.pathHash}`, section: 'earlier', tone: 'success',
         title: path ? `Your ${name} folder is searchable` : 'A watched folder is searchable',
         occurredAt: new Date(since).toISOString(), age: ageWords(now - since), actions: [] });
     }

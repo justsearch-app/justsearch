@@ -41,7 +41,11 @@ function ai(install: Record<string, unknown> = PICTURED): AiState {
     stability: { kind: 'settled' },
     aiEngine: { kind: 'installing', stability: { kind: 'settled' }, installFailure: null },
     activity: { state: 'idle', shapeId: null, startedAtMs: null, canCancel: false, cancel: null },
-    status: { worker: { core: { indexState: 'IDLE', pendingJobs: 0, ownSearchableDocuments: 8 }, enrichment: {} } },
+    // A fresh install's enrichment (frameStatus.optionalAi.test.ts): without AI models the meaning step
+    // cannot run, so a folder that finished reading is keyword-only (H3''').
+    status: { worker: { core: { indexState: 'IDLE', pendingJobs: 0, ownSearchableDocuments: 8 }, enrichment: {
+      embeddingEnabled: false, spladeEnabled: false, nerEnabled: false, embeddingDocCount: 8, embeddingPendingCount: 8,
+      chunk: { chunkDocCount: 3, chunkEmbeddingPendingCount: 3, chunkVectorsReady: false } } } },
     installStatus: { ...install, updatedAtEpochMs: Date.now() }, installObservationLive: true, runtimeObservationLive: true,
     indexingStatusLive: true, snapshotLive: true, episodeMaxPendingJobs: 0, enrichSettleSamples: [],
     capabilities: { chat: false }, runtime: { mode: 'offline' },
