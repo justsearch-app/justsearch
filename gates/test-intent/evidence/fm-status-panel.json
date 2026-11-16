@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-16T10:34:20.342Z",
-  "revision": "558a9ed7af43dedd2d56b4884267fba0a6ec23ce",
-  "tree": "cf52ff93f500c9c902a20e039e158334705c6694",
+  "createdAt": "2026-11-16T10:36:46.742Z",
+  "revision": "8edddb79016abf80ad31d46f3e23fbc3107fab2b",
+  "tree": "7a85a972399324ca71f9aab7aa33c171835b756d",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.firstMinutes.test.ts\" \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/s7sh_uud/tmp/test-intent-vitest-950-1794825244230.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.firstMinutes.test.ts\" \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fm-s8-tmp/test-intent-vitest-3423648-1794825391277.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1319
+      "durationMs": 1054
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/s7sh_uud/tmp/test-intent-vitest-950-1794825245550.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/fm-s8-tmp/test-intent-vitest-3423648-1794825392332.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 5556
+      "durationMs": 5331
     }
   ],
   "checks": [
@@ -330,43 +330,43 @@
     }
   ],
   "failBefore": {
-    "ref": "e94eb4098f",
-    "revision": "e94eb4098fcf51974319bc86036dff0fef0588d4",
+    "ref": "origin/main",
+    "revision": "30f367f53c03a40ca92ea169ae4c43ee05f2f54f",
     "overlays": [],
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.firstMinutes.test.ts\" \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/s7sh_uud/tmp/test-intent-vitest-950-1794825252601.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.firstMinutes.test.ts\" \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fm-s8-tmp/test-intent-vitest-3423648-1794825399135.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1126,
-        "output": "JSON report written to /home/elias/.cache/am/s7sh_uud/tmp/test-intent-vitest-950-1794825252601.json\n\n"
+        "durationMs": 1149,
+        "output": "JSON report written to /home/elias/.cache/am/fm-s8-tmp/test-intent-vitest-3423648-1794825399135.json\n\n"
       },
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/s7sh_uud/tmp/test-intent-vitest-950-1794825253728.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/fm-s8-tmp/test-intent-vitest-3423648-1794825400284.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 6367,
-        "output": "JSON report written to /home/elias/.cache/am/s7sh_uud/tmp/test-intent-vitest-950-1794825253728.json\n\n"
+        "durationMs": 6279,
+        "output": "JSON report written to /home/elias/.cache/am/fm-s8-tmp/test-intent-vitest-3423648-1794825400284.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/state/frameStatus.firstMinutes.test.ts",
         "classification": "assertion",
-        "detail": "S8-1 / H3' the first minutes: one \"Installing AI\" entry \"Search works\", then Running \"Installing AI\" with \"1.3 of 2.6 GB · about 24 min left\" and Pause, no stage rows:  AssertionError: expected undefined to be 'Search works' // Object.is equality\n    at /home/elias/.cache/am/s7sh_uud/tmp/test-intent-before-FeOuRY/modules/ui-web/src/shell-v0/state/frameStatus.firstMinutes.test.ts:69:28\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s8/modules/ui-web/n | S8-1 / H3' the first minutes"
+        "detail": "S8-1 / H3' the first minutes: one \"Installing AI\" entry \"Search works\", then Running \"Installing AI\" with \"1.3 of 2.6 GB · about 24 min left\" and Pause, no stage rows:  AssertionError: expected undefined to be 'Search works' // Object.is equality\n    at /home/elias/.cache/am/fm-s8-tmp/test-intent-before-CN0c9g/modules/ui-web/src/shell-v0/state/frameStatus.firstMinutes.test.ts:69:28\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s8/modules/ui-web/node | S8-1 / H3' the first minutes"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
         "classification": "assertion",
-        "detail": "S8-1 the picture \"What's going on\", \"Search works\", Running \"Installing AI\" with amounts and Pause, Earlier with its age, footer:  AssertionError: expected '1 running' to be 'Search works' // Object.is equality\n    at /home/elias/.cache/am/s7sh_uud/tmp/test-intent-before-FeOuRY/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:84:57\n    at processTicksAndRejections (node:internal/process/task_queues:104:5) | S8-3 / H5' \"Open AI Brain\" only away from AI Brain shows on Search"
+        "detail": "S8-1 the picture \"What's going on\", \"Search works\", Running \"Installing AI\" with amounts and Pause, Earlier with its age, footer:  AssertionError: expected '1 running' to be 'Search works' // Object.is equality\n    at /home/elias/.cache/am/fm-s8-tmp/test-intent-before-CN0c9g/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:84:57\n    at processTicksAndRejections (node:internal/process/task_queues:104:5) | S8-3 / H5' \"Open AI Brain\" only away from AI Brain shows on Search an"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts",
         "classification": "assertion",
-        "detail": "a focused \"Open AI Brain\" that leaves on arriving at AI Brain hands focus to its row's next control, not the page:  Error: expected [ 'Pause download', 'Open AI Brain' ] to deeply equal [ 'Pause' ]\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/fm-s8/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/s7sh_uud/tmp/test-inte | Pause, then the status says paused: the same control reads Resume and keeps focus"
+        "detail": "a focused \"Open AI Brain\" that leaves on arriving at AI Brain hands focus to its row's next control, not the page:  Error: expected [ 'Pause download', 'Open AI Brain' ] to deeply equal [ 'Pause' ]\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/fm-s8/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/fm-s8-tmp/test-intent- | Pause, then the status says paused: the same control reads Resume and keeps focus"
       }
     ]
   },
-  "digest": "sha256:6a463cd986c5e5283ae78ac7b2499cfb555e2185c85074dbe6436a529bb11f2d"
+  "digest": "sha256:07a79858c49b8ad6e283f384a95b3d5161e1eb9a82d0481f788d4fe6ec2d9548"
 }
