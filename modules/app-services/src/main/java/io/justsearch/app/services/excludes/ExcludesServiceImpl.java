@@ -266,7 +266,7 @@ public final class ExcludesServiceImpl implements ExcludesService {
 
   @Override
   public ExcludesResult applyConsentedExcludes(List<?> consentedRules, EngineContext engineContext) throws Exception {
-    return run(false, java.util.Objects.requireNonNull(consentedRules, "consentedRules"), engineContext);
+    return run(false, Objects.requireNonNull(consentedRules, "consentedRules"), engineContext);
   }
 
   private ExcludesResult run(boolean dryRun, List<?> consentedRules, EngineContext engineContext) throws Exception {

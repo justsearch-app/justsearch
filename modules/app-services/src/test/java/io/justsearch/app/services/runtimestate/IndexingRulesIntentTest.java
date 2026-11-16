@@ -172,7 +172,7 @@ final class IndexingRulesIntentTest {
   @Test
   void overnightSundayHoursAndManualPauseSurviveHeadRestart() throws Exception {
     String sunday = "{\"schedule\":{\"enabled\":true,\"days\":[7],\"startMinute\":1320,\"endMinute\":360},\"pauseOnBattery\":false}";
-    java.nio.file.Path saved;
+    Path saved;
     try (var f = new RuntimeIntentTestFixture(directory)) {
       var rules = f.dispatcher("core.set-indexing-rules", handler(f.spec()));
       var pause = f.dispatcher("core.indexing-pause", new IndexingPauseHandler(f::spec, true));
