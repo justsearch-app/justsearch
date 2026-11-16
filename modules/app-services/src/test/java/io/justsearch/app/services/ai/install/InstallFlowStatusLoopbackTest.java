@@ -156,7 +156,7 @@ final class InstallFlowStatusLoopbackTest {
       }
       RECORDED.forEach(all::set);
       ObjectNode sorted = JSON.createObjectNode();
-      all.properties().stream().map(java.util.Map.Entry::getKey).sorted().forEach(key -> sorted.set(key, all.get(key)));
+      all.properties().stream().map(Map.Entry::getKey).sorted().forEach(key -> sorted.set(key, all.get(key)));
       Files.writeString(Path.of(out), JSON.writerWithDefaultPrettyPrinter().writeValueAsString(sorted) + "\n");
       return;
     }
@@ -191,9 +191,9 @@ final class InstallFlowStatusLoopbackTest {
     record("pausedFileFinishing", finishing, presence(service), null);
 
     gateRelease.countDown();
-    AiInstallStatus between = await(service, s -> "installed".equals(pkg(s, "splade").state));
+    await(service, s -> "installed".equals(pkg(s, "splade").state));
     Thread.sleep(300); // the run now waits at the pause gate before the part's next file
-    between = service.getStatus();
+    AiInstallStatus between = service.getStatus();
     assertTrue(between.paused);
     var splade = pkg(between, "splade");
     // The per-file "installed" between two files of one part: bytes and files say it is not done.
