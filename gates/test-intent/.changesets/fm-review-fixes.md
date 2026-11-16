@@ -180,3 +180,14 @@ passes on the candidate (run-evidence with --before 012aae15e5).
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "f266c593-d2c2-4d63-9275-08795a808c09",
+  "verdict": "accept",
+  "digest": "sha256:4927c16793e81d7b9fed372502480382d05993d2db711fe950695a411c71c543",
+  "note": "Test intent accepted. Each new check fails on 012aae15e5 by assertion for the reason under test and passes on f992b6b045; 10 of 11 mutations killed. Surviving mutation: filtering successful settings saves by label text 'Apply Settings' instead of operationId (the fixture couples both), so PH3's 'not by the label text' is not pinned; suggested strengthening, not blocking."
+}
+```
