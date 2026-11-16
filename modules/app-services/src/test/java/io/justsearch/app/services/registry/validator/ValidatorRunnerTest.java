@@ -9,6 +9,7 @@ import io.justsearch.agent.api.registry.OperationHandler;
 import io.justsearch.agent.api.registry.OperationResult;
 import io.justsearch.agent.api.registry.Severity;
 import io.justsearch.app.services.bootstrap.phases.BootstrapHelpers;
+import io.justsearch.app.services.bootstrap.phases.OperationHandlerRegistrations;
 import io.justsearch.app.services.conversation.WorkflowOperationProjection;
 import io.justsearch.agent.tools.AgentToolsOperationCatalog;
 import io.justsearch.app.services.registry.operations.CoreOperationCatalog;
@@ -63,6 +64,8 @@ final class ValidatorRunnerTest {
         new io.justsearch.app.services.registry.operations.handlers.IndexingPauseHandler(() -> null, false));
     handlers.register(CoreOperationCatalog.SET_INDEXING_RULES,
         new io.justsearch.app.services.registry.operations.handlers.IndexingRulesHandler(() -> null));
+    // Production registers it in SubstratePhase through OperationHandlerRegistrations.
+    OperationHandlerRegistrations.registerReadWaitingFiles(handlers, () -> null);
     handlers.register(CoreOperationCatalog.RECOVER_COMPONENT,
         new RecoverComponentHandler(() -> null));
     // Validator tests inspect registrations without invoking them; both durable bulk profiles

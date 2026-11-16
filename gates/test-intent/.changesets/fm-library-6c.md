@@ -9,8 +9,8 @@ author-session: justsearch-fm-s6c
 
 "Read waiting files now" under "When to read files" (owner decision Q2). The new behaviour is
 covered by isolated new test files (exempt) and by the existing files listed here: the catalog id
-list, the recaptured operation-wire golden, the regenerated status fixture, the narrowed 6b1-7 and
-the dead-code pin. Evidence: gates/test-intent/evidence/fm-library-6c.json (candidate and before-state 30f367f53c, one check per file).
+list, the recaptured operation-wire golden, the regenerated status fixture, the narrowed 6b1-7,
+the dead-code pin and the validator fixture's registration of the new operation's handler. Evidence: gates/test-intent/evidence/fm-library-6c.json (candidate and before-state 30f367f53c, one check per file).
 
 Review repairs RV6c-1..5 (reviewer-s6c on 0a1023dc2a, accepted by the orchestrator) add cases to the
 same new files only: a claim of file jobs under a release is serialized with revocation, so Pause,
@@ -38,6 +38,14 @@ unchanged normal ingestion path and are not re-proven under a release here.
 ```json
 {
   "entries": [
+    {
+      "items": [
+        "modules/app-services/src/test/java/io/justsearch/app/services/registry/validator/ValidatorRunnerTest.java"
+      ],
+      "class": "Structural rule kept",
+      "rule": "Every registry shape validator reports zero ERROR findings for the core, agent-tools and composed catalogs, including each executor binding resolving to a registered handler; the fixture mirrors the production handler registrations.",
+      "whySurvives": "Only the fixture registration of core.indexing-read-now is added, through the same OperationHandlerRegistrations.registerReadWaitingFiles call SubstratePhase makes in production, with an unused lazy client supplier like Pause/Resume. No assertions, expected findings, catalogs, validators or validator selection change; the fixture now includes the operation already in the core and composed catalogs."
+    },
     {
       "items": [
         "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/CoreOperationCatalogTest.java"
