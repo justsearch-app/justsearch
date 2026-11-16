@@ -286,7 +286,9 @@ hours, skip rules, settings persistence and operation implementations are outsid
           "newAssertion": "page.goto(origin + 'browse.html', { timeout: 45_000 }); every assertion unchanged.",
           "reason": "Setup budget only; the cold compile under a loaded CI shard took over 3 s (PR #1269 runs 43782755256 twice)."
         }
-      ]
+      ],
+      "moved": "instrumentation",
+      "whatMoved": "the page navigation timeout of the test harness (setup only: 3 s default -> 45 s); no assertion or oracle changed"
     }
   ]
 }
