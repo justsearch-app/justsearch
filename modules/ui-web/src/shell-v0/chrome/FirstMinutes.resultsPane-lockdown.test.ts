@@ -176,6 +176,44 @@ const painted = (mark: Locator) => mark.evaluate(element => {
   return { ink, fill, ratio: (hi! + 0.05) / (lo! + 0.05) };
 });
 
+/**
+ * The theme's normal text colour (--text-primary) as it computes inside the target's own tree: a probe
+ * that takes the token is put in the target and read, so a theme or a component that redefines the
+ * token is honoured, and the result is the token itself, never another element's colour.
+ */
+const normalInk = (target: Locator): Promise<string> => target.evaluate(element => {
+  const probe = document.createElement('span');
+  probe.style.setProperty('color', 'var(--text-primary)');
+  element.append(probe);
+  const computed = getComputedStyle(probe).color;
+  probe.remove();
+  return computed;
+});
+
+/**
+ * The colour the target's own fill paints as, over everything under it (every fill from the page
+ * down, composed on a canvas), and what the given fill would paint as in its place.
+ */
+const fillAgainst = (target: Locator, instead: string) => target.evaluate((element, other) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 1;
+  canvas.height = 1;
+  const paint = canvas.getContext('2d', { willReadFrequently: true })!;
+  const under: string[] = [];
+  for (let at: Element | null = element.parentElement ?? ((element.getRootNode() as ShadowRoot).host ?? null); at !== null;
+    at = at.parentElement ?? ((at.getRootNode() as ShadowRoot).host ?? null)) {
+    const fill = getComputedStyle(at).backgroundColor;
+    if (fill !== 'rgba(0, 0, 0, 0)') under.unshift(fill);
+  }
+  const compose = (top: string): number[] => {
+    paint.fillStyle = getComputedStyle(document.documentElement).colorScheme.includes('light') ? '#fff' : '#000';
+    paint.fillRect(0, 0, 1, 1);
+    for (const fill of [...under, top]) { paint.fillStyle = fill; paint.fillRect(0, 0, 1, 1); }
+    return [...paint.getImageData(0, 0, 1, 1).data.slice(0, 3)];
+  };
+  return { own: compose(getComputedStyle(element).backgroundColor), expected: compose(other) };
+}, instead);
+
 const style = (target: Locator) => target.evaluate(element => {
   const s = getComputedStyle(element);
   return { background: s.backgroundColor, color: s.color, radius: s.borderTopLeftRadius, padding: s.padding, shadow: s.boxShadow,
@@ -183,10 +221,10 @@ const style = (target: Locator) => target.evaluate(element => {
     bottomWidth: s.borderBottomWidth, decoration: s.textDecorationLine };
 });
 
-/** The picture's tokens (tmp/design/fm-05: --mark, --mark-ring), per theme. */
+/** The picture's tokens (tmp/design/fm-05: --mark, --mark-ring, and --r2, the raised tone of the selected row), per theme. */
 const PICTURE = {
-  dark: { mark: 'rgba(240, 184, 96, 0.22)', ring: 'rgba(240, 184, 96, 0.08)' },
-  light: { mark: 'oklch(86% 0.14 85 / 0.55)', ring: 'oklch(86% 0.14 85 / 0.2)' },
+  dark: { mark: 'rgba(240, 184, 96, 0.22)', ring: 'rgba(240, 184, 96, 0.08)', raised: 'rgba(255, 255, 255, 0.06)' },
+  light: { mark: 'oklch(86% 0.14 85 / 0.55)', ring: 'oklch(86% 0.14 85 / 0.2)', raised: 'rgba(0, 0, 0, 0.05)' },
 } as const;
 
 describe('PA1 found words are a faint warm tint behind text in its normal colour', () => {
@@ -195,10 +233,9 @@ describe('PA1 found words are a faint warm tint behind text in its normal colour
     await search(page);
     const mark = rows(page).first().locator('.snippet mark.hl').first();
     expect(await mark.textContent()).toBe('harbor');
-    const title = rows(page).first().locator('.title-text');
     const look = await style(mark);
     expect(look.background).toBe(await resolve(page, 'background-color', PICTURE[palette].mark));
-    expect(look.color, 'the word keeps the text colour').toBe((await style(title)).color);
+    expect(look.color, 'the word is in the normal text colour').toBe(await normalInk(mark));
     expect(look.radius).toBe('4px');
     expect(look.padding).toBe('0px 2px');
     expect((await painted(mark)).ratio).toBeGreaterThanOrEqual(4.5);
@@ -212,7 +249,7 @@ describe('PA1 found words are a faint warm tint behind text in its normal colour
     expect(await marks.allTextContents()).toEqual(['harbor', 'harbor']);
     const look = await style(marks.first());
     expect(look.background).toBe(await resolve(page, 'background-color', PICTURE[palette].mark));
-    expect(look.color).toBe((await style(page.locator('jf-document-pane pre.source'))).color);
+    expect(look.color, 'the word is in the normal text colour').toBe(await normalInk(marks.first()));
     expect(look.radius).toBe('4px');
     expect(look.padding).toBe('1px 2px');
     expect(look.shadow).toBe(`${await resolve(page, 'color', PICTURE[palette].ring)} 0px 0px 0px 3px`);
@@ -264,7 +301,10 @@ describe('PA3 the row whose file is in the pane looks selected', () => {
     expect(await rows(page).nth(1).getAttribute('aria-current')).toBe('true');
     expect(await rows(page).nth(0).getAttribute('aria-current')).toBe('false');
     expect(byPointer.radius).toBe('8px');
+    const tone = await fillAgainst(rows(page).nth(1), PICTURE[palette].raised);
     expect(byPointer.background).not.toBe('rgba(0, 0, 0, 0)');
+    expect(tone.own.every((channel, i) => Math.abs(channel - tone.expected[i]!) <= 2),
+      `the row paints as the picture's raised tone: ${JSON.stringify(tone)}`).toBe(true);
     expect(byPointer.bottomWidth === '0px' || byPointer.bottomColor === 'rgba(0, 0, 0, 0)', 'no line under the selected row').toBe(true);
     expect((await style(rows(page).nth(0))).background).toBe('rgba(0, 0, 0, 0)');
     expect(await rows(page).nth(1).locator('.title-text').evaluate(el => el.getBoundingClientRect().left), 'the text stays where it was').toBe(textLeft);
@@ -295,13 +335,14 @@ describe('PA3 the row whose file is in the pane looks selected', () => {
 });
 
 describe('PA4 the pane’s title, path and text', () => {
-  it.each(['dark', 'light'] as const)('the text is the normal text colour, %s', async palette => {
+  it.each(['dark', 'light'] as const)('the text and the title are the normal text colour, %s', async palette => {
     const page = await open(palette);
     await search(page);
     await openRow(page, 0);
-    const ink = (await style(page.locator('jf-document-pane pre.source'))).color;
+    const text = page.locator('jf-document-pane pre.source');
     const title = page.locator('[data-testid="details-pane"] [role="tab"][aria-selected="true"]');
-    expect(ink).toBe((await style(title)).color);
+    expect((await style(text)).color, 'the document text').toBe(await normalInk(text));
+    expect((await style(title)).color, 'the title').toBe(await normalInk(title));
   }, 120_000);
 
   it.each(['dark', 'light'] as const)('the name is a plain title with a close button named for the file, %s', async palette => {
@@ -342,15 +383,21 @@ describe('PA4 the pane’s title, path and text', () => {
         for (const rect of range.getClientRects()) if (rect.width > 0) tops.push(Math.round(rect.top));
       }
       const lines = new Set(tops);
-      const parts = [...element.children].map(child => ({ text: child.textContent, cut: child.scrollWidth > child.clientWidth,
-        right: child.getBoundingClientRect().right }));
+      const parts = [...element.children].map(child => {
+        const s = getComputedStyle(child);
+        const cut = child.scrollWidth > child.clientWidth;
+        // A cut part shows an ellipsis where it gives way: the browser draws one for text-overflow: ellipsis
+        // on a clipped box; a part that cuts its own text carries the character.
+        const ellipsis = cut ? s.textOverflow === 'ellipsis' && s.overflowX !== 'visible' : (child.textContent ?? '').includes('…');
+        return { text: child.textContent, cut, ellipsis, right: child.getBoundingClientRect().right };
+      });
       return { lines: lines.size, parts, right: element.getBoundingClientRect().right, text: element.textContent };
     });
     expect(geometry.lines, JSON.stringify(geometry)).toBe(1);
     expect(geometry.text?.replace(/\s+/g, ' ').trim()).toBe(`${FOLDER} · 157 B`);
     expect(await line.getAttribute('title')).toBe(`${FOLDER}/note-10-harbor.txt`);
     const [head, tail, rest] = geometry.parts;
-    expect(head).toMatchObject({ cut: true });
+    expect(head, 'the start gives way and ends in an ellipsis').toMatchObject({ cut: true, ellipsis: true });
     expect(tail).toMatchObject({ text: '/Documents', cut: false });
     expect(rest?.text?.trim()).toBe('· 157 B');
     expect(rest!.right).toBeLessThanOrEqual(geometry.right + 0.5);
@@ -360,9 +407,13 @@ describe('PA4 the pane’s title, path and text', () => {
     const page = await open('dark', 1600, 900);
     await search(page);
     await openRow(page, 0);
-    const parts = await page.locator('jf-document-pane .header .path').evaluate(element =>
-      [...element.children].map(child => child.scrollWidth > child.clientWidth));
-    expect(parts).toEqual([false, false, false]);
+    const shown = await page.locator('jf-document-pane .header .path').evaluate(element => ({
+      text: element.textContent,
+      // Whatever draws the line, no box in it clips its own text.
+      cut: [element, ...element.querySelectorAll('*')].filter(part => part.scrollWidth > part.clientWidth).map(part => part.outerHTML),
+    }));
+    expect(shown.text?.replace(/\s+/g, ' ').trim(), 'the whole folder, uncut').toBe(`${FOLDER} · 157 B`);
+    expect(shown.cut, 'nothing in the line is cut off').toEqual([]);
   }, 120_000);
 });
 

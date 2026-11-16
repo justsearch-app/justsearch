@@ -17,13 +17,23 @@ files the gate flags are the generated token-name union and one test's stub host
 Base: `2d51325e394b753a415eaa4ae5821dc940b6225d`. The evidence runs each new file whole (one check per
 file) on the candidate. The same two files were also run on a shared clone of the base: every
 new-behaviour case fails there by assertion (the unit file 5 of 5: `highlightSegments` and
-`splitFolderTail` are not functions; the browser file 17 of 19: the mark computes to the solid
+`splitFolderTail` are not functions; the browser file 16 of 19: the mark computes to the solid
 `oklch(0.5 0.11 70)` / `oklch(0.88 0.12 70)` instead of the picture's tint, the pane has no marks, the
 open row has `aria-current="false"` and no outline in forced colours, the pane's text computes to the
-muted grey, the title keeps its underline, the close button says "Close the cited document" and the
-path runs to two lines). The two preservation cases (a cited document keeps no marks and its own
-close label; the pane keeps its actions and the list its snippet size) pass on the base and on the
-candidate.
+muted grey instead of the theme's `--text-primary`, the title keeps its underline, the close button
+says "Close the cited document" and the path runs to two lines). The three preservation cases (a
+cited document keeps no marks and its own close label; a short path is shown whole and uncut; the
+pane keeps its actions and the list its snippet size) pass on the base and on the candidate.
+
+The colour checks compare with the normal text colour itself: `--text-primary` resolved by a probe
+inside the checked element's own tree, in both themes, never with another element's colour. The
+selected row's fill, painted over what is under it, must match the picture's raised tone `--r2`
+(dark `rgba(255,255,255,.06)`, light `rgba(0,0,0,.05)`) within 2 of 255 per channel; the app has no
+token of that name and draws the tone as `--text-primary` at 6 %, which paints within that margin of the
+picture. The cut start of the path must end in an ellipsis. Mutations on the candidate, each failing
+its case in both themes: the pane's text grey (`--text-secondary`), the title alone grey, the found
+words grey, the path cut without an ellipsis (`text-overflow: clip`), the selected row on
+`--surface-active`.
 
 ```json
 {
@@ -34,7 +44,7 @@ candidate.
         "modules/ui-web/src/shell-v0/chrome/FirstMinutes.resultsPane-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "Found words in result snippets and in the pane's text of a search result are a faint warm tint behind the word (dark rgba(240,184,96,.22), light oklch(86% .14 85 / .55)) with the text in the normal text colour, 4 px corners, padding 0 2px in the list and 1px 2px plus the picture's 3 px ring in the pane; the marked text reads at 4.5:1 or more on its tint in both themes; forced colours use the system Mark/MarkText pair. The pane marks the same words the snippet marks (one matching: highlightSegments), in plain text and in rendered Markdown, only for the search result it shows; a cited document shows no marks and keeps 'Close the cited document'. The row whose file is in the pane has a raised tint with 8 px corners, no line under it, aria-current=true, the same look whether opened by pointer or Enter, its text where it was, and in forced colours a Highlight outline. The pane's document text is the normal text colour; a document shown on its own has a plain title (no underline, also in forced colours) and a close button named 'Close <file name>'. The path is one line shortened in the middle (the last folder and the facts stay whole, the start ends in an ellipsis), the whole folder stays in the text and the full path in the title; a short path shows whole. The pane's actions, the tab count and the snippet's size are unchanged.",
+      "behaviour": "Found words in result snippets and in the pane's text of a search result are a faint warm tint behind the word (dark rgba(240,184,96,.22), light oklch(86% .14 85 / .55)) with the text in the normal text colour, 4 px corners, padding 0 2px in the list and 1px 2px plus the picture's 3 px ring in the pane; the marked text reads at 4.5:1 or more on its tint in both themes; forced colours use the system Mark/MarkText pair. The pane marks the same words the snippet marks (one matching: highlightSegments), in plain text and in rendered Markdown, only for the search result it shows; a cited document shows no marks and keeps 'Close the cited document'. The row whose file is in the pane has the picture's raised tone (--r2, painted within 2/255) with 8 px corners, no line under it, aria-current=true, the same look whether opened by pointer or Enter, its text where it was, and in forced colours a Highlight outline. The pane's document text and the title are the theme's normal text colour (--text-primary, resolved in their own tree), as are the found words; a document shown on its own has a plain title (no underline, also in forced colours) and a close button named 'Close <file name>'. The path is one line shortened in the middle (the last folder and the facts stay whole, the cut start ends in an ellipsis), the whole folder stays in the text and the full path in the title; a short path shows whole: its text is the whole folder and the facts, and nothing in the line is cut off. The pane's actions, the tab count and the snippet's size are unchanged.",
       "sources": [
         {
           "kind": "owner-words",

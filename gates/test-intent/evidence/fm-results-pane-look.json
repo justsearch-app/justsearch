@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-16T20:11:42.131Z",
-  "revision": "2d51325e394b753a415eaa4ae5821dc940b6225d",
-  "tree": "11e3e381fa8afb986d97aa880ed4c2507fa05740",
+  "createdAt": "2026-11-16T20:32:59.322Z",
+  "revision": "d7b59456b4e0e7b4b58b0e7dd33c14175f2d15d9",
+  "tree": "a3da463b8a5e7c82dddc94cfb684630988317acc",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/resultRowPresentation.paneMarks.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/uvb5m_1z/tmp/test-intent-vitest-27260-1794859858893.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/resultRowPresentation.paneMarks.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/m_ghf5s_/tmp/test-intent-vitest-7277-1794861137235.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 802
+      "durationMs": 763
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.resultsPane-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/uvb5m_1z/tmp/test-intent-vitest-27260-1794859859698.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.resultsPane-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/m_ghf5s_/tmp/test-intent-vitest-7277-1794861137999.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 42431
+      "durationMs": 41321
     }
   ],
   "checks": [
@@ -66,7 +66,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.resultsPane-lockdown.test.ts",
       "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.resultsPane-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:0704fbe02eb69be000ae7a0602f8be9e0e241b9f2c24890cbbf9d3fd2951be5d",
+      "contentDigest": "sha256:15af5db9c93f0392a2a3b7b8de2fa238de3dbb497290966ad9d260ae8b1b96b1",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -112,11 +112,11 @@
           "status": "passed"
         },
         {
-          "name": "PA4 the pane’s title, path and text the text is the normal text colour, dark",
+          "name": "PA4 the pane’s title, path and text the text and the title are the normal text colour, dark",
           "status": "passed"
         },
         {
-          "name": "PA4 the pane’s title, path and text the text is the normal text colour, light",
+          "name": "PA4 the pane’s title, path and text the text and the title are the normal text colour, light",
           "status": "passed"
         },
         {
@@ -151,5 +151,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:a6ecffc5b2f57cdd6be80c9407c303fc1bd55a05b5bfff1945d37ca7450d480f"
+  "digest": "sha256:58a5fc3bc8c4f6e4bd53cf934ed1696fce2a2afe75cd22016f72695de4337cfd"
 }
