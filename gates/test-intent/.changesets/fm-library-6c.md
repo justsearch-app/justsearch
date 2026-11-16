@@ -163,3 +163,13 @@ indexed before (RV6c-5; this case also passes on 867670406a and is preservation 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-40mjv8ei",
+  "verdict": "accept",
+  "digest": "sha256:a455234555c4bc0ca75f139db3821dad97b6646637b1ba23349d497968983866"
+}
+```
