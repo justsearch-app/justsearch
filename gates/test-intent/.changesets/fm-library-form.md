@@ -135,3 +135,13 @@ assertion is listed below; every other assertion in these files is unchanged and
   "digest": "sha256:5232691e57c5d0e9b8654a93569455df4c07e197beadaa1ccf3d5663d572877c"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-5wssd1r7",
+  "verdict": "accept",
+  "digest": "sha256:4e717f7bd631a09f336ed9a33abfc14af60b44f8fa9416c02dd55287ff595838"
+}
+```
