@@ -577,3 +577,13 @@ unlisted folder without asking whether the list is live.
   "digest": "sha256:a22c8e5b2e40edad6cb935da02cab2a2b17ba82ff9ea62ff959219925933377e"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-wjprcpzs",
+  "verdict": "accept",
+  "digest": "sha256:9c83f2129ea3f857a27049e72cb27bf055ba22ac77da4ed556b789876e2ba7a4"
+}
+```
