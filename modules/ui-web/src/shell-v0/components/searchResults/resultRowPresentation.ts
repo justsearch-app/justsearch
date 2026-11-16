@@ -156,14 +156,16 @@ export function highlightTerms(text: string, query: string): TemplateResult | st
 /**
  * The found-word mark (first-minutes fm-04/fm-05): a faint warm wash behind the word, which keeps the
  * colour of the text around it — the found words are read as text, not as a row of filled blocks. The
- * wash is the theme's `--highlight-wash`, translucent, so every theme's own ink stays readable on it.
+ * wash is the theme's `--highlight-wash`, which the appearance writer derives from each theme's own
+ * ground and ink so the word reads at >= 4.5:1 (`roleForegrounds.deriveHighlightWashDecls`); only a
+ * theme whose own text does not read on its own ground gets a derived `--highlight-ink`.
  * Unscoped `mark.hl` so it applies in either container that draws it (the result snippet, the reader);
  * the reader adds its own ring and padding. Forced colours take the system Mark pair.
  */
 export const highlightStyles = css`
   mark.hl {
     background: var(--highlight-wash);
-    color: var(--text-primary);
+    color: var(--highlight-ink, var(--text-primary));
     border-radius: 4px;
     padding: 0 2px;
   }

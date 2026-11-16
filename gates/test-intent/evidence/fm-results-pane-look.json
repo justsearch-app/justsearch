@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-16T20:32:59.322Z",
-  "revision": "d7b59456b4e0e7b4b58b0e7dd33c14175f2d15d9",
-  "tree": "a3da463b8a5e7c82dddc94cfb684630988317acc",
+  "createdAt": "2026-11-16T21:03:19.352Z",
+  "revision": "585eaa507075844ff6edac9d43b37dff95c924a9",
+  "tree": "9529041b3f0c45ada8af510aa809c9a212abb7ed",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/resultRowPresentation.paneMarks.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/m_ghf5s_/tmp/test-intent-vitest-7277-1794861137235.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/resultRowPresentation.paneMarks.test.ts\" \"src/shell-v0/themes/roleForegrounds.highlightWash.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/djtp0y_j/tmp/test-intent-vitest-16623-1794862935107.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 763
+      "durationMs": 1491
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.resultsPane-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/m_ghf5s_/tmp/test-intent-vitest-7277-1794861137999.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.resultsPane-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/djtp0y_j/tmp/test-intent-vitest-16623-1794862936600.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 41321
+      "durationMs": 62750
     }
   ],
   "checks": [
@@ -66,7 +66,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.resultsPane-lockdown.test.ts",
       "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.resultsPane-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:15af5db9c93f0392a2a3b7b8de2fa238de3dbb497290966ad9d260ae8b1b96b1",
+      "contentDigest": "sha256:9719ad0e21405da0d07405377448ec4b2930798a3e01d3274cac07d6323ba581",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -89,6 +89,10 @@
         },
         {
           "name": "PA1 found words are a faint warm tint behind text in its normal colour in forced colours both take the system Mark pair",
+          "status": "passed"
+        },
+        {
+          "name": "PA1 found words and the pane text stay readable in every built-in palette, light and dark every palette in the registry and a user theme, in Light and in Dark: found words on their tint and the pane text >= 4.5:1",
           "status": "passed"
         },
         {
@@ -128,6 +132,10 @@
           "status": "passed"
         },
         {
+          "name": "PA4 the pane’s title, path and text the close button keeps the file’s name when a new search leaves the file out of the list",
+          "status": "passed"
+        },
+        {
           "name": "PA4 the pane’s title, path and text in forced colours the title has no underline either",
           "status": "passed"
         },
@@ -148,8 +156,39 @@
           "status": "passed"
         }
       ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/themes/roleForegrounds.highlightWash.test.ts",
+      "file": "modules/ui-web/src/shell-v0/themes/roleForegrounds.highlightWash.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bb89d3ce3c099cdc6d44de392c7e418d1dfc5d79c9594df580086ed8d14cc3b8",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the found-word wash is derived from the theme's own ground and ink keeps the authored wash of the ground's side as a reference where the word reads",
+          "status": "passed"
+        },
+        {
+          "name": "the found-word wash is derived from the theme's own ground and ink chooses the wash by the ground, not the light/dark setting: a dark palette in Light keeps the dark wash",
+          "status": "passed"
+        },
+        {
+          "name": "the found-word wash is derived from the theme's own ground and ink lets the wash give way, keeping its hue, where the authored one would sink the word below 4.5:1",
+          "status": "passed"
+        },
+        {
+          "name": "the found-word wash is derived from the theme's own ground and ink gives the word a derived ink only where the theme's own text does not read on its own ground",
+          "status": "passed"
+        },
+        {
+          "name": "the found-word wash is derived from the theme's own ground and ink derives nothing when the ground or the ink does not resolve",
+          "status": "passed"
+        }
+      ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:58a5fc3bc8c4f6e4bd53cf934ed1696fce2a2afe75cd22016f72695de4337cfd"
+  "digest": "sha256:737a6579ac673b4e54ebb02e44f59bd5572633d39484ad432f868ad6002cde9e"
 }

@@ -6,7 +6,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createServer, type ViteDevServer } from 'vite';
 import { chromium, type Browser, type BrowserContext, type BrowserServer, type Locator, type Page } from 'playwright-core';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -16,18 +16,21 @@ const FOLDER = '/home/reader/.cache/am/vael2d1y/tmp/run/home/Documents';
 
 const HARNESS = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <link rel="stylesheet" href="/src/styles/tokens.css"></head><body><script type="module">
+const realFetch = window.fetch.bind(window);
 const json = (body) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
 const names = ['note-10-harbor.txt', 'note-22-harbor.txt', 'note-34-harbor.txt', 'plan-harbor.md'];
 const hit = (name, i) => ({ id: 'doc-' + i, score: 1 - i / 10, fields: { title: name, filename: name, path: '${FOLDER}/' + name,
   content_preview: 'Note ' + i + ' about the harbor and the garden. The harbor lantern project.', collection: 'docs',
   mime: name.endsWith('.md') ? 'text/markdown' : 'text/plain', mime_base: 'text', file_kind: name.endsWith('.md') ? 'markdown' : 'text', language: 'en',
   modified_at: '2025-06-15T10:30:00Z', size_bytes: '157' }, matchedFields: ['content'], matchSpans: [], excerptRegions: [] });
-window.fetch = async (input) => {
+window.fetch = async (input, init) => {
   const url = decodeURIComponent(String(input?.url ?? input));
   if (url.includes('/api/preview')) return json(url.includes('.md')
     ? { content: '# Harbor plan\\n\\nThe harbor lantern is lit.\\n\\nNothing else here.', totalChars: 60 }
     : { content: 'Note about the harbor and the garden.\\nThe invoice plan mentions harbor again.\\nShared words: meadow river.', totalChars: 110 });
-  if (url.includes('/api/knowledge/search')) return json({ totalHits: 4, matchCount: 4, tookMs: 4, results: names.map(hit), nextCursor: null, facets: {}, facetsTruncated: false });
+  // A search for "meadow" finds every note but the first, so a file open in the pane can leave the list.
+  const found = String(init?.body ?? '').includes('meadow') ? names.slice(1) : names;
+  if (url.includes('/api/knowledge/search')) return json({ totalHits: found.length, matchCount: found.length, tookMs: 4, results: found.map(hit), nextCursor: null, facets: {}, facetsTruncated: false });
   return json({ entries: [], conversations: [] });
 };
 window.EventSource = class { constructor() { this.readyState = 0; } addEventListener() {} removeEventListener() {} close() {} };
@@ -44,6 +47,13 @@ __seedForTest({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', pr
 // The app's own "System" appearance: the theme follows the system preference, as on first launch.
 const { applyAppearance } = await import('/src/shell-v0/state/themeState.ts');
 await applyAppearance({ theme: 'system' }, async () => json({}));
+// A palette and a light/dark choice, applied the way Settings applies them: the palette file is the
+// shipped one, served from the app's own public folder.
+window.look = (paletteId, theme, highContrast = false) =>
+  applyAppearance({ theme, highContrast, paletteId }, (input) => realFetch(input));
+// A user theme, as one saved in the theme editor lands in the catalog.
+const { setCustomThemeEntries } = await import('/src/shell-v0/themes/themesCatalog.ts');
+window.addUserTheme = (tree) => setCustomThemeEntries([{ id: tree.id, displayName: tree.displayName, description: '', tokens: tree }]);
 document.body.append(document.createElement('jf-shell'));
 const stage = () => document.querySelector('jf-shell').shadowRoot.querySelector('jf-stage');
 window.converse = async () => {
@@ -73,7 +83,7 @@ let url: string;
 beforeAll(async () => {
   output = await mkdtemp(path.join(process.env.TMPDIR ?? tmpdir(), 'results-pane-'));
   server = await createServer({
-    configFile: false, root: process.cwd(), cacheDir: output, publicDir: false, logLevel: 'silent',
+    configFile: false, root: process.cwd(), cacheDir: output, publicDir: 'public', logLevel: 'silent',
     server: { host: '127.0.0.1', port: 0 },
     plugins: [{ name: 'results-pane-harness', configureServer(vite) {
       vite.middlewares.use((req, res, next) => {
@@ -270,6 +280,57 @@ describe('PA1 found words are a faint warm tint behind text in its normal colour
   }, 120_000);
 });
 
+/** The palette registry the Settings picker lists (public/themes/manifest.json), and the app's own default. */
+const PALETTES: Promise<ReadonlyArray<{ id: string | null; name: string }>> = readFile(path.join(process.cwd(), 'public/themes/manifest.json'), 'utf8')
+  .then(text => [{ id: null, name: 'Default' }, ...(JSON.parse(text) as { themes: Array<{ id: string; displayName: string }> }).themes
+    .map(theme => ({ id: theme.id, name: theme.displayName }))]);
+
+/**
+ * A user theme with a mid-grey ground: its own text reads (6.4:1), but the authored wash over it is
+ * the tightest pair of all, so it is where the derived wash has to give way.
+ */
+const USER_THEME = { schemaVersion: 1, id: 'user.mid-grey', displayName: 'Mid grey (user theme)',
+  tokens: { 'surface-0': '#595959', 'surface-1': '#5e5e5e', 'surface-2': '#646464', 'text-primary': '#ffffff', 'text-secondary': '#e6e6e6' } };
+
+describe('PA1 found words and the pane text stay readable in every built-in palette, light and dark', () => {
+  it('every palette in the registry and a user theme, in Light and in Dark: found words on their tint and the pane text >= 4.5:1', async () => {
+    const palettes = [...await PALETTES, { id: USER_THEME.id, name: USER_THEME.displayName }];
+    expect(palettes.length, 'the registry lists the built-in palettes').toBeGreaterThan(2);
+    const page = await open('dark');
+    await page.evaluate(tree => (window as unknown as { addUserTheme(tree: unknown): void }).addUserTheme(tree), USER_THEME);
+    await search(page);
+    await openRow(page, 0);
+    const measured: string[] = [];
+    const failures: string[] = [];
+    for (const palette of palettes) {
+      for (const theme of ['light', 'dark'] as const) {
+        // High contrast on top of each: the found word must still read. (Its pane text is not asserted
+        // here: in Dark the switch makes all text white while a light palette keeps its light ground,
+        // app-wide and outside this part.)
+        for (const highContrast of [false, true]) {
+          await page.evaluate(([id, mode, hc]) => (window as unknown as { look(id: string | null, mode: string, hc: boolean): Promise<void> })
+            .look(id as string | null, mode as string, hc as boolean), [palette.id, theme, highContrast] as const);
+          await settle(page, 300);
+          expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(theme);
+          const ratios: Record<string, number> = {
+            // The open row (raised tint) and a plain row: the worse of the two is the list's.
+            list: Math.min((await painted(rows(page).nth(0).locator('.snippet mark.hl').first())).ratio,
+              (await painted(rows(page).nth(1).locator('.snippet mark.hl').first())).ratio),
+            paneWord: (await painted(page.locator('jf-document-pane pre.source mark.hl').first())).ratio,
+          };
+          if (!highContrast) ratios.paneText = (await painted(page.locator('jf-document-pane pre.source span[data-line]').first())).ratio;
+          const line = `${palette.name} ${theme}${highContrast ? ' + high contrast' : ''}: ${Object.entries(ratios)
+            .map(([name, ratio]) => `${name} ${ratio.toFixed(2)}`).join(', ')}`;
+          measured.push(line);
+          if (Object.values(ratios).some(ratio => ratio < 4.5)) failures.push(line);
+        }
+      }
+    }
+    console.info(measured.join('\n'));
+    expect(failures, measured.join('\n')).toEqual([]);
+  }, 300_000);
+});
+
 describe('PA2 the pane marks the found words only for the search result it shows', () => {
   it('a Markdown result is marked in its rendered text as well', async () => {
     const page = await open('dark');
@@ -358,6 +419,21 @@ describe('PA4 the pane’s title, path and text', () => {
     await page.locator('[data-testid="details-pane-close"] button').click();
     await settle(page, 300);
     expect(await page.locator('[data-testid="details-pane"]').count()).toBe(0);
+  }, 120_000);
+
+  it('the close button keeps the file’s name when a new search leaves the file out of the list', async () => {
+    const page = await open('dark');
+    await search(page);
+    await openRow(page, 0);
+    expect(await page.locator('[data-testid="details-pane-close"]').getAttribute('label')).toBe('Close note-10-harbor.txt');
+    await page.locator('jf-sv3-composer textarea').fill('meadow');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => rows(page).count(), { timeout: 15_000 }).toBe(3);
+    await settle(page, 300);
+    expect(await rows(page).first().locator('.title-text').textContent()).not.toContain('note-10-harbor.txt');
+    expect((await page.locator('[data-testid="details-pane"] [role="tab"][aria-selected="true"]').textContent())?.trim(), 'the pane still shows the file')
+      .toBe('note-10-harbor.txt');
+    expect(await page.locator('[data-testid="details-pane-close"]').getAttribute('label')).toBe('Close note-10-harbor.txt');
   }, 120_000);
 
   it('in forced colours the title has no underline either', async () => {
