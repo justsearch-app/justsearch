@@ -1332,3 +1332,13 @@ install run's pill is never replaced by first use's "Reading files". The page ev
   "digest": "sha256:3111b73e1d99239e9edbe6793e3d1deb09532d8d9fe077fb8fab0fd1be2c117a"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-71guuokj",
+  "verdict": "accept",
+  "digest": "sha256:e19f985b238aada016313632ea229bf2a2371d766f1ac1da2070f542f501726a"
+}
+```
