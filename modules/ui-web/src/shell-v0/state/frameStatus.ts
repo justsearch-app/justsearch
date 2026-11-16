@@ -475,7 +475,8 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   const decisions = foldDecisions(input.activity ?? [], !developer);
   for (const entry of input.activity ?? []) {
     if (entry.isRoutine || entry.operationOutcomeKey || decisions.folded.has(entry.id)) continue;
-    if (!developer && (entry.grant || entry.gate?.disposition === 'APPROVED'
+    // RV8-3 — only successful permission history (issued, used) is left out; withdrawn and expired stay.
+    if (!developer && (entry.grant && ['ISSUED', 'CONSUMED'].includes(entry.grant.action.toUpperCase()) || entry.gate?.disposition === 'APPROVED'
       || entry.kind === 'operation' && entry.operationId === ADD_FOLDER && entry.outcome === 'SUCCESS')) continue;
     const pendingId = entry.gate?.pendingId;
     if (pendingId && (waiting.has(pendingId) || entry.gate?.disposition === 'GATED' && terminal.has(pendingId))) continue;
@@ -533,8 +534,10 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
       if (input.rootsLive && state.state !== 'unknown' && seen?.ready !== ready) {
         folders.set(root.pathHash, ready && seen ? { ready, since: now } : { ready });
       }
+      // RV8-2 — shown only while searchable now; an unconfirmed moment (a rebuild, a failed count) keeps
+      // the witnessed time but not the row.
       const since = folders.get(root.pathHash)?.since;
-      if (since !== undefined) add({ id: `folder-searchable:${root.pathHash}`, section: 'earlier', tone: 'success',
+      if (since !== undefined && ready) add({ id: `folder-searchable:${root.pathHash}`, section: 'earlier', tone: 'success',
         title: path ? `Your ${name} folder is searchable` : 'A watched folder is searchable',
         occurredAt: new Date(since).toISOString(), age: ageWords(now - since), actions: [] });
     }
@@ -779,10 +782,11 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   // fm-15, H2' / H2'' — "Search works" (search by exact words, now) only from a fresh verdict with own
   // searchable files: operational, or degraded with no search-unavailable cause, which is exact-word
   // search running while only AI parts are missing (fm-15 pictures it during the install). Otherwise
-  // the outage in today's words, or nothing.
+  // the outage in today's words, or nothing. RV8-1 — the count needs a confirmed indexing observation
+  // (no stale worker RPC, indexing not among the stale sources) to say so.
   const outage = pill.kind === 'unreachable' || pill.kind === 'limited';
   const searchRuns = ai?.verdict.kind === 'operational' || ai?.verdict.kind === 'degraded' && !ai.verdict.reasons.some(isSearchUnavailableCause);
-  const sentence = !outage && ai?.phase === 'connected' && searchRuns && (input.gettingStarted?.searchable ?? 0) > 0
+  const sentence = !outage && ai?.phase === 'connected' && searchRuns && progress.activity.confirmed && (input.gettingStarted?.searchable ?? 0) > 0
     ? 'Search works' : outage ? pill.label : undefined;
   return { pill, sections, progress, ...(sentence ? { sentence } : {}), folders };
 }

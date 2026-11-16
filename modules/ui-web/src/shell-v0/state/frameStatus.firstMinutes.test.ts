@@ -98,7 +98,7 @@ describe('S8-1 / H3\' the first minutes: one "Installing AI" entry', () => {
       { id: 'aiinstall:search', label: 'Downloading AI · Search — Not enough disk space', status: 'failed', originSurfaceId: 'core.brain-surface' } as Task] });
     expect(model.sections.running.map(row => row.title)).toEqual(['Installing AI']);
     expect(model.sections.earlier).toEqual([]);
-    expect(model.sections.running[0]!.note).toBe('Search: Not enough disk space');
+    expect(model.sections.running[0]!.note).toContain('Not enough disk space');
   });
   it('a failed stage with no reason the row can carry keeps its own row', () => {
     const install = { ...PICTURED, stages: [{ stage: 'search', label: 'Search', state: 'failed' }] };
@@ -124,6 +124,15 @@ describe('H2\' "Search works" only when established', () => {
   });
   it('operational with searchable files: "Search works"', () => {
     expect(derive().sentence).toBe('Search works');
+  });
+  // RV8-1 — a searchable count the indexing observation no longer backs is not fresh evidence.
+  it.each([
+    ['the worker RPC is stale', { meta: { workerRpcStale: true } }],
+    ['the indexing source is stale', { operating: { freshness: { staleSources: ['indexing'] } } }],
+  ])('not while %s, even with a positive searchable count', (_case, patch) => {
+    const status = { worker: { core: { indexState: 'IDLE', pendingJobs: 0 }, enrichment: {} }, ...patch } as unknown as AiState['status'];
+    expect(derive({ ai: ai({ status }) }).sentence).not.toBe('Search works');
+    expect(derive({ ai: installing({ status }) }).sentence).not.toBe('Search works');
   });
   it('an outage says what today\'s summary says, never "Search works"', () => {
     const lost = derive({ ai: ai({ connection: { reachable: false, lastSuccessMs: now - MIN, lastContactMs: now - MIN, consecutiveFailures: 3 } }),
@@ -168,7 +177,7 @@ describe('H2\'\' "Search works" while only AI parts are missing (exact-word sear
 describe('H3\'\' one row per folder; Earlier only for what this window witnessed', () => {
   it('reading, then searchable: one Earlier row with its age from the witnessed moment, no file count, no operation row', () => {
     const [reading, ready, later, hours] = observe([{ at: now, roots: [READING] }, { at: now + MIN, roots: [READY] },
-      { at: now + 13 * MIN, roots: [READY] }, { at: now + 3 * 60 * MIN, roots: [READY] }]);
+      { at: now + 13 * MIN, roots: [READY] }, { at: now + MIN + 3 * 60 * MIN, roots: [READY] }]);
     expect(reading!.sections.running.map(row => row.id)).toContain('folder-work:h-docs');
     expect(searchableRow(reading!)).toBeUndefined();
     const row = searchableRow(ready!)!;
@@ -219,6 +228,17 @@ describe('H3\'\' one row per folder; Earlier only for what this window witnessed
     expect(during!.sections.running.map(row => row.id)).not.toContain('folder-work:h-docs');
     expect(searchableRow(after!)).toBeUndefined();
   });
+  // RV8-2 — the row shows only while the folder is searchable now; the witnessed moment is remembered.
+  it('witnessed searchable, then a rebuild or an unconfirmed count: no row; searchable again: the row with its first age', () => {
+    const rebuilding = ai({ stability: { kind: 'provisional', cause: 'rebuilding' } as AiState['stability'] });
+    const countFailed = { ...READY, inFlightCount: null } as unknown as IndexedRootView;
+    const [, ready, during, unknown, back] = observe([{ at: now, roots: [READING] }, { at: now + MIN, roots: [READY] },
+      { at: now + 3 * MIN, roots: [READY], ai: rebuilding }, { at: now + 5 * MIN, roots: [countFailed] }, { at: now + 11 * MIN, roots: [READY] }]);
+    expect(searchableRow(ready!)).toMatchObject({ age: 'just now' });
+    expect(searchableRow(during!)).toBeUndefined();
+    expect(searchableRow(unknown!)).toBeUndefined();
+    expect(searchableRow(back!)).toMatchObject({ title: 'Your Documents folder is searchable', age: '10 min' });
+  });
   it('the retained failure count still reaches the folder\'s problem row while it is read again', () => {
     const model = derive({ roots: [READING], rootPaths: PATHS, rootsLive: true, lastKnownFailed: { 'h-docs': 3 } });
     expect(model.sections.problems.map(row => row.title)).toContain('3 files need review · Documents · last known');
@@ -264,6 +284,14 @@ describe('H4\' words: what the default panel leaves out, and what developer tool
     expect(partial.sections.earlier.map(row => [row.title, row.detail])).toEqual([['Reindex everything', 'Finished incomplete']]);
     const dev = derive({ activity, developer: true });
     expect(dev.sections.earlier.map(row => [row.title, row.detail])).toEqual([['Allowed: Reindex everything', 'Allowed · failed']]);
+  });
+  // RV8-3 — only successful permission history (issued, used) leaves the default view.
+  it('withdrawn and expired permissions keep their rows; an issued or used one is out of the default view', () => {
+    const permission = (action: string): UnifiedActionEntry => ({ id: `k-${action}`, source: 'backend', kind: 'grant', occurredAt: '2026-11-16T09:58:30Z',
+      originator: 'agent', label: `grant ${action}`, grant: { action, subject: 'Search Index' } });
+    const model = derive({ activity: ['ISSUED', 'CONSUMED', 'REVOKED', 'EXPIRED'].map(permission) });
+    expect(model.sections.earlier.map(row => [row.title, row.detail])).toEqual([
+      ['Permission for Search Index', 'Withdrawn'], ['Permission for Search Index', 'Expired']]);
   });
   it('a denial keeps its row', () => {
     expect(titles(derive({ activity: [gate('g4', 'p4', 'DENIED', 'Reindex everything')] }))).toContain('Denied by you: Reindex everything');

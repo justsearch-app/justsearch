@@ -126,6 +126,19 @@ describe('S8-4 / H1 / H4\' the default view and developer tools', () => {
     expect(buttons(row('Notes'))).toContain('Details');
     expect(row('Allowed: Add Watched Folder')).toBeDefined();
   });
+  // RV8-4 — open Details of a row whose Details are a developer tool close when developer tools turn off.
+  it('an expanded Earlier Details closes when developer tools turn off; a failure\'s Details stay', async () => {
+    await show(pictured(true, { advisories: [unread], activity: [failed] }), { developer: true });
+    for (const title of ['Notes', 'Reindex everything']) [...row(title).querySelectorAll('button')].find(b => text(b) === 'Details')!.click();
+    await panel.updateComplete;
+    expect(row('Notes').querySelector('[data-expanded]')).not.toBeNull();
+    panel.developer = false; panel.model = pictured(false, { advisories: [unread], activity: [failed] }); await panel.updateComplete;
+    expect(row('Notes').querySelector('[data-expanded]')).toBeNull();
+    expect(buttons(row('Notes'))).not.toContain('Hide details');
+    expect(row('Reindex everything').querySelector('[data-expanded]')).not.toBeNull();
+    panel.developer = true; await panel.updateComplete;
+    expect(row('Notes').querySelector('[data-expanded]')).toBeNull();
+  });
 });
 
 describe('S8-9\' / S8-8\' through the real status pill', () => {

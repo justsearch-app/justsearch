@@ -198,6 +198,12 @@ export class StatusPanel extends JfElement {
   protected override willUpdate(changed: PropertyValues): void {
     const active = this.shadowRoot?.activeElement;
     this.focusedControlRow = active?.closest('article')?.getAttribute('data-fact') ?? null;
+    // RV8-4 — Details opened as a developer tool close when developer tools turn off.
+    if (changed.has('developer') && !this.developer && this.expanded.size) {
+      const rows = new Map(Object.values(this.model?.sections ?? {}).flat().map(r => [r.id, r]));
+      const kept = new Set([...this.expanded].filter(id => { const r = rows.get(id); return !r || this.hasDetails(r); }));
+      if (kept.size !== this.expanded.size) this.expanded = kept;
+    }
     if (changed.has('model') && this.reviewing && !this.reviewed()) {
       // Answered elsewhere, withdrawn or expired while open: it cannot be answered here any more.
       this.gone = this.answered !== this.reviewing; this.reviewing = null; this.focusSummary = true;
@@ -359,11 +365,14 @@ export class StatusPanel extends JfElement {
     this.expanded = next;
     this.dispatchEvent(new CustomEvent('status-read', { detail: row.id, bubbles: true, composed: true }));
   }
+  /** H4' — Earlier's Details only with developer tools, except on a failure; work rows keep theirs. */
+  private hasDetails(row: StatusFact): boolean {
+    return !!row.details?.length || row.section === 'earlier' && (this.developer || row.tone === 'failure');
+  }
   private row(row: StatusFact): TemplateResult {
-    const expanded = this.expanded.has(row.id);
+    const details = this.hasDetails(row);
+    const expanded = details && this.expanded.has(row.id);
     const actions = (row.actions ?? []).filter(action => !(this.area === BRAIN && action.kind === 'navigate' && action.target === BRAIN));
-    // H4' — Earlier's Details only with developer tools, except on a failure; work rows keep theirs.
-    const details = !!row.details?.length || row.section === 'earlier' && (this.developer || row.tone === 'failure');
     return html`<article data-fact=${row.id}>
       <div class="title"><span class="state-icon" aria-hidden="true" data-tone=${row.tone ?? nothing}>${rowGlyph(row)}</span><span class="text">${row.title}${row.after ? ` · ${row.after}` : nothing}${row.confidence == null ? nothing : html` <jf-status-badge .tone=${row.confidence < 0.5 ? 'warning' : 'neutral'} .label=${`${Math.round(row.confidence * 100)}% confidence`}></jf-status-badge>`} ${row.unread && this.developer ? html`<span class="unread">Unread</span>` : nothing}</span>
         ${row.occurredAt ? html`<time datetime=${row.occurredAt}>${row.age ?? formatRelativeIso(row.occurredAt)}</time>` : nothing}</div>

@@ -24,9 +24,7 @@ function record(key: string, options: Partial<AdvisoryRecord> = {}): AdvisoryRec
 }
 async function publish(records: AdvisoryRecord[]) { current = { ...current, advisories: records }; listeners.forEach(cb => cb(current)); await flush(); }
 beforeEach(async () => {
-  // Slice 8 (fm-15, H4'): Earlier's read state, "Mark all read" and Details on its rows are what
-  // Settings › Advanced › Show developer tools shows; these checks run with it on.
-  __resetUserStateForTest(); setShowDeveloperTools(true);
+  __resetUserStateForTest();
   __resetAiStateForTest(); vi.clearAllMocks();
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 503 })));
   current = { advisories: [], unreadCount: 0, isConnected: true, lastFrameKind: 'snapshot' };
@@ -34,6 +32,9 @@ beforeEach(async () => {
   pill = new StatusPill(); pill.store = store as unknown as AdvisoryStore; document.body.append(pill); await flush();
 });
 afterEach(() => { pill.remove(); listeners.clear(); __resetAiStateForTest(); __resetUserStateForTest(); vi.unstubAllGlobals(); });
+// Slice 8 (fm-15, H4'): Earlier's read state, "Mark all read" and Details on its rows are what
+// Settings › Advanced › Show developer tools shows; the cases that read them turn it on.
+async function developerTools() { setShowDeveloperTools(true); await flush(); }
 function button(label: string) { return [...panel().shadowRoot!.querySelectorAll('button')].find(b => b.textContent!.trim() === label)!; }
 describe('Earlier (moved from the inbox drawer)', () => {
   it('omits empty sections; calm has one line and the two history destinations', async () => {
@@ -44,6 +45,7 @@ describe('Earlier (moved from the inbox drawer)', () => {
     expect(button('All activity')).toBeDefined(); expect(button('Health')).toBeDefined();
   });
   it('newest comes first regardless of read state; unread keeps its marker and history does not reactivate a resolved condition', async () => {
+    await developerTools();
     const newest = record('newest', { acknowledged: true });
     const older = record('older', { event: { ...newest.event, id: 'older', occurredAt: '2026-11-02T10:00:00Z' } });
     await publish([newest, older]);
@@ -58,6 +60,7 @@ describe('Earlier (moved from the inbox drawer)', () => {
     button('Details').click(); await flush(); expect(acknowledge).toHaveBeenCalledTimes(1);
   });
   it('Mark all read uses the existing acknowledgement and stays focusable with a reason when already read', async () => {
+    await developerTools();
     await publish([record('one')]); button('Mark all read').click(); expect(acknowledgeAll).toHaveBeenCalledTimes(1);
     await publish([record('one', { acknowledged: true })]);
     const mark = button('Mark all read'); mark.focus();
@@ -65,6 +68,7 @@ describe('Earlier (moved from the inbox drawer)', () => {
     mark.click(); expect(acknowledgeAll).toHaveBeenCalledTimes(1);
   });
   it.each(['https://example.test/diagnostics', 'diagnostics.i18n.key', 'javascript:alert(1)'])('diagnostics preserve safe navigation or plain text for %s', async diagnosticsLink => {
+    await developerTools();
     const r = record('one'); await publish([{ ...r, event: { ...r.event, diagnosticsLink } }]);
     button('Details').click(); await flush();
     const link = panel().shadowRoot!.querySelector('a');

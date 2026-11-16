@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-16T10:08:19.416Z",
-  "revision": "e94eb4098fcf51974319bc86036dff0fef0588d4",
-  "tree": "3a78c12ab480f7041c974c3d746a2ad475a740ee",
+  "createdAt": "2026-11-16T10:23:20.884Z",
+  "revision": "9e357718789c2ae20d0d8f009b08fa9b9432ed3e",
+  "tree": "78ec03dffad05e08f4863c1783ec1f286c1ade6d",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,13 +18,13 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.firstMinutes.test.ts\" \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/76wjg652/tmp/test-intent-vitest-7699-1794823683555.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.firstMinutes.test.ts\" \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/a27a8q5g/tmp/test-intent-vitest-8798-1794824585045.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1064
+      "durationMs": 1073
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/76wjg652/tmp/test-intent-vitest-7699-1794823684620.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/a27a8q5g/tmp/test-intent-vitest-8798-1794824586120.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
       "durationMs": 5544
@@ -35,7 +35,7 @@
       "id": "modules/ui-web/src/shell-v0/state/frameStatus.firstMinutes.test.ts",
       "file": "modules/ui-web/src/shell-v0/state/frameStatus.firstMinutes.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:1ccd5117742064fa07e5b63d6dbfab51b75f1698be2b3662c6fd2038eca0634a",
+      "contentDigest": "sha256:b86c317796c33baef2177142ce265faaa0c98092a3b664e2684176e8bf9fcbc6",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -113,6 +113,14 @@
           "status": "passed"
         },
         {
+          "name": "H2' \"Search works\" only when established not while the worker RPC is stale, even with a positive searchable count",
+          "status": "passed"
+        },
+        {
+          "name": "H2' \"Search works\" only when established not while the indexing source is stale, even with a positive searchable count",
+          "status": "passed"
+        },
+        {
           "name": "H2' \"Search works\" only when established an outage says what today's summary says, never \"Search works\"",
           "status": "passed"
         },
@@ -185,6 +193,10 @@
           "status": "passed"
         },
         {
+          "name": "H3'' one row per folder; Earlier only for what this window witnessed witnessed searchable, then a rebuild or an unconfirmed count: no row; searchable again: the row with its first age",
+          "status": "passed"
+        },
+        {
           "name": "H3'' one row per folder; Earlier only for what this window witnessed the retained failure count still reaches the folder's problem row while it is read again",
           "status": "passed"
         },
@@ -198,6 +210,10 @@
         },
         {
           "name": "H4' words: what the default panel leaves out, and what developer tools bring back an allowed operation that failed becomes its own row in the default view, in today's failure words",
+          "status": "passed"
+        },
+        {
+          "name": "H4' words: what the default panel leaves out, and what developer tools bring back withdrawn and expired permissions keep their rows; an issued or used one is out of the default view",
           "status": "passed"
         },
         {
@@ -218,7 +234,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:d91abbd21ecbe9b7183cd5cce96ab9f797a746b9cf8d4bb59f22d9437dd2122c",
+      "contentDigest": "sha256:a799092639665bb0d6c96f6333f084a7baf540e83ff626b460b662ff078c5c42",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -237,6 +253,10 @@
         },
         {
           "name": "S8-4 / H1 / H4' the default view and developer tools developer tools bring back gate history, Details, the unread count and Mark all read",
+          "status": "passed"
+        },
+        {
+          "name": "S8-4 / H1 / H4' the default view and developer tools an expanded Earlier Details closes when developer tools turn off; a failure's Details stay",
           "status": "passed"
         },
         {
@@ -302,43 +322,43 @@
     }
   ],
   "failBefore": {
-    "ref": "origin/main",
+    "ref": "e94eb4098f",
     "revision": "e94eb4098fcf51974319bc86036dff0fef0588d4",
     "overlays": [],
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.firstMinutes.test.ts\" \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/76wjg652/tmp/test-intent-vitest-7699-1794823691536.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.firstMinutes.test.ts\" \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/a27a8q5g/tmp/test-intent-vitest-8798-1794824593116.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1084,
-        "output": "JSON report written to /home/elias/.cache/am/76wjg652/tmp/test-intent-vitest-7699-1794823691536.json\n\n"
+        "durationMs": 1105,
+        "output": "JSON report written to /home/elias/.cache/am/a27a8q5g/tmp/test-intent-vitest-8798-1794824593116.json\n\n"
       },
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/76wjg652/tmp/test-intent-vitest-7699-1794823692620.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/a27a8q5g/tmp/test-intent-vitest-8798-1794824594222.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 6562,
-        "output": "JSON report written to /home/elias/.cache/am/76wjg652/tmp/test-intent-vitest-7699-1794823692620.json\n\n"
+        "durationMs": 6427,
+        "output": "JSON report written to /home/elias/.cache/am/a27a8q5g/tmp/test-intent-vitest-8798-1794824594222.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/state/frameStatus.firstMinutes.test.ts",
         "classification": "assertion",
-        "detail": "S8-1 / H3' the first minutes: one \"Installing AI\" entry \"Search works\", then Running \"Installing AI\" with \"1.3 of 2.6 GB · about 24 min left\" and Pause, no stage rows:  AssertionError: expected undefined to be 'Search works' // Object.is equality\n    at /home/elias/.cache/am/76wjg652/tmp/test-intent-before-rAtjWY/modules/ui-web/src/shell-v0/state/frameStatus.firstMinutes.test.ts:69:28\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s8/modules/ui-web/n | S8-1 / H3' the first minutes"
+        "detail": "S8-1 / H3' the first minutes: one \"Installing AI\" entry \"Search works\", then Running \"Installing AI\" with \"1.3 of 2.6 GB · about 24 min left\" and Pause, no stage rows:  AssertionError: expected undefined to be 'Search works' // Object.is equality\n    at /home/elias/.cache/am/a27a8q5g/tmp/test-intent-before-72iIvu/modules/ui-web/src/shell-v0/state/frameStatus.firstMinutes.test.ts:69:28\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s8/modules/ui-web/n | S8-1 / H3' the first minutes"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
         "classification": "assertion",
-        "detail": "S8-1 the picture \"What's going on\", \"Search works\", Running \"Installing AI\" with amounts and Pause, Earlier with its age, footer:  AssertionError: expected '1 running' to be 'Search works' // Object.is equality\n    at /home/elias/.cache/am/76wjg652/tmp/test-intent-before-rAtjWY/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:84:57\n    at processTicksAndRejections (node:internal/process/task_queues:104:5) | S8-3 / H5' \"Open AI Brain\" only away from AI Brain shows on Search"
+        "detail": "S8-1 the picture \"What's going on\", \"Search works\", Running \"Installing AI\" with amounts and Pause, Earlier with its age, footer:  AssertionError: expected '1 running' to be 'Search works' // Object.is equality\n    at /home/elias/.cache/am/a27a8q5g/tmp/test-intent-before-72iIvu/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:84:57\n    at processTicksAndRejections (node:internal/process/task_queues:104:5) | S8-3 / H5' \"Open AI Brain\" only away from AI Brain shows on Search"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts",
         "classification": "assertion",
-        "detail": "a focused \"Open AI Brain\" that leaves on arriving at AI Brain hands focus to its row's next control, not the page:  Error: expected [ 'Pause download', 'Open AI Brain' ] to deeply equal [ 'Pause' ]\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/fm-s8/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/76wjg652/tmp/test-inte | Pause, then the status says paused: the same control reads Resume and keeps focus"
+        "detail": "a focused \"Open AI Brain\" that leaves on arriving at AI Brain hands focus to its row's next control, not the page:  Error: expected [ 'Pause download', 'Open AI Brain' ] to deeply equal [ 'Pause' ]\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/fm-s8/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/a27a8q5g/tmp/test-inte | Pause, then the status says paused: the same control reads Resume and keeps focus"
       }
     ]
   },
-  "digest": "sha256:4c5512b84ff43dbf789a914e2b7cca8f001ad7d0f9b8327d9cd03128593346b7"
+  "digest": "sha256:d9cede187a572eaf846f35fd35605c1748fc4374404e788c36d9469ad14a623c"
 }

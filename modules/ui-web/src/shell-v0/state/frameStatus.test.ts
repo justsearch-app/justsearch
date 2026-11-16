@@ -301,8 +301,9 @@ describe('round 7 repairs', () => {
   it('R3 permission rows read in plain words, never the raw grant action', () => {
     const entry = (action: string) => ({ id: `g-${action}`, source: 'backend' as const, kind: 'grant', occurredAt: '2026-11-03T10:00:00Z',
       originator: 'user' as never, label: `grant ${action} Search Index`, grant: { action, subject: 'Search Index' } });
-    // Slice 8 (H4'): permission history shows with developer tools; the default panel leaves it out.
-    expect(derive({ activity: ['ISSUED', 'CONSUMED', 'REVOKED', 'EXPIRED'].map(entry) }).sections.earlier).toEqual([]);
+    // Slice 8 (H4', RV8-3): successful permission history (issued, used) shows with developer tools; the
+    // default panel keeps withdrawn and expired permissions.
+    expect(derive({ activity: ['ISSUED', 'CONSUMED', 'REVOKED', 'EXPIRED'].map(entry) }).sections.earlier.map(r => r.detail)).toEqual(['Withdrawn', 'Expired']);
     const rows = derive({ activity: ['ISSUED', 'CONSUMED', 'REVOKED', 'EXPIRED'].map(entry), developer: true }).sections.earlier;
     expect(rows.map(r => r.detail)).toEqual(expect.arrayContaining(['Allowed', 'Used', 'Withdrawn', 'Expired']));
     for (const row of rows) {
