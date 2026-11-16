@@ -103,18 +103,21 @@ export class IndexingRulesEditor extends JfElement {
     indexingRulesMessage: { state: true },
     conflictingRules: { state: true },
     readWaiting: { attribute: false },
+    statusObservation: { attribute: false },
     readNowSending: { state: true },
     readNowStarted: { state: true },
     readNowNote: { state: true },
   };
   /** Slice 6c — from fresh status: whether a reading rule alone holds files, and the Engine's release. */
   declare readWaiting: IndexingProgress['readWaiting'];
+  /** The status body `readWaiting` was read from; only a different one is a new observation. */
+  declare statusObservation: unknown;
   declare private readNowSending: boolean;
   /** This window asked and the Engine started (or joined) the release; kept until status shows its end. */
   declare private readNowStarted: boolean;
   declare private readNowNote: string;
-  private readNowSawActive = false;
-  private readNowQuietUpdates = 0;
+  /** The observation held when the Engine answered; the next different one is newer than the click. */
+  private readNowAnsweredAt: unknown = null;
   private readNowHadFocus = false;
   declare developer: boolean;
   declare apiBase: string;
@@ -493,12 +496,14 @@ export class IndexingRulesEditor extends JfElement {
   protected override willUpdate(changed: PropertyValues): void {
     super.willUpdate(changed);
     this.readNowHadFocus = this.shadowRoot?.activeElement?.matches('[data-read-now]') ?? false;
-    if (!changed.has('readWaiting')) return;
-    const status = this.readWaiting;
-    if (status?.active) this.readNowSawActive = true;
-    else if (this.readNowStarted && (this.readNowSawActive || ++this.readNowQuietUpdates >= 2)) this.readNowStarted = false;
-    // "Nothing is waiting" answers one click: the next fresh observation replaces it.
-    if (this.readNowNote && (!status?.offered || this.readNowNote === NOTHING_WAITING)) this.readNowNote = '';
+    if (!changed.has('readWaiting') && !changed.has('statusObservation')) return;
+    // The first observation newer than the answer decides; from then on status alone shows the release.
+    const newer = this.statusObservation !== this.readNowAnsweredAt;
+    if (this.readNowStarted && newer) this.readNowStarted = false;
+    // "Nothing is waiting" answers one click: the next new observation replaces it.
+    if (this.readNowNote && (!this.readWaiting?.offered || this.readNowNote === NOTHING_WAITING && newer)) {
+      this.readNowNote = '';
+    }
   }
 
   protected override updated(changed: PropertyValues): void {
@@ -520,10 +525,9 @@ export class IndexingRulesEditor extends JfElement {
       const result = await getOperationClient(this.apiBase).invokeWithConsent('core.indexing-read-now',
         { args: {}, idempotencyKey: createOperationKey() }, { requestConsent: requestAuthorization });
       const outcome = result.structuredData?.['outcome'];
+      this.readNowAnsweredAt = this.statusObservation;
       if (outcome === 'started' || outcome === 'joined') {
         this.readNowStarted = true;
-        this.readNowSawActive = false;
-        this.readNowQuietUpdates = 0;
       } else if (outcome === 'nothing-waiting') {
         this.readNowNote = NOTHING_WAITING;
       } else {

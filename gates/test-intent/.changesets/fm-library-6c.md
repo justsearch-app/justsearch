@@ -24,6 +24,17 @@ offers the action again when files wait (RV6c-4); the real Engine keeps a new sk
 folder, a cancelled import and a deleted file in effect while a release reads, and keeps content
 indexed before (RV6c-5; this case also passes on 867670406a and is preservation evidence there).
 
+Review repairs RV6c-6, RV6c-8 and RV6c-9 (reviewer-s6c-2 on 39e4d66875, accepted by the orchestrator;
+RV6c-7 declined) add cases to the same new files only: a release records the next reading-hours
+boundary it does not cover, also when it covers only the battery, and ends there even when nothing
+observed the crossing, so a battery release at 08:58 under daily hours 09:00-08:59 admits nothing at
+09:01 (RV6c-6); the line "Reading the waiting files" is reconciled against the first status observation
+newer than the answer, so a release that ended before any active sample ends with that observation,
+after a drain or Pause, while reprojections of the older status keep it (RV6c-8); "Nothing is waiting
+to be read." stays through a reprojection of the same status and goes with a new observation, which
+offers the action again when files wait (RV6c-9). Post-claim fences under a release (RV6c-7) run on the
+unchanged normal ingestion path and are not re-proven under a release here.
+
 ```json
 {
   "entries": [

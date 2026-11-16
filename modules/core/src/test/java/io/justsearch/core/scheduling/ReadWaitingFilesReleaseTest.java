@@ -225,6 +225,38 @@ final class ReadWaitingFilesReleaseTest {
   }
 
   @Test
+  void aBatteryReleaseEndsAtTheNextReadingHoursBoundaryEvenWhenNobodyLookedAtIt() {
+    // RV6c-6: daily hours 09:00-08:59 hold only during 08:59. Released on battery at Monday 08:58 UTC;
+    // the next observation is at 09:01, after the uncovered schedule hold came and went unobserved.
+    var now = new java.util.concurrent.atomic.AtomicLong(
+        java.time.Instant.parse("2026-11-16T08:58:00Z").toEpochMilli());
+    var clock = new java.time.Clock() {
+      @Override public java.time.ZoneId getZone() { return java.time.ZoneOffset.UTC; }
+      @Override public java.time.Clock withZone(java.time.ZoneId zone) { return this; }
+      @Override public java.time.Instant instant() { return java.time.Instant.ofEpochMilli(now.get()); }
+    };
+    var hold = new IndexingHold(clock);
+    hold.setLocalTime(() -> {
+      var local = clock.instant().atZone(java.time.ZoneOffset.UTC);
+      return new IndexingHold.LocalMinute(local.getDayOfWeek().getValue(), local.getHour() * 60 + local.getMinute());
+    });
+    hold.setPolicy(false, null, null, new IndexingSchedule(true, List.of(1, 2, 3, 4, 5, 6, 7), 540, 539), true);
+    hold.setOnBattery(true);
+    assertEquals(List.of("ON_BATTERY"), hold.snapshot().reasons(), "08:58 is inside the reading hours");
+    assertEquals("STARTED", readNow(hold, true), "released for battery only");
+    assertFalse(ingestionHeld(hold));
+    now.addAndGet(java.time.Duration.ofSeconds(59).toMillis());
+    assertFalse(ingestionHeld(hold), "08:58:59: the hours have not closed yet");
+    now.addAndGet(java.time.Duration.ofSeconds(121).toMillis());
+    assertEquals(List.of("ON_BATTERY"), hold.snapshot().reasons(), "09:01: only battery holds again");
+    assertFalse(released(hold), "the schedule hold it did not cover began at 08:59, so the release ended");
+    assertTrue(ingestionHeld(hold), "no further file is admitted on battery");
+    assertNull(call(hold, "tryAcquireIngestion"));
+    assertNull(call(hold, "claimIngestion", (java.util.function.Supplier<String>) () -> "late"),
+        "no claim is made after the boundary");
+  }
+
+  @Test
   void aClaimUnderTheReleaseHoldsBackRevocationButNotObservers() throws Exception {
     var hold = outsideHours(new AtomicInteger(500));
     assertEquals("STARTED", readNow(hold, true));

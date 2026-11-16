@@ -40,11 +40,14 @@ public final class IndexingHold {
 
   private static final List<String> RULE_REASONS = List.of("SCHEDULE", "ON_BATTERY");
 
-  /** The active release: its identity, the rule reasons it covers and when its episode ends. */
+  /** The active release: its identity, the rule reasons it covers and when it ends by the clock. */
   private static final class Release {
     private final List<String> covered;
-    /** When reading hours open, if only the schedule holds; battery changes are reported. */
-    private Long episodeEndsAtMs;
+    /**
+     * The next reading-hours boundary it does not cover: the hours closing when it covers only the
+     * battery, or the hours opening when only the schedule holds. Battery changes are reported.
+     */
+    private Long endsAtMs;
     private Release(List<String> covered) { this.covered = List.copyOf(covered); }
   }
   private IndexingSchedule schedule;
@@ -237,24 +240,26 @@ public final class IndexingHold {
 
   /**
    * Evaluates the release's end conditions on every reading of the reasons, held or not: a manual
-   * hold, an uncovered rule reason, or the end of its hold episode, including reading hours that
-   * opened since the last reading. Once ended it is gone.
+   * hold, an uncovered rule reason, or the end of its hold episode, including a reading-hours
+   * boundary crossed since the last reading. Once ended it is gone.
    */
   private void endFinishedRelease(List<String> reasons) {
     if (release == null) return;
     var rules = reasons.stream().filter(RULE_REASONS::contains).toList();
     long now = clock.millis();
     if (requested || rules.isEmpty() || !release.covered.containsAll(rules)
-        || release.episodeEndsAtMs != null && now >= release.episodeEndsAtMs) {
+        || release.endsAtMs != null && now >= release.endsAtMs) {
       release = null;
       notifyAll();
       return;
     }
-    release.episodeEndsAtMs = rules.contains("ON_BATTERY") ? null : hoursOpenAt(now);
+    boolean scheduled = schedule != null && schedule.enabled();
+    release.endsAtMs = scheduled && !release.covered.contains("SCHEDULE") ? nextMinute(now, false)
+        : rules.contains("ON_BATTERY") ? null : nextMinute(now, true);
   }
 
-  /** The start of the next local minute the reading hours allow, counted from the current one. */
-  private Long hoursOpenAt(long now) {
+  /** The start of the next local minute whose reading hours allow (or hold) file reading. */
+  private Long nextMinute(long now, boolean allowed) {
     var local = localTime.get();
     int weekday = local.weekday();
     int minute = local.minute();
@@ -263,7 +268,7 @@ public final class IndexingHold {
         minute = 0;
         weekday = weekday == 7 ? 1 : weekday + 1;
       }
-      if (schedule.allows(weekday, minute)) return now - Math.floorMod(now, 60_000L) + ahead * 60_000L;
+      if (schedule.allows(weekday, minute) == allowed) return now - Math.floorMod(now, 60_000L) + ahead * 60_000L;
     }
     return null;
   }

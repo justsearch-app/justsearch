@@ -7,7 +7,7 @@ import type { LibrarySurface } from '../LibrarySurface.js';
 import { createMockHostApi } from '../../plugin-api/testHostApi.js';
 import { getOperationClient } from '../../operations/OperationClient.js';
 import { OperationError } from '../../operations/OperationClient.js';
-import { __feedForTest, __resetAiStateForTest, type StatusSnapshot } from '../../state/aiStateStore.js';
+import { __feedForTest, __resetAiStateForTest, __tickClockForTest, type StatusSnapshot } from '../../state/aiStateStore.js';
 import { selectIndexingProgress } from '../../state/indexingProgress.js';
 import type { StatusResponse } from '../../../api/generated/schema-types/index.js';
 
@@ -208,4 +208,43 @@ it('RV6c-4: after "Nothing is waiting", the next fresh status offering waiting w
   offered(editor).click(); await settle(el); await settle(editor);
   expect(invoke).toHaveBeenCalledTimes(2);
   expect(line(editor)).toBe(LINE);
+});
+
+it.each([
+  ['the files drained', { waiting: false }],
+  ['Pause', { reasons: ['user_paused', 'schedule'] }],
+])('RV6c-8: a release that ended before any active sample: the first newer inactive observation after %s ends the line', async (_name, after) => {
+  answer('started');
+  const { el, editor } = await library();
+  offered(editor).click(); await settle(el); await settle(editor);
+  expect(line(editor)).toBe(LINE);
+  await feed(after, el, editor);
+  expect(line(editor), 'the first newer observation shows no release').toBe('');
+  expect(action(editor)).toBeUndefined();
+});
+
+it('RV6c-8: reprojections of the status read before the answer are not newer than the click and keep the line', async () => {
+  answer('started');
+  const { el, editor } = await library();
+  offered(editor).click(); await settle(el); await settle(editor);
+  __tickClockForTest(); await settle(el); await settle(editor);
+  __tickClockForTest(); await settle(el); await settle(editor);
+  expect(line(editor), 'no newer observation yet: the line stays').toBe(LINE);
+  await feed({ active: true }, el, editor);
+  expect(line(editor)).toBe(LINE);
+  await feed({ waiting: false }, el, editor);
+  expect(line(editor)).toBe('');
+});
+
+it('RV6c-9: "Nothing is waiting" stays through a reprojection of the same status; a new observation offering work re-offers the action', async () => {
+  answer('nothing-waiting');
+  const { el, editor } = await library();
+  offered(editor).click(); await settle(el); await settle(editor);
+  expect(line(editor)).toBe('Nothing is waiting to be read.');
+  __tickClockForTest(); await settle(el); await settle(editor);
+  expect(line(editor), 'the same status reprojected keeps the answer').toBe('Nothing is waiting to be read.');
+  expect(action(editor), 'the known-empty action is not offered again').toBeUndefined();
+  await feed({}, el, editor);
+  expect(line(editor)).toBe('');
+  expect(action(editor), 'a new observation offering work offers it again').toBeDefined();
 });
