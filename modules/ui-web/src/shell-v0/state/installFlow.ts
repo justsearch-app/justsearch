@@ -65,7 +65,7 @@ export function formatTimeLeft(seconds: number | null | undefined): string | nul
 }
 
 /** What the run is doing when it is not moving bytes (the Engine's phases); null while it downloads. */
-export function phaseWords(phase: string | null | undefined): string | null {
+function phaseWords(phase: string | null | undefined): string | null {
   switch (phase) {
     case 'preflight':
     case 'plan':
@@ -148,7 +148,7 @@ export interface PartRow {
 type Pkg = NonNullable<AiInstallStatus['packages']>[number];
 
 /** Every final file of the part placed, seen after the run reported its last file. */
-export function partDone(pkg: Pkg, evidence: DoneEvidence): boolean {
+function partDone(pkg: Pkg, evidence: DoneEvidence): boolean {
   const id = pkg.packageId ?? '';
   const seen = evidence.installedSeenAt.get(id);
   if (pkg.state !== 'installed' || seen === undefined || evidence.presenceRequestedAt === null) return false;
@@ -157,7 +157,7 @@ export function partDone(pkg: Pkg, evidence: DoneEvidence): boolean {
 }
 
 /** The run's parts in the page's step order; parts the plan skipped are not part of this install. */
-export function runParts(status: AiInstallStatus | null | undefined): Pkg[] {
+function runParts(status: AiInstallStatus | null | undefined): Pkg[] {
   const parts = (status?.packages ?? []).filter(p => p.state !== 'skipped' && (p.packageId ?? '') !== '');
   const rank = (p: Pkg) => {
     const i = PART_ORDER.indexOf(p.packageId ?? '');
