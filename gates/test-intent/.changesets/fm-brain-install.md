@@ -1090,3 +1090,14 @@ run, Repair is offered" and RS8's cancelled repair (the base counts any file as 
   "note": "Exact words without a source: 'Setting up the downloaded parts' (flow); toast 'Install cancelled. Completed parts stay on this computer.' (flow, repairRun); aiVerdict 'An earlier download is paused. What it downloaded is kept on disk.'. Prose stale: 26 of 29 flow cases fail on base, not 21 of 25; 'cancelled in this session' fails on base; unsourced words are asserted exactly, not by meaning."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-hlwdq2m_",
+  "verdict": "reject",
+  "digest": "sha256:40b0247702ed5dca82c709e069ee94bec1fb53366fa4723977d5d4545df39a89",
+  "note": "Page heading 'Installing AI · N%' has no source: fm-12 shows the page lead 'Installing AI' and the share only in the top-bar status pill; its note, quoted in these entries, says 'the percentage stands once, in the status'. Affected: flow, focus-lockdown, installOperations, repairRun. The candidate shows the share twice."
+}
+```
