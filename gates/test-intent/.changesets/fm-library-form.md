@@ -11,15 +11,24 @@ The design review of the packaged app (fm-07: "form controls [MISS, looks unfini
 under the orchestrator's delegated decisions PD1-PD6 (task t-20261113-fmimpl, 2026-11-16, within the
 delegation "You are supposed to be the implementation session"). The new behaviour is covered by the
 isolated new file `views/library-first-minutes/form-controls-lockdown.test.ts` (exempt). On the base
-2d51325e39 it fails by assertion in 10 of 13 cases: the radios are the browser's own (appearance auto),
+2d51325e39 it fails by assertion in 16 of 19 cases: the radios are the browser's own (appearance auto),
 "How rules work" shows the browser triangle, "One rule per line" is visible text, an empty rule field
-shows with no rules, a second field is added instead of the empty one being reused, and "and" is
-15 px. The keyboard-focus and forced-colours cases pass on the base and on the candidate (preserved
-behaviour).
+shows with no rules, a second field is added instead of the empty one being reused, a middle rule
+cleared and then Add a rule leaves two empty fields and a blank field stays after they are left (also
+after a press on Add a rule released elsewhere), removing a rule by keyboard leaves focus on a cross
+instead of moving it to the next rule's field, the previous one or Add a rule, and "and" is 15 px. The
+keyboard-focus and forced-colours cases pass on the base and on the candidate (preserved behaviour).
+
+PD4' (the orchestrator's repair after a real-app verification, 2026-11-16) is covered by five of those
+cases, which also fail by assertion on the first candidate 62c27f0252: a field cleared of an existing
+rule counts as an empty field, so Add a rule leaves exactly one empty field (focused) and leaving any
+empty field removes it wherever it stands; removing a rule by keyboard moves focus to the next rule's
+field, else the previous one, else Add a rule, with no frame in which focus is on the page (on the
+first candidate it fell to the page for two frames before the generic focus repair put it back).
 
 PD4 changes what four existing checks pinned: with no rules (or before the list is known) there is no
 empty rule field, an empty field has no remove cross, leaving an empty field removes it without a
-save, and Add a rule focuses an empty field already last instead of adding a second one. Each changed
+save, and Add a rule never leaves a second empty field (an empty field already last stays the one focused). Each changed
 assertion is listed below; every other assertion in these files is unchanged and passes.
 
 ```json
@@ -45,7 +54,7 @@ assertion is listed below; every other assertion in these files is unchanged and
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "PD4: with no rules, no empty rule field and no remove cross: only \"+ Add a rule\". Adding a rule shows one empty field with focus in it; leaving it empty removes it without a saved change. Existing rules and saving on leave are unchanged. Builder's detail within it: an empty field has no remove cross (leaving it removes it); a pointer press on Add a rule from an empty field keeps that field and Add focuses it, so the press is not lost and no second empty field is stacked; before the list is known no field shows and Add a rule is disabled.",
+          "choice": "PD4: with no rules, no empty rule field and no remove cross: only \"+ Add a rule\". Adding a rule shows one empty field with focus in it; leaving it empty removes it without a saved change. Existing rules and saving on leave are unchanged. Builder's detail within it: an empty field has no remove cross (leaving it removes it); a pointer press on Add a rule from an empty field keeps that field until the press ends, so the button does not move from under it; Add a rule then removes every empty field (added, or cleared of its rule, in any position) and ends with one empty field, the last, focused (PD4'), and a press released elsewhere removes the kept empty field; before the list is known no field shows and Add a rule is disabled.",
           "label": "agent choice"
         }
       ],

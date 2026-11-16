@@ -122,6 +122,17 @@ const between = (page: Page) => page.getByRole('radio', { name: 'Only between', 
 const battery = (page: Page) => page.getByRole('checkbox', { name: 'Pause while on battery', exact: true });
 const ruleFields = (page: Page) => page.getByRole('textbox', { name: /^Skip rule \d+$/ });
 const removeButtons = (page: Page) => page.getByRole('button', { name: /^Remove skip rule \d+$/ });
+/** Where focus is in every frame while `act` runs and the page settles: a late repair still shows the page. */
+async function focusTrail(page: Page, act: () => Promise<void>): Promise<string[]> {
+  await page.evaluate(() => {
+    const w = window as unknown as FixtureWindow & { trail: string[]; tracing: boolean };
+    w.trail = []; w.tracing = true;
+    const read = () => { w.trail.push(w.focused()); if (w.tracing) requestAnimationFrame(read); };
+    requestAnimationFrame(read);
+  });
+  await act(); await settle(page);
+  return page.evaluate(() => { const w = window as unknown as { trail: string[]; tracing: boolean }; w.tracing = false; return w.trail; });
+}
 
 /** What a control draws: its edge colour and fill, its size, and its contrast against what is behind it. */
 async function drawn(control: ReturnType<typeof anyTime>) {
@@ -312,6 +323,68 @@ describe('PD4: with no rules only "Add a rule" shows', () => {
       expect(await ruleFields(page).count()).toBe(0);
       expect(await removeButtons(page).count()).toBe(0);
       expect(await page.getByRole('button', { name: 'Add a rule', exact: true }).count()).toBe(1);
+    } finally { await page.close(); }
+  }, 60_000);
+
+  // PD4' — a field cleared of an existing rule counts as an empty field, whatever its position.
+  it('a middle rule cleared, then Add a rule: still one empty field, the focused one', async () => {
+    const page = await open('dark', ['*.a', '*.b', '*.c']);
+    try {
+      await ruleFields(page).nth(1).fill(''); await settle(page);
+      await page.getByRole('button', { name: 'Add a rule', exact: true }).click(); await settle(page);
+      const values = await ruleFields(page).evaluateAll(nodes => nodes.map(node => (node as HTMLInputElement).value));
+      expect(values.filter(value => value === ''), 'one empty field, not a second').toEqual(['']);
+      expect(values.filter(Boolean)).toEqual(['*.a', '*.c']);
+      expect(await focused(page)).toBe(`Skip rule ${values.indexOf('') + 1}`);
+    } finally { await page.close(); }
+  }, 60_000);
+
+  it('the empty field left after that goes; no blank field without a cross remains', async () => {
+    const page = await open('dark', ['*.a', '*.b', '*.c']);
+    try {
+      await ruleFields(page).nth(1).fill(''); await settle(page);
+      await page.getByRole('button', { name: 'Add a rule', exact: true }).click(); await settle(page);
+      await page.mouse.click(5, 690); await settle(page);
+      expect(await ruleFields(page).evaluateAll(nodes => nodes.map(node => (node as HTMLInputElement).value))).toEqual(['*.a', '*.c']);
+      expect(await removeButtons(page).count(), 'every field shown has its cross').toBe(2);
+      expect((await posts(page)).at(-1)).toEqual(['*.a', '*.c']);
+    } finally { await page.close(); }
+  }, 60_000);
+
+  it('a press on Add a rule released elsewhere leaves no blank field', async () => {
+    const page = await open('dark', ['*.a', '*.b', '*.c']);
+    try {
+      await ruleFields(page).nth(1).fill(''); await settle(page);
+      const add = await page.getByRole('button', { name: 'Add a rule', exact: true }).boundingBox();
+      await page.mouse.move(add!.x + 5, add!.y + 5); await page.mouse.down();
+      await page.mouse.move(5, 690); await page.mouse.up(); await settle(page);
+      expect(await ruleFields(page).evaluateAll(nodes => nodes.map(node => (node as HTMLInputElement).value))).toEqual(['*.a', '*.c']);
+      expect(await removeButtons(page).count()).toBe(2);
+    } finally { await page.close(); }
+  }, 60_000);
+
+  it('by keyboard: removing the only rule moves focus to Add a rule, never to the page', async () => {
+    const page = await open('dark', ['*.log']);
+    try {
+      await removeButtons(page).first().focus();
+      const trail = await focusTrail(page, () => page.keyboard.press('Enter'));
+      expect(await posts(page)).toEqual([[]]);
+      expect(trail, 'no frame with focus on the page').not.toContain('body');
+      expect(await focused(page)).toBe('Add a rule');
+    } finally { await page.close(); }
+  }, 60_000);
+
+  it('by keyboard: removing a rule moves focus to the next rule\'s field, else the previous one', async () => {
+    const page = await open('dark', ['*.a', '*.b', '*.c']);
+    try {
+      await page.getByRole('button', { name: 'Remove skip rule 2', exact: true }).focus();
+      await page.keyboard.press('Enter'); await settle(page);
+      expect(await focused(page), 'the next rule (*.c) is now Skip rule 2').toBe('Skip rule 2');
+      expect(await ruleFields(page).nth(1).inputValue()).toBe('*.c');
+      await page.getByRole('button', { name: 'Remove skip rule 2', exact: true }).focus();
+      await page.keyboard.press('Space'); await settle(page);
+      expect(await focused(page), 'with no next rule, the previous one').toBe('Skip rule 1');
+      expect(await posts(page)).toEqual([['*.a', '*.c'], ['*.a']]);
     } finally { await page.close(); }
   }, 60_000);
 });

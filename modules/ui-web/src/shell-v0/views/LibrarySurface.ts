@@ -1810,6 +1810,16 @@ export class LibrarySurface extends JfElement {
     this.skipFieldOpen = this.excludesText === '' && fields.length > 0;
   }
 
+  /** Drop rule fields; the last edited rule (else the one before it) and a rule's problem follow their field. */
+  private dropSkipFields(drop: (rule: string, index: number) => boolean): void {
+    const kept: string[] = [];
+    const to = this.skipFields.map((rule, index) => drop(rule, index) ? -1 : kept.push(rule) - 1);
+    this.lastEditedRule = Math.max(0, ...to.slice(0, this.lastEditedRule + 1));
+    const problem = this.excludesRuleProblem;
+    if (problem) this.excludesRuleProblem = (to[problem.index] ?? -1) < 0 ? null : { ...problem, index: to[problem.index]! };
+    this.setSkipFields(kept);
+  }
+
   /** R25 — focus a rule field (the first when that one is gone), or Add a rule when no rule is shown. */
   private async focusSkipRule(index: number): Promise<void> {
     await this.updateComplete;
@@ -2475,8 +2485,7 @@ export class LibrarySurface extends JfElement {
       // Fields are rendered by position: focus moving to a later row stays on that row after the removal.
       const toRow = to ? rows.findIndex(row => row.contains(to)) : -1;
       const toPart = toRow > index && to?.matches('input') ? 'input' : null;
-      this.setSkipFields(fields.filter((_, i) => i !== index));
-      if (this.lastEditedRule >= index) this.lastEditedRule = Math.max(0, this.lastEditedRule - 1);
+      this.dropSkipFields((_, i) => i === index);
       if (toPart) {
         void this.updateComplete.then(() => {
           this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input')[toRow - 1]?.focus();
@@ -3068,9 +3077,18 @@ export class LibrarySurface extends JfElement {
             ${!rule.trim() ? nothing : html`<jf-button variant="ghost" label=${`Remove skip rule ${index + 1}`}
               .disabled=${!this.excludesLoaded}
               .onActivate=${() => {
+                const fromRow = !!this.shadowRoot?.activeElement?.closest('.skip-rule');
                 this.setSkipFields(this.skipFields.filter((_, i) => i !== index));
                 this.lastEditedRule = Math.max(0, index - 1);
                 void this.handleSaveExcludes();
+                // PD4' — the keyboard never falls to the page: the next rule's field, else the previous one,
+                // else Add a rule.
+                if (fromRow) {
+                  void this.updateComplete.then(() => {
+                    const inputs = this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input');
+                    (inputs?.[index] ?? inputs?.[index - 1] ?? this.shadowRoot?.querySelector<HTMLElement>('.add-rule'))?.focus();
+                  });
+                }
               }}
               >${icon({ name: 'x', size: 14 })}</jf-button>`}
           </div>${problem ? html`<p id=${`rule-problem-${index}`} class="rule-problem" role="alert">${problem.reason}</p>` : nothing}`;
@@ -3079,13 +3097,24 @@ export class LibrarySurface extends JfElement {
             .disabled=${!this.excludesLoaded}
             @pointerdown=${() => {
               this.addRulePressed = true;
-              window.addEventListener('pointerup', () => { this.addRulePressed = false; }, { once: true });
+              window.addEventListener('pointerup', () => {
+                this.addRulePressed = false;
+                // PD4' — a press that ends in no click (released elsewhere) leaves no empty field behind.
+                setTimeout(() => {
+                  const active = this.shadowRoot?.activeElement;
+                  const inputs = [...this.shadowRoot?.querySelectorAll('.skip-rule input') ?? []];
+                  if (this.skipFields.some((rule, i) => !rule.trim() && inputs[i] !== active)) {
+                    this.dropSkipFields((rule, i) => !rule.trim() && inputs[i] !== active);
+                  }
+                });
+              }, { once: true });
             }}
             .onActivate=${() => {
               // R26 — one empty focused field per press; nothing is awaited, so no press is refused as busy.
-              // fm-07 — an empty field already last is the one focused, never a second empty one.
-              const fields = this.skipFields;
-              if (fields.length === 0 || fields[fields.length - 1]!.trim()) this.setSkipFields([...fields, '']);
+              // fm-07/PD4' — never a second empty field: an empty one anywhere (added, or cleared of its
+              // rule) goes first, and the press ends with one empty field, the last.
+              this.dropSkipFields(rule => !rule.trim());
+              this.setSkipFields([...this.skipFields, '']);
               void this.updateComplete.then(() => {
                 const inputs = this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input');
                 inputs?.[inputs.length - 1]?.focus();
