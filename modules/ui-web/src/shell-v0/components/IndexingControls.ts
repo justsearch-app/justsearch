@@ -27,7 +27,11 @@ class IndexingControls extends SignalWatcher(JfElement) {
   declare duration: number;
   declare pending: boolean;
   declare message: string;
-  declare saveWithSettings: ((write: (operationKey: string) => Promise<OperationInvocationSuccess>) => Promise<void>) | undefined;
+  /**
+   * Library's shared settings write chain (R23): it bounds the request, cancels it through `signal` at
+   * the bound and answers with the timeout; a late answer settles nothing.
+   */
+  declare saveWithSettings: ((write: (operationKey: string, signal: AbortSignal) => Promise<OperationInvocationSuccess>) => Promise<void>) | undefined;
 
   // Retain the last observed action through uncertain polls; page controls also retain it while focused.
   // This is control identity, never a claim that indexing is paused or running.
@@ -141,9 +145,9 @@ class IndexingControls extends SignalWatcher(JfElement) {
     this.message = '';
     this.awaitingStatus = false;
     try {
-      const write = (operationKey?: string) => getOperationClient(this.apiBase).invokeWithConsent(
+      const write = (operationKey?: string, signal?: AbortSignal) => getOperationClient(this.apiBase).invokeWithConsent(
         resume ? 'core.indexing-resume' : 'core.indexing-pause', { args, ...(operationKey ? { idempotencyKey: operationKey } : {}) },
-        { requestConsent: requestAuthorization },
+        { requestConsent: requestAuthorization, ...(signal ? { signal } : {}) },
       );
       if (this.saveWithSettings) await this.saveWithSettings(write); else await write();
       this.requestedResume = resume;

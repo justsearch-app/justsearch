@@ -155,8 +155,12 @@ type RemovalAsk = { readonly serial: number; readonly list: string; readonly bas
  */
 type RemovalOutcome = { readonly kind: 'done' | 'partly' | 'unsure' | 'unavailable' | 'kept' | 'nothing'; readonly serial: number;
   readonly capped: boolean; readonly scopes: ExcludesResult['uncheckedScopes']; readonly list: string; readonly detail: string };
-/** R22 — how long one skip-rule write, every network step of it, runs before its outcome is unknown. */
-const SKIP_WRITE_BOUND_MS = 10_000;
+/**
+ * R22/R23 — how long one owner of Library's shared settings write chain (a skip-rule or reading-hours
+ * save, the toolbar's Pause or Resume) waits for it and holds it, every network step included, before
+ * its outcome is unknown.
+ */
+const SETTINGS_WRITE_BOUND_MS = 10_000;
 const OVERRIDE_NO_REMOVAL = 'Skip rules set by an override are in effect, so files can\'t be removed from here.';
 /** A skip-rule draft: its glob rules as one text, and the exact-path entries kept with them. */
 type SkipDraft = { readonly text: string; readonly literals: readonly ExactPathExclusion[] };
@@ -365,8 +369,7 @@ export class LibrarySurface extends JfElement {
    * R7/R11 — the drafts captured when their field was left (or by Try again or Undo), saved in order.
    * Only these bytes are ever sent: text typed after returning to a field stays a draft until it is left.
    */
-  private readonly skipQueue = new SaveQueue<SkipSnapshot>(next => this.queueSettingsWrite(() => this.sendSkipRules(next)),
-    () => this.requestUpdate());
+  private readonly skipQueue = new SaveQueue<SkipSnapshot>(next => this.sendSkipRules(next), () => this.requestUpdate());
   /** Only the latest glob change can be undone. */
   private skipUndoSerial = 0;
   /** The Undo being run, answered when its queued snapshot settles. */
@@ -1730,15 +1733,32 @@ export class LibrarySurface extends JfElement {
 
   private settingsWrites: Promise<unknown> = Promise.resolve();
 
-  private queueSettingsWrite<T>(write: () => Promise<T>): Promise<T> {
-    const pending = this.settingsWrites.then(write);
-    this.settingsWrites = pending.catch(() => {});
-    return pending;
+  /**
+   * One Library settings write at a time. R23 — every owner holds the chain under one bound (its own,
+   * or one started now) that covers its wait for the chain too. At the bound the owner's turn is
+   * cancelled (never started if it was still waiting), the chain moves on and the owner is answered
+   * with the timeout; its late completion settles nothing.
+   */
+  private queueSettingsWrite<T>(write: (signal: AbortSignal) => Promise<T>, bound?: AbortSignal): Promise<T> {
+    const own = bound ? null : new AbortController();
+    const timer = own ? setTimeout(() => own.abort(new Error('Settings request timed out.')), SETTINGS_WRITE_BOUND_MS) : undefined;
+    const signal = bound ?? own!.signal;
+    const turn = this.settingsWrites.then(() => { signal.throwIfAborted(); return write(signal); });
+    const held = new Promise<T>((resolve, reject) => {
+      const timedOut = () => reject(signal.reason instanceof Error ? signal.reason : new Error('Settings request timed out.'));
+      if (signal.aborted) timedOut(); else signal.addEventListener('abort', timedOut, { once: true });
+      turn.then(resolve, reject).finally(() => { signal.removeEventListener('abort', timedOut); clearTimeout(timer); });
+    });
+    // The next owner waits for this one and every earlier one, even one released before its turn.
+    this.settingsWrites = Promise.allSettled([this.settingsWrites, held]);
+    return held;
   }
 
-  private async invokeSettingsWrite(write: (operationKey: string) => Promise<OperationInvocationSuccess>,
-      operationKey: string = createOperationKey()): Promise<void> {
-    const result = await write(operationKey);
+  private async invokeSettingsWrite(write: (operationKey: string, signal: AbortSignal) => Promise<OperationInvocationSuccess>,
+      signal: AbortSignal, operationKey: string = createOperationKey()): Promise<void> {
+    const result = await write(operationKey, signal);
+    // Past the bound the chain has moved on: this late answer settles nothing.
+    if (signal.aborted) return;
     const receipt = settingsV2Schema.pick({ witness: true }).safeParse({ witness: result.structuredData?.witness });
     const witness = receipt.success ? receipt.data.witness : null;
     // Only this write's direct successor can advance a retained draft. A missing receipt
@@ -1756,17 +1776,19 @@ export class LibrarySurface extends JfElement {
     this.shadowRoot?.querySelector<IndexingRulesEditor>('jf-indexing-rules-editor')?.adoptOwnSuccessor(before, after);
   }
 
-  private readonly saveSettingsOperation = (write: (operationKey: string) => Promise<OperationInvocationSuccess>): Promise<void> =>
-    this.queueSettingsWrite(() => this.invokeSettingsWrite(write));
+  /** The toolbar's (and a hold card's) Pause or Resume: bounded like every chain owner (R23). */
+  private readonly saveSettingsOperation = (write: (operationKey: string, signal: AbortSignal) => Promise<OperationInvocationSuccess>): Promise<void> =>
+    this.queueSettingsWrite(signal => this.invokeSettingsWrite(write, signal));
 
   /**
    * Reading-hours writes carry their own base revision (B6') and their own key, so an uncertain one is
    * sent again unchanged (R8); the shared write chain keeps one Library settings write in flight. An
-   * uncertain skip-rule write does not hold them: its own retry rebases across them (B11).
+   * uncertain skip-rule write does not hold them: its own retry rebases across them (B11). The editor's
+   * bound holds for its wait for the chain too (R23).
    */
   private readonly saveIndexingRulesWithSettings = (write: (operationKey: string) => Promise<OperationInvocationSuccess>,
-      operationKey: string): Promise<void> =>
-    this.queueSettingsWrite(() => this.invokeSettingsWrite(write, operationKey));
+      operationKey: string, bound: AbortSignal): Promise<void> =>
+    this.queueSettingsWrite(signal => this.invokeSettingsWrite(write, signal, operationKey), bound);
 
   /**
    * Send one captured snapshot (R11), never the live text. The head's attempt whose outcome is unknown
@@ -1775,15 +1797,21 @@ export class LibrarySurface extends JfElement {
    * setting was saved, so the same snapshot is sent again on the new revision (B11); changed means
    * "Changed elsewhere", and the queue waits for the person's choice.
    *
-   * R22 — the whole write (every send, retry, admission wait and the re-read after a refusal) runs under
-   * one bound; at it the write is cancelled, the chain is freed and its outcome is unknown: the snapshot
-   * stays queued and a sent attempt keeps its key and bytes. A late answer settles nothing.
+   * R22/R23 — the whole write (its wait for the shared settings chain, every send, retry, admission wait
+   * and the re-read after a refusal) runs under one bound; at it the write is cancelled, the chain is
+   * freed and its outcome is unknown: the snapshot stays queued and a sent attempt keeps its key and
+   * bytes. A late answer settles nothing.
    */
   private async sendSkipRules(next: SkipSnapshot): Promise<SendOutcome> {
     const bound = new AbortController();
-    const timer = setTimeout(() => bound.abort(new Error('Settings request timed out.')), SKIP_WRITE_BOUND_MS);
+    const timer = setTimeout(() => bound.abort(new Error('Settings request timed out.')), SETTINGS_WRITE_BOUND_MS);
     try {
-      return await (next.undo ? this.sendSkipUndo(next, next.undo, bound.signal) : this.sendSkipList(next, bound.signal));
+      return await this.queueSettingsWrite(signal => next.undo ? this.sendSkipUndo(next, next.undo, signal) : this.sendSkipList(next, signal),
+        bound.signal);
+    } catch (err) {
+      if (!bound.signal.aborted) throw err;
+      // The bound was reached while waiting for the chain or before the write's own answer: unknown.
+      return 'uncertain';
     } finally {
       clearTimeout(timer);
     }

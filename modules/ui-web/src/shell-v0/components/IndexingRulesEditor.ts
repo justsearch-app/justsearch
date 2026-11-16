@@ -71,7 +71,9 @@ export class IndexingRulesEditor extends JfElement {
   declare host_: PluginHostApi | undefined;
   declare readOnly: boolean;
   /** Library serializes its settings writers and advances its own shared settings witness. */
-  declare saveWithSettings: ((write: (operationKey: string) => Promise<OperationInvocationSuccess>, operationKey: string) => Promise<void>) | undefined;
+  /** Library's shared settings write chain; `bound` covers the wait for it too (R23). */
+  declare saveWithSettings: ((write: (operationKey: string) => Promise<OperationInvocationSuccess>, operationKey: string,
+    bound: AbortSignal) => Promise<void>) | undefined;
   private savedRules: SavedIndexingRules = { schedule: null, pauseOnBattery: false };
   /** The revision the saved rules were observed at; every write is based on it. */
   private savedWitness: SettingsWitness | null = null;
@@ -200,25 +202,25 @@ export class IndexingRulesEditor extends JfElement {
    * only by other settings is taken up and the same pair tried again (B11). A retained write whose answer
    * was lost is sent again with its own key and base revision (same bytes).
    *
-   * R22 — every network step of it (the send, retries, admission waits, follow-up polls, the re-read
-   * after a refusal) runs under one bound, started when the write first goes out. At the bound the
-   * steps are cancelled, the shared settings chain is freed, and the outcome is unknown: the snapshot
-   * stays queued, a sent write keeps its key and bytes, and a late answer settles nothing.
+   * R22/R23 — every step of it (the wait for Library's shared settings chain, the send, retries,
+   * admission waits, follow-up polls, the re-read after a refusal) runs under one bound, started when
+   * the change is taken up. At the bound the steps are cancelled, the shared settings chain is freed,
+   * and the outcome is unknown: the snapshot stays queued, a sent write keeps its key and bytes, and a
+   * late answer settles nothing.
    */
   private async sendRules(next: SavedIndexingRules): Promise<SendOutcome> {
     if (this.conflictingRules) return 'stopped';
     const bound = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const startBound = () => { timer ??= setTimeout(() => bound.abort(), WRITE_BOUND_MS); };
+    const timer = setTimeout(() => bound.abort(), WRITE_BOUND_MS);
     try {
-      return await this.sendRulesWithin(next, bound.signal, startBound);
+      return await this.sendRulesWithin(next, bound.signal);
     } finally {
       clearTimeout(timer);
       bound.abort();
     }
   }
 
-  private async sendRulesWithin(next: SavedIndexingRules, signal: AbortSignal, startBound: () => void): Promise<SendOutcome> {
+  private async sendRulesWithin(next: SavedIndexingRules, signal: AbortSignal): Promise<SendOutcome> {
     for (let attempt = 0; attempt < 3; attempt++) {
       const same = this.retained;
       const witness = same?.witness ?? this.savedWitness;
@@ -234,7 +236,7 @@ export class IndexingRulesEditor extends JfElement {
         return typeof state !== 'string' || state === 'COMPLETE';
       };
       const write = async (): Promise<OperationInvocationSuccess> => {
-        startBound();
+        signal.throwIfAborted();
         sent = true;
         const first = await invoke();
         return finished(first) ? first : this.followRunning(invoke, finished, signal);
@@ -242,7 +244,8 @@ export class IndexingRulesEditor extends JfElement {
       try {
         let receipt: unknown;
         if (this.saveWithSettings) {
-          await this.saveWithSettings(async () => { const result = await write(); receipt = result.structuredData?.['witness']; return result; }, operationKey);
+          await this.saveWithSettings(async () => { const result = await write(); receipt = result.structuredData?.['witness']; return result; },
+            operationKey, signal);
         } else receipt = (await write()).structuredData?.['witness'];
         const observed = settingsV2Schema.shape.witness.safeParse(receipt);
         this.retained = null;
@@ -259,6 +262,12 @@ export class IndexingRulesEditor extends JfElement {
       } catch (error) {
         const conflict = error instanceof OperationError && (error.httpStatus === 409 || error.errorCode === 'VERSION_CONFLICT');
         if (!conflict) {
+          if (!sent && signal.aborted) {
+            // The bound came while waiting for the shared chain: nothing new went out, and a write
+            // retained from before keeps its key and bytes.
+            this.indexingRulesError = '';
+            return 'uncertain';
+          }
           if (sent && outcomeUnknown(error)) {
             // The answer was lost: keep the exact write to settle before anything newer.
             this.retained = { key: operationKey, witness };

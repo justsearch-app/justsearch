@@ -1362,3 +1362,122 @@ it('R19 (review 6): Try again on a removal outcome while an override is now in e
   expect(f.invoke.mock.calls.length, 'nothing runs under the override').toBe(calls);
   expect(text(el.shadowRoot!.querySelector('.removal-slot'))).toContain('Skip rules set by an override are in effect, so files can\'t be removed from here.');
 });
+
+/** The toolbar's Pause reading control, once the status confirms reading is running. */
+async function toolbarPause(el: LibrarySurface) {
+  const toolbar = el.shadowRoot!.querySelector<HTMLElement & { updateComplete: Promise<unknown> }>('jf-indexing-controls[toolbar]');
+  expect(toolbar).toBeTruthy(); await settle(toolbar!);
+  return {
+    toolbar: toolbar!,
+    async pause() {
+      toolbar!.shadowRoot!.querySelector<HTMLButtonElement>('#pause-toggle')!.click(); await settle(toolbar!);
+      toolbar!.shadowRoot!.querySelector<HTMLButtonElement>('.pause-options button')!.click(); await settle(toolbar!); await settle(el);
+    },
+    said: () => text(toolbar!.shadowRoot!.querySelector('#control-state')),
+  };
+}
+const feedRunning = () => __feedForTest({ status: { worker: { core: { indexState: 'IDLE', indexHealthy: true } },
+  operating: { indexing: { state: 'IDLE', reasons: [] } } } as unknown as StatusSnapshot });
+/** An operation answer that never comes on its own: its signal and a late answer are kept. */
+function stalledOp(into: { signal?: AbortSignal | null; answer?: (response: Response) => void }) {
+  return (init?: RequestInit) => { into.signal = init?.signal; return new Promise<Response>(resolve => { into.answer = resolve; }); };
+}
+const committed = (operationKey: string) => ({ success: true, message: 'Committed',
+  structuredData: { witness: { acceptedRevision: 99, lastCommittedOperationKey: operationKey } } });
+async function at(el: LibrarySurface, ms: number) {
+  await vi.advanceTimersByTimeAsync(ms); await settle(editor(el)); await settle(el); await settle(editor(el));
+}
+/** Both editors ended their write: neither still says Saving…, each says Not sure this saved and offers Try again. */
+function bothEnded(el: LibrarySurface, rules: IndexingRulesEditor) {
+  expect(statusOf(rules.shadowRoot), 'the reading-hours save is not left sending').not.toContain('Saving…');
+  expect(text(rules.shadowRoot), 'reading hours: unknown outcome shown').toContain('Not sure this saved');
+  expect(named(rules.shadowRoot, 'Try again'), 'reading hours: Try again').toBeDefined();
+  // Shown only once the skip-rule queue is no longer sending.
+  expect(text(el.shadowRoot), 'skip rules: unknown outcome shown, not left sending').toContain('Not sure this saved');
+  expect(named(el.shadowRoot, 'Try again'), 'skip rules: Try again').toBeDefined();
+}
+
+it('R23 (review 8): an unanswered toolbar Pause, then a reading-hours change and a skip-rule leave: every owner ends at its bound, leaving and returning keeps nothing blocked', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  feedRunning();
+  const f = backend(); const el = await mount(f); const rules = editor(el);
+  const bar = await toolbarPause(el);
+  const pauseCall: { signal?: AbortSignal | null; answer?: (response: Response) => void } = {};
+  const hoursCall: { signal?: AbortSignal | null; answer?: (response: Response) => void } = {};
+  f.scriptOpAnswers(stalledOp(pauseCall), stalledOp(hoursCall));
+  f.hangWrites(true);
+  await bar.pause();
+  expect(f.ops.map(op => op.id), 'the pause is sent and unanswered').toEqual(['core.indexing-pause']);
+  await at(el, 1_000);
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules); await settle(el);
+  await type(el, rule(el, 1), '*.tmp'); await leave(el, rule(el, 1));
+  // Leaving Library and coming back does not keep anything waiting forever.
+  el.remove(); await settle(); document.body.append(el); await settle(el);
+  await at(el, 11_500);
+  bothEnded(el, rules);
+  expect(pauseCall.signal?.aborted, 'the unanswered pause is cancelled at its bound').toBe(true);
+  expect(bar.said(), 'the toolbar says it could not confirm, in its existing words').toContain('Could not confirm the reading request');
+  expect(bar.toolbar.shadowRoot!.querySelector('#pause-toggle')?.getAttribute('aria-disabled'), 'and can be tried again').toBe('false');
+  expect(f.s.ui.excludePatterns, 'nothing saved').toEqual(['*.log']);
+  expect(f.s.ui.indexingPause.pauseOnBattery).toBe(false);
+  // A late answer to the pause settles nothing.
+  pauseCall.answer?.(Response.json(committed(f.ops[0]!.key ?? '')));
+  hoursCall.answer?.(Response.json(committed(f.ops[1]?.key ?? '')));
+  await at(el, 100);
+  expect(bar.said()).toContain('Could not confirm the reading request');
+  expect(bar.said()).not.toContain('Waiting for status');
+  bothEnded(el, rules);
+  // The chain is free: Try again saves each.
+  f.hangWrites(false);
+  await press(rules, control(rules.shadowRoot, 'Try again')); await settle(el);
+  expect(f.s.ui.indexingPause.pauseOnBattery).toBe(true);
+  await press(el, control(el.shadowRoot, 'Try again'));
+  expect(f.s.ui.excludePatterns).toEqual(['*.tmp']);
+  expect(f.s.ui.indexingPause.pauseOnBattery).toBe(true);
+  expect(text(rules.shadowRoot)).toContain('Reading rules saved');
+});
+
+it('R23 (review 8): an unanswered skip-rule write holds the chain; a reading-hours change and a toolbar Pause behind it end within their own bounds', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  feedRunning();
+  const f = backend(); const el = await mount(f); const rules = editor(el);
+  const bar = await toolbarPause(el);
+  f.hangWrites(true);
+  f.scriptOpAnswers(stalledOp({}), stalledOp({}));
+  await type(el, rule(el, 1), '*.tmp'); await leave(el, rule(el, 1));
+  expect(f.posts, 'the skip-rule write is sent and unanswered').toHaveLength(1);
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules); await settle(el);
+  await bar.pause();
+  await at(el, 10_500);
+  expect(bar.said(), 'the pause waited no longer than its own bound').toContain('Could not confirm the reading request');
+  bothEnded(el, rules);
+  f.hangWrites(false);
+  await press(el, control(el.shadowRoot, 'Try again'));
+  expect(f.s.ui.excludePatterns).toEqual(['*.tmp']);
+  await press(rules, control(rules.shadowRoot, 'Try again')); await settle(el);
+  expect(f.s.ui.indexingPause.pauseOnBattery).toBe(true);
+});
+
+it('R23 (review 8): an unanswered reading-hours write holds the chain; a skip-rule leave and a toolbar Pause behind it end within their own bounds', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  feedRunning();
+  const f = backend(); const el = await mount(f); const rules = editor(el);
+  const bar = await toolbarPause(el);
+  f.hangWrites(true);
+  f.scriptOpAnswers(stalledOp({}), stalledOp({}));
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules); await settle(el);
+  expect(f.ops.map(op => op.id), 'the reading-hours write is sent and unanswered').toEqual(['core.set-indexing-rules']);
+  await type(el, rule(el, 1), '*.tmp'); await leave(el, rule(el, 1));
+  await bar.pause();
+  await at(el, 10_500);
+  expect(bar.said(), 'the pause waited no longer than its own bound').toContain('Could not confirm the reading request');
+  bothEnded(el, rules);
+  f.hangWrites(false);
+  await press(rules, control(rules.shadowRoot, 'Try again')); await settle(el);
+  expect(f.s.ui.indexingPause.pauseOnBattery).toBe(true);
+  await press(el, control(el.shadowRoot, 'Try again'));
+  expect(f.s.ui.excludePatterns).toEqual(['*.tmp']);
+});
