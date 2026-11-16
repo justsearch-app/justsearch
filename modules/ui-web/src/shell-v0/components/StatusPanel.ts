@@ -16,6 +16,7 @@ import { OverflowController } from '../primitives/adaptiveBar.js';
 import './ProvenanceChip.js';
 import './IndexingControls.js';
 import './StatusBadge.js';
+import { icon } from './Icon.js';
 
 const SECTION_NAMES: Record<StatusSection, string> = {
   needs: 'Needs you', problems: 'Problems right now', running: 'Running', earlier: 'Earlier',
@@ -134,6 +135,7 @@ export class StatusPanel extends JfElement {
     button { font: inherit; color: var(--text-primary); background: transparent; border: 0; padding: var(--jf-space-1); cursor: pointer; }
     .actions button, .footer button { color: var(--text-primary); font-weight: 500; }
     button:hover { text-decoration: underline; }
+    .close { display: inline-grid; place-items: center; }
     button:focus-visible { outline: var(--frame-focus-width) solid var(--focus-ring-color); outline-offset: var(--jf-space-1); }
     progress { display: block; width: 100%; height: var(--jf-space-1); accent-color: var(--accent); margin-top: var(--jf-space-2); }
     .unread { font-size: var(--font-size-xs); color: var(--text-secondary); }
@@ -466,7 +468,7 @@ export class StatusPanel extends JfElement {
       <div class="header"><div><h2>What's going on</h2>${model?.sentence || !model ? html`<p class="detail">${model?.sentence ?? 'Checking search status'}</p>` : nothing}
         ${this.gone ? html`<p class="detail" role="status">The request you were reviewing is no longer waiting.</p>` : nothing}
         ${this.renderNoticeGone()}</div>
-        <button type="button" aria-label="Close status panel" @click=${() => this.dispatchEvent(new CustomEvent('status-close', { bubbles: true, composed: true }))}>×</button></div>
+        <button type="button" class="close" aria-label="Close status panel" @click=${() => this.dispatchEvent(new CustomEvent('status-close', { bubbles: true, composed: true }))}>${icon({ name: 'x', size: 14 })}</button></div>
       ${model ? (['needs', 'problems', 'running', 'earlier'] as const).map(section => {
         const rows = model.sections[section];
         if (!rows.length) return nothing;

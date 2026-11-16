@@ -2124,7 +2124,8 @@ export class Sv3Composer extends JfElement {
 
   private corpusLine(): TemplateResult | typeof nothing {
     const setup = getFirstUse();
-    if (this.tier !== 'search' || !setup.sessionReading || !setup.reading || (setup.roots ?? 0) === 0 || setup.searchable === null) return nothing;
+    // PH1 (fm-02) — from 1 file on: at 0 the top bar's "Reading files" already says it.
+    if (this.tier !== 'search' || !setup.sessionReading || !setup.reading || (setup.roots ?? 0) === 0 || !setup.searchable) return nothing;
     return html`<p class="corpus" data-testid="first-use-progress">${setup.searchable.toLocaleString()} ${setup.searchable === 1 ? 'file' : 'files'} searchable so far</p>`;
   }
 

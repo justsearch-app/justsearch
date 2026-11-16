@@ -131,4 +131,17 @@ it.each([[1, '1 file searchable so far'], [2, '2 files searchable so far']])('a 
   await line.waitFor();
   expect((await line.textContent())?.trim()).toBe(words);
 });
+// PH1 (fm-02) — at 0 searchable the top bar's "Reading files" already says it: no count line.
+it('a count of 0 shows no line while the top bar says "Reading files"', async () => {
+  const page = await open(); await page.evaluate(() => (window as unknown as AppWindow).attachHost());
+  await add(page).click();
+  await page.getByRole('textbox', { name: 'Folder path', exact: true }).fill('/notes');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.evaluate(() => { const w = window as unknown as AppWindow; w.observe(1, 0, 8); w.finishAdd({ success: true }); });
+  await expect.poll(() => page.locator('jf-status-pill .label').textContent()).toBe('Reading files');
+  await settle(page);
+  expect(await page.locator('[data-testid="first-use-progress"]').count()).toBe(0);
+  await page.evaluate(() => (window as unknown as AppWindow).observe(1, 1, 8));
+  await expect.poll(() => page.locator('[data-testid="first-use-progress"]').textContent().then(t => t?.trim())).toBe('1 file searchable so far');
+});
 });

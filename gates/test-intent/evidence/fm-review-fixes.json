@@ -1,0 +1,240 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-16T23:29:39.798Z",
+  "revision": "012aae15e5e5218cf6258c347b98fd6aa4624daf",
+  "tree": "99a480ee01cde2c2ee734cdc48cec86e4bcb66ea",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.countWords-lockdown.test.ts\" \"src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts\" \"src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-38403-1794871726067.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 24342
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-38403-1794871750411.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1739
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.countWords-lockdown.test.ts#a count of 0 shows no line while the top bar says \"Reading files\"",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.countWords-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f6fb406d9315747133fd83ab2cdbaf591d3c94a7d3b4848aa1e3109c601ab47d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first-reading count words through the running app a count of 0 shows no line while the top bar says \"Reading files\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts#\"Reading files\" is words without an outline or fill in dark",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dc4f858a4e15dc4c8f4a318a0286850c41e996a4bfc5f8717799f06ada38b444",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first-minutes repairs through the running app \"Reading files\" is words without an outline or fill in dark",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts#\"Reading files\" is words without an outline or fill in light",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dc4f858a4e15dc4c8f4a318a0286850c41e996a4bfc5f8717799f06ada38b444",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "first-minutes repairs through the running app \"Reading files\" is words without an outline or fill in light",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a successful settings save is no row; a failed one is",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:76d97d234a090498f951e242ac26b2d9655a4d10e857a24aa444253bea0ed3df",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PH3 settings saves and the close mark a successful settings save is no row; a failed one is",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a settings save advisory that succeeded is no row; one that failed is",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:76d97d234a090498f951e242ac26b2d9655a4d10e857a24aa444253bea0ed3df",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PH3 settings saves and the close mark a settings save advisory that succeeded is no row; one that failed is",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#the close button draws the app's close icon, not a text cross",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:76d97d234a090498f951e242ac26b2d9655a4d10e857a24aa444253bea0ed3df",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PH3 settings saves and the close mark the close button draws the app's close icon, not a text cross",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts#a not-installed page with a current reading shows no graphics card; installed, it does",
+      "file": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:135e55a95ae68a0d703c5925c1afd0c76bdfe88f3af5a74b450a250198d54313",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PH4 the graphics card waits for an installed AI a not-installed page with a current reading shows no graphics card; installed, it does",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts#the consent is centred below the top bar and opens on Cancel in dark",
+      "file": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bbf158198946f19d3c5e24e2edf30f7c28fb33ab8f32b57100252ea4d15fe11c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the consent is centred below the top bar and opens on Cancel in dark",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts#the consent is centred below the top bar and opens on Cancel in light",
+      "file": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bbf158198946f19d3c5e24e2edf30f7c28fb33ab8f32b57100252ea4d15fe11c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the consent is centred below the top bar and opens on Cancel in light",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "012aae15e5",
+    "revision": "012aae15e5e5218cf6258c347b98fd6aa4624daf",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.countWords-lockdown.test.ts\" \"src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts\" \"src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-38403-1794871754330.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 23834,
+        "output": "JSON report written to /home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-38403-1794871754330.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-38403-1794871778164.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1374,
+        "output": "JSON report written to /home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-38403-1794871778164.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.countWords-lockdown.test.ts#a count of 0 shows no line while the top bar says \"Reading files\"",
+        "classification": "assertion",
+        "detail": "first-reading count words through the running app a count of 0 shows no line while the top bar says \"Reading files\":  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-m3qZLn/modules/ui-web/src/shell-v0/chrome/FirstMinutes.countWords-lockdown.test.ts:143:76\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-ph/modules/ui-web/node_module"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts#\"Reading files\" is words without an outline or fill in dark",
+        "classification": "assertion",
+        "detail": "first-minutes repairs through the running app \"Reading files\" is words without an outline or fill in dark:  AssertionError: expected { fill: false, outline: false, …(1) } to deeply equal { fill: true, outline: true, …(1) }\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-m3qZLn/modules/ui-web/src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts:225:16\n    at file:///home/elias/dev/justsea"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts#\"Reading files\" is words without an outline or fill in light",
+        "classification": "assertion",
+        "detail": "first-minutes repairs through the running app \"Reading files\" is words without an outline or fill in light:  AssertionError: expected { fill: false, outline: false, …(1) } to deeply equal { fill: true, outline: true, …(1) }\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-m3qZLn/modules/ui-web/src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts:225:16\n    at runNextTicks (node:internal/pr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a successful settings save is no row; a failed one is",
+        "classification": "assertion",
+        "detail": "PH3 settings saves and the close mark a successful settings save is no row; a failed one is:  AssertionError: expected 'What\\'s going onSearch works × Runnin…' not to match /Apply Settings/\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-m3qZLn/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:110:41\n    at file:///home/elias/dev/justsearch/.claude/worktree"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a settings save advisory that succeeded is no row; one that failed is",
+        "classification": "assertion",
+        "detail": "PH3 settings saves and the close mark a settings save advisory that succeeded is no row; one that failed is:  AssertionError: expected 'Your Documents folder is searchable |…' not to match /Apply Settings/\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-m3qZLn/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:118:80\n    at file:///home/elias/dev/justsearch/.claude/worktree"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#the close button draws the app's close icon, not a text cross",
+        "classification": "assertion",
+        "detail": "PH3 settings saves and the close mark the close button draws the app's close icon, not a text cross:  AssertionError: expected '×' to be '' // Object.is equality\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-m3qZLn/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:124:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-ph/modules/ui-web/node_modules/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts#a not-installed page with a current reading shows no graphics card; installed, it does",
+        "classification": "assertion",
+        "detail": "PH4 the graphics card waits for an installed AI a not-installed page with a current reading shows no graphics card; installed, it does:  AssertionError: expected <section …(2)>…(3)</section> to be null\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-m3qZLn/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts:150:22\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-ph/modules/u"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts#the consent is centred below the top bar and opens on Cancel in dark",
+        "classification": "assertion",
+        "detail": "the consent is centred below the top bar and opens on Cancel in dark:  Error: expected 'Terms for Understand meaning' to be 'Cancel' // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/fm-ph/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/fehoqyko/tmp/test-in"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts#the consent is centred below the top bar and opens on Cancel in light",
+        "classification": "assertion",
+        "detail": "the consent is centred below the top bar and opens on Cancel in light:  Error: expected 'Terms for Understand meaning' to be 'Cancel' // Object.is equality\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/fm-ph/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/fehoqyko/tmp/test-in"
+      }
+    ]
+  },
+  "digest": "sha256:f0b875fff1d71bf4c8f5f9a17afe7c2cbf0ff699f8835cfe11535bc6e8afc324"
+}

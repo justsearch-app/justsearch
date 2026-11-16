@@ -80,6 +80,8 @@ export class StatusPill extends JfElement {
     jf-status-badge::part(badge) { min-width: 0; max-width: 100%; box-sizing: border-box; }
     .trigger.calm jf-status-badge::part(badge) { inline-size: 1.875rem; block-size: 1.875rem;
       padding: 0; justify-content: center; background: transparent; border-color: transparent; }
+    /* PH2 (fm-02) — the working status is words beside its ring: no outline, no pill fill. */
+    .trigger.working jf-status-badge::part(badge) { background: transparent; border-color: transparent; }
     .trigger[aria-expanded='true'] jf-status-badge::part(badge) { background: var(--surface-2); border-color: var(--border-emphasized); }
     .calm .symbol { inline-size: var(--frame-status-dot); block-size: var(--frame-status-dot);
       border-radius: var(--frame-pill-radius); background: var(--text-success); }

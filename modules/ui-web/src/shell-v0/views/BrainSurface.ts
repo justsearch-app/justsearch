@@ -674,7 +674,8 @@ export class BrainSurface extends JfElement {
     dialog: () => this.shadowRoot?.querySelector<HTMLDialogElement>('dialog.consent'),
     onOpened: () => {
       requestAnimationFrame(() => {
-        (this.shadowRoot?.querySelector('jf-button.consent-confirm') as HTMLElement | null)?.focus();
+        // PH5 (fm-11) — the consent opens on Cancel, never on a Terms link that leaves the app.
+        (this.shadowRoot?.querySelector('jf-button.consent-cancel') as HTMLElement | null)?.focus();
       });
     },
   });
@@ -1011,6 +1012,8 @@ export class BrainSurface extends JfElement {
     }
     /* Install consent dialog — native <dialog> (browser inert + focus-trap + Top Layer), driven by
        ModalController so the scroll-lock/focus-restore half cannot be forgotten. */
+    /* PH5 (fm-11) — centred in the area below the top bar; the dimming starts under the bar, which
+       stays visible and, as everything outside a modal dialog, inert. */
     dialog.consent {
       border: 1px solid var(--border-subtle);
       border-radius: 14px;
@@ -1019,8 +1022,12 @@ export class BrainSurface extends JfElement {
       padding: 0;
       background: var(--surface-1);
       color: var(--text-primary);
+      inset-block-start: var(--frame-topbar-height, 2.75rem);
+      /* Not the page's stack spacing (.body > * + *): auto margins centre it in that area. */
+      margin: auto;
     }
     dialog.consent::backdrop {
+      inset-block-start: var(--frame-topbar-height, 2.75rem);
       background: rgba(0, 0, 0, 0.55);
     }
     .consent-card {
@@ -1329,7 +1336,8 @@ export class BrainSurface extends JfElement {
     jf-button::part(control) { border: 0; border-radius: 0; background: transparent; }
     jf-button.install-action::part(control), jf-button.consent-confirm::part(control) { background: var(--accent-tint); color: var(--accent-on-tint); border-radius: 8px; }
     jf-button.repair-action::part(control) { background: transparent; border-color: transparent; color: var(--text-primary); font-weight: 500; }
-    dialog.consent { box-sizing: border-box; width: min(32rem, calc(100vw - 2rem)); max-height: calc(100vh - 2rem); overflow: auto; }
+    dialog.consent { box-sizing: border-box; width: min(32rem, calc(100vw - 2rem));
+      max-height: calc(100vh - var(--frame-topbar-height, 2.75rem) - 2rem); overflow: auto; }
     @media (max-width: 800px) {
       .body { padding: 1.25rem; }
       .brain-path { grid-template-columns: minmax(0, 1fr); padding-top: 0; gap: 1rem; }
@@ -2326,6 +2334,7 @@ export class BrainSurface extends JfElement {
   /**
    * The graphics card's memory, only with a current reading (AM8): while installing, starting or
    * switching, with a stale or missing reading, nothing is drawn — and nothing is inferred from that.
+   * Before AI is installed the page draws none at all (PH4, fm-10); System › Health keeps the reading.
    */
   private renderGraphicsCard(): TemplateResult | typeof nothing {
     const gpu = this.systemStatus?.gpu;
@@ -3502,7 +3511,7 @@ export class BrainSurface extends JfElement {
           data-testid="brain-install-failure-detail">Detail for support: ${this.deriveAiEngineVerdict().installFailure}</jf-error-alert>` : nothing}
         ${known && !stopped && !(failed && repairRemedy.kind !== 'manual') ? this.renderRepairAlert() : nothing}
         ${alone ? nothing : this.renderFeaturePath()}
-        ${alone ? nothing : this.renderGraphicsCard()}
+        ${alone || !installed ? nothing : this.renderGraphicsCard()}
         ${alone || !(showAdvanced || this.devTools || this.answersShown || choiceUnknown) ? nothing : html`<div class="row brain-links">
           ${showAdvanced ? html`<button type="button" aria-expanded=${!!this.expanded.advanced} @click=${() => this.toggleSection('advanced')}>${icon({ name: 'settings', size: 16 })} Advanced settings</button>` : nothing}
           ${this.devTools && installed && aiState !== 'installing' && !activationRequired ? html`<jf-button variant="ghost" data-testid="brain-answers-action"
@@ -4074,7 +4083,7 @@ export class BrainSurface extends JfElement {
           <div class="consent-actions">
             ${this.planLoading ? html`<p role="status">Loading download sizes and licences…</p>` : nothing}
             ${this.planError || (!this.planLoading && !this.consentReady()) ? html`<p role="status">${this.planError ?? 'Every download size must be known before accepting.'}</p><jf-button variant="ghost" label="Retry download preview" .onActivate=${() => void this.refreshInstallPlanPreview()}>Retry download preview</jf-button>` : nothing}
-            <jf-button label="Cancel" .onActivate=${() => (this.installConsentOpen = false)}>
+            <jf-button class="consent-cancel" label="Cancel" .onActivate=${() => (this.installConsentOpen = false)}>
               Cancel
             </jf-button>
             <jf-button
