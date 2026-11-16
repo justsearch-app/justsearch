@@ -74,13 +74,15 @@ last rule saves an empty list. A rule that is not complete yet (such as `[a`) is
 field says why, and fixing it saves. Reading hours and the battery rule save on change (a time when
 its field is left); an invalid combination is not sent and says why. A save never disables the field
 being typed in; what is saved is the text as it was when its field was left, so text typed during a
-save is saved when its field is left again, and is not called saved before it is. An unknown outcome
-(of a skip-rule or a reading-hours save) reads **Not sure this saved** with **Try again**, which
-checks the same save, with its same key and contents, before any newer change is sent. A reading-hours
-change already requested still saves after leaving Library. When another window changed the same rules, the draft is
-kept and **Changed elsewhere** offers **Use the saved rules** or **Keep my draft**; a save elsewhere
-of other settings is not a conflict. Each reading-rules write carries the revision its draft was
-based on.
+save is saved when its field is left again, and is not called saved before it is. Each editor saves
+its changes one at a time, in the order they were made (leaving a field, a reading-hours choice,
+**Try again**, **Undo**). An unknown outcome (of a skip-rule or a reading-hours save) reads **Not sure
+this saved** with **Try again**, which checks the same save, with its same key and contents, before
+any newer change is sent; newer changes wait and read as not saved yet, also after leaving Library and
+coming back. Changes already made still save after leaving Library. When another window changed the
+same rules, the draft is kept and **Changed elsewhere** offers **Use the saved rules** or **Keep my
+draft** (which saves the draft as it is then); a save elsewhere of other settings is not a conflict.
+Each reading-rules write carries the revision its draft was based on.
 
 Adding a skip rule asks in place, without moving focus: **Remove files already read that match your
 skip rules from search? Files on disk are not touched.** **Keep them** leaves them searchable;
@@ -90,10 +92,12 @@ the answer and the removal (another window, an override), nothing is removed and
 and asked again for the new list. The outcome is plain and names no number of files (the engine
 confirms deletion requests, one per matching folder, not documents): done, partly done (naming
 offline or missing folders, unreadable files and files that couldn't be removed) with **Try again**,
-or not sure with **Try again**. Files no longer on disk are not checked and may stay searchable.
+or not sure with **Try again**. An outcome is about the list its answer was for: if a rule is saved
+while a removal runs, the new ask stays, and the outcome names the rules it was for. Files no longer
+on disk are not checked and may stay searchable.
 While an override is set nothing is asked; the note explains the saved list takes effect when the
-override is removed. The latest skip-rule glob change offers **Undo** until another settings save;
-it restores the rule list only (removed files come back when read again). Hidden weekdays remain
+override is removed. The latest skip-rule glob change offers **Undo** until another settings save
+(an Undo waits for an earlier change still being saved, and closes if that change was saved); it restores the rule list only (removed files come back when read again). Hidden weekdays remain
 saved, with a concise days line beside restricted hours. Their editor, per-rule match counts
 (**Count matching files**), collection/diagnostic facts and routine removal history are behind
 **Settings → Advanced → Show developer tools**.

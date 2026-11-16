@@ -764,3 +764,205 @@ it('R10: removal words never turn deletion-request counts into a number of files
   expect(said).toContain('Done.');
   expect(said, 'one folder request is not "1 file removed"').not.toMatch(/\d+ files? removed/);
 });
+
+// Second review of the repairs (R11, R12). The four counterexamples fail on 67e5f1400c by assertion; the
+// three further orderings check the one save rule: a snapshot per save-triggering event, sent in order.
+
+const timeField = (rules: IndexingRulesEditor, label: 'Start time' | 'End time') => {
+  const field = [...rules.shadowRoot!.querySelectorAll<HTMLInputElement>('input[type=time]')]
+    .find(input => input.closest('label')?.textContent?.includes(label));
+  expect(field, label).toBeTruthy(); return field!;
+};
+async function setTime(rules: IndexingRulesEditor, field: HTMLInputElement, value: string, leaveIt: boolean) {
+  field.focus(); field.value = value; field.dispatchEvent(new Event('input'));
+  if (leaveIt) field.blur();
+  await settle(rules);
+}
+
+it('R11 (review 1): a change queued behind a write whose answer is lost survives leaving and returning, and is saved after that write is settled', async () => {
+  const f = backend(); const el = await mount(f); const rules = editor(el);
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  f.holdWrites();
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules);
+  battery.checked = false; battery.dispatchEvent(new Event('change')); await settle(rules);
+  el.remove(); await settle();
+  // The first write commits, and its answer is lost on the way back.
+  f.loseNextOpAnswer(); f.release(); await settle(); await settle();
+  expect(f.s.ui.indexingPause.pauseOnBattery, 'the server committed "on"').toBe(true);
+  expect(f.ops.map(o => o.args.pauseOnBattery), 'nothing newer is sent before the lost write is settled').toEqual([true]);
+  document.body.append(el); await settle(el); await settle(rules); await settle(el);
+  expect(battery.checked, 'the queued "off" is not replaced by the older saved base').toBe(false);
+  expect(text(rules.shadowRoot)).toContain('Not sure this saved');
+  expect(text(rules.shadowRoot)).toContain('not saved yet');
+  await press(rules, control(rules.shadowRoot, 'Try again')); await settle(el); await settle(rules);
+  expect(f.ops[1]!.key, 'settled with the same key').toBe(f.ops[0]!.key);
+  expect(f.ops[1]!.args, 'and the same bytes').toEqual(f.ops[0]!.args);
+  expect(f.ops.map(o => o.args.pauseOnBattery)).toEqual([true, true, false]);
+  expect(f.s.ui.indexingPause.pauseOnBattery, 'what is shown is what is saved').toBe(false);
+  expect(battery.checked).toBe(false);
+  expect(text(rules.shadowRoot)).not.toContain('Not sure this saved');
+});
+
+it('R11 (review 2): a newer skip-rule draft left while an uncertain write waits is saved after that write is rebased across an unrelated save', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const f = backend(); const el = await mount(f);
+  f.hangWrites(true);
+  await type(el, rule(el, 1), 'A'); await leave(el, rule(el, 1));
+  await vi.advanceTimersByTimeAsync(10_500); await settle(el);
+  expect(text(el.shadowRoot)).toContain('Not sure this saved');
+  f.hangWrites(false);
+  f.elsewhere(ui => ({ ...ui, theme: 'light' }));
+  await type(el, rule(el, 1), 'B'); await leave(el, rule(el, 1)); await settle(el);
+  const bodies = f.posts.map(p => p.body);
+  expect(bodies[1], 'A is settled first with the same key and bytes').toBe(bodies[0]);
+  expect(globsSent(f)).toEqual([['A'], ['A'], ['A'], ['B']]);
+  expect(f.posts[2]!.parsed.operationKey, 'the refused A is sent again on the new revision').not.toBe(f.posts[0]!.parsed.operationKey);
+  expect(f.s.ui.excludePatterns, 'B is not dropped').toEqual(['B']);
+  expect(f.s.ui.theme).toBe('light');
+  expect(text(el.shadowRoot)).not.toContain('Changed elsewhere');
+  expect(text(el.shadowRoot)).not.toContain('Not sure this saved');
+});
+
+it('R11 (review 2): when the uncertain write\'s list is found saved, the newer draft is still saved after it', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const f = backend(); const el = await mount(f);
+  f.hangWrites(true);
+  await type(el, rule(el, 1), 'A'); await leave(el, rule(el, 1));
+  await vi.advanceTimersByTimeAsync(10_500); await settle(el);
+  f.hangWrites(false);
+  // Another window saved the very same list meanwhile.
+  f.elsewhere(ui => ({ ...ui, excludePatterns: ['A'] }));
+  await type(el, rule(el, 1), 'B'); await leave(el, rule(el, 1)); await settle(el);
+  expect(globsSent(f)).toEqual([['A'], ['A'], ['B']]);
+  expect(f.s.ui.excludePatterns).toEqual(['B']);
+  expect(text(el.shadowRoot)).not.toContain('Changed elsewhere');
+});
+
+it('R11 (review 3): a reading-hours change is saved as it was when its field was left, not as typed after returning to it', async () => {
+  const f = backend(); const el = await mount(f); const rules = editor(el);
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  f.holdWrites();
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules);
+  const start = timeField(rules, 'Start time');
+  await setTime(rules, start, '10:00', true);
+  // Back in the field: 11:00 is typed and the field is not left.
+  await setTime(rules, start, '11:00', false);
+  f.release(); await settle(rules); await settle(el); await settle(rules);
+  expect(f.ops).toHaveLength(2);
+  expect((f.ops[1]!.args.schedule as Schedule).startMinute, 'the left value 10:00').toBe(600);
+  expect(f.s.ui.indexingPause.schedule?.startMinute).toBe(600);
+  expect(start.value).toBe('11:00');
+  expect(text(rules.shadowRoot), 'the unsaved 11:00 is not called saved').not.toContain('Reading rules saved');
+  start.blur(); await settle(rules); await settle(el);
+  expect(f.s.ui.indexingPause.schedule?.startMinute).toBe(660);
+});
+
+it('R12 (review 4): an older removal result keeps the newer ask and names only the list it removed for', async () => {
+  const f = backend(); const el = await mount(f);
+  const engine = f.invoke.getMockImplementation()!;
+  let finish!: () => void;
+  const gate = new Promise<void>(resolve => { finish = resolve; });
+  // The engine checks the list it was given when asked, and answers later.
+  f.invoke.mockImplementationOnce(async (id, args, options) => { const answer = engine(id, args, options); await gate; return answer; });
+  await addRule(el, '*.tmp');
+  await press(el, control(askRegion(el)[0], 'Remove from search'));
+  expect(f.removedFor).toEqual([['*.log', '*.tmp']]);
+  // Another rule is saved while that removal's answer is pending: a new ask for the new list.
+  await addRule(el, '*.bak');
+  const newer = askRegion(el)[0]; expect(newer).toBeDefined();
+  finish(); await settle(el); await settle(el);
+  expect(askRegion(el), 'the newer ask stays').toHaveLength(1);
+  const said = text(el.shadowRoot!.querySelector('.removal-slot'));
+  expect(said).toContain('Done.');
+  expect(said, 'the outcome names the list it was for').toContain('*.log, *.tmp');
+  expect(said, 'never claims files matching the rule added since').not.toContain('*.bak');
+  expect(said).not.toContain('match your skip rules are no longer in search');
+  await press(el, control(askRegion(el)[0], 'Remove from search'));
+  expect(f.removedFor).toEqual([['*.log', '*.tmp'], ['*.log', '*.tmp', '*.bak']]);
+  expect(askRegion(el)).toHaveLength(0);
+  expect(text(el.shadowRoot!.querySelector('.removal-slot'))).toContain('match your skip rules are no longer in search');
+});
+
+it('R11: an unknown outcome, then leaving and returning, keeps the newer draft shown as not saved yet until the write is settled', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const f = backend(); const el = await mount(f);
+  f.hangWrites(true);
+  await type(el, rule(el, 1), 'A'); await leave(el, rule(el, 1));
+  await vi.advanceTimersByTimeAsync(10_500); await settle(el);
+  el.remove(); await settle();
+  document.body.append(el); await settle(el);
+  expect(rule(el, 1).value, 'the uncertain draft is not replaced by the older saved list').toBe('A');
+  await type(el, rule(el, 1), 'B');
+  el.remove(); await settle();
+  await vi.advanceTimersByTimeAsync(10_500); await settle();
+  document.body.append(el); await settle(el);
+  expect(rule(el, 1).value).toBe('B');
+  expect(text(el.shadowRoot)).toContain('Not sure this saved');
+  expect(text(el.shadowRoot)).toContain('not saved yet');
+  expect(text(el.shadowRoot)).not.toMatch(/Skip rules saved/);
+  f.hangWrites(false);
+  await press(el, control(el.shadowRoot, 'Try again')); await settle(el);
+  const bodies = f.posts.map(p => p.body);
+  expect(new Set(bodies.slice(0, -1)).size, 'every send of A has the same key and bytes').toBe(1);
+  expect(globsSent(f).at(-1)).toEqual(['B']);
+  expect(f.s.ui.excludePatterns).toEqual(['B']);
+  expect(text(el.shadowRoot)).not.toContain('Not sure this saved');
+});
+
+it('R11: two queued snapshots of each editor are saved in order across an unrelated revision move', async () => {
+  const f = backend(); const el = await mount(f); const rules = editor(el);
+  f.holdWrites();
+  await type(el, rule(el, 1), 'A'); await leave(el, rule(el, 1));
+  await type(el, rule(el, 1), 'B'); await leave(el, rule(el, 1));
+  await type(el, rule(el, 1), 'C'); await leave(el, rule(el, 1));
+  f.elsewhere(ui => ({ ...ui, theme: 'light' }));
+  f.release(); await settle(el); await settle(el);
+  expect(globsSent(f)).toEqual([['A'], ['A'], ['B'], ['C']]);
+  expect(f.s.ui.excludePatterns).toEqual(['C']);
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  f.holdWrites();
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules);
+  await setTime(rules, timeField(rules, 'Start time'), '10:00', true);
+  await setTime(rules, timeField(rules, 'End time'), '18:00', true);
+  f.elsewhere(ui => ({ ...ui, mode: 'advanced' }));
+  f.release(); await settle(rules); await settle(el); await settle(rules); await settle(el);
+  const sent = f.ops.map(o => [o.args.pauseOnBattery, (o.args.schedule as Schedule | null)?.startMinute ?? null, (o.args.schedule as Schedule | null)?.endMinute ?? null]);
+  expect(sent).toEqual([[true, null, null], [true, null, null], [true, 600, 1020], [true, 600, 1080]]);
+  expect(f.s.ui.indexingPause).toMatchObject({ pauseOnBattery: true, schedule: { startMinute: 600, endMinute: 1080 } });
+  expect(f.s.ui.theme).toBe('light'); expect(f.s.ui.mode).toBe('advanced');
+  expect(text(el.shadowRoot)).not.toContain('Changed elsewhere');
+  expect(text(rules.shadowRoot)).not.toContain('Changed elsewhere');
+});
+
+it('R11: Undo pressed behind a write whose outcome is unknown settles that write first and never overwrites it', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const f = backend(); const el = await mount(f);
+  await addRule(el, '*.tmp');
+  const undo = listOpenReversals()[0]; expect(undo).toBeDefined();
+  f.hangWrites(true);
+  await type(el, rule(el, 1), 'B'); await leave(el, rule(el, 1));
+  await vi.advanceTimersByTimeAsync(10_500); await settle(el);
+  f.hangWrites(false);
+  const before = f.posts.length;
+  undo!.run(); await settle(el); await settle(el);
+  expect(f.posts[before]!.body, 'the uncertain write is settled first, same key and bytes').toBe(f.posts[before - 1]!.body);
+  expect(globsSent(f).slice(before), 'the Undo sends nothing over the later change').toEqual([['B', '*.tmp']]);
+  expect(f.s.ui.excludePatterns).toEqual(['B', '*.tmp']);
+  expect(text(el.shadowRoot)).not.toContain('Not sure this saved');
+});
+
+it('R11: a draft left behind an Undo whose answer was lost is saved after that Undo is settled', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const f = backend(); const el = await mount(f);
+  await addRule(el, '*.tmp');
+  const undo = listOpenReversals()[0]; expect(undo).toBeDefined();
+  f.hangWrites(true);
+  undo!.run(); await settle(el);
+  await vi.advanceTimersByTimeAsync(10_500); await settle(el);
+  f.hangWrites(false);
+  await type(el, rule(el, 1), 'C'); await leave(el, rule(el, 1)); await settle(el);
+  const undos = f.posts.slice(1, 3).map(p => p.body);
+  expect(undos[1], 'the Undo is settled with the same key and bytes').toBe(undos[0]);
+  expect(globsSent(f)).toEqual([['*.log', '*.tmp'], ['*.log'], ['*.log'], ['C', '*.tmp']]);
+  expect(f.s.ui.excludePatterns).toEqual(['C', '*.tmp']);
+});

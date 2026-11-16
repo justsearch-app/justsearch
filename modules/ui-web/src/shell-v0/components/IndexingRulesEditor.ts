@@ -8,6 +8,7 @@ import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { settingsV2Schema, type SettingsV2 } from '../../api/generated/schema-types/settings-v2.js';
 import type { SettingsWitness } from '../../api/settingsAttempt.js';
 import { createOperationKey } from '../../api/operationKey.js';
+import { SaveQueue, type SendOutcome } from '../state/saveQueue.js';
 
 export type SavedIndexingRules = {
   schedule: NonNullable<NonNullable<NonNullable<SettingsV2['ui']>['indexingPause']>['schedule']> | null;
@@ -30,8 +31,9 @@ function outcomeUnknown(error: unknown): boolean {
 
 /**
  * The reading-hours editor. Only the explicit rule pair is written, and it saves as it changes: a
- * choice on change, a time when its field is left. Each write carries the settings revision its draft
- * was based on, so a save made elsewhere since is a conflict rather than overwritten (B6').
+ * choice on change, a time when its field is left. Each change is captured then and saved in order
+ * (R11). Each write carries the settings revision its draft was based on, so a save made elsewhere
+ * since is a conflict rather than overwritten (B6').
  */
 export class IndexingRulesEditor extends JfElement {
   static properties = {
@@ -45,7 +47,6 @@ export class IndexingRulesEditor extends JfElement {
     indexingRulesError: { state: true },
     indexingRulesMessage: { state: true },
     conflictingRules: { state: true },
-    uncertainWrite: { state: true },
   };
   declare developer: boolean;
   declare apiBase: string;
@@ -59,16 +60,23 @@ export class IndexingRulesEditor extends JfElement {
   declare private conflictingRules: SavedIndexingRules | null;
   private conflictWitness: SettingsWitness | null = null;
   private loadSerial = 0;
-  /** A change arrived while a save was in flight; it is saved when that one settles. */
-  private saveAgain = false;
+  /** R11 — the rule pairs captured by save-triggering events, saved in order; it outlives leaving Library. */
+  private readonly queue = new SaveQueue<SavedIndexingRules>(next => this.sendRules(next), () => {
+    this.indexingRulesSaving = this.queue.sending;
+    this.requestUpdate();
+  });
   /**
-   * R8 — a sent write whose outcome is unknown: its key, rule pair and base revision. It is sent again
-   * unchanged, and settled, before any newer change is judged or sent; until then it says "Not sure this saved".
+   * R8 — the queue head's sent write whose outcome is unknown: its key and base revision. It is sent
+   * again with the same key and bytes, and settled, before anything newer; until then "Not sure this saved".
    */
-  declare private uncertainWrite: { key: string; rules: SavedIndexingRules; witness: SettingsWitness } | null;
+  private retained: { key: string; witness: SettingsWitness } | null = null;
+  /** The rule pair saved once every captured change is: what the draft is compared with. */
+  private get queuedRules(): SavedIndexingRules {
+    return this.queue.snapshots.at(-1) ?? this.savedRules;
+  }
   private get indexingRulesDirty(): boolean {
     const next = this.draftRules();
-    return next !== null && !sameRules(next, this.savedRules);
+    return next !== null && !sameRules(next, this.queuedRules);
   }
   private indexingScheduleConfigured = false;
   declare indexingRules: { enabled: boolean; days: number[]; start: string; end: string; pauseOnBattery: boolean };
@@ -156,43 +164,31 @@ export class IndexingRulesEditor extends JfElement {
   };
 
   /**
-   * Save the draft as it now is; a change during a save is saved right after it, also after the
-   * editor has left the page (R9). A write whose outcome is unknown is settled first (R8).
+   * A save-triggering event (a choice, leaving a time field, leaving Library, Try again): the draft as it
+   * is now is captured and queued behind any earlier change (R11). Nothing reads the draft later.
    */
-  private async saveIndexingRules(): Promise<void> {
-    if (!this.indexingRulesLoaded || this.readOnly || this.conflictingRules) return;
-    if (this.indexingRulesSaving) { this.saveAgain = true; return; }
-    if (!this.uncertainWrite) {
-      this.indexingRulesError = this.draftProblem();
-      if (this.indexingRulesError || !this.indexingRulesDirty) return;
-    }
-    this.indexingRulesSaving = true;
-    this.indexingRulesMessage = '';
+  private saveIndexingRules(): Promise<void> {
+    if (!this.indexingRulesLoaded || this.readOnly) return Promise.resolve();
+    const problem = this.draftProblem();
+    if (!this.queue.uncertain) this.indexingRulesError = problem;
+    if (problem || !this.indexingRulesDirty) return this.queue.resume();
     ++this.loadSerial;
-    try {
-      do {
-        this.saveAgain = false;
-        const uncertain = this.uncertainWrite;
-        if (uncertain && !await this.writeRules(uncertain.rules, uncertain)) break;
-        if (this.draftProblem()) { this.indexingRulesError = this.draftProblem(); break; }
-        if (!this.indexingRulesDirty) { this.indexingRulesError = ''; break; }
-        if (!await this.writeRules(this.draftRules()!)) break;
-      } while (this.saveAgain);
-    } finally {
-      this.indexingRulesSaving = false;
-    }
+    this.indexingRulesMessage = '';
+    return this.queue.push(Object.freeze(structuredClone(this.draftRules()!)));
   }
 
   /**
-   * One rule write on the observed revision; a revision moved only by other settings is taken up and
-   * tried again. `same` re-sends an uncertain write with its own key and base revision (same bytes).
+   * One captured rule pair, written on the revision the saved rules were observed at; a revision moved
+   * only by other settings is taken up and the same pair tried again (B11). A retained write whose answer
+   * was lost is sent again with its own key and base revision (same bytes).
    */
-  private async writeRules(next: SavedIndexingRules, same?: { key: string; witness: SettingsWitness }): Promise<boolean> {
+  private async sendRules(next: SavedIndexingRules): Promise<SendOutcome> {
+    if (this.conflictingRules) return 'stopped';
     for (let attempt = 0; attempt < 3; attempt++) {
+      const same = this.retained;
       const witness = same?.witness ?? this.savedWitness;
-      if (!witness) { this.indexingRulesError = 'Could not save reading rules. Reload Library and try again.'; return false; }
+      if (!witness) { this.indexingRulesError = 'Could not save reading rules. Reload Library and try again.'; return 'stopped'; }
       const operationKey = same?.key ?? createOperationKey();
-      same = undefined;
       let sent = false;
       const write = () => {
         sent = true;
@@ -206,7 +202,7 @@ export class IndexingRulesEditor extends JfElement {
           await this.saveWithSettings(async () => { const result = await write(); receipt = result.structuredData?.['witness']; return result; }, operationKey);
         } else receipt = (await write()).structuredData?.['witness'];
         const observed = settingsV2Schema.shape.witness.safeParse(receipt);
-        this.uncertainWrite = null;
+        this.retained = null;
         // Only this write's direct successor is known to hold exactly these rules; otherwise the next
         // write is refused and rebased after reading the saved rules.
         if (observed.success && observed.data && observed.data.lastCommittedOperationKey === operationKey
@@ -216,34 +212,34 @@ export class IndexingRulesEditor extends JfElement {
         this.savedRules = next;
         this.indexingRulesError = '';
         this.indexingRulesMessage = 'Reading rules saved.';
-        return true;
+        return 'saved';
       } catch (error) {
         const conflict = error instanceof OperationError && (error.httpStatus === 409 || error.errorCode === 'VERSION_CONFLICT');
         if (!conflict) {
           if (sent && outcomeUnknown(error)) {
             // The answer was lost: keep the exact write to settle before anything newer.
-            this.uncertainWrite = { key: operationKey, rules: next, witness };
+            this.retained = { key: operationKey, witness };
             this.indexingRulesError = '';
-            return false;
+            return 'uncertain';
           }
-          this.uncertainWrite = null;
+          this.retained = null;
           this.indexingRulesError = `Could not save reading rules. ${error instanceof Error ? error.message : String(error)}`;
-          return false;
+          return 'dropped';
         }
         // Refused on its revision: that write was not saved.
-        this.uncertainWrite = null;
+        this.retained = null;
         const observed = await this.observeSaved();
-        if (!observed) return false;
-        if (sameRules(observed.rules, next)) { this.savedRules = next; this.savedWitness = observed.witness; return true; }
+        if (!observed) return 'stopped';
+        if (sameRules(observed.rules, next)) { this.savedRules = next; this.savedWitness = observed.witness; return 'saved'; }
         if (sameRules(observed.rules, this.savedRules)) { this.savedWitness = observed.witness; continue; }
         this.conflictingRules = observed.rules;
         this.conflictWitness = observed.witness;
         this.indexingRulesError = '';
-        return false;
+        return 'stopped';
       }
     }
     this.indexingRulesError = 'Could not save reading rules: settings kept changing. Try the change again.';
-    return false;
+    return 'stopped';
   }
 
   /**
@@ -293,7 +289,6 @@ export class IndexingRulesEditor extends JfElement {
     this.indexingRulesError = '';
     this.indexingRulesMessage = '';
     this.conflictingRules = null;
-    this.uncertainWrite = null;
   }
 
   override connectedCallback(): void {
@@ -328,11 +323,13 @@ export class IndexingRulesEditor extends JfElement {
       const saved: SavedIndexingRules = { schedule: schedule ? { enabled: schedule.enabled ?? false, days: [...(schedule.days ?? [])],
         startMinute: schedule.startMinute ?? 540, endMinute: schedule.endMinute ?? 1020 } : null, pauseOnBattery: policy?.pauseOnBattery ?? false };
       const dirty = this.indexingRulesLoaded && this.indexingRulesDirty;
-      if (mode === 'preserve' && dirty && !sameRules(saved, this.savedRules)) {
+      // Captured changes not saved yet stay as they are: their own writes find out what changed (R11).
+      const queued = this.queue.snapshots.length > 0 || this.queue.sending;
+      if (mode === 'preserve' && dirty && !queued && !sameRules(saved, this.savedRules)) {
         this.conflictingRules = saved;
         this.conflictWitness = data.witness ?? null;
       }
-      const adopt = mode === 'discard' || !dirty && !this.indexingRulesSaving;
+      const adopt = mode === 'discard' || !dirty && !queued;
       if (adopt) { this.savedRules = saved; this.savedWitness = data.witness ?? null; }
       if (adopt) {
         this.indexingScheduleConfigured = schedule != null;
@@ -361,10 +358,13 @@ export class IndexingRulesEditor extends JfElement {
 
   /** "Changed elsewhere": keep the draft over the rules shown, or take the saved rules and write nothing. */
   private async resolveConflict(keepDraft: boolean): Promise<void> {
-    if (this.indexingRulesSaving || this.readOnly || !this.conflictingRules) return;
+    if (this.queue.sending || this.readOnly || !this.conflictingRules) return;
+    // Either choice settles every change captured before it: none of them is sent.
+    this.queue.clear();
+    this.retained = null;
     if (keepDraft) {
-      // Consent covers exactly the rules displayed: the write is based on their revision, so a
-      // further change elsewhere since is shown as a new conflict instead of overwritten.
+      // The draft kept is captured now. Consent covers exactly the rules displayed: it is based on their
+      // revision, so a further change elsewhere since is shown as a new conflict instead of overwritten.
       this.savedRules = this.conflictingRules;
       this.savedWitness = this.conflictWitness;
       this.conflictingRules = null;
@@ -453,10 +453,12 @@ export class IndexingRulesEditor extends JfElement {
           <p id="indexing-battery-help">Applies only while this computer is known to run on battery. If the power source is unknown, this rule does not hold reading. Your preference is kept.</p>
         </details>
         ${this.renderSavedRules()}
-        ${this.uncertainWrite && !this.indexingRulesSaving ? html`<p role="alert">Not sure this saved.
+        ${this.queue.snapshots.length > 0 && !this.indexingRulesSaving && !this.conflictingRules
+          ? html`<p role="alert">${this.queue.uncertain ? `Not sure this saved.${this.queue.snapshots.length > 1
+            ? ' Your newer changes are not saved yet.' : ''}` : 'Your changes are not saved yet.'}
           <button type="button" @click=${() => void this.saveIndexingRules()}>Try again</button></p>` : nothing}
         <p id="indexing-rules-error" role="alert">${this.indexingRulesError}</p>
-        <p role="status">${this.indexingRulesMessage}</p>
+        <p role="status">${this.indexingRulesDirty || this.queue.snapshots.length ? '' : this.indexingRulesMessage}</p>
         ${!this.indexingRulesLoaded ? html`<p>Waiting for saved reading rules.</p>` : nothing}
         ${this.readOnly ? html`<p>Settings are read-only in this session.</p>` : nothing}
       </form>
