@@ -1623,6 +1623,22 @@ executors. Generic Settings exposes `indexingPause` read-only.
   An optional `witness` `{acceptedRevision, lastCommittedOperationKey}` names the settings revision
   the caller's draft was based on; the write then commits only at that revision and otherwise fails
   with `VERSION_CONFLICT` (Library sends it, so another window's newer save is never overwritten).
+- `core.indexing-read-now`: `{}`; "Read waiting files now". Installs, in Engine memory only, a release
+  that lets file reading (initial reads, rescans, watcher changes) through the reading rules (hours,
+  battery); enrichment, picture reading and GPL stay held and the rules are unchanged. Files arriving
+  during the release are read too. It ends at the first file-reading poll under it that claims
+  nothing, on manual Pause or settings recovery, on an accepted change of the reading rules, when a
+  rule reason that did not hold at its start begins to hold or no rule holds any more (also when
+  reading hours opened unobserved; an ended release never revives), and on Engine restart. Pause,
+  recovery and a rule change wait for a claim in progress under it; no claim starts after they return. MEDIUM risk, no confirmation, metadata audit. `structuredData.outcome` is `started`
+  (installed; not "files read"), `joined` (already active), `nothing-waiting` or `not-held` with
+  `reason` `paused`, `recovery` or `not-held`. A keyed replay returns the recorded receipt and never
+  installs it again.
+
+`operating.indexing.readingRuleReasons` lists the reading rules (`schedule`, `on_battery`) holding file
+reading now, apart from bulk-work reasons; `heldFilesWaiting` says ready file jobs are held from
+reading; `release.active` says a read-now release is reading them. While it is active the block
+reports file reading as it runs (never PAUSED for the rules) and still lists the rule reasons.
 
 `operating.indexing.reasons` is ordered settings recovery, manual (`user_paused`), `schedule`,
 `on_battery`, then automatic bulk-work reasons. The primary lifecycle codes are

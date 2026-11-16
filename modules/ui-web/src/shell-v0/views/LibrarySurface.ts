@@ -299,6 +299,8 @@ export class LibrarySurface extends JfElement {
   private rebuilding = false;
   private provisionalHeadline = 'Reading status unconfirmed';
   private indexProgress = selectIndexingProgress(null, false, 0, []);
+  /** Slice 6c — the status body held now: a new one is a new observation, a reprojection keeps it. */
+  private statusObservation: unknown = null;
   static properties = {
     developer: { state: true }, rereadConfirmOpen: { state: true }, rereadBusy: { state: true }, activityOpen: { state: true },
     apiBase: { attribute: 'api-base', type: String },
@@ -1004,6 +1006,7 @@ export class LibrarySurface extends JfElement {
       if (progress.activity.confirmed) this.lastKnownHold = progress.pause ? progress : undefined;
       this.indexingActivity = progress.activity;
       this.indexProgress = progress;
+      this.statusObservation = s.status;
       this.retryWaiting = progress.activity.confirmed && progress.phase === 'waiting';
       this.enrichmentStages = progress.stages;
       // Round-15 F1b — same projection, same tick: whether the semantic stage can run at all, so a
@@ -3052,7 +3055,8 @@ export class LibrarySurface extends JfElement {
         </div>
         <div class="removal-slot" aria-live="polite">${this.renderRemoval()}</div>
       </section>
-      <jf-indexing-rules-editor api-base=${this.apiBase} .host_=${this.host_}
+      <jf-indexing-rules-editor api-base=${this.apiBase} .host_=${this.host_} .readWaiting=${this.indexProgress.readWaiting}
+        .statusObservation=${this.statusObservation}
         .developer=${this.developer} .saveWithSettings=${this.saveIndexingRulesWithSettings}></jf-indexing-rules-editor>
       </div>
       ${this.developer && !(this.unfinishedForgets?.items.length ?? 0) && this.forgetReadStatus !== 'unavailable' && !this.forgetMessage ? html`<details class="removal-history"><summary>Removal history</summary>${this.renderUnfinishedForgets()}</details>` : nothing}

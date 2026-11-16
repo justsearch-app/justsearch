@@ -911,8 +911,9 @@ export interface OperationProjectable {
 }
 
 function canProjectOperationAsZeroArgAction(op: OperationProjectable): boolean {
+  // "Read waiting files now" is offered in Library only while a reading rule holds files back.
   return op.id !== 'core.start-ai-install' && op.id !== 'core.repair-ai-install'
-    && op.id !== 'core.set-indexing-rules';
+    && op.id !== 'core.set-indexing-rules' && op.id !== 'core.indexing-read-now';
 }
 
 /**

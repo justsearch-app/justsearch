@@ -34,6 +34,10 @@
         }
       }
     },
+    "IndexingReason" : {
+      "type" : "string",
+      "enum" : [ "settings_recovery", "user_paused", "schedule", "on_battery", "game_mode", "gpu_busy_external", "energy_saver", "chat_generating" ]
+    },
     "MigrationEnumeratorView-nullable" : {
       "type" : [ "object", "null" ],
       "properties" : {
@@ -682,8 +686,17 @@
             "agingReleaseAt" : {
               "type" : [ "string", "null" ]
             },
+            "heldFilesWaiting" : {
+              "type" : "boolean"
+            },
             "pendingJobs" : {
               "type" : "integer"
+            },
+            "readingRuleReasons" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "#/$defs/IndexingReason"
+              }
             },
             "reasonCode" : {
               "type" : [ "string", "null" ]
@@ -691,9 +704,17 @@
             "reasons" : {
               "type" : "array",
               "items" : {
-                "type" : "string",
-                "enum" : [ "settings_recovery", "user_paused", "schedule", "on_battery", "game_mode", "gpu_busy_external", "energy_saver", "chat_generating" ]
+                "$ref" : "#/$defs/IndexingReason"
               }
+            },
+            "release" : {
+              "type" : "object",
+              "properties" : {
+                "active" : {
+                  "type" : "boolean"
+                }
+              },
+              "required" : [ "active" ]
             },
             "sampledAt" : {
               "type" : "string"
@@ -712,7 +733,7 @@
               "type" : "boolean"
             }
           },
-          "required" : [ "affects", "agingReleaseAt", "pendingJobs", "reasonCode", "reasons", "sampledAt", "since", "state", "untilEpochMs", "waitingForResume" ]
+          "required" : [ "affects", "agingReleaseAt", "heldFilesWaiting", "pendingJobs", "readingRuleReasons", "reasonCode", "reasons", "release", "sampledAt", "since", "state", "untilEpochMs", "waitingForResume" ]
         },
         "schemaVersion" : {
           "type" : "integer"

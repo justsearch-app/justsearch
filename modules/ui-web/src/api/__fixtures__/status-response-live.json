@@ -492,7 +492,12 @@
       "agingReleaseAt" : null,
       "sampledAt" : "2025-01-01T00:00:00Z",
       "untilEpochMs" : null,
-      "waitingForResume" : false
+      "waitingForResume" : false,
+      "readingRuleReasons" : [ ],
+      "heldFilesWaiting" : false,
+      "release" : {
+        "active" : false
+      }
     },
     "gpu" : {
       "profile" : "P12",

@@ -64,6 +64,8 @@ Manual Pause keeps files already read searchable. Resume clears the manual pause
 and the pause-on-battery preference still apply. Outside the saved hours, processing waits for the
 schedule. Change hours opens the hours control; Change battery setting opens the battery preference.
 On a known battery reading, it waits for AC power or a change to the battery preference.
+While files wait for these rules, **Read waiting files now** under **When to read files** reads them
+once; the rules stay as they are and picture reading still waits.
 An unknown power reading adds no battery hold. The battery preference is off by default and stays saved
 even when no battery is detected.
 

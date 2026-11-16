@@ -226,6 +226,14 @@ public final class CoreOperationCatalog implements OperationCatalog {
   public static final OperationRef SET_INDEXING_RULES = new OperationRef("core.set-indexing-rules");
 
   /**
+   * "Read waiting files now": an in-memory release letting file reading through the reading rules
+   * (hours, battery) until no ready file job is left. Enrichment, picture reading and GPL stay held;
+   * the rules are unchanged. Returns {@code structuredData.outcome}: started, joined,
+   * nothing-waiting or not-held (with {@code reason}: paused, recovery or not-held).
+   */
+  public static final OperationRef READ_WAITING_FILES = new OperationRef("core.indexing-read-now");
+
+  /**
    * Slice 3a-2-c BrainRuntimeSection Trigger Offline Processing button.
    * Dispatches the VDU + embeddings catch-up worker. LOW risk (background
    * batch; idempotent — re-running just re-attempts pending work). Returns
@@ -388,6 +396,7 @@ public final class CoreOperationCatalog implements OperationCatalog {
       setChatEnabled(),
       indexingPause(PAUSE_INDEXING, true),
       indexingPause(RESUME_INDEXING, false),
+      readWaitingFiles(),
       indexingRules(),
       triggerOfflineProcessing(),
       activateRuntimeVariant(),
@@ -1053,6 +1062,18 @@ public final class CoreOperationCatalog implements OperationCatalog {
             AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false)
             .withRecordKind(io.justsearch.agent.api.registry.OperationKind.SETTINGS_APPLY),
         OperationAvailability.empty(), OperationLineage.empty(), Binding.of(SET_INDEXING_RULES),
+        Provenance.core("1.0"), Set.of(ExecutorTag.UI));
+  }
+
+  private static Operation readWaitingFiles() {
+    return new Operation(READ_WAITING_FILES, Presentation.forId(READ_WAITING_FILES),
+        Interface.of("{\"type\":\"object\",\"properties\":{},\"additionalProperties\":false}",
+            "{\"type\":\"object\",\"properties\":{\"outcome\":{\"type\":\"string\","
+                + "\"enum\":[\"started\",\"joined\",\"nothing-waiting\",\"not-held\"]},"
+                + "\"reason\":{\"type\":\"string\",\"enum\":[\"paused\",\"recovery\",\"not-held\"]}}}"),
+        new OperationPolicy(RiskTier.MEDIUM, ConfirmStrategy.None.INSTANCE,
+            AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false),
+        OperationAvailability.empty(), OperationLineage.empty(), Binding.of(READ_WAITING_FILES),
         Provenance.core("1.0"), Set.of(ExecutorTag.UI));
   }
 

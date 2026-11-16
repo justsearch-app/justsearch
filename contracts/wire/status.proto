@@ -129,8 +129,8 @@ message ChatLoadView {
 message OperatingIndexingView {
   // IndexingState: IDLE | RUNNING | SLOWED | PAUSING | PAUSED.
   string state = 1 [json_name = "state"];
-  // IndexingReason tokens in precedence order: user_paused, settings_recovery,
-  // game_mode, gpu_busy_external, energy_saver,
+  // IndexingReason tokens in precedence order: settings_recovery, user_paused,
+  // schedule, on_battery, game_mode, gpu_busy_external, energy_saver,
   // chat_generating.
   repeated string reasons = 2 [json_name = "reasons"];
   optional string reason_code = 3 [json_name = "reasonCode"];
@@ -142,6 +142,18 @@ message OperatingIndexingView {
   string sampled_at = 8 [json_name = "sampledAt"];
   optional int64 until_epoch_ms = 9 [json_name = "untilEpochMs"];
   bool waiting_for_resume = 10 [json_name = "waitingForResume"];
+  // The reading rules holding file reading now, apart from bulk-work reasons
+  // (IndexingReason tokens: schedule, on_battery).
+  repeated string reading_rule_reasons = 11 [json_name = "readingRuleReasons"];
+  // Ready file jobs are held from reading.
+  bool held_files_waiting = 12 [json_name = "heldFilesWaiting"];
+  // "Read waiting files now": whether a release lets file reading through the reading rules.
+  IndexingReleaseView release = 13 [json_name = "release"];
+}
+
+// In Engine memory only; enrichment, picture reading and GPL stay held while it is active.
+message IndexingReleaseView {
+  bool active = 1 [json_name = "active"];
 }
 
 message OperatingGpuView {

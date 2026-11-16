@@ -1578,7 +1578,10 @@ public final class McpToolSurface {
           sb.append(", untilEpochMs: ").append(extras.get("indexingPauseUntilEpochMs"));
         }
         sb.append(")\n");
-        if (status.queueDepth() > 0 || Boolean.TRUE.equals(extras.get("indexingWaitingForResume"))) {
+        if (Boolean.TRUE.equals(extras.get("indexingReleased"))) {
+          // "Read waiting files now": file reading passes the reading rules once; they are unchanged.
+          sb.append("processing: reading waiting files now; reading rules unchanged\n");
+        } else if (status.queueDepth() > 0 || Boolean.TRUE.equals(extras.get("indexingWaitingForResume"))) {
           String waiting = switch (String.valueOf(extras.get("indexingPauseReason"))) {
             case "schedule" -> "indexing hours";
             case "on_battery" -> "AC power or a change to the battery setting";

@@ -92,6 +92,12 @@ export interface EnrichSettleSample {
 export interface IndexingProgress {
   /** WP3.7: Engine-confirmed policy hold, distinct from automatic enrichment holds. */
   pause?: { state: 'pausing' | 'paused'; reason: string; reasons?: readonly string[]; untilEpochMs: number | null; waiting: boolean } | null;
+  /**
+   * Slice 6c — "Read waiting files now", from fresh status only. `offered`: a reading rule (hours,
+   * battery) alone holds ready file jobs; manual Pause and settings recovery never offer it, and
+   * bulk-work reasons are ignored. `active`: the Engine's release is reading them now.
+   */
+  readWaiting?: { offered: boolean; active: boolean };
   /** WP3.3: one account of current activity and automatic holds for every status surface. */
   activity: {
     summary: string;
@@ -236,6 +242,7 @@ export function isWorkerReportedIndex(status: StatusResponse | null | undefined)
 
 const EMPTY: IndexingProgress = {
   pause: null,
+  readWaiting: { offered: false, active: false },
   activity: { summary: 'Reading status unconfirmed', detail: null, confirmed: false, enrichmentDeferred: false },
   phase: 'unknown',
   jobsPending: 0,
@@ -477,9 +484,12 @@ const PAUSE_REASON_WORDING: ReadonlyMap<string, string> = new Map([
 function policyPause(status: StatusResponse | null | undefined): IndexingProgress['pause'] {
   const indexing = status?.operating?.indexing;
   if (!indexing || (indexing.state !== 'PAUSING' && indexing.state !== 'PAUSED')) return null;
+  // Slice 6c — while "read waiting files now" releases them, the reading rules do not hold file reading.
+  const holding = indexing.release?.active === true
+    ? indexing.reasons.filter(r => r !== 'schedule' && r !== 'on_battery') : indexing.reasons;
   const ordered = ['settings_recovery', 'user_paused', 'schedule', 'on_battery'];
-  const reasons = ordered.filter(r => indexing.reasons.includes(r as typeof indexing.reasons[number]));
-  const reason = reasons[0] ?? indexing.reasons.find(r => !AUTOMATIC_REASONS.has(r));
+  const reasons = ordered.filter(r => holding.includes(r as typeof indexing.reasons[number]));
+  const reason = reasons[0] ?? holding.find(r => !AUTOMATIC_REASONS.has(r));
   if (!reason) return null;
   return { state: indexing.state === 'PAUSING' ? 'pausing' : 'paused', reason: reason ?? '', reasons,
     untilEpochMs: indexing.untilEpochMs, waiting: indexing.waitingForResume };
@@ -664,6 +674,14 @@ export function selectIndexingProgress(
   const confirmed = indexingStatusLive && status.meta?.workerRpcStale !== true &&
     !status.operating?.freshness?.staleSources?.includes('indexing');
   const reportedPause = confirmed ? policyPause(status) : null;
+  const held = status.operating?.indexing;
+  const releaseActive = confirmed && held?.release?.active === true;
+  const readWaiting = {
+    offered: confirmed && !releaseActive && (held?.readingRuleReasons?.length ?? 0) > 0
+      && held?.heldFilesWaiting === true
+      && !held.reasons.some(reason => reason === 'user_paused' || reason === 'settings_recovery'),
+    active: releaseActive,
+  };
   const pause = reportedPause ? { ...reportedPause,
     waiting: reportedPause.waiting || jobsPending > 0 || work.rawPending > 0 || count(core.pendingVduCount) > 0 } : null;
   const phase = pause?.state ?? derivePhase(core.indexState, jobsPending, work);
@@ -696,6 +714,7 @@ export function selectIndexingProgress(
 
   return {
     pause,
+    readWaiting,
     activity,
     phase,
     jobsPending,

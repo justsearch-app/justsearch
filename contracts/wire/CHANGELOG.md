@@ -33,6 +33,11 @@ the V1.5 follow-up per slice 3a-1-8f.
 
 ### Added
 
+- Wire 3.0.6: OperatingIndexingView fields 11-13 `readingRuleReasons` (reading rules holding
+  file reading now), `heldFilesWaiting` (ready file jobs held from reading) and `release`
+  (`IndexingReleaseView.active`: a "read waiting files now" release is letting file reading
+  through those rules). Additive; the release lives in Engine memory only, no stored state.
+
 - Wire 3.0.5: CoreIndexView field 20 `ownSearchableDocuments` is the searchable population
   without the app's internal collections (bundled Help, agent history), from the same snapshot
   as `searchableDocuments`; absent when the index counts are unknown. Additive optional; no

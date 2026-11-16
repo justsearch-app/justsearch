@@ -33,6 +33,9 @@ export const indexCleanupWarningSchema = z.strictObject({
   "reason": z.string().nullable().optional(),
 });
 
+export type IndexingReason = "settings_recovery" | "user_paused" | "schedule" | "on_battery" | "game_mode" | "gpu_busy_external" | "energy_saver" | "chat_generating";
+export const indexingReasonSchema = z.enum(["settings_recovery", "user_paused", "schedule", "on_battery", "game_mode", "gpu_busy_external", "energy_saver", "chat_generating"]);
+
 export type MigrationEnumeratorViewNullable = {
   done?: boolean;
   filesEnqueued?: number;
@@ -258,9 +261,14 @@ export interface StatusResponse {
     indexing?: {
       affects: ("INDEXING" | "VDU")[];
       agingReleaseAt: string | null;
+      heldFilesWaiting: boolean;
       pendingJobs: number;
+      readingRuleReasons: IndexingReason[];
       reasonCode: string | null;
-      reasons: ("settings_recovery" | "user_paused" | "schedule" | "on_battery" | "game_mode" | "gpu_busy_external" | "energy_saver" | "chat_generating")[];
+      reasons: IndexingReason[];
+      release: {
+        active: boolean;
+      };
       sampledAt: string;
       since: string;
       state: "IDLE" | "RUNNING" | "SLOWED" | "PAUSING" | "PAUSED";
@@ -707,9 +715,14 @@ export const statusResponseSchema = z.strictObject({
     "indexing": z.strictObject({
       "affects": z.array(z.enum(["INDEXING", "VDU"])),
       "agingReleaseAt": z.string().nullable(),
+      "heldFilesWaiting": z.boolean(),
       "pendingJobs": z.number().int(),
+      "readingRuleReasons": z.array(indexingReasonSchema),
       "reasonCode": z.string().nullable(),
-      "reasons": z.array(z.enum(["settings_recovery", "user_paused", "schedule", "on_battery", "game_mode", "gpu_busy_external", "energy_saver", "chat_generating"])),
+      "reasons": z.array(indexingReasonSchema),
+      "release": z.strictObject({
+        "active": z.boolean(),
+      }),
       "sampledAt": z.string(),
       "since": z.string(),
       "state": z.enum(["IDLE", "RUNNING", "SLOWED", "PAUSING", "PAUSED"]),

@@ -42,6 +42,7 @@ import io.justsearch.app.api.status.VectorFormatView;
 import io.justsearch.app.api.status.VisualExtractionView;
 import io.justsearch.app.api.status.WorkerOperationalView;
 import io.justsearch.app.api.status.operating.ChatLoadView;
+import io.justsearch.app.api.status.operating.IndexingReleaseView;
 import io.justsearch.app.api.status.operating.OperatingChatView;
 import io.justsearch.app.api.status.operating.OperatingDegradationView;
 import io.justsearch.app.api.status.operating.OperatingFreshnessView;
@@ -278,8 +279,10 @@ final class StatusFieldClassification {
         state("phase", "expectedSource"), measurement("expectedMs"),
         time("startedAt", "elapsedMs"));
     put(table, OperatingIndexingView.class,
-        state("state", "reasons", "reasonCode", "affects", "waitingForResume"), measurement("pendingJobs"),
+        state("state", "reasons", "reasonCode", "affects", "waitingForResume", "readingRuleReasons",
+            "heldFilesWaiting", "release"), measurement("pendingJobs"),
         time("since", "agingReleaseAt", "sampledAt", "untilEpochMs"));
+    put(table, IndexingReleaseView.class, state("active"));
     put(table, OperatingGpuView.class,
         state("profile", "profileSource", "adapter", "spillSuspected", "source", "stale"),
         measurement("adapterTotalBytes", "adapterFreeBytes", "ourDedicatedBytes",

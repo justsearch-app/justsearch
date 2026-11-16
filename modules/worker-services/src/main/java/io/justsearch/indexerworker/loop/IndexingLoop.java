@@ -750,7 +750,7 @@ public class IndexingLoop implements Closeable {
     while (running.get() && !Thread.currentThread().isInterrupted()) {
       try {
         heavyIndexing();
-        if (lease != null && hold.held()) {
+        if (lease != null && hold.ingestionHeld()) {
           // Retain ownership across batches: buffered writes must be published before quiet.
           if (!finishIdleCommit()) {
             Thread.sleep(50L);
@@ -766,7 +766,8 @@ public class IndexingLoop implements Closeable {
         // Resource handoff for foreground search/Ask remains live while processing is held.
         embeddingLifecycle.handleGpuStateTransition();
 
-        if (hold != null && lease == null) lease = hold.tryAcquire();
+        // A "read waiting files now" release admits file reading only; other lanes stay held.
+        if (hold != null && lease == null) lease = hold.tryAcquireIngestion();
         if (hold != null && lease == null) {
           // Keep cycling through cutover/upgrade coordination while processing admission is closed.
           Thread.sleep(50L);
@@ -778,11 +779,25 @@ public class IndexingLoop implements Closeable {
           continue;
         }
 
-        // Poll for pending jobs
-        List<JobQueue.IndexJob> jobs = jobQueue.pollPending(pacing().pollBatchSize());
+        // Poll for pending jobs. The claim is made under the hold, so a hold or a revoked release
+        // since admission claims nothing more and revocation waits for a claim in progress; the
+        // next pass publishes and acknowledges as for any hold.
+        int pollBatchSize = pacing().pollBatchSize();
+        Object release = null;
+        List<JobQueue.IndexJob> jobs;
+        if (hold == null) {
+          jobs = jobQueue.pollPending(pollBatchSize);
+        } else {
+          var claim = hold.claimIngestion(() -> jobQueue.pollPending(pollBatchSize));
+          if (claim == null) continue;
+          jobs = claim.claimed();
+          release = claim.release();
+        }
         if (journal.commitWriteFailure() == null) queueFailures.success();
 
         if (jobs.isEmpty()) {
+          // The release's poll that claims nothing ends it, a bounded scan of refused rows included.
+          if (release != null) hold.endRelease(release);
           if (jobQueue.pollPendingBudgetExhausted()) continue;
           // No work to do - log batch summary if we just finished one
           if (currentState == LoopState.RUNNING && batchStats.hasWork()) {
@@ -1335,10 +1350,12 @@ public class IndexingLoop implements Closeable {
   }
 
   // Match file-processing admission below: energy saver and GPU bulk holds only pace
-  // enrichment; manual, schedule and battery holds share the loop's IndexingHold.
+  // enrichment; manual, schedule and battery holds share the loop's IndexingHold, and a
+  // "read waiting files now" release lets file reading progress through the rules.
   private boolean heavyIndexingCanProgress() {
+    var hold = signalBus.indexingHold();
     return isRunning() && !cutoverPauseRequested && serviceOutagePausedUntilMs() == 0
-        && !signalBus.isIndexingHeld();
+        && (hold == null ? !signalBus.isIndexingHeld() : !hold.ingestionHeld());
   }
 
   /**
