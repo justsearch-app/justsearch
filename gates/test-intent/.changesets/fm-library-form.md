@@ -84,3 +84,13 @@ assertion is listed below; every other assertion in these files is unchanged and
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-amdwh43b",
+  "verdict": "accept",
+  "digest": "sha256:a177fff7000d9ae2b385a1fdf1b7765fc0e325821093f9f1b43b3e55d6639aa3"
+}
+```
