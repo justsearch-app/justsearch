@@ -139,3 +139,13 @@ Registrar's Ledger with high contrast in Dark 1.17-1.31).
   "digest": "sha256:8b6c120b2799310213110026501fc08615f24bbf1986714c083ec45465a3141c"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "dc77580d-ea00-4b41-997d-e652fb2efca8",
+  "verdict": "accept",
+  "digest": "sha256:8b6c120b2799310213110026501fc08615f24bbf1986714c083ec45465a3141c"
+}
+```
