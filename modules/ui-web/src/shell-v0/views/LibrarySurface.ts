@@ -819,7 +819,8 @@ export class LibrarySurface extends JfElement {
     failedChipStyles,
     folderRowStyles,
     css`
-      .folders-scroll { padding: 1.8rem 2.5rem; min-width: 0; }
+      /* The page column: the scroller spans the window, its content sits on the centred column. */
+      .folders-scroll { padding: 1.8rem calc(var(--surface-content-gutter) + 2.5rem); min-width: 0; }
       .header-left h2 { font-size: var(--font-size-headline); font-variation-settings: "opsz" 32; font-weight: 400; }
       .header { margin-bottom: 1.5rem; }
       .subtitle { overflow-wrap: anywhere; }

@@ -441,7 +441,8 @@ export class HealthSurface extends JfElement {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0.75rem 1.5rem;
+      /* The page column: the line spans the window, the content sits on the centred column. */
+      padding: 0.75rem calc(var(--surface-content-gutter) + 1.5rem);
       gap: 1rem;
       border-bottom: 1px solid var(--border-subtle);
     }
@@ -472,7 +473,7 @@ export class HealthSurface extends JfElement {
       min-width: 0;
       flex: 1;
       overflow-y: auto;
-      padding: 1rem 1.5rem;
+      padding: 1rem calc(var(--surface-content-gutter) + 1.5rem);
       display: flex;
       flex-direction: column;
       gap: 1rem;

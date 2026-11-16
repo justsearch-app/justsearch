@@ -393,18 +393,26 @@
   --density-stack-gap-sm: 24px;     /* ~ Tailwind space-y-6 */
   --density-stack-gap: 32px;        /* ~ Tailwind space-y-8 */
   --density-stack-gap-lg: 40px;     /* ~ Tailwind space-y-10 */
-  /* 559 Authority VI (slack/fill) — the reading-column width a SurfaceLayout
-     body uses under data-fill="reading": short content sits in a centered
-     max-width column with intentional side whitespace instead of stretching
-     full-bleed and reading as a loose empty band on wide viewports. */
-  --surface-content-max-width: 72rem;
+  /* The page width (owner decision, 15 November: "a wide window does not stretch the page"). Below
+     the top bar every area's content is one centred column of at most this width, the area's own
+     inline padding included; at or below it nothing changes. A region that spans the window (a
+     scroller, a tab row's line, a header's line) keeps its full width and adds
+     --surface-content-gutter to its inline padding, so its content sits on the column while its
+     line and its scroll area stay full width. A region inside a full-width scroller may instead take
+     max-width + margin-inline: auto. Search with its side pane open centres the list and the pane
+     together in --surface-content-with-pane-max-width. The split stage resets the gutter and the
+     with-pane width (Shell.ts Stage). Also SurfaceLayout's data-fill="reading" column. */
+  --surface-content-max-width: 960px;
+  --surface-content-with-pane-max-width: 1280px;
+  /* Unregistered, so `100%` resolves where the gutter is used: against the region's containing block. */
+  --surface-content-gutter: max(0px, calc((100% - var(--surface-content-max-width)) / 2));
   /* Tempdoc 816 §3/§4a.3 — the MEASURE tokens: role-derived inline-size bounds in CONTENT units.
      The values are NOT authored here — `governance/ui-proportion-baseline.v1.json`'s `roles` block
      is the authority (it also states each bound's function) and `jsharness ui-proportion-gate` fails on
      any drift between these declarations and the register (the catalog-verbatim pattern: one
      authority both renders and judges).
      NOT to be confused with --surface-content-max-width above: that is the SURFACE PAGE column
-     (Settings-class, 72rem/1152px); a measure is a line-length bound in `ch`, resolved against the
+     (960px, owner decision of 15 November); a measure is a line-length bound in `ch`, resolved against the
      bound element's OWN type — the same token is a different pixel count on 16px chrome and a 13px
      textarea, which is the whole point of a content unit. */
   --measure-prose: 88ch;

@@ -1,0 +1,364 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-16T13:18:59.816Z",
+  "revision": "30f367f53c03a40ca92ea169ae4c43ee05f2f54f",
+  "tree": "6d50acb0a9bbfdfd7997c754e4adebde6199393f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/sv3-boundaries.page-width.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/05nfjv67/tmp/test-intent-vitest-36902-1794834878384.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1715
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.wide-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/05nfjv67/tmp/test-intent-vitest-36902-1794834880101.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 142811
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.page-width.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.page-width.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:defe2a93c198c16456d85b378bb8fecff18d22c782921b2b670b31caef80f84e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Search page width — the automatic pane (W2′) at 1920 px with a 0 px sidebar the automatic pane is 560 px",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the automatic pane (W2′) at 1920 px with a 48 px sidebar the automatic pane is 560 px",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the automatic pane (W2′) at 1920 px with a 256 px sidebar the automatic pane is 560 px",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the automatic pane (W2′) at 1280 px with a 0 px sidebar the automatic pane is 560 px",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the automatic pane (W2′) at 1100 px with a 0 px sidebar the automatic pane is 460 px",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the automatic pane (W2′) at 1088 px with a 48 px sidebar the automatic pane is 400 px",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the automatic pane (W2′) at 1040 px with a 0 px sidebar the automatic pane is 400 px",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the automatic pane (W2′) grows from 400 at the 1040 / 1088 boundaries by the room it gains, up to 560",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the automatic pane (W2′) below 1040 keeps the existing constrained-window ceiling (no worse than before the rule)",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the automatic pane (W2′) with no published cap (split stage, no layout) is the automatic width from before the rule",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the gutter beside the list and the pane (W2′) at 1920 px with a 0 px sidebar the list and pane are centred with 320 px each side",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the gutter beside the list and the pane (W2′) at 1920 px with a 48 px sidebar the list and pane are centred with 296 px each side",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the gutter beside the list and the pane (W2′) at 1920 px with a 256 px sidebar the list and pane are centred with 192 px each side",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the gutter beside the list and the pane (W2′) at 1280 px with a 0 px sidebar the list and pane are centred with 0 px each side",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the gutter beside the list and the pane (W2′) at 1100 px with a 0 px sidebar the list and pane are centred with 0 px each side",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the gutter beside the list and the pane (W2′) list plus pane fill at most the cap, and the main column keeps its 640 at 1920",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — the gutter beside the list and the pane (W2′) is zero for an unmeasured window or without a published cap",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — what the rule leaves alone (W2′/W2″) the inline/overlay switch still measures the whole window at 979 / 980",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — what the rule leaves alone (W2′/W2″) a remembered or dragged width is clamped as before, 360-560",
+          "status": "passed"
+        },
+        {
+          "name": "Search page width — what the rule leaves alone (W2′/W2″) the sidebar ceiling still measures the whole window",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.wide-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.wide-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:82e37aba236935588259815ffe8cf30b24a1daa6014011c5655ab155f60dd208",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SW-1 maximised (1920×1080): one centred column per area, tab lines span the top bar spans the window",
+          "status": "passed"
+        },
+        {
+          "name": "SW-1 maximised (1920×1080): one centred column per area, tab lines span Library › Folders: content on the centred column of at most 960 px",
+          "status": "passed"
+        },
+        {
+          "name": "SW-1 maximised (1920×1080): one centred column per area, tab lines span Library › Browse: content on the centred column of at most 960 px",
+          "status": "passed"
+        },
+        {
+          "name": "SW-1 maximised (1920×1080): one centred column per area, tab lines span AI Brain: content on the centred column of at most 960 px",
+          "status": "passed"
+        },
+        {
+          "name": "SW-1 maximised (1920×1080): one centred column per area, tab lines span AI Brain › Memory: content on the centred column of at most 960 px",
+          "status": "passed"
+        },
+        {
+          "name": "SW-1 maximised (1920×1080): one centred column per area, tab lines span System › Health: content on the centred column of at most 960 px",
+          "status": "passed"
+        },
+        {
+          "name": "SW-1 maximised (1920×1080): one centred column per area, tab lines span System › Logs: content on the centred column of at most 960 px",
+          "status": "passed"
+        },
+        {
+          "name": "SW-1 maximised (1920×1080): one centred column per area, tab lines span System › Activity: content on the centred column of at most 960 px",
+          "status": "passed"
+        },
+        {
+          "name": "SW-1 maximised (1920×1080): one centred column per area, tab lines span Help: content on the centred column of at most 960 px",
+          "status": "passed"
+        },
+        {
+          "name": "SW-1 maximised (1920×1080): one centred column per area, tab lines span Search results with the pane closed: the list is on the centred column",
+          "status": "passed"
+        },
+        {
+          "name": "SW-1 maximised (1920×1080): one centred column per area, tab lines span Library with a document open: the column is centred in what the details pane leaves",
+          "status": "passed"
+        },
+        {
+          "name": "SW-1 Activity with a record open System › Activity: the side pane stays at the window edge; the feed is on the column centred in what it leaves",
+          "status": "passed"
+        },
+        {
+          "name": "SW-2 Search with the pane open at 1920: list and pane centred, at most 1280 with no sidebar",
+          "status": "passed"
+        },
+        {
+          "name": "SW-2 Search with the pane open at 1920: list and pane centred, at most 1280 with an expanded sidebar",
+          "status": "passed"
+        },
+        {
+          "name": "SW-2 Search with the pane open at 1920: list and pane centred, at most 1280 with a collapsed sidebar",
+          "status": "passed"
+        },
+        {
+          "name": "SW-2 Search with the pane open at 1920: list and pane centred, at most 1280 a wheel in either gutter moves the list",
+          "status": "passed"
+        },
+        {
+          "name": "SW-2 Search with the pane open at 1920: list and pane centred, at most 1280 live resize: the automatic pane and the gutter follow the window",
+          "status": "passed"
+        },
+        {
+          "name": "SW-3 extra height goes to lists; first-launch and empty-search blocks centred Search results: the list reaches the window bottom and its last row is reachable",
+          "status": "passed"
+        },
+        {
+          "name": "SW-3 extra height goes to lists; first-launch and empty-search blocks centred Library › Folders: the list reaches the window bottom and its last row is reachable",
+          "status": "passed"
+        },
+        {
+          "name": "SW-3 extra height goes to lists; first-launch and empty-search blocks centred Library › Browse: the list reaches the window bottom and its last row is reachable",
+          "status": "passed"
+        },
+        {
+          "name": "SW-3 extra height goes to lists; first-launch and empty-search blocks centred first launch: the block is centred in the window",
+          "status": "passed"
+        },
+        {
+          "name": "SW-3 extra height goes to lists; first-launch and empty-search blocks centred an empty Search: the block is centred in the window",
+          "status": "passed"
+        },
+        {
+          "name": "SW-3 extra height goes to lists; first-launch and empty-search blocks centred zero matches: the block is centred in the window",
+          "status": "passed"
+        },
+        {
+          "name": "SW-4 at or below 960 nothing changes; the 980 switch is unchanged at 960 px each area keeps its own padding and no gutter",
+          "status": "passed"
+        },
+        {
+          "name": "SW-4 at or below 960 nothing changes; the 980 switch is unchanged at 800 px each area keeps its own padding and no gutter",
+          "status": "passed"
+        },
+        {
+          "name": "SW-4 at or below 960 nothing changes; the 980 switch is unchanged at 979 px the pane is an overlay: true",
+          "status": "passed"
+        },
+        {
+          "name": "SW-4 at or below 960 nothing changes; the 980 switch is unchanged at 980 px the pane is an overlay: false",
+          "status": "passed"
+        },
+        {
+          "name": "SW-4 at or below 960 nothing changes; the 980 switch is unchanged at 1040 px with no sidebar the automatic pane is 400 px wide, at the window edge",
+          "status": "passed"
+        },
+        {
+          "name": "SW-4 at or below 960 nothing changes; the 980 switch is unchanged at 1100 px with no sidebar the automatic pane is 460 px wide, at the window edge",
+          "status": "passed"
+        },
+        {
+          "name": "SW-4 at or below 960 nothing changes; the 980 switch is unchanged at 1280 px every area is on the centred column",
+          "status": "passed"
+        },
+        {
+          "name": "SW-5 the remembered pane width: stored value against effective width, no writes on reflow stored absent: the pane opens at its effective width and reflow writes nothing",
+          "status": "passed"
+        },
+        {
+          "name": "SW-5 the remembered pane width: stored value against effective width, no writes on reflow stored 360: the pane opens at its effective width and reflow writes nothing",
+          "status": "passed"
+        },
+        {
+          "name": "SW-5 the remembered pane width: stored value against effective width, no writes on reflow stored 450: the pane opens at its effective width and reflow writes nothing",
+          "status": "passed"
+        },
+        {
+          "name": "SW-5 the remembered pane width: stored value against effective width, no writes on reflow stored 600: the pane opens at its effective width and reflow writes nothing",
+          "status": "passed"
+        },
+        {
+          "name": "SW-5 the remembered pane width: stored value against effective width, no writes on reflow stored invalid: the pane opens at its effective width and reflow writes nothing",
+          "status": "passed"
+        },
+        {
+          "name": "SW-5 the remembered pane width: stored value against effective width, no writes on reflow stored storage unavailable: the pane opens at its effective width and reflow writes nothing",
+          "status": "passed"
+        },
+        {
+          "name": "SW-5 the remembered pane width: stored value against effective width, no writes on reflow dragging clamps to 360-560 and remembers; reset returns to automatic and forgets",
+          "status": "passed"
+        },
+        {
+          "name": "SW-7 scrolling and reach Search results at 1920: a wheel in either gutter moves the same scroller as one over the content",
+          "status": "passed"
+        },
+        {
+          "name": "SW-7 scrolling and reach Library › Folders at 1920: a wheel in either gutter moves the same scroller as one over the content",
+          "status": "passed"
+        },
+        {
+          "name": "SW-7 scrolling and reach Library › Browse at 1920: a wheel in either gutter moves the same scroller as one over the content",
+          "status": "passed"
+        },
+        {
+          "name": "SW-7 scrolling and reach a short maximised window (1920×500): the last result is reachable by keyboard focus",
+          "status": "passed"
+        },
+        {
+          "name": "SW-8 themes, text size and the split stage Library at 1920 in light (forced colours false) is on the column",
+          "status": "passed"
+        },
+        {
+          "name": "SW-8 themes, text size and the split stage Library at 1920 in dark (forced colours false) is on the column",
+          "status": "passed"
+        },
+        {
+          "name": "SW-8 themes, text size and the split stage Library at 1920 in dark (forced colours true) is on the column",
+          "status": "passed"
+        },
+        {
+          "name": "SW-8 themes, text size and the split stage 200% text at 1920: Search results and Library stay on the column",
+          "status": "passed"
+        },
+        {
+          "name": "SW-8 themes, text size and the split stage a horizontal split at 1920 is unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "SW-8 themes, text size and the split stage a vertical split at 1920 is unchanged",
+          "status": "passed"
+        },
+        {
+          "name": "SW-8 themes, text size and the split stage from a split back to the single stage, the area returns to the centred column",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "30f367f53c03a40ca92ea169ae4c43ee05f2f54f",
+    "revision": "30f367f53c03a40ca92ea169ae4c43ee05f2f54f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/sv3-boundaries.page-width.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/05nfjv67/tmp/test-intent-vitest-36902-1794835026571.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 542,
+        "output": "JSON report written to /home/elias/.cache/am/05nfjv67/tmp/test-intent-vitest-36902-1794835026571.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.wide-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/05nfjv67/tmp/test-intent-vitest-36902-1794835027113.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 112177,
+        "output": "JSON report written to /home/elias/.cache/am/05nfjv67/tmp/test-intent-vitest-36902-1794835027113.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.page-width.test.ts",
+        "classification": "assertion",
+        "detail": "Search page width — the automatic pane (W2′) at 1920 px with a 0 px sidebar the automatic pane is 560 px:  AssertionError: sv3AutomaticPaneWidth exists: expected 'undefined' to be 'function' // Object.is equality\n    at rule (/home/elias/.cache/am/05nfjv67/tmp/test-intent-before-ZDqGAM/modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.page-width.test.ts:19:39)\n    at /home/elias/.cache/am/05nfjv | Search page width — the automatic pane (W2′) at 1920 px with a 48 px sidebar the automatic"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.wide-lockdown.test.ts",
+        "classification": "assertion",
+        "detail": "SW-1 maximised (1920×1080): one centred column per area, tab lines span Library › Folders: content on the centred column of at most 960 px:  AssertionError: Library › Folders: content left 32 within column from 480: expected 32 to be greater than or equal to 479\n    at expectOnColumn (/home/elias/.cache/am/05nfjv67/tmp/test-intent-before-ZDqGAM/modules/ui-web/src/shell-v0/chrome/Shell.wide-lockdown.test.ts:337:97)\n    at /home/elias/.cac | SW-1 maximised (1920×1080): one centred column per area,"
+      }
+    ]
+  },
+  "digest": "sha256:de423106e1cc7aafea26041008cbb16ae88d56d5758f47621ce141e13d859f16"
+}

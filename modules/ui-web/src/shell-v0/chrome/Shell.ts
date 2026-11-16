@@ -2692,6 +2692,10 @@ export class Stage extends JfElement {
       height: 100%;
       gap: 1px;
       background: var(--border-subtle);
+      /* The page-width rule is the single stage's: two windows side by side or stacked keep the
+         full width of their pane, as before it (the owner's decision left the split unchanged). */
+      --surface-content-gutter: 0px;
+      --surface-content-with-pane-max-width: none;
     }
     .split.horizontal { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
     .split.vertical { grid-template-rows: 1fr 1fr; grid-template-columns: 1fr; }
