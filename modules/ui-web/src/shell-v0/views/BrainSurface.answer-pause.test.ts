@@ -42,7 +42,7 @@ async function mount() {
   return el;
 }
 function toggle(el: Brain) {
-  const button = el.shadowRoot!.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Pause answers while indexing"]');
+  const button = el.shadowRoot!.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Pause answers while files are read"]');
   expect(button).not.toBeNull(); return button!;
 }
 beforeEach(() => {
@@ -52,6 +52,9 @@ beforeEach(() => {
     aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
     runtime: { mode: 'online', installed: { known: true, value: true } },
     installStatus: { state: 'completed', installedFully: true }, capabilities: { chat: true },
+    // Slice 7a (AM3, X1): "AI is ready" needs live meaning evidence: the encoder and the Worker's COMPATIBLE reading.
+    runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] },
+    status: { embedding: { compatState: 'COMPATIBLE' } },
   } as AiState;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input);
@@ -74,7 +77,7 @@ it('defaults off, saves only the pause policy, and waits for the witnessed save'
   const el = await mount();
   expect(toggle(el).getAttribute('aria-checked')).toBe('false');
   expect(toggle(el).parentElement!.textContent).toContain('Off');
-  expect(toggle(el).closest('.advanced-row')!.textContent).toContain('indexing files (bulk import, reindex)');
+  expect(toggle(el).closest('.advanced-row')!.textContent).toContain('Wait while many files are being read (a large import, reading everything again)');
   let release!: () => void;
   holdSave = new Promise(resolve => { release = resolve; });
   toggle(el).click(); await settle(el);
@@ -96,8 +99,9 @@ it('uses the Engine pause observation for wording and converges a second window'
   toggle(first).click(); await settle(first);
   emit(true); await settle(first); await settle(second);
   expect(toggle(second).getAttribute('aria-checked')).toBe('true');
-  expect(first.shadowRoot!.querySelector('h1')!.textContent).toBe('Answers paused while indexing');
-  expect(first.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('Answers resume automatically when bulk file indexing ends.');
+  // Slice 7a (AM9): read words, not indexing ones.
+  expect(first.shadowRoot!.querySelector('h1')!.textContent).toBe('Answers paused while files are read');
+  expect(first.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('Answers resume when JustSearch finishes reading the files.');
   expect(first.shadowRoot!.querySelector('.brain-sentence')!.textContent).toContain('answer model stays loaded');
   toggle(second).click(); await settle(second);
   expect(enabled).toBe(false);

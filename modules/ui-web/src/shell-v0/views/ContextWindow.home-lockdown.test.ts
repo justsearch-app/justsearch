@@ -14,7 +14,7 @@ let server: ViteDevServer, browserServer: BrowserServer, browser: Browser;
 let context: BrowserContext | undefined;
 let output: string, url: string;
 declare global {
-  interface Window { openContextSettings(): void; openContextBrain(): void }
+  interface Window { openContextSettings(): void; openContextBrain(): void; openContextMemory(): void; showContextDeveloperTools(): void }
 }
 
 beforeAll(async () => {
@@ -33,6 +33,7 @@ import '/src/shell-v0/views/BrainSurface.ts';
 import { __seedForTest as seedCatalog } from '/src/api/registry/SurfaceCatalogClient.ts';
 import { __seedForTest as seedLabels } from '/src/i18n/resourceCatalog.ts';
 import { requestSurfaceNavigation } from '/src/shell-v0/controllers/navigateRequest.ts';
+import { setShowDeveloperTools } from '/src/shell-v0/state/developerToolsState.ts';
 seedLabels(${JSON.stringify(labels)});
 const surface = (id, mountTag, placement = 'RAIL') => ({ id, mountTag, placement, audience: 'USER',
  presentation: { labelKey: id, descriptionKey: id }, consumes: { operations: [], resources: [], prompts: [], diagnosticChannels: [] },
@@ -46,6 +47,8 @@ seedCatalog({ schemaVersion: '1.0.0', catalogVersion: 1, namespace: 'core', prim
 const shell = document.createElement('jf-shell'); document.body.append(shell);
 window.openContextSettings = () => requestSurfaceNavigation('core.settings-surface', { section: 'agent' });
 window.openContextBrain = () => requestSurfaceNavigation('core.brain-surface');
+window.openContextMemory = () => requestSurfaceNavigation('core.memory-surface');
+window.showContextDeveloperTools = () => setShowDeveloperTools(true);
 document.body.dataset.ready = 'true';
 </script></body></html>`;
   server = await createServer({
@@ -93,7 +96,8 @@ it.each(['cold', 'Memory tab'])('Settings arrives at Reading memory with focus f
     const brain = page.locator('jf-brain-surface');
     await brain.waitFor({ state: 'attached' });
     await brain.evaluate(el => { (el as BrainSurface).expanded = {}; });
-    await brain.locator('button[data-tab-id="core.memory-surface"]').click();
+    // Slice 7a (D1): no tab row until answers work here; Memory's own route still opens its tab.
+    await page.evaluate(() => window.openContextMemory());
     await expect.poll(() => page.evaluate(() => location.hash)).toContain('tab=core.memory-surface');
   }
   await page.evaluate(() => window.openContextSettings());
@@ -155,6 +159,8 @@ it.each([500, 409])('queued keyboard changes return to saved Reading memory afte
       await route.fulfill({ json: { ui: {}, llm: { contextWindow: saved }, witness: { acceptedRevision: 0, lastCommittedOperationKey: null } } });
     }
   });
+  // Slice 7a (AM5): with nothing observed, Advanced settings is a developer tool.
+  await page.evaluate(() => window.showContextDeveloperTools());
   await page.evaluate(() => window.openContextBrain());
   const brain = page.locator('jf-brain-surface');
   await brain.locator('.brain-links button').first().click();

@@ -37,6 +37,9 @@ beforeAll(async () => {
           import '/src/shell-v0/components/ConfirmBand.ts';
           import { __feedForTest } from '/src/shell-v0/state/aiStateStore.ts';
           import { createMockHostApi } from '/src/shell-v0/plugin-api/testHostApi.ts';
+          import { setShowDeveloperTools } from '/src/shell-v0/state/developerToolsState.ts';
+          // Slice 7a (AM5): this fixture observes no AI state, so Advanced settings is a developer tool.
+          setShowDeveloperTools(true);
           let brain, refusal = '', release;
           const settle = async () => { for (let i = 0; i < 3; i++) await new Promise(requestAnimationFrame); };
           window.removalCalls = []; window.removalOuterEscapes = 0; window.otherRemovalDraft = false;

@@ -63,10 +63,17 @@ function renderPanel(kind: AiEngineVerdict['kind'], opts: { onlineAiEnabled?: bo
   };
   el.fetchJson = () => Promise.resolve(null);
 
+  // Slice 7a (D2, D5): the escape action is the Answer questions switch under its step; the old
+  // Start/Stop answers button is a developer tool. Activating the switch writes the same intent.
   const container = document.createElement('div');
   render(el.renderSimplePanel(), container);
-  const button = container.querySelector('[data-testid="brain-simple-action"]') as ActionButton;
-  return { container, button, invocations };
+  const control = container.querySelector<HTMLButtonElement>('[data-step="chat"] [role="switch"]');
+  const reason = () => container.querySelector(`[id="${control?.id}-reason"]`)?.textContent?.trim() ?? '';
+  const button = control === null ? null : Object.assign(control, {
+    onActivate: async () => { control.click(); for (let i = 0; i < 3; ++i) await new Promise(resolve => setTimeout(resolve, 0)); },
+    get availability() { return control.getAttribute('aria-disabled') === 'true' ? unavailableBecause(reason()) : { kind: 'available' }; },
+  }) as unknown as ActionButton;
+  return { container, button: button as ActionButton, invocations };
 }
 
 // The chat-lifecycle states + the enabled arg each one's primary action must write. These are the
@@ -85,9 +92,9 @@ describe('BrainSurface Simple panel â€” chat-enabled intent write (tempdoc 737 Â
     it(`${kind}: the primary action exists and invokes core.set-chat-enabled {enabled:${enabled}}`, async () => {
       const { button, invocations } = renderPanel(kind);
 
-      // No dead button: the primary action is present and carries a non-empty label.
+      // No dead control: the answer switch is present with its accessible name.
       expect(button).not.toBeNull();
-      expect(button.getAttribute('label')?.length ?? 0).toBeGreaterThan(0);
+      expect(button.getAttribute('aria-label')).toBe('Use Answer questions');
 
       await button.onActivate();
 
@@ -95,11 +102,14 @@ describe('BrainSurface Simple panel â€” chat-enabled intent write (tempdoc 737 Â
     });
   }
 
-  it('disables Start AI with the plan reason when chat is unavailable', () => {
+  it('draws answers as not reachable when chat is unavailable: no switch, the reason once in ordinary words', () => {
     const reason = 'Chat runtime is not supplied for linux-x86_64.';
     const { button, container } = renderPanel('offline', { chatUnavailable: reason });
-    expect(button.availability).toEqual(unavailableBecause(reason));
-    expect(container.textContent).toContain(reason);
+    expect(button).toBeNull();
+    const step = container.querySelector('[data-step="chat"]')!;
+    expect(step.getAttribute('data-reach')).toBe('na');
+    expect(step.querySelector('.step-reason')?.textContent?.trim()).toBeTruthy();
+    expect(container.textContent).not.toContain(reason);
   });
 
   it('never posts the superseded core.switch-inference-mode from any chat-lifecycle state', async () => {

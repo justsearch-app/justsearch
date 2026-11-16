@@ -13,6 +13,7 @@ vi.mock('../state/aiStateStore.js', async original => ({
   },
 }));
 import './BrainSurface.js';
+import { setShowDeveloperTools } from '../state/developerToolsState.js';
 
 // Answers whose answer model was removed (declined): every route that turns answers on asks first
 // and saves nothing until the consented download starts, and that download carries the answers
@@ -83,7 +84,7 @@ beforeEach(() => {
     return json({});
   }));
 });
-afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); });
+afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); setShowDeveloperTools(false); });
 
 describe('answers consented with a removed answer model are switched on when the download completes', () => {
   const removedAnswers = () => {
@@ -113,8 +114,9 @@ describe('answers consented with a removed answer model are switched on when the
 
   it('Start answers: asks first, Cancel saves nothing, Accept starts the download without switching answers on', async () => {
     removedAnswers();
+    setShowDeveloperTools(true); // Slice 7a (D5): Start/Stop answers is a developer tool.
     const el = await mount();
-    const start = () => el.shadowRoot!.querySelector('[data-testid="brain-simple-action"]') as unknown as { onActivate(): void; getAttribute(name: string): string | null };
+    const start = () => el.shadowRoot!.querySelector('[data-testid="brain-answers-action"]') as unknown as { onActivate(): void; getAttribute(name: string): string | null };
 
     expect(start().getAttribute('label')).toBe('Start answers');
     start().onActivate(); await settle(el);

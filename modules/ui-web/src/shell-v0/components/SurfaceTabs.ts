@@ -64,6 +64,9 @@ export class SurfaceTabs extends JfElement {
     // exactly as the Shell mounts a standalone surface (Shell.renderOneSurface). Without it, a member
     // that calls this.host_.data.* (Browse, Health, Presentation editor) throws "reading 'data'".
     host_: { attribute: false },
+    // A host whose row has nothing to choose between yet (AI Brain before answers work) keeps its
+    // panel and mounted member but draws no tab row.
+    tablistHidden: { type: Boolean, attribute: 'tablist-hidden' },
   };
 
   declare items: SurfaceTabItem[];
@@ -71,6 +74,7 @@ export class SurfaceTabs extends JfElement {
   declare apiBase: string;
   declare tablistLabel: string;
   declare host_: PluginHostApi | undefined;
+  declare tablistHidden: boolean;
 
   /** Cached mounted member element + the tab id it belongs to, so re-renders don't re-mount. */
   private _activeEl: HTMLElement | null = null;
@@ -83,6 +87,7 @@ export class SurfaceTabs extends JfElement {
     this.apiBase = '';
     this.tablistLabel = 'Views';
     this.host_ = undefined;
+    this.tablistHidden = false;
   }
 
   static styles = css`
@@ -264,6 +269,9 @@ export class SurfaceTabs extends JfElement {
     const active = this.resolvedActiveId;
     const activeItem = this.items.find((t) => t.id === active) ?? this.items[0];
     if (activeItem === undefined) return html`${nothing}`;
+    if (this.tablistHidden) {
+      return html`<div id="surface-tabs-panel">${this.renderPanel(activeItem)}</div>`;
+    }
     return html`
       <div class="tab-bar"><div class="tabs" role="tablist" aria-label=${this.tablistLabel} @keydown=${this.onKeydown}>
         ${this.items.map((t) => {

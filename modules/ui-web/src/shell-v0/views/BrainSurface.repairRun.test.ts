@@ -83,6 +83,8 @@ beforeEach(() => {
     installStatus: { state: 'completed', installedFully: true, repairNeeded: true, startedAtEpochMs: 100, updatedAtEpochMs: 100 },
     runtime: { mode: 'offline', installed: { known: true, value: true } },
     runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] },
+    // X1: meaning search works only with the Worker's COMPATIBLE reading.
+    status: { embedding: { compatState: 'COMPATIBLE' } },
     capabilities: { chat: false },
   } as unknown as AiState;
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
@@ -96,7 +98,12 @@ beforeEach(() => {
     return json({});
   }));
 });
-afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals();
+  delete (navigator as unknown as Record<string, unknown>).platform;
+});
+// The reason for a part that cannot work here depends on the platform; these cases run as on Windows.
+const onWindows = () => Object.defineProperty(navigator, 'platform', { configurable: true, get: () => 'Win32' });
 
 describe('Brain running repair controls (B2/B8)', () => {
   it('Cancel says the download paused when it stopped, and shows the completed state when the install finished first', async () => {
@@ -126,7 +133,8 @@ describe('Brain running repair controls (B2/B8)', () => {
       } as unknown as Partial<AiState>);
       await settle(el);
       expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).toBeNull();
-      expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('AI is ready');
+      // Slice 7a (D3): answers are saved Off here, so the heading says what works: meaning search.
+      expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Search understands meaning');
     } finally { window.removeEventListener(EPHEMERAL_TOAST_EVENT, onToast); }
   });
 
@@ -223,6 +231,7 @@ describe('Brain running repair controls (B2/B8)', () => {
   });
 
   it.each(['declined', 'unavailable', 'not-in-mode'])('planning ignores retained downloading records for an excluded %s package', async state => {
+    onWindows();
     const fetch = globalThis.fetch;
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       if (String(input).endsWith('/plan-preview')) return json({ totalDownloadBytes: 1024, components: [
@@ -238,7 +247,12 @@ describe('Brain running repair controls (B2/B8)', () => {
     expectPlanning(el);
     const reranker = el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent!;
     expect(reranker).not.toMatch(/Downloading|Waiting to download|Preparing download/);
-    expect(reranker).toContain(state === 'declined' ? 'Not downloaded' : 'Unavailable on this computer');
+    // Slice 7a (D4): a part that cannot work here is drawn not reachable with its reason in ordinary words.
+    if (state === 'declined') expect(reranker).toContain('Not downloaded');
+    else expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.getAttribute('data-reach')).toBe('na');
+    if (state === 'unavailable') expect(reranker).toContain('Not available on this computer');
+    if (state === 'not-in-mode') expect(reranker).toContain('Not part of this install');
+    expect(reranker).not.toContain('Not available here.');
   });
 
   it.each(['download', 'plan'])('a failed install read gates a retained running %s observation and recovery restores it', async phase => {
@@ -250,7 +264,9 @@ describe('Brain running repair controls (B2/B8)', () => {
     expect(el.shadowRoot!.querySelector('[data-testid="install-staged-progress"]')).toBeNull();
     expect(el.shadowRoot!.querySelector('[label="Pause download"]')).toBeNull();
     expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).toBeNull();
-    expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Unknown — checking AI status');
+    // W5: the heading says once that AI status is being checked; the step does not repeat it and is not lit.
+    expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).not.toContain('Unknown — checking AI status');
+    expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.getAttribute('data-lit')).toBe('false');
     expect(el.shadowRoot!.textContent).not.toMatch(/Downloading|Preparing download|Download stalled/);
     notify({ installObservationLive: true, snapshotLive: true }); await settle(el);
     expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
@@ -270,6 +286,7 @@ describe('Brain running repair controls (B2/B8)', () => {
   });
 
   it('while a Repair run is being planned, a package unavailable on this computer is not said to be preparing', async () => {
+    onWindows();
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const path = String(input);
       if (path.endsWith('/api/settings/v2')) return json({ ui: { chatEnabled: false } });
@@ -281,7 +298,10 @@ describe('Brain running repair controls (B2/B8)', () => {
     const el = await mount(); await settle(el);
     expectPlanning(el);
     const chat = el.shadowRoot!.querySelector('[data-feature="chat"]')!.textContent!;
-    expect(chat).not.toMatch(/Preparing download|Waiting to download|Downloading/); expect(chat).toContain('Unavailable on this computer');
+    expect(chat).not.toMatch(/Preparing download|Waiting to download|Downloading/);
+    expect(el.shadowRoot!.querySelector('[data-feature="chat"]')!.getAttribute('data-reach')).toBe('na');
+    expect(chat).toContain('Not available on this computer');
+    expect(chat).not.toContain('Needs the answer runtime.');
   });
   it('planning an unavailable answer runtime with complete answer files keeps the observed step state', async () => {
     const fetch = globalThis.fetch;
@@ -298,7 +318,7 @@ describe('Brain running repair controls (B2/B8)', () => {
     const el = await mount(); await settle(el);
     const chat = el.shadowRoot!.querySelector('[data-feature="chat"]')!.textContent!;
     expect(chat).not.toMatch(/Preparing download|Waiting to download|Downloading/);
-    expect(chat).toContain('Off — background work can continue');
+    expect(el.shadowRoot!.querySelector('[data-feature="chat"] .switch-state')!.textContent).toBe('Off');
     expectPlanning(el);
   });
 

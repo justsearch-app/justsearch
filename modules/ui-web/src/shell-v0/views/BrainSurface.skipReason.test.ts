@@ -26,6 +26,7 @@ import './BrainSurface';
 import { skipExplanation } from './BrainSurface.js';
 import type { InstallStatus } from '../state/aiStateStore.js';
 import { __resetUiModeForTest, setUiMode } from '../state/uiModeState.js';
+import { setShowDeveloperTools } from '../state/developerToolsState.js';
 
 interface BrainHost extends HTMLElement {
   apiBase: string;
@@ -41,6 +42,7 @@ async function modelsText(installStatus: InstallStatus): Promise<string> {
   const el = document.createElement('jf-brain-surface') as BrainHost;
   el.apiBase = '';
   setUiMode('advanced');
+  setShowDeveloperTools(true); // Slice 7a (X6, AM5): the package history in Advanced is a developer tool.
   el.settings = { mode: 'advanced' };
   document.body.appendChild(el);
   await el.updateComplete;
@@ -84,7 +86,7 @@ const MIXED_PACKAGES: InstallStatus = {
   ],
 } as InstallStatus;
 
-afterEach(() => __resetUiModeForTest());
+afterEach(() => { __resetUiModeForTest(); setShowDeveloperTools(false); });
 
 describe('skipExplanation (941)', () => {
   it('returns null for a package that was not skipped', () => {
