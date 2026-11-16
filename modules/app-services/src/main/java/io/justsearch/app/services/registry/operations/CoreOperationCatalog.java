@@ -1039,7 +1039,11 @@ public final class CoreOperationCatalog implements OperationCatalog {
     return new Operation(SET_INDEXING_RULES, Presentation.forId(SET_INDEXING_RULES),
         Interface.of("{\"type\":\"object\",\"required\":[\"schedule\",\"pauseOnBattery\"],"
             + "\"properties\":{\"schedule\":{\"type\":[\"object\",\"null\"]},"
-            + "\"pauseOnBattery\":{\"type\":\"boolean\"}},\"additionalProperties\":false}",
+            + "\"pauseOnBattery\":{\"type\":\"boolean\"},"
+            + "\"witness\":{\"type\":\"object\",\"required\":[\"acceptedRevision\",\"lastCommittedOperationKey\"],"
+            + "\"properties\":{\"acceptedRevision\":{\"type\":\"integer\",\"minimum\":0},"
+            + "\"lastCommittedOperationKey\":{\"type\":[\"string\",\"null\"]}},\"additionalProperties\":false}},"
+            + "\"additionalProperties\":false}",
             "{\"type\":\"object\"}"),
         new OperationPolicy(RiskTier.MEDIUM, ConfirmStrategy.None.INSTANCE,
             AuditPolicy.METADATA_ONLY, RetryPolicy.noRetry(), Set.of(), false)

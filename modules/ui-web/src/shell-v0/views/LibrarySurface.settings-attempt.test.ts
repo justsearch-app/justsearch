@@ -97,7 +97,7 @@ describe('Library retained-base exclusions', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('RF55 removes a precise keep-out only through the witnessed save without editing glob text', async () => {
+  it('RF55 removing a precise keep-out saves it at once through the witnessed save without editing glob text', async () => {
     const { library, send } = fixture();
     const literal = { literal: { version: 1, id: 'aa10bcec-4102-47f8-a26d-d02346c8a211',
       path: '/docs/folder ', scope: 'FOLDER' } };
@@ -111,10 +111,11 @@ describe('Library retained-base exclusions', () => {
       HTMLElement & { onActivate: () => void };
     expect(remove).toBeTruthy();
     remove.onActivate();
-    expect(send.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
-    await library.handleSaveExcludes();
-    const write = send.mock.calls.find(([, init]) => init?.method === 'POST');
-    expect(JSON.parse(String(write?.[1]?.body)).ui.excludePatterns).toEqual(['*.log']);
+    await vi.advanceTimersByTimeAsync(0);
+    const writes = send.mock.calls.filter(([, init]) => init?.method === 'POST');
+    expect(writes).toHaveLength(1);
+    expect(JSON.parse(String(writes[0]?.[1]?.body)).ui.excludePatterns).toEqual(['*.log']);
+    expect(JSON.parse(String(writes[0]?.[1]?.body)).witness).toEqual(observed);
     expect(library.excludesText).toBe('*.log');
     library.remove();
     await vi.advanceTimersByTimeAsync(0);
@@ -140,17 +141,21 @@ describe('Library retained-base exclusions', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('AX1 unchanged legacy list can be previewed and applied without replacing the saved policy', async () => {
+  it('AX1 a legacy literal-name rule survives saving another rule, and removal applies the saved list unchanged', async () => {
     const { library, send, invoke } = fixture();
     send.mockResolvedValueOnce(json({ ui: { excludePatterns: ['[legacy', 'private'],
-      invalidExcludePatterns: ['[legacy'] }, witness: observed }));
+      invalidExcludePatterns: ['[legacy'] }, witness: observed }))
+      .mockImplementationOnce(async (_, init) => complete(init))
+      .mockResolvedValueOnce(json({ ui: { excludePatterns: ['[legacy', 'private', 'more'] },
+        witness: { acceptedRevision: 5, lastCommittedOperationKey: prior } }));
     await library.loadExcludes();
-    await library.handlePreviewExcludes();
+    library.excludesText = '[legacy\nprivate\nmore';
+    await library.handleSaveExcludes();
+    expect(JSON.parse(String(send.mock.calls[1]?.[1]?.body)).ui.excludePatterns).toEqual(['[legacy', 'private', 'more']);
     await library.handleApplyExcludes();
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(invoke).toHaveBeenNthCalledWith(1, 'core.preview-excludes', {});
-    expect(invoke).toHaveBeenNthCalledWith(2, 'core.apply-excludes', {}, { consented: true });
-    expect(library.excludesText).toBe('[legacy\nprivate');
+    expect(invoke).toHaveBeenCalledWith('core.apply-excludes', {}, { consented: true });
+    expect(send.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+    expect(library.excludesText).toBe('[legacy\nprivate\nmore');
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -198,36 +203,43 @@ describe('Library retained-base exclusions', () => {
     await library.handleSaveExcludes();
     expect(library.excludesLoaded).toBe(false);
     expect(library.excludesText).toBe('');
-    expect(library.error).toBeTruthy();
-    expect(send).toHaveBeenCalledTimes(1);
+    document.body.appendChild(library); await library.updateComplete;
+    expect(library.shadowRoot?.querySelector('section[aria-label="Exclude patterns"] [role="alert"]')?.textContent)
+      .toContain("Couldn't load your skip rules");
+    expect(library.shadowRoot?.querySelector<HTMLInputElement>('.skip-rule input')?.disabled).toBe(true);
+    expect(send.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
     expect(invoke).not.toHaveBeenCalled();
+    library.remove(); await vi.advanceTimersByTimeAsync(0);
   });
 
-  it('preserves a conflicting draft and blocks effects until explicit reload and a new attempt', async () => {
+  it('preserves a conflicting draft and blocks effects until a choice, then a fresh attempt on the shown revision', async () => {
     const { library, send, invoke } = fixture();
     send.mockResolvedValueOnce(json({ ui: { excludePatterns: ['old'] }, witness: observed }))
       .mockResolvedValueOnce(json({ errorCode: 'VERSION_CONFLICT', state: 'FAILED' }, 409))
-      .mockResolvedValueOnce(json({ ui: { excludePatterns: ['elsewhere'] }, witness: { acceptedRevision: 6, lastCommittedOperationKey: prior } }))
-      .mockImplementationOnce(async (_, init) => complete(init));
+      .mockImplementation(async (_, init) => init?.method === 'POST' ? complete(init)
+        : json({ ui: { excludePatterns: ['elsewhere'] }, witness: { acceptedRevision: 6, lastCommittedOperationKey: prior } }));
     await library.loadExcludes();
     library.excludesText = 'my draft';
     await library.handleSaveExcludes();
     expect(invoke).not.toHaveBeenCalled();
     expect(library.excludesText).toBe('my draft');
-    expect(library.excludesLoaded).toBe(false);
-    expect(library.excludesError).toContain('Reload and review');
+    expect(library.excludesLoaded, 'the draft stays editable').toBe(true);
     await library.handleSaveExcludes();
-    expect(send).toHaveBeenCalledTimes(2);
-    expect(invoke).not.toHaveBeenCalled();
-    await library.loadExcludes();
-    expect(library.excludesText).toBe('elsewhere');
+    expect(send.mock.calls.filter(([, init]) => init?.method === 'POST'), 'no write until a choice').toHaveLength(1);
+    document.body.appendChild(library); await vi.advanceTimersByTimeAsync(0); await library.updateComplete;
+    const keep = [...library.shadowRoot!.querySelectorAll<HTMLButtonElement>('.skip-conflict button')].find(b => b.textContent?.trim() === 'Keep my draft');
+    expect(keep).toBeDefined();
     library.excludesText += '\nreviewed';
-    await library.handleSaveExcludes();
+    keep!.click(); for (let i = 0; i < 10; i++) await vi.advanceTimersByTimeAsync(0);
     expect(invoke).not.toHaveBeenCalled();
-    const oldAttempt = JSON.parse(String(send.mock.calls[1]?.[1]?.body));
-    const freshAttempt = JSON.parse(String(send.mock.calls[3]?.[1]?.body));
+    const posts = send.mock.calls.filter(([, init]) => init?.method === 'POST');
+    expect(posts).toHaveLength(2);
+    const oldAttempt = JSON.parse(String(posts[0]?.[1]?.body));
+    const freshAttempt = JSON.parse(String(posts[1]?.[1]?.body));
     expect(freshAttempt.operationKey).not.toBe(oldAttempt.operationKey);
     expect(freshAttempt.witness.acceptedRevision).toBe(6);
+    expect(freshAttempt.ui.excludePatterns).toEqual(['my draft', 'reviewed']);
+    library.remove(); await vi.advanceTimersByTimeAsync(0);
   });
 
   it('waits through open202 during Save and rejects overlapping clicks', async () => {
@@ -270,26 +282,30 @@ describe('Library retained-base exclusions', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('renders disabled controls after failed load and retains a conflicting draft across remount', async () => {
+  it('keeps a conflicting draft editable with its choice, without removal controls, across remount', async () => {
     const { library, send } = fixture();
     send.mockResolvedValueOnce(json({ ui: { excludePatterns: ['base'] }, witness: observed }))
-      .mockResolvedValueOnce(json({ errorCode: 'VERSION_CONFLICT', state: 'FAILED' }, 409));
+      .mockResolvedValueOnce(json({ errorCode: 'VERSION_CONFLICT', state: 'FAILED' }, 409))
+      .mockResolvedValueOnce(json({ ui: { excludePatterns: ['other'] }, witness: { acceptedRevision: 5, lastCommittedOperationKey: prior } }));
     await library.loadExcludes();
     library.excludesText = 'my unsaved draft';
     await library.handleSaveExcludes();
     document.body.appendChild(library);
     await library.updateComplete;
-    const textarea = library.shadowRoot?.querySelector<HTMLInputElement>('.skip-rule input');
-    expect(textarea?.disabled).toBe(true);
-    expect(textarea?.value).toBe('my unsaved draft');
-    expect((library.shadowRoot?.querySelector('jf-button[label="Apply"]') as HTMLElement & { disabled: boolean }).disabled).toBe(true);
-    expect((library.shadowRoot?.querySelector('jf-button[label="Reload saved patterns"]') as HTMLElement & { disabled: boolean }).disabled).toBe(false);
-    expect(send.mock.calls.filter(([path, init]) => path === '/api/settings/v2' && init?.signal)).toHaveLength(2);
+    const field = library.shadowRoot?.querySelector<HTMLInputElement>('.skip-rule input');
+    expect(field?.disabled).toBe(false);
+    expect(field?.value).toBe('my unsaved draft');
+    expect(library.shadowRoot?.querySelector('jf-button[label="Apply"]')).toBeNull();
+    expect(library.shadowRoot?.querySelector('.skip-conflict')?.textContent).toContain('Changed elsewhere');
+    expect(send.mock.calls.filter(([path, init]) => path === '/api/settings/v2' && init?.signal)).toHaveLength(3);
     library.remove();
+    await vi.advanceTimersByTimeAsync(0);
     document.body.appendChild(library);
     await library.updateComplete;
     expect(library.excludesText).toBe('my unsaved draft');
-    expect(send.mock.calls.filter(([path, init]) => path === '/api/settings/v2' && init?.signal)).toHaveLength(2);
+    expect(library.shadowRoot?.querySelector('.skip-conflict')?.textContent).toContain('Changed elsewhere');
+    expect(send.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+    library.remove(); await vi.advanceTimersByTimeAsync(0);
   });
 
   it('unblocks reload after a stalled GET and ignores its late result after a newer observation', async () => {
@@ -313,13 +329,13 @@ describe('Library retained-base exclusions', () => {
   });
 
   for (const [kind, count, makePattern, message] of [
-    ['input', 513, (i: number) => `file${i}.txt`, 'Invalid settings request'],
-    ['expanded', 257, (i: number) => `directory${i}`, 'Invalid settings request'],
+    ['input', 513, (i: number) => `file${i}.txt`, 'At most 512 skip rules can be saved; this list has 513. Remove some to save your changes.'],
+    ['expanded', 257, (i: number) => `directory${i}`, 'These skip rules could not be saved. Check the rule you changed last.'],
   ] as const) {
     it(`EX4 editor reports ${kind} limit refusal without applying or discarding the draft`, async () => {
       const { library, send, invoke } = fixture();
       send.mockResolvedValueOnce(json({ ui: { excludePatterns: ['saved'] }, witness: observed }))
-        .mockResolvedValueOnce(json({ errorCode: 'INVALID_REQUEST', error: message }, 400));
+        .mockResolvedValue(json({ errorCode: 'INVALID_REQUEST', error: 'Invalid settings request' }, 400));
       await library.loadExcludes();
       const patterns = Array.from({ length: count }, (_, index) => makePattern(index));
       const draft = patterns.join('\n');
@@ -334,7 +350,12 @@ describe('Library retained-base exclusions', () => {
       await library.updateComplete;
       expect(library.shadowRoot?.querySelector('#excludes-error[role="alert"]')?.textContent).toContain(message);
       library.remove();
-      await vi.advanceTimersByTimeAsync(0);
+      for (let i = 0; i < 10; i++) await vi.advanceTimersByTimeAsync(0);
+      // Leaving Library leaves the field: the unsaved draft is tried once more and refused the same way.
+      const writes = send.mock.calls.filter(([, init]) => init?.method === 'POST');
+      expect(writes).toHaveLength(2);
+      expect(JSON.parse(String(writes[1]?.[1]?.body)).ui.excludePatterns).toEqual(patterns);
+      expect(library.excludesText).toBe(draft);
       expect(vi.getTimerCount()).toBe(0);
     });
   }

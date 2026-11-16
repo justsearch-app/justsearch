@@ -127,4 +127,68 @@ final class IndexingRulesIntentTest {
       assertEquals("VERSION_CONFLICT", result.errorCode().orElseThrow());
     }
   }
+
+  private String withWitness(String rules, io.justsearch.app.api.settings.SettingsWitness witness) {
+    String key = witness.lastCommittedOperationKey();
+    return rules.substring(0, rules.length() - 1) + ",\"witness\":{\"acceptedRevision\":" + witness.acceptedRevision()
+        + ",\"lastCommittedOperationKey\":" + (key == null ? "null" : "\"" + key + "\"") + "}}";
+  }
+
+  /** B6': a window's draft carries the revision it was based on; a save elsewhere since is a conflict. */
+  @Test
+  void ruleWriteCarryingItsDraftRevisionConflictsAfterAnotherWindowSaved() throws Exception {
+    try (var f = new RuntimeIntentTestFixture(directory)) {
+      var rules = f.dispatcher("core.set-indexing-rules", handler(f.spec()));
+      var draftBase = f.settings().inspect().witness();
+      // Another window saves reading rules after this window read them.
+      assertTrue(rules.dispatch("{\"schedule\":null,\"pauseOnBattery\":true}", key()).success());
+      var saved = f.settings().inspect();
+      var stale = rules.dispatch(withWitness(RULES, draftBase), key());
+      assertFalse(stale.success(), "a draft based on an older revision must not overwrite the newer save");
+      assertEquals("VERSION_CONFLICT", stale.errorCode().orElseThrow());
+      assertEquals(saved.witness(), f.settings().inspect().witness());
+      assertEquals(json.valueToTree(saved.settings()), json.valueToTree(f.settings().load()));
+      // The same draft, rebased on the shown revision, is accepted and replays by key without a new revision.
+      String replay = key();
+      String current = withWitness(RULES, saved.witness());
+      assertTrue(rules.dispatch(current, replay).success());
+      long revision = f.settings().inspect().witness().acceptedRevision();
+      assertEquals(saved.witness().acceptedRevision() + 1, revision);
+      assertTrue(rules.dispatch(current, replay).success());
+      assertEquals(revision, f.settings().inspect().witness().acceptedRevision());
+      assertEquals(json.readTree(RULES).get("schedule"), json.valueToTree(f.settings().load()).get("indexingPause").get("schedule"));
+      for (String malformed : List.of(RULES.replace("true}", "true,\"witness\":{}}"),
+          RULES.replace("true}", "true,\"witness\":{\"acceptedRevision\":\"1\",\"lastCommittedOperationKey\":null}}"),
+          RULES.replace("true}", "true,\"witness\":null}"))) {
+        var refused = rules.dispatch(malformed, key());
+        assertFalse(refused.success(), malformed);
+        assertEquals("BAD_REQUEST", refused.errorCode().orElseThrow(), malformed);
+        assertEquals(revision, f.settings().inspect().witness().acceptedRevision());
+      }
+    }
+  }
+
+  /** Overnight Sunday hours and a manual pause survive a Head restart (the settings owner and its hold). */
+  @Test
+  void overnightSundayHoursAndManualPauseSurviveHeadRestart() throws Exception {
+    String sunday = "{\"schedule\":{\"enabled\":true,\"days\":[7],\"startMinute\":1320,\"endMinute\":360},\"pauseOnBattery\":false}";
+    java.nio.file.Path saved;
+    try (var f = new RuntimeIntentTestFixture(directory)) {
+      var rules = f.dispatcher("core.set-indexing-rules", handler(f.spec()));
+      var pause = f.dispatcher("core.indexing-pause", new IndexingPauseHandler(f::spec, true));
+      assertTrue(rules.dispatch(withWitness(sunday, f.settings().inspect().witness()), key()).success());
+      assertTrue(pause.dispatch("{}", key()).success());
+      saved = f.settings().settingsPath();
+    }
+    var restarted = new io.justsearch.app.services.settings.UiSettingsStore(
+        io.justsearch.app.services.settings.UiSettingsStore.PersistenceMode.READ_WRITE, saved);
+    var hold = new IndexingHold();
+    restarted.bindIndexingHold(hold);
+    var policy = restarted.load().getIndexingPause();
+    assertEquals(json.readTree(sunday).get("schedule"), json.valueToTree(policy).get("schedule"));
+    assertTrue(policy.paused(), "manual pause intent is kept");
+    assertEquals("USER_PAUSED", policy.reason());
+    assertTrue(policy.schedule().allows(7, 1400) && policy.schedule().allows(1, 300) && !policy.schedule().allows(1, 420),
+        "overnight hours belong to Sunday and continue into Monday morning");
+  }
 }

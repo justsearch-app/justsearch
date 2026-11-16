@@ -6,13 +6,25 @@ import { getOperationClient, OperationError, type OperationInvocationSuccess } f
 import { requestAuthorization } from '../operations/authorizationBroker.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { settingsV2Schema, type SettingsV2 } from '../../api/generated/schema-types/settings-v2.js';
+import type { SettingsWitness } from '../../api/settingsAttempt.js';
 
 export type SavedIndexingRules = {
   schedule: NonNullable<NonNullable<NonNullable<SettingsV2['ui']>['indexingPause']>['schedule']> | null;
   pauseOnBattery: boolean;
 };
 
-/** The indexing editor, extracted from Settings. Only the explicit rule pair is written. */
+/** Field order on the wire is not ours: compare the rule pair by value. */
+function sameRules(a: SavedIndexingRules, b: SavedIndexingRules): boolean {
+  const key = (rules: SavedIndexingRules) => JSON.stringify([rules.pauseOnBattery, rules.schedule && [rules.schedule.enabled,
+    [...(rules.schedule.days ?? [])].sort((x, y) => x - y), rules.schedule.startMinute, rules.schedule.endMinute]]);
+  return key(a) === key(b);
+}
+
+/**
+ * The reading-hours editor. Only the explicit rule pair is written, and it saves as it changes: a
+ * choice on change, a time when its field is left. Each write carries the settings revision its draft
+ * was based on, so a save made elsewhere since is a conflict rather than overwritten (B6').
+ */
 export class IndexingRulesEditor extends JfElement {
   static properties = {
     developer: { type: Boolean },
@@ -30,12 +42,20 @@ export class IndexingRulesEditor extends JfElement {
   declare apiBase: string;
   declare host_: PluginHostApi | undefined;
   declare readOnly: boolean;
-  /** Library serializes its two editors and advances their shared settings witness. */
-  declare saveWithSettings: ((write: (operationKey: string) => Promise<OperationInvocationSuccess>, saved: SavedIndexingRules) => Promise<void>) | undefined;
+  /** Library serializes its settings writers and advances its own shared settings witness. */
+  declare saveWithSettings: ((write: (operationKey: string) => Promise<OperationInvocationSuccess>) => Promise<void>) | undefined;
   private savedRules: SavedIndexingRules = { schedule: null, pauseOnBattery: false };
+  /** The revision the saved rules were observed at; every write is based on it. */
+  private savedWitness: SettingsWitness | null = null;
   declare private conflictingRules: SavedIndexingRules | null;
+  private conflictWitness: SettingsWitness | null = null;
   private loadSerial = 0;
-  private indexingRulesDirty = false;
+  /** A change arrived while a save was in flight; it is saved when that one settles. */
+  private saveAgain = false;
+  private get indexingRulesDirty(): boolean {
+    const next = this.draftRules();
+    return next !== null && !sameRules(next, this.savedRules);
+  }
   private indexingScheduleConfigured = false;
   declare indexingRules: { enabled: boolean; days: number[]; start: string; end: string; pauseOnBattery: boolean };
   declare indexingRulesLoaded: boolean;
@@ -88,54 +108,136 @@ export class IndexingRulesEditor extends JfElement {
   }
 
   private editIndexingRules(patch: Partial<typeof this.indexingRules>): void {
-    this.indexingRulesDirty = true;
     if (Object.keys(patch).some(key => key !== 'pauseOnBattery')) this.indexingScheduleConfigured = true;
     this.indexingRules = { ...this.indexingRules, ...patch };
     this.indexingRulesMessage = '';
   }
 
-  private async saveIndexingRules(event: Event): Promise<void> {
-    event.preventDefault();
-    if (!this.indexingRulesLoaded || this.indexingRulesSaving || this.readOnly) return;
+  /** The draft as the rule pair it would save, or null while its times cannot be read. */
+  private draftRules(): SavedIndexingRules | null {
     const draft = this.indexingRules;
     const minute = (value: string): number => {
       const parts = /^(\d{2}):(\d{2})$/.exec(value);
       return parts ? Number(parts[1]) * 60 + Number(parts[2]) : NaN;
     };
     const startMinute = minute(draft.start), endMinute = minute(draft.end);
-    this.indexingRulesError = '';
-    this.indexingRulesMessage = '';
-    if (!Number.isInteger(startMinute) || !Number.isInteger(endMinute)) {
-      this.indexingRulesError = 'Enter a start time and an end time.';
-    } else if (startMinute === endMinute) {
-      this.indexingRulesError = 'Start and end times must be different.';
-    } else if (draft.enabled && !draft.days.length) {
-      this.indexingRulesError = 'Choose at least one day or turn reading hours off.';
-    }
-    if (this.indexingRulesError) return;
+    if (!Number.isInteger(startMinute) || !Number.isInteger(endMinute)) return null;
+    return { schedule: this.indexingScheduleConfigured
+      ? { enabled: draft.enabled, days: [...draft.days], startMinute, endMinute } : null,
+      pauseOnBattery: draft.pauseOnBattery };
+  }
+
+  /** Why the draft cannot be saved, in the person's words; empty when it can. */
+  private draftProblem(): string {
+    const next = this.draftRules();
+    if (!next) return 'Enter a start time and an end time.';
+    if (next.schedule && next.schedule.startMinute === next.schedule.endMinute) return 'Start and end times must be different.';
+    if (next.schedule?.enabled && !(next.schedule.days ?? []).length) return 'Choose at least one day or turn reading hours off.';
+    return '';
+  }
+
+  private readonly submitIndexingRules = (event: Event): void => {
+    event.preventDefault();
+    void this.saveIndexingRules();
+  };
+
+  /** Save the draft as it now is; a change during a save is saved right after it. */
+  private async saveIndexingRules(): Promise<void> {
+    if (!this.indexingRulesLoaded || this.readOnly || this.conflictingRules) return;
+    if (this.indexingRulesSaving) { this.saveAgain = true; return; }
+    this.indexingRulesError = this.draftProblem();
+    if (this.indexingRulesError || !this.indexingRulesDirty) return;
     this.indexingRulesSaving = true;
+    this.indexingRulesMessage = '';
     ++this.loadSerial;
     try {
-      const next: SavedIndexingRules = { schedule: this.indexingScheduleConfigured
-        ? { enabled: draft.enabled, days: [...draft.days], startMinute, endMinute } : null,
-        pauseOnBattery: draft.pauseOnBattery };
-      const write = (operationKey?: string) => getOperationClient(this.apiBase).invokeWithConsent('core.set-indexing-rules', {
-        ...(operationKey ? { idempotencyKey: operationKey } : {}), args: next,
-      }, { requestConsent: requestAuthorization });
-      if (this.saveWithSettings) await this.saveWithSettings(write, this.savedRules); else await write();
-      this.savedRules = next;
-      this.indexingRulesDirty = false;
-      this.conflictingRules = null;
-      this.indexingRulesMessage = 'Reading rules saved.';
-    } catch (error) {
-      const conflict = error instanceof OperationError && (error.httpStatus === 409 || error.errorCode === 'VERSION_CONFLICT');
-      this.indexingRulesError = conflict
-        ? `Settings changed before this save. Review your draft and save again. ${error.message}`
-        : `Could not save reading rules. ${error instanceof Error ? error.message : String(error)}`;
-      if (conflict) await this.loadSettings('conflict');
+      do {
+        this.saveAgain = false;
+        if (this.draftProblem()) { this.indexingRulesError = this.draftProblem(); break; }
+        if (!this.indexingRulesDirty || !await this.writeRules(this.draftRules()!)) break;
+      } while (this.saveAgain && this.isConnected);
     } finally {
       this.indexingRulesSaving = false;
     }
+  }
+
+  /** One rule write on the observed revision; a revision moved only by other settings is taken up and tried again. */
+  private async writeRules(next: SavedIndexingRules): Promise<boolean> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const witness = this.savedWitness;
+      if (!witness) { this.indexingRulesError = 'Could not save reading rules. Reload Library and try again.'; return false; }
+      const write = (operationKey?: string) => getOperationClient(this.apiBase).invokeWithConsent('core.set-indexing-rules', {
+        ...(operationKey ? { idempotencyKey: operationKey } : {}), args: { ...next, witness },
+      }, { requestConsent: requestAuthorization });
+      try {
+        let receipt: unknown, usedKey: string | undefined;
+        if (this.saveWithSettings) {
+          await this.saveWithSettings(async key => { usedKey = key; const result = await write(key); receipt = result.structuredData?.['witness']; return result; });
+        } else receipt = (await write()).structuredData?.['witness'];
+        const observed = settingsV2Schema.shape.witness.safeParse(receipt);
+        // Only this write's direct successor is known to hold exactly these rules; otherwise the next
+        // write is refused and rebased after reading the saved rules.
+        if (observed.success && observed.data && usedKey && observed.data.lastCommittedOperationKey === usedKey
+            && observed.data.acceptedRevision === witness.acceptedRevision + 1) {
+          this.savedWitness = observed.data;
+        }
+        this.savedRules = next;
+        this.indexingRulesError = '';
+        this.indexingRulesMessage = 'Reading rules saved.';
+        return true;
+      } catch (error) {
+        const conflict = error instanceof OperationError && (error.httpStatus === 409 || error.errorCode === 'VERSION_CONFLICT');
+        if (!conflict) {
+          this.indexingRulesError = `Could not save reading rules. ${error instanceof Error ? error.message : String(error)}`;
+          return false;
+        }
+        const observed = await this.observeSaved();
+        if (!observed) return false;
+        if (sameRules(observed.rules, next)) { this.savedRules = next; this.savedWitness = observed.witness; return true; }
+        if (sameRules(observed.rules, this.savedRules)) { this.savedWitness = observed.witness; continue; }
+        this.conflictingRules = observed.rules;
+        this.conflictWitness = observed.witness;
+        this.indexingRulesError = '';
+        return false;
+      }
+    }
+    this.indexingRulesError = 'Could not save reading rules: settings kept changing. Try the change again.';
+    return false;
+  }
+
+  /**
+   * Library's own settings write (a skip-rule save, Pause, Resume) committed directly after the
+   * revision these rules were observed at: it did not touch them, so they hold at its successor too.
+   */
+  adoptOwnSuccessor(before: SettingsWitness, after: SettingsWitness): void {
+    const at = this.savedWitness;
+    if (at && at.acceptedRevision === before.acceptedRevision && at.lastCommittedOperationKey === before.lastCommittedOperationKey
+        && after.acceptedRevision === before.acceptedRevision + 1) this.savedWitness = after;
+  }
+
+  private async observeSaved(): Promise<{ rules: SavedIndexingRules; witness: SettingsWitness } | null> {
+    try {
+      const res = this.host_ ? await this.host_.data.fetch('/api/settings/v2') : await authorizedFetch(`${this.apiBase}/api/settings/v2`);
+      if (!res.ok) throw new Error(`Could not load reading rules (${res.status}).`);
+      const data = settingsV2Schema.parse(await res.json());
+      if (!data.witness) throw new Error('Saved reading rules did not include a revision.');
+      const policy = data.ui?.indexingPause;
+      return { rules: { schedule: policy?.schedule ? { enabled: policy.schedule.enabled ?? false, days: [...(policy.schedule.days ?? [])],
+        startMinute: policy.schedule.startMinute ?? 540, endMinute: policy.schedule.endMinute ?? 1020 } : null,
+        pauseOnBattery: policy?.pauseOnBattery ?? false }, witness: data.witness };
+    } catch (error) {
+      this.indexingRulesError = `Could not check the saved reading rules. ${error instanceof Error ? error.message : String(error)}`;
+      return null;
+    }
+  }
+
+  private readonly saveOnLeave = (event: FocusEvent): void => {
+    if ((event.target as HTMLElement | null)?.matches?.('input[type=time]')) void this.saveIndexingRules();
+  };
+
+  private changeAndSave(patch: Partial<typeof this.indexingRules>): void {
+    this.editIndexingRules(patch);
+    void this.saveIndexingRules();
   }
 
 
@@ -159,6 +261,8 @@ export class IndexingRulesEditor extends JfElement {
 
   override disconnectedCallback(): void {
     this.cancelIndexingRuleFocus();
+    // Leaving Library leaves a time field too: its change is saved like any other.
+    if (this.indexingRulesLoaded && this.indexingRulesDirty && !this.draftProblem()) void this.saveIndexingRules();
     ++this.loadSerial;
     super.disconnectedCallback();
   }
@@ -168,7 +272,7 @@ export class IndexingRulesEditor extends JfElement {
     if (this.indexingRuleFocus) void this.focusPendingIndexingRule();
   }
 
-  private async loadSettings(mode: 'preserve' | 'conflict' | 'discard' = 'preserve'): Promise<boolean> {
+  private async loadSettings(mode: 'preserve' | 'discard' = 'preserve'): Promise<boolean> {
     const serial = ++this.loadSerial;
     try {
       const res = this.host_ ? await this.host_.data.fetch('/api/settings/v2')
@@ -179,11 +283,16 @@ export class IndexingRulesEditor extends JfElement {
       this.readOnly = data.settingsMode === 'in_memory';
       const policy = data.ui?.indexingPause;
       const schedule = policy?.schedule;
-      const saved = { schedule: schedule ?? null, pauseOnBattery: policy?.pauseOnBattery ?? false };
-      if (mode === 'conflict' || mode === 'preserve' && this.indexingRulesDirty
-          && JSON.stringify(saved) !== JSON.stringify(this.savedRules)) this.conflictingRules = saved;
-      if (mode === 'discard' || !this.indexingRulesDirty && !this.indexingRulesSaving) this.savedRules = saved;
-      if (mode === 'discard' || !this.indexingRulesDirty && !this.indexingRulesSaving) {
+      const saved: SavedIndexingRules = { schedule: schedule ? { enabled: schedule.enabled ?? false, days: [...(schedule.days ?? [])],
+        startMinute: schedule.startMinute ?? 540, endMinute: schedule.endMinute ?? 1020 } : null, pauseOnBattery: policy?.pauseOnBattery ?? false };
+      const dirty = this.indexingRulesLoaded && this.indexingRulesDirty;
+      if (mode === 'preserve' && dirty && !sameRules(saved, this.savedRules)) {
+        this.conflictingRules = saved;
+        this.conflictWitness = data.witness ?? null;
+      }
+      const adopt = mode === 'discard' || !dirty && !this.indexingRulesSaving;
+      if (adopt) { this.savedRules = saved; this.savedWitness = data.witness ?? null; }
+      if (adopt) {
         this.indexingScheduleConfigured = schedule != null;
         const time = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
         this.indexingRules = { enabled: schedule?.enabled ?? false,
@@ -192,30 +301,33 @@ export class IndexingRulesEditor extends JfElement {
           pauseOnBattery: policy?.pauseOnBattery ?? false };
       }
       if (mode === 'discard') {
-        this.indexingRulesDirty = false;
         this.conflictingRules = null;
+        this.conflictWitness = null;
         this.indexingRulesError = '';
-        this.indexingRulesMessage = 'Saved reading rules loaded.';
+        this.indexingRulesMessage = '';
       }
       this.indexingRulesLoaded = true;
       return true;
     } catch (error) {
       if (serial === this.loadSerial) {
         const message = error instanceof Error ? error.message : String(error);
-        this.indexingRulesError = mode === 'conflict' ? `${this.indexingRulesError} ${message}` : message;
+        this.indexingRulesError = message;
       }
       return false;
     }
   }
 
-  private async resolveConflict(event: Event, keepDraft: boolean): Promise<void> {
-    if (this.indexingRulesSaving || this.readOnly) return;
+  /** "Changed elsewhere": keep the draft over the rules shown, or take the saved rules and write nothing. */
+  private async resolveConflict(keepDraft: boolean): Promise<void> {
+    if (this.indexingRulesSaving || this.readOnly || !this.conflictingRules) return;
     if (keepDraft) {
-      // Consent covers exactly the rules displayed in this review. The serialized
-      // save guard must reject another writer's change since that observation.
-      if (!this.conflictingRules) return;
+      // Consent covers exactly the rules displayed: the write is based on their revision, so a
+      // further change elsewhere since is shown as a new conflict instead of overwritten.
       this.savedRules = this.conflictingRules;
-      await this.saveIndexingRules(event);
+      this.savedWitness = this.conflictWitness;
+      this.conflictingRules = null;
+      this.conflictWitness = null;
+      await this.saveIndexingRules();
       return;
     }
     this.indexingRulesSaving = true;
@@ -229,16 +341,16 @@ export class IndexingRulesEditor extends JfElement {
     const schedule = saved.schedule;
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     const time = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
-    return html`<section aria-label="Saved reading rules">
-      <p>Reading times changed elsewhere. Your draft is kept. Current saved rules:</p>
+    return html`<section aria-label="Saved reading rules" role="alert">
+      <p>Changed elsewhere. Your draft is kept. The saved rules are now:</p>
       <details open><summary>Current saved reading rules</summary>
       <p>${schedule?.enabled ? 'Only between' : 'Any time'}${schedule ? html` · ${time(schedule.startMinute ?? 540)}–${time(schedule.endMinute ?? 1020)}
         · ${(schedule.days ?? []).map(day => days[day - 1]).join(', ')}${!schedule.enabled ? ' (hours turned off; days and times kept)' : ''}` : nothing}
         · Pause while on battery: ${saved.pauseOnBattery ? 'on' : 'off'}</p></details>
-      <div class="conflict-actions"><button type="button" ?disabled=${this.indexingRulesSaving || this.readOnly}
-        @click=${(event: Event) => void this.resolveConflict(event, true)}>Save my draft</button>
-      <button type="button" ?disabled=${this.indexingRulesSaving || this.readOnly}
-        @click=${(event: Event) => void this.resolveConflict(event, false)}>Discard my draft</button></div>
+      <div class="conflict-actions"><button type="button" ?disabled=${this.readOnly}
+        @click=${() => void this.resolveConflict(false)}>Use the saved rules</button>
+      <button type="button" ?disabled=${this.readOnly}
+        @click=${() => void this.resolveConflict(true)}>Keep my draft</button></div>
     </section>`;
   }
 
@@ -270,13 +382,13 @@ export class IndexingRulesEditor extends JfElement {
   override render() {
     return html`<section aria-labelledby="when-to-index">
       <h3 id="when-to-index" tabindex="-1">When to read files</h3>
-      <form @submit=${(event: Event) => void this.saveIndexingRules(event)} novalidate aria-label="Reading rules">
-        <fieldset ?disabled=${!this.indexingRulesLoaded || this.indexingRulesSaving || this.readOnly}
+      <form @submit=${this.submitIndexingRules} @focusout=${this.saveOnLeave} novalidate aria-label="Reading rules">
+        <fieldset ?disabled=${!this.indexingRulesLoaded || this.readOnly}
           aria-label="When to read files" aria-describedby="indexing-rules-error">
           <div class="rule-choice"><label><input type="radio" name="indexing-hours" .checked=${!this.indexingRules.enabled}
-            @change=${() => this.editIndexingRules({ enabled: false })}>Any time</label></div>
+            @change=${() => this.changeAndSave({ enabled: false })}>Any time</label></div>
           <div class="rule-choice"><label><input id="indexing-hours" type="radio" name="indexing-hours" .checked=${this.indexingRules.enabled}
-            @change=${() => this.editIndexingRules({ enabled: true })}>Only between</label>
+            @change=${() => this.changeAndSave({ enabled: true })}>Only between</label>
             <label><span class="visually-hidden">Start time</span><input type="time" .value=${this.indexingRules.start} aria-describedby="indexing-local-time indexing-rules-error"
               @input=${(e: Event) => this.editIndexingRules({ start: (e.target as HTMLInputElement).value })}></label>
             and <label><span class="visually-hidden">End time</span><input type="time" .value=${this.indexingRules.end} aria-describedby="indexing-local-time indexing-rules-error"
@@ -286,20 +398,18 @@ export class IndexingRulesEditor extends JfElement {
           <div class="indexing-days" role="group" aria-label="Reading days" ?hidden=${!this.developer || !this.indexingRules.enabled}>
             ${['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day, index) => html`
               <label><input type="checkbox" .checked=${this.indexingRules.days.includes(index + 1)}
-                @change=${(e: Event) => this.editIndexingRules({ days: (e.target as HTMLInputElement).checked
+                @change=${(e: Event) => this.changeAndSave({ days: (e.target as HTMLInputElement).checked
                   ? [...this.indexingRules.days, index + 1].sort((a, b) => a - b)
                   : this.indexingRules.days.filter(d => d !== index + 1) })}>${day}</label>`)}
           </div>
           <label><input id="indexing-battery" type="checkbox" .checked=${this.indexingRules.pauseOnBattery}
             aria-describedby="indexing-battery-help"
-            @change=${(e: Event) => this.editIndexingRules({ pauseOnBattery: (e.target as HTMLInputElement).checked })}>Pause while on battery</label>
+            @change=${(e: Event) => this.changeAndSave({ pauseOnBattery: (e.target as HTMLInputElement).checked })}>Pause while on battery</label>
         </fieldset>
         <details><summary>About reading times</summary>
           <p id="indexing-local-time">Hours follow this computer's local time. An end time before the start continues into the next day. Turning hours off keeps your days and times.</p>
           <p id="indexing-battery-help">Applies only while this computer is known to run on battery. If the power source is unknown, this rule does not hold reading. Your preference is kept.</p>
         </details>
-        <button type="submit" ?disabled=${!this.indexingRulesLoaded || this.readOnly}
-          aria-disabled=${this.indexingRulesSaving ? 'true' : 'false'}>${this.indexingRulesSaving ? 'Saving reading rules…' : 'Save reading rules'}</button>
         ${this.renderSavedRules()}
         <p id="indexing-rules-error" role="alert">${this.indexingRulesError}</p>
         <p role="status">${this.indexingRulesMessage}</p>

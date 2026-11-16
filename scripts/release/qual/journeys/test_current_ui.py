@@ -148,16 +148,40 @@ class AuthoredStateTests(unittest.TestCase):
                 run.wd.click.assert_any_call('button[role="radio"]', 'Dark')
                 labels = [c.args[0] for c in run.wd.click.call_args_list]
                 if phase == 'candidate':
+                    # Slice 6b-2: no Save patterns; leaving the field (Tab) saves, then the in-place ask is answered.
                     self.assertEqual(labels[:3], ['button[role="tab"][data-tab-id="folders"]',
-                        'button[aria-label="Add a rule"]:not(:disabled)',
-                        'button[aria-label="Save patterns"]:not(:disabled)'])
-                    run.wd.keys.assert_called_once_with('.skip-rule:last-of-type input[aria-label^="Skip rule "]', RULE)
+                        'button[aria-label="Add a rule"]:not(:disabled)', 'button'])
+                    run.wd.click.assert_any_call('button', 'Keep them')
+                    run.wd.keys.assert_called_once_with('.skip-rule:last-of-type input[aria-label^="Skip rule "]', RULE + '\ue004')
+                    self.assertFalse(any('Save patterns' in label for label in labels))
                     self.assertEqual(run.facts['skipRule'], RULE)
                 else:
                     run.wd.keys.assert_not_called()
                     self.assertNotIn('skipRule', run.facts)
                 self.assertNotIn('bookmark', run.facts)
                 self.assertTrue(run.facts['authored'])
+
+    def test_j4_waits_for_the_left_field_to_persist_before_answering_the_ask(self):
+        # The rule must be saved by leaving the field before Keep them is pressed; nothing is removed.
+        run = Mock(args=NS(phase='candidate', resume=None), facts={})
+        order = []
+        saved = {'ui': {'theme': 'dark', 'excludePatterns': []}}
+        def keys(selector, text):
+            order.append(('keys', text))
+            saved['ui']['excludePatterns'] = [RULE]
+        def click(selector, *args):
+            order.append(('click', selector, *args))
+            if args == ('Keep them',):
+                self.assertEqual(saved['ui']['excludePatterns'], [RULE], 'the ask is answered only after the rule persisted')
+        run.wd.keys.side_effect = keys
+        run.wd.click.side_effect = click
+        run.api.side_effect = lambda path, *a: saved
+        run.wd.execute.return_value = {'pattern': RULE, 'label': 'Skip rule 2'}
+        with patch.object(linux, 'wait_for', lambda probe, *a, **k: probe()), patch.object(linux, 'snapshot', return_value={}):
+            linux.author_state(run)
+        self.assertIn(('click', 'button', 'Keep them'), order)
+        self.assertLess(order.index(('keys', RULE + '\ue004')), order.index(('click', 'button', 'Keep them')))
+        self.assertNotIn('Remove from search', json.dumps(order))
 
     def test_h5_assert_state_requires_rule_and_dark_even_if_before_snapshot_matches(self):
         for phase, patterns, theme, passes in (('candidate', [RULE], 'dark', True),

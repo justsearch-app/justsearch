@@ -1620,6 +1620,9 @@ executors. Generic Settings exposes `indexingPause` read-only.
   and at least one day when enabled. Disabled schedules still validate and retain their hours.
   Types are strict. Both rules replace atomically; invalid requests return HTTP 400 with field
   information and preserve the policy. Manual pause, deadline and recovery reason are preserved.
+  An optional `witness` `{acceptedRevision, lastCommittedOperationKey}` names the settings revision
+  the caller's draft was based on; the write then commits only at that revision and otherwise fails
+  with `VERSION_CONFLICT` (Library sends it, so another window's newer save is never overwritten).
 
 `operating.indexing.reasons` is ordered settings recovery, manual (`user_paused`), `schedule`,
 `on_battery`, then automatic bulk-work reasons. The primary lifecycle codes are

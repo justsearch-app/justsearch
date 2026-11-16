@@ -150,6 +150,14 @@ Note: `GET /api/debug/effective-config` exists for "effective config" debugging.
    In a browser, enter its path in the form.
 3. The folder row shows its reading state and the last observed number of disk files.
 
+### Skipping files and setting reading hours
+
+In **Library → Folders**, **Skip these files** holds one rule per line. Choose **Add a rule**, type it,
+and leave the field: it is saved. Library then asks in place whether to remove files already read that
+match your skip rules; **Keep them** leaves them searchable, **Remove from search** removes them (files on
+disk are not touched). **When to read files** saves as you change it. If another window changed the same
+rules, choose **Use the saved rules** or **Keep my draft**.
+
 ### Reading files again
 
 At the foot of **Library → Folders**, beside **Activity**, choose **Read everything again**.

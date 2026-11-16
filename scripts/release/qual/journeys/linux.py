@@ -517,10 +517,12 @@ def author_state(run):
         run.nav('Library')
         run.wd.click('button[role="tab"][data-tab-id="folders"]')
         run.wd.click('button[aria-label="Add a rule"]:not(:disabled)')
-        run.wd.keys('.skip-rule:last-of-type input[aria-label^="Skip rule "]', SKIP_RULE)
-        run.wd.click('button[aria-label="Save patterns"]:not(:disabled)')
+        # Slice 6b-2: a rule saves when its field is left; Tab (U+E004) leaves it.
+        run.wd.keys('.skip-rule:last-of-type input[aria-label^="Skip rule "]', SKIP_RULE + '\ue004')
         wait_for(lambda: SKIP_RULE in run.api('/api/settings/v2').get('ui', {}).get('excludePatterns', []),
                  'UI-authored skip rule persisted', seconds=20)
+        # Adding a rule asks in place whether to remove matching read files; keep them (the fixture stays).
+        run.wd.click('button', 'Keep them')
         run.facts['skipRule'] = SKIP_RULE
         skip_rule_entry(run, SKIP_RULE)
         run.native.shot('J4-authored-skip-rule')

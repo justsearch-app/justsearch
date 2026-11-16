@@ -130,17 +130,24 @@ it('L2 a second clean window observes add, remove and undo on focus and on retur
   await draft(first, '*.tmp'); await save(first);
   await activate(second);
   await expect.poll(async () => (await state(second)).text).toBe('*.tmp');
-  await first.locator('jf-button[label^="Remove keep-out"] button').click(); await save(first);
+  // Slice 6b-2 (B5'): removing an exact-path keep-out saves at once and offers no Undo.
+  await first.locator('jf-button[label^="Remove keep-out"] button').click();
+  await expect.poll(() => saved).toEqual(['*.tmp']);
   await second.evaluate(() => window.windowfix.leave());
   await second.evaluate(() => window.windowfix.return());
   await expect.poll(async () => (await state(second)).literals).toEqual([]);
   await first.evaluate(() => window.windowfix.undo());
-  await expect.poll(() => saved).toEqual(['*.tmp', literal]);
+  await first.waitForTimeout(150);
+  expect(saved, 'no Undo re-adds an exact path or rewinds over a later save').toEqual(['*.tmp']);
+  await draft(first, '*.bak'); await save(first);
+  await first.evaluate(() => window.windowfix.undo());
+  await expect.poll(() => saved).toEqual(['*.tmp']);
   await activate(second);
-  await expect.poll(async () => (await state(second)).literals).toEqual([literal]);
+  await expect.poll(async () => (await state(second)).text).toBe('*.tmp');
 }, 30_000);
 
-it.each(['text', 'exact-path'])('L3 a second window keeps its %s draft and original conflict witness', async kind => {
+// Slice 6b-2: an exact-path removal saves at once (no exact-path draft); see LibrarySurface.settings-attempt RF55.
+it.each(['text'])('L3 a second window keeps its %s draft and original conflict witness', async kind => {
   const first = await open(), second = await open();
   const original = await state(second);
   if (kind === 'text') await draft(second, 'my draft');
@@ -204,8 +211,9 @@ it('L5 an uncertain save keeps its operation key and exact bytes through focus a
   expect(after.attempt).toEqual(attempt);
   expect(after.text).toBe('draft');
   failSave = false; await save(page);
-  expect(writes).toHaveLength(2);
-  expect(writes[1]).toBe(writes[0]);
+  // Leaving Library checks the same attempt once more (slice 6b-2): every write is the same key and bytes.
+  expect(writes).toHaveLength(3);
+  expect(new Set(writes).size).toBe(1);
   expect(saved[0]).toBe('draft');
 }, 30_000);
 
@@ -250,10 +258,10 @@ it('L6 leaving with an outstanding read discards its result, including after rec
   await expect.poll(async () => (await state(page)).text).toBe('changed');
 }, 30_000);
 
-it.each(['reload', 'focus'])('L7 %s retains empty lists, glob strings, warnings and exact-path bytes on the next save', async how => {
+it.each(['return', 'focus'])('L7 %s retains empty lists, glob strings, warnings and exact-path bytes on the next save', async how => {
   const page = await open();
-  const observe = async () => how === 'reload'
-    ? page.locator('jf-button[label="Reload saved patterns"] button').click() : activate(page);
+  const observe = async () => how === 'return'
+    ? page.evaluate(() => { window.windowfix.leave(); window.windowfix.return(); }) : activate(page);
   saved = []; await observe();
   await expect.poll(async () => (await state(page)).literals).toEqual([]);
   await expect.poll(async () => (await state(page)).text).toBe('');
@@ -264,11 +272,14 @@ it.each(['reload', 'focus'])('L7 %s retains empty lists, glob strings, warnings 
   expect(saved).toEqual(['*.tmp', '[broken', literal]);
 }, 30_000);
 
-it('L8 effective override is refreshed with saved rules and gates Preview/Apply consistently', async () => {
+it('L8 effective override is refreshed with saved rules, keeps the editor saving, and asks nothing to remove', async () => {
   const page = await open();
   override = { source: 'env_var', sourceDetail: 'JUSTSEARCH_UI_EXCLUDE_PATTERNS', patterns: ['operator-only'] };
   await activate(page);
   await expect.poll(async () => (await state(page)).policy).toEqual(override);
   expect(await page.locator('#excludes-override').textContent()).toContain('operator-only');
-  for (const label of ['Preview', 'Apply']) expect(await page.locator(`jf-button[label="${label}"] button`).isEnabled()).toBe(true);
+  for (const label of ['Preview', 'Apply', 'Save patterns']) expect(await page.locator(`jf-button[label="${label}"]`).count()).toBe(0);
+  await draft(page, '*.tmp'); await save(page);
+  expect(saved).toEqual(['*.tmp', literal]);
+  expect(await page.getByRole('region', { name: /^Remove files already read/ }).count()).toBe(0);
 }, 30_000);

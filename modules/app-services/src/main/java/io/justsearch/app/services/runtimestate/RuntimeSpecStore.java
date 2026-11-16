@@ -47,6 +47,15 @@ public final class RuntimeSpecStore {
     return RuntimeIntentPreparation.prepare(argumentsJson, capture().witness());
   }
 
+  /**
+   * Freeze the revision the caller's draft was based on instead of the current one: the accepted
+   * write then commits only if no other settings save happened since that draft was read.
+   */
+  public OperationPreparation prepareIntent(String argumentsJson, io.justsearch.app.api.settings.SettingsWitness basedOn) {
+    requireWriter();
+    return RuntimeIntentPreparation.prepare(argumentsJson, java.util.Objects.requireNonNull(basedOn, "basedOn"));
+  }
+
   /** The existing dispatcher-issued attempt owns this synchronous settings effect. */
   public OperationResult applyIntent(OperationPreparation prepared, boolean enabled, OperationRecordHandle record) {
     var expected = RuntimeIntentPreparation.validate(prepared);
