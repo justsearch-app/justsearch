@@ -206,6 +206,8 @@ export class HelpSurface extends JfElement {
       justify-content: space-between;
       align-items: flex-start;
       gap: 1rem;
+      /* The page column: the header's line spans the window, its content and the grid sit on it. */
+      padding-inline: calc(var(--surface-content-gutter) + var(--density-header-pad-x));
       padding-bottom: 1rem;
       border-bottom: 1px solid var(--border-subtle);
       margin-bottom: 1rem;
@@ -283,6 +285,7 @@ export class HelpSurface extends JfElement {
       display: grid;
       grid-template-columns: 1fr;
       gap: 1.5rem;
+      padding-inline: var(--surface-content-gutter);
     }
     @media (min-width: 64rem) {
       .grid {

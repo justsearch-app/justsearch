@@ -302,7 +302,8 @@ export class LogSurface extends JfElement {
     css`
     .header {
       flex-shrink: 0;
-      padding: 0.75rem 1rem;
+      /* The page column: the line and the scroller span the window, the content sits on the column. */
+      padding: 0.75rem calc(var(--surface-content-gutter) + 1rem);
       border-bottom: 1px solid var(--border-subtle);
       display: flex;
       flex-direction: column;
@@ -356,7 +357,7 @@ export class LogSurface extends JfElement {
     .body {
       flex: 1;
       overflow-y: auto;
-      padding: 0.5rem 1rem;
+      padding: 0.5rem calc(var(--surface-content-gutter) + 1rem);
     }
     .empty,
     .error {

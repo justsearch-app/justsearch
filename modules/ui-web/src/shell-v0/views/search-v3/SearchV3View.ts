@@ -119,6 +119,7 @@ import {
   SV3_SIDEBAR_COLLAPSED_PX,
   SV3_SIDEBAR_DEFAULT_PX,
 } from './sv3-boundaries.js';
+import { Sv3PageWidth, sv3PageWidthStyles } from './sv3-page-width.js';
 import {
   activeTurns,
   adoptRunSession,
@@ -353,6 +354,7 @@ export class SearchV3View extends JfElement {
   static styles = [
     sv3Tokens,
     sv3Shared,
+    sv3PageWidthStyles,
     css`
       /* Search sits on the app's page background, the same one the top bar uses (design: #0a0a0c dark). */
       :host, :host([theme='light']) { --background: var(--surface-0); }
@@ -877,6 +879,7 @@ export class SearchV3View extends JfElement {
 
   /** Watches the window box so the pane's presentation follows it (Phase F8). */
   private boxObserver: ResizeObserver | null = null;
+  private readonly pageWidth = new Sv3PageWidth(this, () => [this.availableWidth(), this.sidebarOccupiedWidth(), this.paneTab !== null && !this.paneOverlay, this.paneWidthPx]);
   /** 859 §B — the dock's own box watcher, and the node it is currently bound to. */
   private dockObserver: ResizeObserver | null = null;
   private observedRecentList: HTMLElement | null = null;
@@ -1488,6 +1491,7 @@ export class SearchV3View extends JfElement {
     this.boxObserver = new ResizeObserver(() => {
       this.paneOverlay = !sv3PaneIsInline(this.availableWidth());
       this.reflowSidebar();
+      this.paneWidthPx = this.pageWidth.sync();
     });
     this.boxObserver.observe(this);
   }
@@ -1601,6 +1605,7 @@ export class SearchV3View extends JfElement {
     if (changed.has('sidebarWidthPx') || changed.has('paneWidthPx') || changed.has('paneTab')) {
       this.reflowSidebar();
     }
+    if (this.pageWidth.sidebarMoved(this.sidebarOccupiedWidth()) || changed.has('paneTab') || changed.has('paneOverlay')) this.paneWidthPx = this.pageWidth.sync();
     // Here rather than in the store's callback: by now a first connect has also restored the saved
     // draft, which `followSharedQuery` must see before it writes the composer.
     const move = this.search.takeSharedMove();
@@ -1859,11 +1864,8 @@ export class SearchV3View extends JfElement {
       this.paneOccupiedWidth(available),
     );
     this.applySidebarWidth(this.sidebarWidthPx);
-    this.paneWidthPx = resolveInitialSv3PaneWidth(
-      readStoredSv3PaneWidth(),
-      available,
-      this.sidebarOccupiedWidth(),
-    );
+    this.paneWidthPx = resolveInitialSv3PaneWidth(this.pageWidth.recall(readStoredSv3PaneWidth()), available, this.sidebarOccupiedWidth());
+    this.paneWidthPx = this.pageWidth.sync();
     this.applyPaneWidth(this.paneWidthPx);
     this.reflowSidebar();
   }
@@ -1886,6 +1888,7 @@ export class SearchV3View extends JfElement {
   }
 
   private adoptPaneWidth(px: number): void {
+    this.pageWidth.chosen = true;
     this.paneWidthPx = px;
     storeSv3PaneWidth(px);
   }
@@ -1908,11 +1911,7 @@ export class SearchV3View extends JfElement {
   /** The pane's half of the same withdrawal (818 L13 / the spec's `resetSidebarWidth`). */
   private resetPaneWidth(): void {
     forgetSv3PaneWidth();
-    this.paneWidthPx = resolveInitialSv3PaneWidth(
-      null,
-      this.availableWidth(),
-      this.sidebarOccupiedWidth(),
-    );
+    this.paneWidthPx = this.pageWidth.forget();
   }
 
   /**
@@ -2098,6 +2097,7 @@ export class SearchV3View extends JfElement {
     const available = this.availableWidth();
     this.paneOverlay = !sv3PaneIsInline(available);
     this.paneWidthPx = clampSv3PaneWidth(this.paneWidthPx, available, this.sidebarOccupiedWidth());
+    this.paneWidthPx = this.pageWidth.sync();
     this.applyPaneWidth(this.paneWidthPx);
   }
 
@@ -2856,7 +2856,7 @@ export class SearchV3View extends JfElement {
           data-testid="sv3-composer"
         ></jf-sv3-composer>
         </div>
-        ${this.search.forgetNotice ? html`<div role="status" aria-live="polite" data-testid="sv3-forget-notice">
+        ${this.search.forgetNotice ? html`<div class="forget-row" role="status" aria-live="polite" data-testid="sv3-forget-notice">
           <span class="forget-notice">${this.search.forgetNotice}</span>
           <jf-button label="Review in Library" .onActivate=${() => requestSurfaceNavigation('core.library-surface')}>Review in Library</jf-button>
         </div>` : nothing}

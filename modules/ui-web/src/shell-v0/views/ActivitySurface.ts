@@ -501,6 +501,10 @@ export class ActivitySurface extends JfElement {
       flex: none;
       overflow-y: visible;
     }
+    /* The page column, inside the scroller beside the details pane: the scroller and the header's
+       line span what the pane leaves; the feed sits on a centred column within it. */
+    .main > .header { padding-inline: calc(var(--surface-content-gutter) + var(--density-header-pad-x)); }
+    .main > .body { padding-inline: calc(var(--surface-content-gutter) + var(--density-inner-pad-x)); }
     jf-action-ledger {
       display: block;
       width: 100%;

@@ -360,6 +360,9 @@ export class Sv3Main extends JfElement {
         flex: 1 1 auto;
         min-height: 0;
         padding: var(--floating-content-inset);
+        /* The page column (owner decision, 15 November): the scroller spans the main column, so a
+           wheel anywhere in it scrolls; its content sits on the centred column (SearchV3View's gutters). */
+        padding-inline: calc(var(--sv3-gutter-start, 0px) + var(--floating-content-inset)) calc(var(--sv3-gutter-end, 0px) + var(--floating-content-inset));
         /* ── The occluded band (tempdoc 859 §B) ──────────────────────────────
            The composer FLOATS over this scroller now, so the client box is no longer the visible
            region. Two declarations, two different jobs, and neither substitutes for the other:

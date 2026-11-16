@@ -1222,7 +1222,7 @@ export class BrainSurface extends JfElement {
       background: var(--accent-on-tint);
     }
     /* fm-10 / fm-13 / fm-14 — one centred column; the heading, one sentence, the steps, then the links. */
-    .body { padding: 1.625rem 2.75rem 2rem; gap: 0; min-width: 0; overflow-wrap: anywhere; box-sizing: border-box; width: 100%; max-width: 960px; margin-inline: auto; }
+    .body { padding: 1.625rem 2.75rem 2rem; gap: 0; min-width: 0; overflow-wrap: anywhere; box-sizing: border-box; width: 100%; max-width: var(--surface-content-max-width); margin-inline: auto; }
     .body > * + * { margin-top: 1rem; }
     .brain-headline { margin: 0; font-size: var(--font-size-headline); line-height: 2.25rem; font-variation-settings: "opsz" 32; font-weight: 400; letter-spacing: -0.02em; outline: none; }
     .brain-sentence { font-size: var(--font-size-md); color: var(--text-secondary); line-height: 1.6; margin: 0.5rem 0 0; max-width: 51.25rem; }

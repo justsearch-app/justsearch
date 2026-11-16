@@ -197,6 +197,43 @@ export function resolveInitialSv3PaneWidth(
   return Math.min(preferred, sv3PaneMaxWidth(hostWidth, sidebarOccupiedWidth));
 }
 
+/** The automatic pane's floor on a wide window (the owner's page-width rule: "the pane 400 px"). */
+const SV3_PANE_AUTO_MIN_PX = 400;
+
+/**
+ * THE PAGE-WIDTH RULE (owner decision, 15 November): "Search with the side pane open: list and pane
+ * together, centred, at most 1280 px, the pane 400 px growing to at most 560". `withPaneCap` is that
+ * 1280, read from the frame's `--surface-content-with-pane-max-width`; a cap the frame does not
+ * publish (a split stage, a DOM without layout) is `Infinity`, and then nothing here changes the
+ * window from what it was before the rule.
+ *
+ * The sidebar stays outside the cap at the window's left edge; the main column and an open inline
+ * pane share what it leaves, at most the cap, centred. This is the gutter on EACH side of that box.
+ */
+export function sv3PageGutter(hostWidth: number, sidebarOccupiedWidth: number, withPaneCap: number): number {
+  if (!Number.isFinite(hostWidth) || !Number.isFinite(withPaneCap)) return 0;
+  return Math.max(0, Math.floor((Math.floor(hostWidth) - sidebarOccupiedWidth - withPaneCap) / 2));
+}
+
+/**
+ * The pane's width when the reader has not chosen one: the room the main column's 640 leaves in the
+ * CAPPED box, 400-560, and never past the existing ceiling ({@link sv3PaneMaxWidth}), so a window
+ * between 980 and 1040 px keeps the narrower pane it had (the constrained-window fallback). With no
+ * published cap it is the window's automatic width from before the rule.
+ */
+export function sv3AutomaticPaneWidth(
+  hostWidth: number,
+  sidebarOccupiedWidth: number,
+  withPaneCap: number,
+): number {
+  if (!Number.isFinite(withPaneCap)) {
+    return resolveInitialSv3PaneWidth(null, hostWidth, sidebarOccupiedWidth);
+  }
+  const box = Math.min(Math.floor(hostWidth) - sidebarOccupiedWidth, withPaneCap);
+  const preferred = Math.max(SV3_PANE_AUTO_MIN_PX, Math.min(SV3_PANE_MAX_PX, box - SV3_MAIN_MIN_PX));
+  return Math.min(preferred, sv3PaneMaxWidth(hostWidth, sidebarOccupiedWidth));
+}
+
 const SIDEBAR_WIDTH_KEY = 'justsearch.searchV3.sidebar.width.v1';
 const COLLAPSED_KEY = 'justsearch.searchV3.sidebar.collapsed.v1';
 

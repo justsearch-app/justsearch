@@ -397,7 +397,8 @@ export class MemorySurface extends JfElement {
     surfaceScrollLayoutStyles,
     css`
       .memory-surface {
-        padding: 1rem 1.25rem;
+        /* The page column: the host scrolls across the window, the content sits on the column. */
+        padding: 1rem calc(var(--surface-content-gutter) + 1.25rem);
         display: flex;
         flex-direction: column;
         gap: 1.5rem;
