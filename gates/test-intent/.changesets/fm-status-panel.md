@@ -540,3 +540,15 @@ unlisted folder without asking whether the list is live.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-mbmmjnil",
+  "verdict": "accept",
+  "digest": "sha256:a22c8e5b2e40edad6cb935da02cab2a2b17ba82ff9ea62ff959219925933377e"
+}
+```
