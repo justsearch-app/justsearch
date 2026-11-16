@@ -184,3 +184,13 @@ unchanged normal ingestion path and are not re-proven under a release here.
   "digest": "sha256:a455234555c4bc0ca75f139db3821dad97b6646637b1ba23349d497968983866"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-mx5katc9",
+  "verdict": "accept",
+  "digest": "sha256:e8ef81eff953a967106683b04ff52d4e7b8b0f99e933e6a3d9c4ab1f2f60d63a"
+}
+```
