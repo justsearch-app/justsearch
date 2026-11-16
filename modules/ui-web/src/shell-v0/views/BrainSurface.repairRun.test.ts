@@ -19,6 +19,7 @@ vi.mock('../utils/aiInstallPoll.js', async original => ({
   refreshAiInstallNow: refreshInstall,
 }));
 import './BrainSurface.js';
+import { StatusPill } from '../components/StatusPill.js';
 
 interface Brain extends HTMLElement { apiBase: string; host_: unknown; updateComplete: Promise<boolean> }
 interface Button extends HTMLElement { updateComplete: Promise<boolean> }
@@ -31,8 +32,18 @@ let repairReply: (() => Promise<InstallStatus>) | null;
 let cancelReply: (InstallStatus & { alreadyCompleted: boolean }) | null;
 
 async function settle(el: Brain) { await new Promise(resolve => setTimeout(resolve, 0)); await el.updateComplete; }
+/**
+ * Slice 7b, G3'' — the run as shown: the page's plain heading and whether the page says the run is
+ * paused, then the top bar's status entry, where the run's share stands once.
+ */
+async function progressWords(el: Brain) {
+  const pill = document.querySelector<StatusPill>('jf-status-pill') ?? document.body.appendChild(new StatusPill());
+  await settle(el); await pill.updateComplete;
+  return `${el.shadowRoot!.querySelector('.brain-headline')!.textContent}${el.shadowRoot!.querySelector('.flow-paused') ? ' · Paused' : ''}`
+    + ` | ${pill.shadowRoot!.querySelector('.label')!.textContent}`;
+}
 function expectPlanning(el: Brain) {
-  expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing…');
+  expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing AI');
   const steps = el.shadowRoot!.querySelectorAll('.path-step');
   expect(steps.length).toBeGreaterThan(0);
   for (const step of steps) expect(step.textContent).not.toMatch(/Preparing download|Waiting to download|Downloading/);
@@ -77,7 +88,13 @@ beforeEach(() => {
     packages: [{ packageId: 'embedding', state: 'downloading', bytesDownloaded: 256, bytesTotal: 1024 }],
     stages: [{ stage: 'search', label: 'Search', state: 'running', downloadedBytes: 256, totalBytes: 1024 }],
   };
+  const now = Date.now();
   store.current = {
+    // The rest of the store's state the top bar reads: a reachable Engine, search working.
+    phase: 'connected', connection: { reachable: true, lastSuccessMs: now, lastContactMs: now, consecutiveFailures: 0 },
+    verdict: { kind: 'operational', severity: 'ok', reasons: [] }, stability: { kind: 'settled' },
+    activity: { state: 'idle', shapeId: null, startedAtMs: null, canCancel: false, cancel: null },
+    indexingStatusLive: true, episodeMaxPendingJobs: 0, enrichSettleSamples: [],
     installObservationLive: true, runtimeObservationLive: true, snapshotLive: true,
     aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null },
     installStatus: { state: 'completed', installedFully: true, repairNeeded: true, startedAtEpochMs: 100, updatedAtEpochMs: 100 },
@@ -114,7 +131,8 @@ describe('Brain running repair controls (B2/B8)', () => {
       notify({ installStatus: run });
       const el = await mount();
       await click(el, 'Cancel');
-      expect(toasts).toEqual([expect.stringContaining('Download paused')]);
+      // Slice 7b G4' — Cancel says what is kept and promises no continuing.
+      expect(toasts).toEqual(['Install cancelled. Completed parts stay on this computer.']);
 
       toasts.length = 0;
       run = { ...run, state: 'running', phase: 'download' };
@@ -140,6 +158,7 @@ describe('Brain running repair controls (B2/B8)', () => {
 
   it('Repair requests a read immediately and only store observations change progress, Pause, Resume and Cancel', async () => {
     run = { ...run, updatedAtEpochMs: Date.now() - 120_000, readyCapabilities: ['retrieval-core'],
+      packages: [...run.packages!, { packageId: 'chat', state: 'pending', stage: 'answers' }],
       stages: [...run.stages!, { stage: 'answers', label: 'Answers', state: 'blocked', blockedReason: 'Not enough disk space.' }] };
     const el = await mount();
     await click(el, 'Repair');
@@ -148,24 +167,25 @@ describe('Brain running repair controls (B2/B8)', () => {
     expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).not.toContain('Installing');
     emit(run); await settle(el);
     expect(store.current.aiEngine.kind).toBe('offline');
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 25%');
+    expect(await progressWords(el)).toBe('Installing AI | Installing AI · 25%');
     expect(el.shadowRoot!.querySelector<HTMLElement>('.progress-bar')!.style.width).toBe('25%');
     expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Downloading 25%');
-    expect(el.shadowRoot!.querySelector('[data-testid="install-staged-progress"]')).not.toBeNull();
-    expect(el.shadowRoot!.querySelector('[data-testid="install-stage-blocked-answers"]')!.textContent).toContain('Not enough disk space.');
-    expect(el.shadowRoot!.querySelector('[data-testid="install-search-ready"]')!.textContent).toContain('Search is ready');
+    expect(el.shadowRoot!.querySelector('[data-testid="install-flow"] ul[aria-label="Parts"]')).not.toBeNull();
+    // Slice 7b — a refused stage's reason stands on its part's row (G3'); fm-12 has no search-ready line.
+    expect([...el.shadowRoot!.querySelectorAll('ul[aria-label="Parts"] > li')].find(li => li.textContent?.includes('Answer questions'))?.textContent)
+      .toContain('Not enough disk space.');
     expect(el.shadowRoot!.textContent).toContain('Download stalled');
-    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
-    await click(el, 'Pause download');
+    expect(el.shadowRoot!.querySelector('[label="Pause"]')).not.toBeNull();
+    await click(el, 'Pause');
     expect(refreshInstall).toHaveBeenCalledTimes(2);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 25%');
+    expect(await progressWords(el)).toBe('Installing AI | Installing AI · 25%');
     emit(run); await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Paused 25%');
-    await click(el, 'Resume download');
+    expect(await progressWords(el)).toBe('Installing AI · Paused | Installing AI · 25% · Paused');
+    await click(el, 'Resume');
     expect(refreshInstall).toHaveBeenCalledTimes(3);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Paused 25%');
+    expect(await progressWords(el)).toBe('Installing AI · Paused | Installing AI · 25% · Paused');
     emit(run); await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 25%');
+    expect(await progressWords(el)).toBe('Installing AI | Installing AI · 25%');
     await click(el, 'Cancel');
     expect(refreshInstall).toHaveBeenCalledTimes(4);
     expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).not.toBeNull();
@@ -185,11 +205,11 @@ describe('Brain running repair controls (B2/B8)', () => {
     expect(refreshInstall).toHaveBeenCalledTimes(1);
     notify({ runtimeStatus: { onnxFeatures: [] } }); await settle(el);
     expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).not.toContain('Installing');
-    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).toBeNull();
+    expect(el.shadowRoot!.querySelector('[label="Pause"]')).toBeNull();
     emit({ ...run, downloadedBytes: 512 }); await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 50%');
+    expect(await progressWords(el)).toBe('Installing AI | Installing AI · 50%');
     emit({ ...run, updatedAtEpochMs: run.updatedAtEpochMs! + 1, state: 'completed' }); await settle(el);
-    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).toBeNull();
+    expect(el.shadowRoot!.querySelector('[label="Pause"]')).toBeNull();
     expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).toBeNull();
   });
 
@@ -199,35 +219,35 @@ describe('Brain running repair controls (B2/B8)', () => {
     const el = await mount(); await click(el, 'Repair');
     emit({ ...run, updatedAtEpochMs: run.updatedAtEpochMs! + 1, downloadedBytes: 768 }); await settle(el);
     resolve(run); await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 75%');
-    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
+    expect(await progressWords(el)).toBe('Installing AI | Installing AI · 75%');
+    expect(el.shadowRoot!.querySelector('[label="Pause"]')).not.toBeNull();
   });
 
   it.each(['Pause', 'Resume'])('%s requests an immediate read and waits for the store even at an equal timestamp', async action => {
     run = { ...run, paused: action === 'Resume' };
     emit({ ...run });
     const el = await mount();
-    await click(el, `${action} download`);
+    await click(el, action);
     expect(refreshInstall).toHaveBeenCalledTimes(1);
-    const previous = action === 'Pause' ? 'Installing… 25%' : 'Paused 25%';
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe(previous);
+    const previous = action === 'Pause' ? 'Installing AI | Installing AI · 25%' : 'Installing AI · Paused | Installing AI · 25% · Paused';
+    expect(await progressWords(el)).toBe(previous);
     notify({ runtimeStatus: { onnxFeatures: [] } }); await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe(previous);
+    expect(await progressWords(el)).toBe(previous);
     emit({ ...run }); await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe(action === 'Pause' ? 'Paused 25%' : 'Installing… 25%');
-    expect(el.shadowRoot!.querySelector(`[label="${action === 'Pause' ? 'Resume' : 'Pause'} download"]`)).not.toBeNull();
+    expect(await progressWords(el)).toBe(action === 'Pause' ? 'Installing AI · Paused | Installing AI · 25% · Paused' : 'Installing AI | Installing AI · 25%');
+    expect(el.shadowRoot!.querySelector(`[label="${action === 'Pause' ? 'Resume' : 'Pause'}"]`)).not.toBeNull();
   });
 
   it('the shared store alone decides which install observation follows Pause regardless of timestamp', async () => {
     emit({ ...run });
     const el = await mount();
-    await click(el, 'Pause download');
+    await click(el, 'Pause');
     emit({ ...run, paused: false, updatedAtEpochMs: run.updatedAtEpochMs! - 1 }); await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 25%');
-    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
+    expect(await progressWords(el)).toBe('Installing AI | Installing AI · 25%');
+    expect(el.shadowRoot!.querySelector('[label="Pause"]')).not.toBeNull();
     emit({ ...run }); await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Paused 25%');
-    expect(el.shadowRoot!.querySelector('[label="Resume download"]')).not.toBeNull();
+    expect(await progressWords(el)).toBe('Installing AI · Paused | Installing AI · 25% · Paused');
+    expect(el.shadowRoot!.querySelector('[label="Resume"]')).not.toBeNull();
   });
 
   it.each(['declined', 'unavailable', 'not-in-mode'])('planning ignores retained downloading records for an excluded %s package', async state => {
@@ -261,15 +281,15 @@ describe('Brain running repair controls (B2/B8)', () => {
     notify({ installObservationLive: false, snapshotLive: false }); await settle(el);
     expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Checking AI status…');
     expect(el.shadowRoot!.querySelector('.progress-bar')).toBeNull();
-    expect(el.shadowRoot!.querySelector('[data-testid="install-staged-progress"]')).toBeNull();
-    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).toBeNull();
+    expect(el.shadowRoot!.querySelector('[data-testid="install-flow"] ul[aria-label="Parts"]')).toBeNull();
+    expect(el.shadowRoot!.querySelector('[label="Pause"]')).toBeNull();
     expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).toBeNull();
     // W5: the heading says once that AI status is being checked; the step does not repeat it and is not lit.
     expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).not.toContain('Unknown — checking AI status');
     expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.getAttribute('data-lit')).toBe('false');
     expect(el.shadowRoot!.textContent).not.toMatch(/Downloading|Preparing download|Download stalled/);
     notify({ installObservationLive: true, snapshotLive: true }); await settle(el);
-    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
+    expect(el.shadowRoot!.querySelector('[label="Pause"]')).not.toBeNull();
     expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).not.toBeNull();
   });
 
@@ -277,12 +297,12 @@ describe('Brain running repair controls (B2/B8)', () => {
     const el = await mount(); await click(el, 'Repair');
     notify({ installObservationLive: false, snapshotLive: false }); await settle(el);
     expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Checking AI status…');
-    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).toBeNull();
+    expect(el.shadowRoot!.querySelector('[label="Pause"]')).toBeNull();
     expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).toBeNull();
     emit(run); await settle(el);
     expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Checking AI status…');
     notify({ installObservationLive: true, snapshotLive: true }); await settle(el);
-    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
+    expect(el.shadowRoot!.querySelector('[label="Pause"]')).not.toBeNull();
   });
 
   it('while a Repair run is being planned, a package unavailable on this computer is not said to be preparing', async () => {
@@ -327,9 +347,9 @@ describe('Brain running repair controls (B2/B8)', () => {
     notify({ runtimeObservationLive: false, snapshotLive: false,
       aiEngine: { kind: 'connecting', stability: { kind: 'provisional', cause: 'checking' }, installFailure: null } });
     await settle(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 25%');
+    expect(await progressWords(el)).toBe('Installing AI | Installing AI · 25%');
     expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Downloading 25%');
-    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
+    expect(el.shadowRoot!.querySelector('[label="Pause"]')).not.toBeNull();
     expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).not.toBeNull();
   });
 
@@ -338,10 +358,10 @@ describe('Brain running repair controls (B2/B8)', () => {
     const el = await mount(); await click(el, 'Repair');
     emit(run); await settle(el);
     expectPlanning(el);
-    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing…');
+    expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing AI');
     expect(el.shadowRoot!.querySelector('.progress-bar')).toBeNull();
-    expect(el.shadowRoot!.querySelector('[data-testid="install-staged-progress"]')).toBeNull();
-    expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
+    expect(el.shadowRoot!.querySelector('[data-testid="install-flow"] ul[aria-label="Parts"]')).toBeNull();
+    expect(el.shadowRoot!.querySelector('[label="Pause"]')).not.toBeNull();
     expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).not.toBeNull();
     emit({ ...run, phase: 'download', downloadedBytes: 256, packages: [{ packageId: 'embedding', state: 'downloading', bytesDownloaded: 256, bytesTotal: 1024 }] });
     await el.updateComplete;
@@ -362,9 +382,9 @@ describe('Brain running repair controls (B2/B8)', () => {
     store.current = { ...store.current, runtimeObservationLive: false, aiEngine: { kind: 'connecting', stability: { kind: 'provisional', cause: 'checking' }, installFailure: null } };
     const first = await mount(); const second = await mount(); first.remove(); const reloaded = await mount();
     for (const el of [second, reloaded]) {
-      expect(el.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('Installing… 25%');
+      expect(await progressWords(el)).toBe('Installing AI | Installing AI · 25%');
       expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent).toContain('Downloading 25%');
-      expect(el.shadowRoot!.querySelector('[label="Pause download"]')).not.toBeNull();
+      expect(el.shadowRoot!.querySelector('[label="Pause"]')).not.toBeNull();
       expect(el.shadowRoot!.querySelector('[data-testid="brain-simple-action"][label="Cancel"]')).not.toBeNull();
     }
   });

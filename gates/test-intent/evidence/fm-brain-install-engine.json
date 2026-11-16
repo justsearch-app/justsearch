@@ -1,0 +1,82 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-16T08:27:01.566Z",
+  "revision": "627789362059a7f38ceee954de077abf00b333ba",
+  "tree": "d148f135c59e8eb50f9a68b96866f111e80b84d7",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": "openjdk version \"25.0.4.1\" 2026-08-18 LTS",
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.InstallFlowStatusLoopbackTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+      "cwd": ".",
+      "exitCode": 0,
+      "durationMs": 132506
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/InstallFlowStatusLoopbackTest.java",
+      "file": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/InstallFlowStatusLoopbackTest.java",
+      "runner": "gradle",
+      "contentDigest": "sha256:c748d0312d6d6084f95402410d624bdc3d284ab37301080e4065abcc422a84bf",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "pauseHoldsBetweenFilesAndAPartIsDoneOnlyAfterItsLastFile()",
+          "status": "passed"
+        },
+        {
+          "name": "failureAfterEveryFileArrivedLeavesNothingPlaced()",
+          "status": "passed"
+        },
+        {
+          "name": "droppedConnectionAndFailedResumeFailTheRunThenANewRunCoversOnlyWhatIsMissing()",
+          "status": "passed"
+        },
+        {
+          "name": "cancelWithNothingPlacedLeavesNoPart()",
+          "status": "passed"
+        },
+        {
+          "name": "cancelKeepsPlacedParts()",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "origin/main",
+    "revision": "dea8a9f97b0a6fbce3fd54e9c1ee610f3467e4b3",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "./gradlew :modules:app-services:test --tests \"io.justsearch.app.services.ai.install.InstallFlowStatusLoopbackTest\" --rerun -PskipWebBuild=true --console=plain --init-script build/test-evidence-profile.init.gradle",
+        "cwd": "<before-worktree>",
+        "exitCode": 0,
+        "durationMs": 130030
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/app-services/src/test/java/io/justsearch/app/services/ai/install/InstallFlowStatusLoopbackTest.java",
+        "classification": "passed",
+        "detail": "the check passes on the before-state, so it does not show a repair"
+      }
+    ]
+  },
+  "digest": "sha256:958aae81d42abba030874f0abc9fc5085a1b2a883c20df90a82fe21a51cc3f5a"
+}

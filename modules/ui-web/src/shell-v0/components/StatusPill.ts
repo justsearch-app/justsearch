@@ -427,8 +427,9 @@ export class StatusPill extends JfElement {
   }
   override render() {
     const model = this.status.model;
-    if (getFirstUse().empty && ['calm', 'working', 'first-use'].includes(model.pill.kind) && !this.open) return html``;
-    const reading = getFirstUse().reading && model.pill.kind === 'working';
+    // G3''' — first use hides calm and work, except an AI install run (fm-12 "Installing AI · N%").
+    if (getFirstUse().empty && ['calm', 'working', 'first-use'].includes(model.pill.kind) && !model.pill.installRun && !this.open) return html``;
+    const reading = getFirstUse().reading && model.pill.kind === 'working' && !model.pill.installRun;
     const pill = reading ? { ...model.pill, label: 'Reading files', percent: undefined } : model.pill;
     const plugins = this.pluginsVisible ? listStatusBarItems().filter(item => item.source === 'plugin') : [];
     const notice = this.status.snapshot.advisories.find(row => row.key === this.status.transientKey);
@@ -437,7 +438,7 @@ export class StatusPill extends JfElement {
     const transient = placement === 'pill' ? notice : undefined;
     const beside = placement === 'beside' ? notice : undefined;
     const calm = !transient && pill.kind === 'calm';
-    const label = transient?.toast?.message ?? `${pill.label}${pill.percent != null ? ` · ${pill.percent}%` : ''}`;
+    const label = transient?.toast?.message ?? `${pill.label}${pill.percent != null ? ` · ${pill.percent}%` : ''}${pill.after ? ` · ${pill.after}` : ''}`;
     const symbols = { calm: '●', working: '◌', needs: '!', problems: '!', unreachable: '×', limited: '!', finished: '✓', unknown: '?' };
     // ref-09: the count sits in a badge and the words follow it; a known fraction draws a ring.
     // Needs you and problems show their count (ref-22: also when the pill is its icon alone).
@@ -447,7 +448,9 @@ export class StatusPill extends JfElement {
         ? html`<svg class="ring ${reading ? 'indeterminate' : ''}" viewBox="0 0 20 20" aria-hidden="true" data-percent=${reading ? nothing : pill.percent}><circle class="track" cx="10" cy="10" r="8"></circle>
           <circle class="arc" cx="10" cy="10" r="8" pathLength="100" stroke-dasharray="${reading ? 25 : pill.percent} 100" transform="rotate(-90 10 10)"></circle></svg>`
         : html`<span class="symbol" aria-hidden="true">${calm ? nothing : symbols[pill.kind]}</span>`;
-    const text = transient?.toast?.message ?? (pill.kind === 'needs' && pill.count != null ? (pill.count === 1 ? 'Needs you' : 'Need you')
+    // fm-12b — one item that names itself shows its own words beside the count ("1 Download stopped").
+    const text = transient?.toast?.message ?? (pill.kind === 'needs' && pill.named ? pill.words ?? pill.label
+      : pill.kind === 'needs' && pill.count != null ? (pill.count === 1 ? 'Needs you' : 'Need you')
       : pill.kind === 'problems' && pill.count != null ? 'Problems right now' : label);
     const shown = transient ?? beside;
     // DE6 — the notice's action shows while it can still run; a real reversal carries the Ctrl+Z hint.

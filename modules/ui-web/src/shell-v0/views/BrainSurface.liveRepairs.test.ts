@@ -14,6 +14,7 @@ vi.mock('../state/aiStateStore.js', async original => ({
   },
 }));
 import './BrainSurface.js';
+import { __resetStoppedRunForTest } from '../state/installFlow.js';
 interface Brain extends HTMLElement { apiBase: string; host_: unknown; updateComplete: Promise<boolean>; llm: Record<string, number | null>; runtimeError: string | null }
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 let preview: InstallPlanPreview;
@@ -74,7 +75,7 @@ beforeEach(() => {
     return json({});
   }));
 });
-afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); setShowDeveloperTools(false); });
+afterEach(() => { document.body.innerHTML = ''; store.listeners.clear(); __resetStoppedRunForTest(); vi.unstubAllGlobals(); vi.useRealTimers(); setShowDeveloperTools(false); });
 
 describe('Brain live redesign repairs', () => {
   it.each(['no observation', 'retained negative', 'unconfirmed verdict'] as const)('D2 the whole page waits for live install and verdict: %s', async state => {
@@ -227,6 +228,15 @@ describe('Brain live redesign repairs', () => {
     emit({ installStatus: { state: runState, installedFully: false, packages: [{ packageId: 'embedding', state: 'downloading', bytesDownloaded: 512, bytesTotal: 1024 }, { packageId: 'reranker', state: 'downloading', bytesDownloaded: 512, bytesTotal: 1024 }] }, aiEngine: { kind: 'offline', stability: { kind: 'settled' }, installFailure: null }, runtime: { mode: 'offline', installed: { known: true, value: false } } as AiState['runtime'], runtimeStatus: { onnxFeatures: [{ id: 'reranker', status: 'active', modelActive: true }] } });
     preview.components = preview.components!.map(c => c.id === 'embedding' ? { ...c, state: 'to-download' } : c);
     const el = await mount();
+    // Slice 7b (fm-12b): a failed run with parts missing is a stopped download, the page's only view;
+    // Cancel install closes it and the steps return.
+    if (runState === 'failed') {
+      expect(el.shadowRoot!.querySelector('[data-feature="meaning"]')).toBeNull();
+      const close = [...el.shadowRoot!.querySelectorAll<HTMLElement & { label?: string; updateComplete: Promise<boolean> }>('jf-button')].find(b => b.label === 'Cancel install')!;
+      await close.updateComplete;
+      const control = close.shadowRoot!.querySelector<HTMLElement & { updateComplete: Promise<boolean> }>('jf-control')!; await control.updateComplete;
+      control.shadowRoot!.querySelector('button')!.click(); await settle(el);
+    }
     const meaning = el.shadowRoot!.querySelector('[data-feature="meaning"]')!.textContent!;
     expect(meaning).not.toContain('Downloading'); expect(meaning).toContain('Not downloaded');
     const reranker = el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent!;

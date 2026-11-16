@@ -381,10 +381,11 @@ describe('BrainSurface — honest install progress', () => {
     return el;
   }
 
-  it('shows the measured rate and time remaining', async () => {
+  it('shows the time remaining the Engine estimates, and no rate (slice 7b fm-12)', async () => {
     const el = await renderInstalling(RUNNING_STATUS);
-    const line = el.shadowRoot?.querySelector('[data-testid="install-transfer-line"]');
-    expect(line?.textContent?.trim()).toBe('1.0 MB/s · ~2m 5s left');
+    const text = el.shadowRoot?.textContent ?? '';
+    expect(text).toContain('about 2 min left');
+    expect(text).not.toContain('MB/s');
   });
 
   it('renders NO transfer line at all when the wire says the rate and horizon are unknown', async () => {
@@ -399,23 +400,18 @@ describe('BrainSurface — honest install progress', () => {
     expect(text).not.toContain('0s left');
   });
 
-  it('says search is usable while the rest is still downloading', async () => {
-    const el = await renderInstalling(RUNNING_STATUS);
-    const ready = el.shadowRoot?.querySelector('[data-testid="install-search-ready"]');
-    expect(ready?.textContent).toContain('Search is ready');
-    expect(ready?.textContent).toContain('Retrieval enrichment');
+  it('shows a blocked stage as an actionable reason on its part, not a generic failure', async () => {
+    const el = await renderInstalling({ ...RUNNING_STATUS, packages: [...RUNNING_STATUS.packages!,
+      { packageId: 'chat', label: 'Chat model', state: 'pending', stage: 'chat' }] });
+    const answers = [...el.shadowRoot!.querySelectorAll('ul[aria-label="Parts"] > li')].find(li => li.textContent?.includes('Answer questions'));
+    expect(answers?.textContent).toContain('Not enough disk space: 6.0 GB needed, 2.1 GB free.');
+    expect(answers?.textContent).not.toMatch(/Failed|Waiting/);
   });
 
-  it('shows a blocked stage as an actionable reason, not a generic failure', async () => {
-    const el = await renderInstalling(RUNNING_STATUS);
-    const blocked = el.shadowRoot?.querySelector('[data-testid="install-stage-blocked-chat"]');
-    expect(blocked?.textContent).toContain('Not enough disk space');
-  });
-
-  it('names the component being downloaded instead of its filesystem path (U5)', async () => {
+  it('names the part being downloaded instead of its filesystem path (U5; slice 7b part names)', async () => {
     const el = await renderInstalling(RUNNING_STATUS);
     const text = el.shadowRoot?.textContent ?? '';
-    expect(text).toContain('Downloading Search embeddings');
+    expect(el.shadowRoot!.querySelector('ul[aria-label="Parts"]')?.textContent).toContain('Understand meaning');
     expect(text).not.toContain('gte-multilingual-base/model.onnx');
   });
 
@@ -424,7 +420,7 @@ describe('BrainSurface — honest install progress', () => {
     const pause = el.shadowRoot?.querySelector('[data-testid="install-pause-toggle"]') as
       | (HTMLElement & { label?: string })
       | null;
-    expect(pause?.label).toBe('Pause download');
+    expect(pause?.label).toBe('Pause');
   });
 
   it('reads as PAUSED (and offers resume) when the backend says the run is paused', async () => {
@@ -432,7 +428,7 @@ describe('BrainSurface — honest install progress', () => {
     const pause = el.shadowRoot?.querySelector('[data-testid="install-pause-toggle"]') as
       | (HTMLElement & { label?: string })
       | null;
-    expect(pause?.label).toBe('Resume download');
+    expect(pause?.label).toBe('Resume');
     expect(el.shadowRoot?.textContent).toContain('Paused');
   });
 });

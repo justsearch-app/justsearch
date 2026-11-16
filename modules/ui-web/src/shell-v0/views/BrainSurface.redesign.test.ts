@@ -185,7 +185,7 @@ describe('AI Brain redesign behaviour', () => {
     preview.components = preview.components!.map(c => c.id === 'chat' ? component('chat', 'declined', true) : c);
     emit({ capabilities: { chat: false } as AiState['capabilities'], runtime: { mode: 'offline', modelId: null, installed: { known: true, value: true } } as AiState['runtime'] });
     const el = await mount(); switches(el, 'Answer questions')[0]!.click(); await settle(el); await settle(el);
-    expect(el.shadowRoot!.querySelector('dialog')!.textContent).toContain('1.0 KB');
+    expect(el.shadowRoot!.querySelector('dialog')!.textContent).toContain('1 KB');
     expect(el.shadowRoot!.querySelector('dialog')!.textContent).toContain('Apache-2.0');
     expect(calls).toEqual([]);
     expect(switches(el, 'Answer questions')[0]!.getAttribute('aria-disabled')).toBe('true');
@@ -213,13 +213,15 @@ describe('AI Brain redesign behaviour', () => {
   it('retains progress across a tab switch and remount and blocks plan changes while paused', async () => {
     const running: InstallStatus = { state: 'running', paused: true, phase: 'download', totalBytes: 1024, downloadedBytes: 512 };
     emit({ installStatus: running, aiEngine: { kind: 'installing', stability: { kind: 'provisional', cause: 'installing' }, installFailure: null } });
+    // G3'' — the heading carries no share (it stands in the top bar); the page's progress bar keeps it.
+    const share = (brain: HTMLElement) => brain.shadowRoot!.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow');
     const el = await mount();
-    expect(el.shadowRoot!.textContent).toContain('50%');
+    expect(share(el)).toBe('50');
     expect(switches(el, 'Answer questions')[0]!.getAttribute('aria-disabled')).toBe('true');
     el.shadowRoot!.querySelector('jf-surface-tabs')!.dispatchEvent(new CustomEvent('tab-change', { detail: { id: 'memory' } })); await el.updateComplete;
     el.shadowRoot!.querySelector('jf-surface-tabs')!.dispatchEvent(new CustomEvent('tab-change', { detail: { id: 'runtime' } })); await el.updateComplete;
-    expect(el.shadowRoot!.textContent).toContain('50%');
-    el.remove(); const reloaded = await mount(); expect(reloaded.shadowRoot!.textContent).toContain('50%');
+    expect(share(el)).toBe('50');
+    el.remove(); const reloaded = await mount(); expect(share(reloaded)).toBe('50');
     emit({ installStatus: { state: 'completed', phase: 'done', installedFully: true }, aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null } }); await settle(reloaded);
     expect(reloaded.shadowRoot!.querySelector('.brain-headline')!.textContent).toBe('AI is ready');
   });

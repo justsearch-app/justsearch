@@ -87,9 +87,13 @@ describe('S7a-7 a first install that runs', () => {
     expect(page).not.toMatch(/repair|already installed|\binstalled\b/i);
     expect(buttons(el).map(b => b.label)).not.toContain('Repair');
     expect(el.shadowRoot!.querySelector('[data-testid="install-repair-needed"]')).toBeNull();
-    expect(el.shadowRoot!.querySelector('.path-step[data-feature="reranker"]'), 'Best match first step').not.toBeNull();
-    expect(el.shadowRoot!.querySelectorAll('.path-step [role="switch"]:not([aria-disabled="true"])')).toHaveLength(0);
-    expect(buttons(el).map(b => b.label)).toEqual(expect.arrayContaining(['Pause download', 'Cancel']));
+    // Slice 7b (fm-12): during a first install the install view is the page; Best match first is its
+    // part row, and no step or switch is drawn until the run is over.
+    expect(words(el.shadowRoot!.querySelector('ul[aria-label="Parts"]')), 'Best match first part').toContain('Best match first');
+    expect(el.shadowRoot!.querySelectorAll('.path-step')).toHaveLength(0);
+    expect(el.shadowRoot!.querySelectorAll('[role="switch"]:not([aria-disabled="true"])')).toHaveLength(0);
+    // Slice 7b fm-12: Pause and Cancel together.
+    expect(buttons(el).map(b => b.label)).toEqual(expect.arrayContaining(['Pause', 'Cancel']));
   });
 });
 

@@ -347,7 +347,7 @@ export class StatusPanel extends JfElement {
   private row(row: StatusFact): TemplateResult {
     const expanded = this.expanded.has(row.id);
     return html`<article data-fact=${row.id}>
-      <div class="title"><span class="state-icon" aria-hidden="true" data-tone=${row.tone ?? nothing}>${rowGlyph(row)}</span><span class="text">${row.title}${row.confidence == null ? nothing : html` <jf-status-badge .tone=${row.confidence < 0.5 ? 'warning' : 'neutral'} .label=${`${Math.round(row.confidence * 100)}% confidence`}></jf-status-badge>`} ${row.unread ? html`<span class="unread">Unread</span>` : nothing}</span>
+      <div class="title"><span class="state-icon" aria-hidden="true" data-tone=${row.tone ?? nothing}>${rowGlyph(row)}</span><span class="text">${row.title}${row.after ? ` · ${row.after}` : nothing}${row.confidence == null ? nothing : html` <jf-status-badge .tone=${row.confidence < 0.5 ? 'warning' : 'neutral'} .label=${`${Math.round(row.confidence * 100)}% confidence`}></jf-status-badge>`} ${row.unread ? html`<span class="unread">Unread</span>` : nothing}</span>
         ${row.occurredAt ? html`<time datetime=${row.occurredAt}>${formatRelativeIso(row.occurredAt)}</time>` : nothing}</div>
       ${row.stale ? html`<p class="detail">Last seen · checking for an update</p>` : nothing}
       ${row.detail ? html`<p class="detail" title=${row.progressLabel ?? nothing} aria-label=${row.progressLabel ?? nothing}>${row.detail}</p>` : nothing}

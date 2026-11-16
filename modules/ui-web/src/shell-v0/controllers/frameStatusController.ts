@@ -2,6 +2,7 @@
 import { setFirstUseRoots, getFirstUse, subscribeFirstUse } from '../state/firstUse.js';
 import type { ReactiveController, ReactiveControllerHost } from 'lit';
 import { subscribeAiState, type AiState } from '../state/aiStateStore.js';
+import { stoppedInstall, subscribeStoppedRun } from '../state/installFlow.js';
 import { deriveFrameStatus, spokenStatus, completedLongWork, transientPlacement, FINISHED_DWELL_MS, type FrameStatus, type Spoken, type StatusFact, type DurableStatusOperation } from '../state/frameStatus.js';
 import { subscribeTasks, listTasks, completeTask } from '../substrates/tasks/index.js';
 import { subscribePending, listPending } from '../substrates/pending-effects/index.js';
@@ -145,7 +146,7 @@ export class FrameStatusController implements ReactiveController {
       subscribeConsent(() => this.refresh()), subscribeAppUpdate(() => this.refresh()),
       onStatusBarChange(() => this.host.requestUpdate()), subscribeFirstUse(() => this.refresh()),
       subscribeIndexedRoots(() => this.observeRoots()), subscribeSeenCursor(() => this.refresh()),
-      subscribeStatusEpoch(() => this.invalidateRemote()),
+      subscribeStatusEpoch(() => this.invalidateRemote()), subscribeStoppedRun(() => this.refresh()),
       subscribeProfileSwitch(() => this.invalidateRemote())];
     this.observeRoots();
     this.timer = setInterval(() => this.refresh(), 1_000);
@@ -413,7 +414,8 @@ export class FrameStatusController implements ReactiveController {
       consents: listPendingConsentRequests().map(c => ({ id: String(c.id), pluginId: c.contributorId, capability: c.capability })),
       gettingStarted: getFirstUse(), update: getAppUpdateStatus(), conditions: this.conditions, finished: this.finished,
       roots: this.roots, rootPaths: this.rootPaths, rootsLive: this.rootsLive && !!this.ai?.indexingStatusLive,
-      activity: this.activity, withdrawn: withdrawnAuthorizations(), presence: { runs: this.presence, live: this.presenceLive && !!this.ai?.snapshotLive }, operations: [...this.operations.values()] });
+      activity: this.activity, withdrawn: withdrawnAuthorizations(), presence: { runs: this.presence, live: this.presenceLive && !!this.ai?.snapshotLive }, operations: [...this.operations.values()],
+      installFlow: stoppedInstall(this.ai?.installStatus) });
     let next = derive();
     const finishedBefore = this.finished;
     const p = next.progress;

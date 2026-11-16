@@ -181,9 +181,10 @@ describe('Best match first live switch', () => {
     const el = await mount(); switches(el)[0]!.click(); await settle(el);
     const dialog = el.shadowRoot!.querySelector('[data-testid="install-consent-dialog"]');
     expect(el.installConsentOpen).toBe(true);
-    expect(dialog?.textContent).toContain('3.0 KB');
+    expect(dialog?.textContent).toContain('3 KB');
+    // Slice 7b G2 — the page's part names and the consent's sizes.
     expect([...dialog!.querySelectorAll('.consent-terms li')].map(li => li.textContent?.replace(/\s+/g, ' ').trim()))
-      .toEqual(['Ranking model 1.0 KB Apache-2.0 Terms ↗', 'Entity model 2.0 KB MIT Terms ↗']);
+      .toEqual(['Best match first 1 KB Apache-2.0 Terms', 'Names of people and places 2 KB MIT Terms']);
     (dialog!.querySelector('[label="Cancel"]') as unknown as { onActivate(): void }).onActivate();
     await settle(el);
     expect(el.installConsentOpen).toBe(false);

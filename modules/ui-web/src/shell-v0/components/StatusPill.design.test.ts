@@ -64,14 +64,14 @@ describe('status pill drawing', () => {
     const ring = trigger().querySelector('svg.ring')!;
     expect(ring.getAttribute('data-percent')).toBe('40');
     expect(ring.querySelector('.arc')!.getAttribute('stroke-dasharray')).toBe('40 100');
-    expect(trigger().querySelector('.label')!.textContent).toBe('Installing AI models · 40%');
+    expect(trigger().querySelector('.label')!.textContent).toBe('Installing AI · 40%');
     expect(trigger().textContent).toContain('40%');
-    expect(trigger().getAttribute('aria-label')).toBe('Installing AI models · 40%');
+    expect(trigger().getAttribute('aria-label')).toBe('Installing AI · 40%');
     pill.status.ai = ai({ installStatus: { state: 'running' }, installObservationLive: true,
       aiEngine: { kind: 'installing', stability: { kind: 'settled' }, installFailure: null } } as unknown as Partial<AiState>);
     await flush();
     expect(trigger().querySelector('svg.ring')).toBeNull();
-    expect(trigger().getAttribute('aria-label')).toBe('Installing AI models');
+    expect(trigger().getAttribute('aria-label')).toBe('Installing AI');
   });
 
   it('below 1000 px the pill is an icon (badge or dot) with the same accessible name, without truncated text', async () => {

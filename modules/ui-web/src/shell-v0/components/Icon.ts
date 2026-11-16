@@ -60,6 +60,7 @@ type IconName =
   | 'maximize-2'
   | 'list'
   | 'play'
+  | 'pause'
   | 'square'
   | 'search'
   | 'x-circle'
@@ -137,6 +138,7 @@ const PATHS: Record<IconName, SVGTemplateResult> = {
   'maximize-2': svg`<polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" x2="14" y1="3" y2="10" /><line x1="3" x2="10" y1="21" y2="14" />`,
   list: svg`<line x1="8" x2="21" y1="6" y2="6" /><line x1="8" x2="21" y1="12" y2="12" /><line x1="8" x2="21" y1="18" y2="18" /><line x1="3" x2="3.01" y1="6" y2="6" /><line x1="3" x2="3.01" y1="12" y2="12" /><line x1="3" x2="3.01" y1="18" y2="18" />`,
   play: svg`<polygon points="6 3 20 12 6 21 6 3" />`,
+  pause: svg`<path d="M9 5v14M15 5v14" />`,
   square: svg`<rect width="18" height="18" x="3" y="3" rx="2" />`,
   search: svg`<circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />`,
   'x-circle': svg`<circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" />`,

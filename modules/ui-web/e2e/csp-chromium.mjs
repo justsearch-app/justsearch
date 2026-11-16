@@ -139,7 +139,8 @@ try {
       await check(prefix + '-S1-download-45', async () => {
         await page.getByRole('button', { name: 'AI Brain', exact: true }).click();
         const brain = page.locator('jf-brain-surface');
-        await brain.locator('.brain-headline').filter({ hasText: '45%' }).waitFor();
+        // G3'' — the heading carries no share; wait for the run's 45% on its bar.
+        await brain.locator('[data-testid="brain-simple-panel"] [role="progressbar"][aria-valuenow="45"]').waitFor();
         const bar = brain.locator('[data-testid="brain-simple-panel"] .progress-bar').first();
         await bar.waitFor();
         const ratio = await bar.evaluate(el => el.getBoundingClientRect().width / el.parentElement.getBoundingClientRect().width);

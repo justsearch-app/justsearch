@@ -255,11 +255,12 @@ describe('picture reading live switch', () => {
     expect(switches(el)).toHaveLength(1);
     switches(el)[0]!.click(); await settle(el);
     const dialog = el.shadowRoot!.querySelector('[data-testid="install-consent-dialog"]');
-    expect(dialog?.textContent).toContain('Answer model');
-    expect(dialog?.textContent).toContain('Entity model');
+    // Slice 7b G2 — consent rows carry the page's part names.
+    expect(dialog?.textContent).toContain('Answer questions');
+    expect(dialog?.textContent).toContain('Names of people and places');
     expect(dialog?.textContent).toContain('Apache-2.0');
     expect(dialog?.textContent).toContain('MIT');
-    expect(dialog?.textContent).toContain('3.0 KB');
+    expect(dialog?.textContent).toContain('3 KB');
     expect(posts).toEqual([]); expect(operations).toEqual([]);
     (dialog!.querySelector('[label="Cancel"]') as unknown as { onActivate(): void }).onActivate();
     await settle(el);

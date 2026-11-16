@@ -49,7 +49,7 @@ describe('FA3 optional AI and the status pill', () => {
   it('an AI install the person started shows its progress, not "Needs you", while it runs', () => {
     const model = derive(ai('installing', {}, { state: 'running', paused: false, totalBytes: 100, downloadedBytes: 40 }));
     expect(model.pill.kind).toBe('working');
-    expect(model.pill.label).toBe('Installing AI models');
+    expect(model.pill.label).toBe('Installing AI');
     expect(model.sections.needs).toEqual([]);
   });
 });
