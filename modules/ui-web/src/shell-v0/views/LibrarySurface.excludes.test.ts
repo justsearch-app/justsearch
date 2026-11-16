@@ -183,7 +183,7 @@ it('S32.5 keeps the conflicting draft, shows the saved rules, and Keep my draft 
   expect(el.excludesText).toBe('my draft');
 });
 
-it('S32.7 announces the final outcome once while a removal in flight ignores repeated answers', async () => {
+it('S32.7 announces busy and the final outcome once while a removal in flight ignores repeated answers', async () => {
   const { el, invoke, confirm } = fixture();
   await el.loadExcludes(); document.body.appendChild(el); await settle(el);
   const ask = await addRuleAndAsk(el);
@@ -191,6 +191,11 @@ it('S32.7 announces the final outcome once while a removal in flight ignores rep
   invoke.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
   control(ask, 'Remove from search').click(); await settle(el);
   try {
+    // R15: while the removal runs, one polite status says so.
+    const busy = el.shadowRoot?.querySelectorAll('.removal-slot [role="status"]');
+    expect(busy).toHaveLength(1);
+    expect(busy?.[0]?.textContent?.trim()).toBe('Removing matching files from search…');
+    expect(busy?.[0]?.closest('[aria-live]')?.getAttribute('aria-live')).toBe('polite');
     expect(control(ask, 'Remove from search').getAttribute('aria-disabled')).toBe('true');
     control(ask, 'Remove from search').click(); control(ask, 'Keep them').click(); await settle(el);
     expect(invoke).toHaveBeenCalledTimes(1);
@@ -203,5 +208,8 @@ it('S32.7 announces the final outcome once while a removal in flight ignores rep
   expect(statuses).toHaveLength(1);
   expect(statuses?.[0]?.textContent).toContain('Done. Files already read that match your skip rules are no longer in search');
   expect(statuses?.[0]?.textContent).not.toMatch(/\d+ files? removed/);
+  expect(statuses?.[0]?.textContent).not.toContain('Removing matching files from search');
+  // R15: the outcome is announced as a whole, as on main.
+  expect(statuses?.[0]?.getAttribute('aria-atomic')).toBe('true');
   expect(el.shadowRoot?.querySelector('.removal-slot')?.getAttribute('aria-live')).toBe('polite');
 });

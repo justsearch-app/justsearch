@@ -146,23 +146,42 @@ it('L2 a second clean window observes add, remove and undo on focus and on retur
   await expect.poll(async () => (await state(second)).text).toBe('*.tmp');
 }, 30_000);
 
-// Slice 6b-2: an exact-path removal saves at once (no exact-path draft); see LibrarySurface.settings-attempt RF55.
-it.each(['text'])('L3 a second window keeps its %s draft and original conflict witness', async kind => {
+it('L3 a second window keeps its text draft and original conflict witness', async () => {
   const first = await open(), second = await open();
   const original = await state(second);
-  if (kind === 'text') await draft(second, 'my draft');
-  else await second.locator('jf-button[label^="Remove keep-out"] button').click();
+  await draft(second, 'my draft');
   await draft(first, 'elsewhere'); await save(first); await activate(second);
   await second.evaluate(() => { window.windowfix.leave(); window.windowfix.return(); });
   expect((await state(second)).witness).toEqual(original.witness);
-  expect((await state(second)).text).toBe(kind === 'text' ? 'my draft' : '*.log');
-  expect((await state(second)).literals).toEqual(kind === 'text' ? [literal] : []);
+  expect((await state(second)).text).toBe('my draft');
+  expect((await state(second)).literals).toEqual([literal]);
   await save(second);
   const refused = await state(second);
   expect(refused.conflict).toBe(true);
   expect(saved[0]).toBe('elsewhere');
   await activate(second); await second.waitForTimeout(100);
   expect(await state(second), 'a focus keeps the conflict and its draft').toEqual(refused);
+}, 30_000);
+
+// Slice 6b-2: an exact-path removal is saved at once, so a stale second window's removal is sent on the
+// revision that window last observed: refused, never overwriting the other window's save.
+it('L3 a stale second window\'s exact-path removal is refused, keeps its draft and original conflict witness', async () => {
+  const first = await open(), second = await open();
+  const original = await state(second);
+  await draft(first, 'elsewhere'); await save(first);
+  await second.locator('jf-button[label^="Remove keep-out"] button').click();
+  await expect.poll(async () => (await state(second)).conflict).toBe(true);
+  expect(saved, 'the other window\'s save is not overwritten').toEqual(['elsewhere', literal]);
+  expect(JSON.parse(writes.at(-1)!).witness, 'sent on the revision this window observed').toEqual(original.witness);
+  await second.evaluate(() => { window.windowfix.leave(); window.windowfix.return(); });
+  const refused = await state(second);
+  expect(refused.witness).toEqual(original.witness);
+  expect(refused.text).toBe('*.log');
+  expect(refused.literals).toEqual([]);
+  expect(refused.conflict).toBe(true);
+  await activate(second); await second.waitForTimeout(100);
+  expect(await state(second), 'a focus keeps the conflict and its draft').toEqual(refused);
+  expect(saved).toEqual(['elsewhere', literal]);
 }, 30_000);
 
 it.each(['text', 'exact-path'])('L4 a late refresh cannot replace a newer %s draft', async kind => {

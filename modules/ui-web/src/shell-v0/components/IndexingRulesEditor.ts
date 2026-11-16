@@ -22,6 +22,9 @@ function sameRules(a: SavedIndexingRules, b: SavedIndexingRules): boolean {
   return key(a) === key(b);
 }
 
+/** How long a write still running is followed before its outcome is called unknown. */
+const FOLLOW_MS = 10_000;
+
 /** A sent write whose answer was lost: it may or may not have been saved. */
 function outcomeUnknown(error: unknown): boolean {
   return !(error instanceof OperationError)
@@ -190,11 +193,20 @@ export class IndexingRulesEditor extends JfElement {
       if (!witness) { this.indexingRulesError = 'Could not save reading rules. Reload Library and try again.'; return 'stopped'; }
       const operationKey = same?.key ?? createOperationKey();
       let sent = false;
-      const write = () => {
+      const request = { idempotencyKey: operationKey, args: { ...next, witness } };
+      const write = async (): Promise<OperationInvocationSuccess> => {
         sent = true;
-        return getOperationClient(this.apiBase).invokeWithConsent('core.set-indexing-rules', {
-          idempotencyKey: operationKey, args: { ...next, witness },
-        }, { requestConsent: requestAuthorization });
+        const deadline = Date.now() + FOLLOW_MS;
+        for (;;) {
+          const result = await getOperationClient(this.apiBase).invokeWithConsent('core.set-indexing-rules', request,
+            { requestConsent: requestAuthorization });
+          // R14 — a replay of an attempt not finished yet (ACCEPTED, RUNNING) carries no witness and is not
+          // a save: the same key and bytes are sent again until it completes or is refused.
+          const state = result.structuredData?.['state'];
+          if (typeof state !== 'string' || state === 'COMPLETE') return result;
+          if (Date.now() >= deadline) throw new OperationError('The reading rules were not confirmed saved yet.', 'UNKNOWN');
+          await new Promise(resolve => setTimeout(resolve, 250));
+        }
       };
       try {
         let receipt: unknown;
@@ -311,6 +323,7 @@ export class IndexingRulesEditor extends JfElement {
 
   private async loadSettings(mode: 'preserve' | 'discard' = 'preserve'): Promise<boolean> {
     const serial = ++this.loadSerial;
+    const shown = JSON.stringify(this.indexingRules);
     try {
       const res = this.host_ ? await this.host_.data.fetch('/api/settings/v2')
         : await authorizedFetch(`${this.apiBase}/api/settings/v2`);
@@ -329,9 +342,12 @@ export class IndexingRulesEditor extends JfElement {
         this.conflictingRules = saved;
         this.conflictWitness = data.witness ?? null;
       }
-      const adopt = mode === 'discard' || !dirty && !queued;
+      // R13 — the draft is replaced only while it is still what it was when this read began; after
+      // "Use the saved rules", a change made meanwhile stays as a draft over the saved rules.
+      const unchanged = JSON.stringify(this.indexingRules) === shown;
+      const adopt = mode === 'discard' || !dirty && !queued && unchanged;
       if (adopt) { this.savedRules = saved; this.savedWitness = data.witness ?? null; }
-      if (adopt) {
+      if (adopt && unchanged) {
         this.indexingScheduleConfigured = schedule != null;
         const time = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
         this.indexingRules = { enabled: schedule?.enabled ?? false,
@@ -458,7 +474,8 @@ export class IndexingRulesEditor extends JfElement {
             ? ' Your newer changes are not saved yet.' : ''}` : 'Your changes are not saved yet.'}
           <button type="button" @click=${() => void this.saveIndexingRules()}>Try again</button></p>` : nothing}
         <p id="indexing-rules-error" role="alert">${this.indexingRulesError}</p>
-        <p role="status">${this.indexingRulesDirty || this.queue.snapshots.length ? '' : this.indexingRulesMessage}</p>
+        <p role="status">${this.queue.sending && !this.conflictingRules ? 'Saving…'
+          : this.indexingRulesDirty || this.queue.snapshots.length ? '' : this.indexingRulesMessage}</p>
         ${!this.indexingRulesLoaded ? html`<p>Waiting for saved reading rules.</p>` : nothing}
         ${this.readOnly ? html`<p>Settings are read-only in this session.</p>` : nothing}
       </form>

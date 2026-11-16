@@ -1629,8 +1629,8 @@ export class LibrarySurface extends JfElement {
     this.excludesReading = true;
     try {
       const body = await readSettingsObservation((path, init) => this.doFetch(path, init));
-      // A change captured meanwhile is not replaced by the list read before it.
-      if (this.skipQueue.snapshots.length) return;
+      // A change captured meanwhile, or text typed meanwhile, is not replaced by the list read before it (R13).
+      if (this.skipQueue.snapshots.length || (this.excludesLoaded && this.excludesDirty)) return;
       const entries = body.ui?.excludePatterns ?? [];
       this.excludesSavedText = entries.filter((entry) => typeof entry === 'string').join('\n');
       this.excludesSavedLiterals = entries.filter((entry): entry is ExactPathExclusion => typeof entry !== 'string');
@@ -1846,9 +1846,6 @@ export class LibrarySurface extends JfElement {
     }
     const attempt = this.excludesAttempt;
     const before = { text: this.excludesSavedText ?? '', literals: [...this.excludesSavedLiterals] };
-    // The editor follows the Undo only while it shows the list being undone and nothing newer is captured.
-    const follow = this.skipQueue.snapshots.length === 1
-      && this.savedListKey(this.excludesText, this.excludesLiterals) === this.savedListKey(before.text, before.literals);
     try {
       const result = await executeSettingsAttempt((path, init) => this.doFetch(path, init), attempt);
       this.ownSuccessor(attempt.witness, result.witness);
@@ -1857,7 +1854,10 @@ export class LibrarySurface extends JfElement {
       this.excludesError = null;
       this.skipUndoSerial++;
       this.savedSkipRules(before, next, result.witness, 'undone');
-      if (follow && this.skipQueue.snapshots.length === 1) {
+      // R13 — the editor follows the Undo only if, now, it still shows the list the Undo was based on
+      // and nothing newer is captured: text typed meanwhile stays and is saved when its field is left.
+      if (this.skipQueue.snapshots.length === 1
+          && this.savedListKey(this.excludesText, this.excludesLiterals) === this.savedListKey(before.text, before.literals)) {
         this.excludesText = next.text;
         this.excludesLiterals = [...next.literals];
       }
@@ -2876,8 +2876,10 @@ export class LibrarySurface extends JfElement {
   private renderRemoval(): TemplateResult | typeof nothing {
     const ask = this.removalAsk;
     const outcome = this.removalOutcome;
-    if (!ask && !outcome) return nothing;
-    return html`${outcome ? this.renderRemovalOutcome(outcome) : nothing}${ask ? html`${repeat([ask], item => item.serial, () => html`<section role="region" aria-label=${REMOVAL_ASK} class="removal-ask">
+    if (!ask && !outcome && !this.removalBusy) return nothing;
+    // R15 — while a removal runs one polite status says so; the outcome replaces it and is read as a whole.
+    return html`${this.removalBusy ? html`<p role="status" aria-atomic="true">Removing matching files from search…</p>`
+      : outcome ? this.renderRemovalOutcome(outcome) : nothing}${ask ? html`${repeat([ask], item => item.serial, () => html`<section role="region" aria-label=${REMOVAL_ASK} class="removal-ask">
         <p>${REMOVAL_ASK}</p>
         <button type="button" class="text-action" aria-disabled=${this.removalBusy ? 'true' : 'false'}
           @click=${() => { if (!this.removalBusy) void this.handleApplyExcludes(ask); }}>Remove from search</button>
@@ -2887,7 +2889,7 @@ export class LibrarySurface extends JfElement {
   }
 
   private renderRemovalOutcome(outcome: RemovalOutcome): TemplateResult {
-    if (outcome.kind === 'kept') return html`<p role="status">Files already read stay searchable.</p>`;
+    if (outcome.kind === 'kept') return html`<p role="status" aria-atomic="true">Files already read stay searchable.</p>`;
     const current = outcome.list === this.savedListKey();
     const rules = current ? 'your skip rules' : (JSON.parse(outcome.list) as unknown[])
       .map(entry => typeof entry === 'string' ? entry : describeExactPath((entry as ExactPathExclusion).literal.path)).join(', ');
@@ -2895,12 +2897,12 @@ export class LibrarySurface extends JfElement {
     const retry = html`<button type="button" class="text-action" aria-disabled=${this.removalBusy ? 'true' : 'false'}
       @click=${() => { if (!this.removalBusy) void this.handleApplyExcludes(outcome); }}>Try again</button>`;
     // The result confirms deletion requests (a folder is one), not documents, so no number is said (R10).
-    if (outcome.kind === 'done') return html`<p role="status">Done. Files already read that match ${rules} are no longer in search. ${missing}</p>`;
+    if (outcome.kind === 'done') return html`<p role="status" aria-atomic="true">Done. Files already read that match ${rules} are no longer in search. ${missing}</p>`;
     if (outcome.kind === 'partly') {
       const said = (scope: ExcludesResult['uncheckedScopes'][number]) => scope.status === 'not_removed'
         ? /rebuild/i.test(scope.reason) ? 'Waits for the rebuild to finish' : 'Couldn\'t be removed'
         : /offline|missing|unavailable/i.test(scope.reason) ? 'Offline or missing folder, not checked' : 'Couldn\'t be read, not checked';
-      return html`<div role="status"><p>Partly done${current ? '' : ` for ${rules}`}. Some matching files may still be searchable:</p>
+      return html`<div role="status" aria-atomic="true"><p>Partly done${current ? '' : ` for ${rules}`}. Some matching files may still be searchable:</p>
         <ul>${outcome.scopes.map(scope => html`<li title=${scope.reason}>${said(scope)}: <span class="literal-path">${scope.path}</span></li>`)}
           ${outcome.capped ? html`<li>Too many files to check them all at once.</li>` : nothing}</ul>
         <p>${missing}</p>${retry}</div>`;

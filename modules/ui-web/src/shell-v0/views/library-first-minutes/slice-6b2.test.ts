@@ -36,6 +36,8 @@ function backend(initial: { patterns?: unknown[]; pause?: Partial<Pause>; overri
   let hold: Promise<void> | null = null, release = () => {};
   let hang = false, workerDown = false, loseNextOpAnswer = false;
   let onRead: (() => void) | null = null;
+  /** Answers given instead of running the operation, in order; 'lost' commits nothing and loses the answer. */
+  const scripted: unknown[] = [];
   const opReceipts = new Map<string, unknown>();
   const removedFor: unknown[][] = [];
   const witness = (): Witness => ({ acceptedRevision: s.revision, lastCommittedOperationKey: s.lastKey });
@@ -86,6 +88,11 @@ function backend(initial: { patterns?: unknown[]; pause?: Partial<Pause>; overri
     const { args = {}, idempotencyKey } = JSON.parse(String(init?.body ?? '{}')) as { args?: Record<string, unknown>; idempotencyKey?: string };
     ops.push({ id, args, key: idempotencyKey });
     if (hold) await hold;
+    if (scripted.length) {
+      const answer = scripted.shift();
+      if (answer === 'lost') throw new TypeError('Failed to fetch');
+      return Response.json(answer);
+    }
     const replayed = idempotencyKey ? opReceipts.get(idempotencyKey) : undefined;
     if (replayed) return Response.json(replayed);
     if (id === 'core.set-indexing-rules') {
@@ -124,6 +131,8 @@ function backend(initial: { patterns?: unknown[]; pause?: Partial<Pause>; overri
     s, host, posts, ops, invoke, fetchSettings, removedFor,
     /** Runs once, right after the next settings read is answered (another window acting in between). */
     afterNextRead(hook: () => void) { onRead = hook; },
+    /** The next operations are answered with these, in order, without running ('lost': no answer). */
+    scriptOpAnswers(...answers: unknown[]) { scripted.push(...answers); },
     /** The next operation commits, but its answer is lost on the way back. */
     loseNextOpAnswer() { loseNextOpAnswer = true; },
     /** Another window (or an unrelated owner) commits through the same settings owner. */
@@ -965,4 +974,83 @@ it('R11: a draft left behind an Undo whose answer was lost is saved after that U
   expect(undos[1], 'the Undo is settled with the same key and bytes').toBe(undos[0]);
   expect(globsSent(f)).toEqual([['*.log', '*.tmp'], ['*.log'], ['*.log'], ['C', '*.tmp']]);
   expect(f.s.ui.excludePatterns).toEqual(['C', '*.tmp']);
+});
+
+it('R13 (review 5): text typed while an Undo is pending stays when the Undo completes and is saved when its field is left', async () => {
+  const f = backend(); const el = await mount(f);
+  await addRule(el, '*.tmp');
+  const undo = listOpenReversals()[0]; expect(undo).toBeDefined();
+  f.holdWrites();
+  undo!.run(); await settle(el);
+  // The Undo's request is pending; the person types into a rule without leaving it.
+  await type(el, rule(el, 1), '*.typed');
+  f.release(); await settle(el); await settle(el);
+  expect(f.s.ui.excludePatterns, 'the Undo saved').toEqual(['*.log']);
+  expect(rule(el, 1).value, 'the typed text stays').toBe('*.typed');
+  expect(rule(el, 2).value).toBe('*.tmp');
+  expect(text(el.shadowRoot)).not.toContain('Skip rules saved');
+  await leave(el, rule(el, 1));
+  expect(globsSent(f).at(-1)).toEqual(['*.typed', '*.tmp']);
+  expect(f.s.ui.excludePatterns).toEqual(['*.typed', '*.tmp']);
+});
+
+it('R13 (review 5): an Undo completing for an unchanged draft still shows the list it restored', async () => {
+  const f = backend(); const el = await mount(f);
+  await addRule(el, '*.tmp');
+  const undo = listOpenReversals()[0]; expect(undo).toBeDefined();
+  f.holdWrites();
+  undo!.run(); await settle(el);
+  f.release(); await settle(el); await settle(el);
+  expect(f.s.ui.excludePatterns).toEqual(['*.log']);
+  expect(rule(el, 1).value).toBe('*.log');
+  expect(el.shadowRoot!.querySelector('input[aria-label="Skip rule 2"]')).toBeNull();
+});
+
+const running = (operationKey: string) => ({ success: true, message: 'Operation RUNNING',
+  structuredData: { operationKey, operationRecordId: 7, state: 'RUNNING', unitsCompleted: 0, unitsFailed: 0 } });
+const failed = { success: false, message: 'Reading rules could not be saved', errorClass: 'HANDLER_FAILURE', errorCode: 'SETTINGS_COMMIT_FAILED' };
+
+it('R14 (review 5): a replay reporting RUNNING without a witness is not saved; the write is followed until it fails', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const f = backend(); const el = await mount(f); const rules = editor(el);
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  f.scriptOpAnswers('lost');
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules); await settle(el);
+  expect(text(rules.shadowRoot)).toContain('Not sure this saved');
+  expect(f.ops, 'the change was sent once').toHaveLength(1);
+  const sentKey = f.ops[0]!.key!;
+  f.scriptOpAnswers(running(sentKey), failed);
+  await press(rules, control(rules.shadowRoot, 'Try again')); await settle(el);
+  expect(text(rules.shadowRoot), 'RUNNING is not saved').not.toContain('Reading rules saved');
+  expect(rules.shadowRoot!.querySelector('[role="status"]')?.textContent?.trim(), 'still saving').toBe('Saving…');
+  await vi.advanceTimersByTimeAsync(1_000); await settle(rules); await settle(el);
+  expect(f.ops.map(o => o.key), 'followed by its own key to its end').toEqual([sentKey, sentKey, sentKey]);
+  expect(f.ops.map(o => o.args), 'with the same bytes').toEqual([f.ops[0]!.args, f.ops[0]!.args, f.ops[0]!.args]);
+  expect(text(rules.shadowRoot)).toContain('Could not save reading rules');
+  expect(text(rules.shadowRoot)).not.toContain('Reading rules saved');
+  expect(text(rules.shadowRoot)).not.toContain('Not sure this saved');
+  expect(f.s.ui.indexingPause.pauseOnBattery, 'nothing was saved').toBe(false);
+  expect(battery.checked, 'the draft is kept').toBe(true);
+});
+
+it('R14 (review 5): a newer reading-rule change waits while a RUNNING write is followed, then is saved after it settles', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  const f = backend(); const el = await mount(f); const rules = editor(el);
+  const battery = rules.shadowRoot!.querySelector<HTMLInputElement>('#indexing-battery')!;
+  f.scriptOpAnswers('lost');
+  battery.checked = true; battery.dispatchEvent(new Event('change')); await settle(rules); await settle(el);
+  expect(f.ops, 'the change was sent once').toHaveLength(1);
+  const sentKey = f.ops[0]!.key!;
+  f.scriptOpAnswers(running(sentKey), failed);
+  await press(rules, control(rules.shadowRoot, 'Try again')); await settle(el);
+  // Turning it off again while the first write is still running.
+  battery.checked = false; battery.dispatchEvent(new Event('change')); await settle(rules); await settle(el);
+  expect(f.ops.every(o => o.key === sentKey), 'nothing newer is sent before the write settles').toBe(true);
+  await vi.advanceTimersByTimeAsync(1_000); await settle(rules); await settle(el);
+  expect(f.ops.slice(0, 3).map(o => o.key)).toEqual([sentKey, sentKey, sentKey]);
+  expect(f.ops).toHaveLength(4);
+  expect(f.ops[3]!.key).not.toBe(sentKey);
+  expect(f.ops[3]!.args.pauseOnBattery).toBe(false);
+  expect(f.s.ui.indexingPause.pauseOnBattery).toBe(false);
+  expect(battery.checked).toBe(false);
 });
