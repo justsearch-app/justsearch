@@ -145,7 +145,7 @@ changing its old assertions is listed individually. Saved-state checks observe e
           "label": "agent choice"
         }
       ],
-      "behaviour": "Exact-path bytes, retained-attempt bytes, witness chaining and the 202 wait are unchanged; removal of a keep-out saves at once; a conflict keeps the draft editable with its choice; load failure is said in the section; capacity refusals are plain.",
+      "behaviour": "Exact-path bytes, retained-attempt bytes, witness chaining and the 202 wait are unchanged; removal of a keep-out saves at once; a conflict keeps the draft editable with its choice; load failure is said in the section; capacity refusals are plain. Each test is a new window: afterEach clears sessionStorage, so unsettled saves one test leaves (R24) are not restored into the next test's Library; no assertion changed for this.",
       "conflictSearch": "Decision records under docs/decisions/ (54) searched for skip rules, exclude patterns, apply-excludes, Save patterns, indexing/reading rules, reading hours and explicit save/autosave: only 0008-settings-ephemeral-defaults-safe.md mentions excludePatterns (that it persists), which this keeps; no conflict. docs/reference/secondary-views-behavior.md described explicit Save as an intermediate slice and is updated here. Private records were not read, per the builder brief.",
       "assertionChanges": [
         {
@@ -499,6 +499,35 @@ changing its old assertions is listed individually. Saved-state checks observe e
     },
     {
       "items": [
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/slice-6b2-reload-lockdown.test.ts"
+      ],
+      "change": "added",
+      "kind": "test-code",
+      "class": "New",
+      "repaired": true,
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Library. The headline says the state, the folder row says how many and how current; nothing is said twice. Skip rules and reading hours save as you change them: no Save / Reload / Preview / Apply row; adding a rule that removes files asks in place.",
+          "location": "task t-20261113-fmimpl agreement, picture note fm-07"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "R24 A page reload (including the app's own reload after an Engine restart) never drops a requested save: the skip-rule and reading-hours queues keep their unsettled snapshots (and an uncertain write's exact key and bytes) in this window's sessionStorage, restore them after the reload, reconcile the uncertain write first (same key and bytes), and show \"Your changes are not saved yet\" with Try again for the rest; nothing restored is sent without reconciling. Find where the app reloads itself after an Engine restart and keep it; do not add new reload rules. R25 After \"Use the saved rules\" focus goes to the first rule field (or the \"Add a rule\" action when there are none); after \"Keep my draft\" focus goes back to the field that was being edited (or the first rule field); same in the reading-hours editor (its first control). R26 \"Add a rule\" always adds exactly one empty field and focuses it, including right after \"Keep them\", Undo, or a save completing. Builder details: the restored snapshots keep the list and revision they were based on (a change saved elsewhere meanwhile is Changed elsewhere, not overwritten); a write out at the reload counts as uncertain; a reading-hours write keeps its key and base revision; text replacing the shown rules (a read again on window focus, a completed Undo) keeps the empty fields opened at the end; while an Undo waits, the list it replaces still shown is not a new change (leaving a field then saved it again over the Undo).",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "9 headless-Chromium cases over a stub settings owner whose saved state survives page.reload(): a skip-rule write unanswered at the reload is sent again after it with its same key and bytes and saved; with an uncertain (saved, answer lost) write and a newer queued one, only the first is sent again (revision unchanged), the newer stays the draft with 'Your changes are not saved yet. Try again' and saves on Try again, and a second reload restores nothing; a restored change whose list was saved elsewhere meanwhile shows Changed elsewhere instead of being sent over it; reading hours: an unanswered write is sent again with the same key and arguments, the newer battery change waits for Try again; a saved-but-unanswered reading-hours write settles from its receipt without a new revision. Focus: after Use the saved rules the first rule field (Add a rule when no rule is saved), after Keep my draft the field being edited, by mouse and keyboard; in reading hours the first control and the control being edited. Add a rule adds exactly one empty focused field after Keep them, after Undo, across a read again on window focus, while a save completes and while an Undo completes (the Undo is not saved over). Controls are asserted present before use. On 2ce8d48b15 and on origin/main all 9 fail by assertion.",
+      "evidence": "gates/test-intent/evidence/fm-library-6b2.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/views/library-first-minutes/slice-6b2-reload-lockdown.test.ts"
+      ]
+    },
+    {
+      "items": [
         "modules/app-services/src/test/java/io/justsearch/app/services/registry/operations/CoreOperationCatalogTest.java"
       ],
       "change": "modified",
@@ -598,8 +627,9 @@ changing its old assertions is listed individually. Saved-state checks observe e
 
 Evidence `gates/test-intent/evidence/fm-library-6b2.json` was written by
 `run-evidence.mjs --before origin/main` (dea8a9f97b) with one `--check` per new-check file.
-Candidate: `IndexingRulesIntentTest` 5/5, `ExcludesConsentTest` 6/6, `slice-6b2.test.ts` 66/66 and
-`slice-6b2-lockdown.test.ts` 7/7 passed; before-state classification `assertion` for all four.
+Candidate: `IndexingRulesIntentTest` 5/5, `ExcludesConsentTest` 6/6, `slice-6b2.test.ts` 66/66,
+`slice-6b2-lockdown.test.ts` 7/7 and `slice-6b2-reload-lockdown.test.ts` 9/9 passed; before-state
+classification `assertion` for all five.
 
 Review repairs (R6-R10) were also checked against the committed slice dfdd5e42ea in a shared clone:
 the seven repair cases in `slice-6b2.test.ts` fail there by assertion (R6 `{}` sent instead of the
@@ -643,6 +673,18 @@ candidate's test files, in a shared clone): the three R23 cases in `slice-6b2.te
 assertion (after an unanswered toolbar Pause, the reading-hours save still says Saving… 12.5 s later;
 behind an unanswered skip-rule or reading-hours write, the toolbar Pause still says Request in
 progress 10.5 s later) and the other 63 pass.
+
+Seventh repairs (R24-R26), after the packaged-app verification, were checked against 2ce8d48b15 (the
+unchanged implementation with the candidate's test files, in a shared clone): all nine cases in
+`slice-6b2-reload-lockdown.test.ts` fail there by assertion. R24: after the reload the unanswered
+skip-rule write, the saved-but-unanswered skip-rule write and both reading-hours writes are never
+sent again (one POST or operation where two are expected), and a restored change whose list was saved
+elsewhere shows no Changed elsewhere; R25: after Keep my draft focus is not on the edited rule field,
+after Use the saved rules with no rule saved not on Add a rule, and after Use the saved rules in
+reading hours not on its first control; R26: the empty field added by Add a rule is gone after a read
+again on window focus (2 fields, not 4). R26's last step also covers a data bug found while writing
+it: leaving a field while an Undo waited captured the list it replaced and saved it again after the
+Undo. On origin/main (dea8a9f97b) the same nine fail by assertion too (the evidence's fail-before).
 
 The J4 release journey change (`scripts/release/qual/journeys/linux.py`) is checked by
 `scripts/release/qual/journeys/test_current_ui.py` (python unittest, outside the evidence runners):

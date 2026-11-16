@@ -20,7 +20,7 @@ import { createOperationKey } from '../../api/operationKey.js';
 import { settingsV2Schema } from '../../api/generated/schema-types/settings-v2.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { renderFolderRow, folderRowStyles, type FolderRow, type FolderRowIntent } from '../components/folderRow.js';
-import { createSettingsAttempt, executeSettingsAttempt, readSettingsObservation, SettingsAttemptError, type SettingsAttempt, type SettingsWitness } from '../../api/settingsAttempt.js';
+import { captureSettingsPatch, createSettingsAttempt, executeSettingsAttempt, readSettingsObservation, requireSettingsWitness, SettingsAttemptError, type SettingsAttempt, type SettingsWitness } from '../../api/settingsAttempt.js';
 import { describeExactPath, type ExactPathExclusion } from '../../api/exclusionPolicy.js';
 import { decideForget, forgetObservationText, parseForgetPage, publishForgetCompletion } from '../../api/domains/forget.js';
 import { deepActiveElement } from '../utils/keyboardHandler.js';
@@ -41,7 +41,7 @@ import { getSurface } from '../../api/registry/SurfaceCatalogClient.js';
 import { present } from '../display/present.js';
 import { formatCount, formatFileCount } from '../display/format.js';
 import { offerReversal, ReversalClosedError } from '../state/ownReversals.js';
-import { SaveQueue, type SendOutcome } from '../state/saveQueue.js';
+import { keepUnsettled, readUnsettled, SaveQueue, type SendOutcome } from '../state/saveQueue.js';
 import { FocusKeeper, focusRowsUnder } from '../primitives/focusKeeper.js';
 import '../components/ConfirmBand.js';
 import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
@@ -169,6 +169,46 @@ type SkipDraft = { readonly text: string; readonly literals: readonly ExactPathE
  * before the save it is bound to, on that save's own revision only (B5').
  */
 type SkipSnapshot = SkipDraft & { readonly undo?: { readonly serial: number; readonly witness: SettingsWitness } };
+
+/**
+ * R24 — this window's unsettled skip-rule saves, kept in sessionStorage across a reload: the list and
+ * revision they are based on, the captured snapshots, and the head's sent attempt (key and bytes).
+ */
+const UNSETTLED_SKIP_RULES = 'justsearch.library.unsettledSkipRules';
+const keptWitnessSchema = z.object({ acceptedRevision: z.number(), lastCommittedOperationKey: z.string().nullable() });
+const unsettledSkipRulesSchema = z.object({
+  base: z.object({ text: z.string(), literals: z.array(z.unknown()), witness: keptWitnessSchema }),
+  snapshots: z.array(z.object({ text: z.string(), literals: z.array(z.unknown()),
+    undo: z.object({ serial: z.number().int(), witness: keptWitnessSchema }).optional() })).min(1),
+  attempt: z.object({ operationKey: z.string(), witness: keptWitnessSchema, body: z.string(),
+    headers: z.record(z.string(), z.string()) }).nullable(),
+  undoSerial: z.number().int(),
+});
+type UnsettledSkipRules = { base: SkipDraft & { witness: SettingsWitness }; snapshots: SkipSnapshot[];
+  attempt: SettingsAttempt | null; undoSerial: number };
+
+/** The kept record, if it is one: its revisions and exact-path entries are checked as the save path does. */
+function readUnsettledSkipRules(): UnsettledSkipRules | null {
+  const parsed = unsettledSkipRulesSchema.safeParse(readUnsettled(UNSETTLED_SKIP_RULES));
+  if (!parsed.success) return null;
+  const { base, snapshots, attempt, undoSerial } = parsed.data;
+  try {
+    const literals = (entries: unknown[]) => {
+      captureSettingsPatch({ ui: { excludePatterns: entries as ExactPathExclusion[] } });
+      if (entries.some(entry => typeof entry === 'string')) throw new Error('not an exact-path entry');
+      return entries as ExactPathExclusion[];
+    };
+    return {
+      base: { text: base.text, literals: literals(base.literals), witness: requireSettingsWitness(base.witness) },
+      snapshots: snapshots.map(snapshot => Object.freeze({ text: snapshot.text, literals: literals(snapshot.literals),
+        ...snapshot.undo ? { undo: { serial: snapshot.undo.serial, witness: requireSettingsWitness(snapshot.undo.witness) } } : {} })),
+      attempt: attempt ? Object.freeze({ ...attempt, witness: Object.freeze(requireSettingsWitness(attempt.witness)) }) : null,
+      undoSerial,
+    };
+  } catch {
+    return null;
+  }
+}
 
 /** Support codes stay on each exact gap; the decision itself uses plain language. */
 function rebuildGapReason(code: string): string {
@@ -369,7 +409,10 @@ export class LibrarySurface extends JfElement {
    * R7/R11 — the drafts captured when their field was left (or by Try again or Undo), saved in order.
    * Only these bytes are ever sent: text typed after returning to a field stays a draft until it is left.
    */
-  private readonly skipQueue = new SaveQueue<SkipSnapshot>(next => this.sendSkipRules(next), () => this.requestUpdate());
+  private readonly skipQueue = new SaveQueue<SkipSnapshot>(next => this.sendSkipRules(next), () => {
+    this.keepUnsettledSkipRules();
+    this.requestUpdate();
+  });
   /** Only the latest glob change can be undone. */
   private skipUndoSerial = 0;
   /** The Undo being run, answered when its queued snapshot settles. */
@@ -384,8 +427,14 @@ export class LibrarySurface extends JfElement {
     return this.skipQueue.snapshots.at(-1) ?? { text: this.excludesSavedText ?? '', literals: this.excludesSavedLiterals };
   }
   private get excludesDirty(): boolean {
+    const draft = this.savedListKey(this.excludesText, this.excludesLiterals);
     const queued = this.queuedList;
-    return this.savedListKey(this.excludesText, this.excludesLiterals) !== this.savedListKey(queued.text, [...queued.literals]);
+    if (draft === this.savedListKey(queued.text, [...queued.literals])) return false;
+    // R13 — while an Undo waits, the list it replaces is still shown: that is not a new change.
+    const snapshots = this.skipQueue.snapshots;
+    if (!snapshots.at(-1)?.undo) return true;
+    const replaced = snapshots.at(-2) ?? { text: this.excludesSavedText ?? '', literals: this.excludesSavedLiterals };
+    return draft !== this.savedListKey(replaced.text, [...replaced.literals]);
   }
   /** The queue head's sent attempt: kept with its key and bytes while its outcome is unknown. */
   private excludesAttempt: SettingsAttempt | null = null;
@@ -1639,6 +1688,7 @@ export class LibrarySurface extends JfElement {
 
   private async loadExcludes(): Promise<void> {
     if (this.excludesBusy || this.skipQueue.snapshots.length) return;
+    if (!this.excludesLoadStarted && await this.restoreUnsettledSkipRules()) return;
     this.excludesLoadStarted = true;
     this.excludesReading = true;
     const mark = this.skipEditorMark();
@@ -1671,6 +1721,77 @@ export class LibrarySurface extends JfElement {
     } finally {
       this.excludesReading = false;
     }
+  }
+
+  /** R24 — what is not settled yet, kept in this window's sessionStorage; removed once nothing is. */
+  private keepUnsettledSkipRules(): void {
+    const snapshots = this.skipQueue.snapshots;
+    keepUnsettled(UNSETTLED_SKIP_RULES, snapshots.length && this.excludesWitness ? {
+      base: { text: this.excludesSavedText ?? '', literals: this.excludesSavedLiterals, witness: this.excludesWitness },
+      snapshots, attempt: this.excludesAttempt, undoSerial: this.skipUndoSerial } : null);
+  }
+
+  /**
+   * R24 — after a reload, the saves this window had not settled come back as they were: on the list and
+   * revision they were based on, the latest one as the draft. An uncertain write is sent again first
+   * with its same key and bytes; the rest wait for Try again ("Your changes are not saved yet").
+   */
+  private async restoreUnsettledSkipRules(): Promise<boolean> {
+    const kept = readUnsettledSkipRules();
+    if (!kept) return false;
+    this.excludesLoadStarted = true;
+    this.excludesSavedText = kept.base.text;
+    this.excludesSavedLiterals = [...kept.base.literals];
+    this.excludesWitness = kept.base.witness;
+    const draft = kept.snapshots.at(-1)!;
+    this.excludesText = draft.text;
+    this.excludesLiterals = [...draft.literals];
+    this.excludesAttempt = kept.attempt;
+    this.skipUndoSerial = kept.undoSerial;
+    this.excludesLoaded = true;
+    this.excludesLoadFailed = false;
+    this.skipQueue.restore(kept.snapshots, kept.attempt !== null);
+    this.excludesReading = true;
+    try {
+      await this.loadExcludesPolicy();
+    } finally {
+      this.excludesReading = false;
+    }
+    if (kept.attempt) await this.skipQueue.settleHead();
+    return true;
+  }
+
+  /**
+   * R13/R26 — text replacing the shown rules (a completed Undo, a list saved elsewhere) keeps the empty
+   * fields the person opened at the end; the one that had focus keeps it.
+   */
+  private replaceDraftText(text: string): void {
+    const fields = this.excludesText.split('\n');
+    let open = 0;
+    while (open < fields.length && !fields[fields.length - 1 - open]!.trim()) open++;
+    // With no rule shown, the first empty field is the one every empty list shows.
+    if (open === fields.length) open--;
+    const next = [...text.split('\n'), ...fields.slice(fields.length - open)];
+    const inputs = [...(this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input') ?? [])];
+    const active = deepActiveElement();
+    const at = inputs.findIndex(input => input === active);
+    this.excludesText = next.join('\n');
+    if (open === 0 || at < fields.length - open) return;
+    const target = next.length - (fields.length - at);
+    void this.updateComplete.then(() => {
+      const now = deepActiveElement();
+      if (now && now !== active && now !== document.body) return;
+      this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input')[target]?.focus();
+    });
+  }
+
+  /** R25 — focus a rule field (the first when that one is gone), or Add a rule when no rule is shown. */
+  private async focusSkipRule(index: number): Promise<void> {
+    await this.updateComplete;
+    const fields = [...(this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input') ?? [])];
+    const target = globRules(this.excludesText).length ? fields[index] ?? fields[0] : undefined;
+    if (target) target.focus();
+    else this.shadowRoot?.querySelector<HTMLElement>('.add-rule')?.focus();
   }
 
   /** The saved list as one comparable value (glob rules, then exact-path entries). */
@@ -1724,7 +1845,7 @@ export class LibrarySurface extends JfElement {
     if (this.savedListKey(text, literals) !== this.savedListKey()) { this.excludesResult = null; this.excludesNotice = ''; }
     this.excludesSavedText = text;
     this.excludesSavedLiterals = literals;
-    this.excludesText = text;
+    this.replaceDraftText(text);
     this.excludesLiterals = [...literals];
     this.excludesInvalidPatterns = invalid;
     this.excludesWitness = witness;
@@ -1822,6 +1943,8 @@ export class LibrarySurface extends JfElement {
     for (let rebase = 0; rebase < 3; rebase++) {
       this.excludesAttempt ??= createSettingsAttempt({ ui: { excludePatterns: [...globRules(next.text), ...next.literals] } }, this.excludesWitness);
       const attempt = this.excludesAttempt;
+      // R24 — kept before it is sent: a reload from here on settles it with this key and these bytes.
+      this.keepUnsettledSkipRules();
       const before = { text: this.excludesSavedText ?? '', literals: [...this.excludesSavedLiterals] };
       try {
         const result = await executeSettingsAttempt((path, init) => this.doFetch(path, init), attempt, { signal: bound });
@@ -1900,6 +2023,7 @@ export class LibrarySurface extends JfElement {
       this.excludesAttempt = createSettingsAttempt({ ui: { excludePatterns: [...globRules(next.text), ...next.literals] } }, undo.witness);
     }
     const attempt = this.excludesAttempt;
+    this.keepUnsettledSkipRules();
     const before = { text: this.excludesSavedText ?? '', literals: [...this.excludesSavedLiterals] };
     try {
       const result = await executeSettingsAttempt((path, init) => this.doFetch(path, init), attempt, { signal: bound });
@@ -1913,7 +2037,7 @@ export class LibrarySurface extends JfElement {
       // and nothing newer is captured: text typed meanwhile stays and is saved when its field is left.
       if (this.skipQueue.snapshots.length === 1
           && this.savedListKey(this.excludesText, this.excludesLiterals) === this.savedListKey(before.text, before.literals)) {
-        this.excludesText = next.text;
+        this.replaceDraftText(next.text);
         this.excludesLiterals = [...next.literals];
       }
       answer();
@@ -1999,11 +2123,15 @@ export class LibrarySurface extends JfElement {
       this.excludesWitness = saved.witness;
       this.excludesSavedText = saved.text;
       this.excludesSavedLiterals = saved.literals;
-      await this.handleSaveExcludes();
+      // R25 — the keyboard goes back to the field being edited.
+      const saving = this.handleSaveExcludes();
+      await this.focusSkipRule(this.lastEditedRule);
+      await saving;
       return;
     }
     this.adoptObservedList([...globRules(saved.text), ...saved.literals], saved.witness, []);
     this.excludesRuleProblem = null;
+    await this.focusSkipRule(0);
   }
 
   /**
@@ -2896,9 +3024,13 @@ export class LibrarySurface extends JfElement {
           })}
           <jf-button class="add-rule" variant="ghost" label="Add a rule"
             .disabled=${!this.excludesLoaded}
-            .onActivate=${async () => {
-              this.excludesText += '\n'; await this.updateComplete;
-              this.shadowRoot?.querySelector<HTMLInputElement>('.skip-rule:last-of-type input')?.focus();
+            .onActivate=${() => {
+              // R26 — one empty field per press, focused; nothing is awaited, so no press is refused as busy.
+              this.excludesText += '\n';
+              void this.updateComplete.then(() => {
+                const fields = this.shadowRoot?.querySelectorAll<HTMLInputElement>('.skip-rule input');
+                fields?.[fields.length - 1]?.focus();
+              });
             }}><span aria-hidden="true">+</span> Add a rule</jf-button>
         </div>
         ${this.developer ? html`<div class="actions">

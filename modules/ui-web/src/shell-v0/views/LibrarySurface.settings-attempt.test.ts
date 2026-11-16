@@ -47,7 +47,8 @@ function fixture() {
   return { library, send, invoke };
 }
 beforeEach(() => vi.useFakeTimers());
-afterEach(() => { document.body.innerHTML = ''; vi.useRealTimers(); vi.restoreAllMocks(); });
+// Each test is a new window: what one left unsettled in sessionStorage (R24) is not another's.
+afterEach(() => { document.body.innerHTML = ''; sessionStorage.clear(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe('Library retained-base exclusions', () => {
   it('RF55 exact rows visibly distinguish trailing whitespace, control characters and slash pairs', async () => {

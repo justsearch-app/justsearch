@@ -6,9 +6,10 @@ import { getOperationClient, OperationError, type OperationInvocationSuccess } f
 import { requestAuthorization } from '../operations/authorizationBroker.js';
 import type { PluginHostApi } from '../plugin-api/plugin-types.js';
 import { settingsV2Schema, type SettingsV2 } from '../../api/generated/schema-types/settings-v2.js';
-import type { SettingsWitness } from '../../api/settingsAttempt.js';
+import { requireSettingsWitness, type SettingsWitness } from '../../api/settingsAttempt.js';
 import { createOperationKey } from '../../api/operationKey.js';
-import { SaveQueue, type SendOutcome } from '../state/saveQueue.js';
+import { keepUnsettled, readUnsettled, SaveQueue, type SendOutcome } from '../state/saveQueue.js';
+import { z } from 'zod';
 
 export type SavedIndexingRules = {
   schedule: NonNullable<NonNullable<NonNullable<SettingsV2['ui']>['indexingPause']>['schedule']> | null;
@@ -20,6 +21,38 @@ function sameRules(a: SavedIndexingRules, b: SavedIndexingRules): boolean {
   const key = (rules: SavedIndexingRules) => JSON.stringify([rules.pauseOnBattery, rules.schedule && [rules.schedule.enabled,
     [...(rules.schedule.days ?? [])].sort((x, y) => x - y), rules.schedule.startMinute, rules.schedule.endMinute]]);
   return key(a) === key(b);
+}
+
+/**
+ * R24 — this window's unsettled reading-rule saves, kept in sessionStorage across a reload: the rules
+ * and revision they are based on, the captured rule pairs, and the head's sent write (key and revision).
+ */
+const UNSETTLED_READING_RULES = 'justsearch.library.unsettledReadingRules';
+const keptWitnessSchema = z.object({ acceptedRevision: z.number(), lastCommittedOperationKey: z.string().nullable() });
+const keptRulesSchema = z.object({
+  schedule: z.object({ enabled: z.boolean(), days: z.array(z.number().int().min(1).max(7)),
+    startMinute: z.number().int().min(0).max(1439), endMinute: z.number().int().min(0).max(1439) }).nullable(),
+  pauseOnBattery: z.boolean(),
+});
+const unsettledReadingRulesSchema = z.object({
+  base: z.object({ rules: keptRulesSchema, witness: keptWitnessSchema }),
+  snapshots: z.array(keptRulesSchema).min(1),
+  sent: z.object({ key: z.string(), witness: keptWitnessSchema }).nullable(),
+});
+type UnsettledReadingRules = { base: { rules: SavedIndexingRules; witness: SettingsWitness }; snapshots: SavedIndexingRules[];
+  sent: { key: string; witness: SettingsWitness } | null };
+
+function readUnsettledReadingRules(): UnsettledReadingRules | null {
+  const parsed = unsettledReadingRulesSchema.safeParse(readUnsettled(UNSETTLED_READING_RULES));
+  if (!parsed.success) return null;
+  try {
+    const { base, snapshots, sent } = parsed.data;
+    return { base: { rules: base.rules, witness: requireSettingsWitness(base.witness) },
+      snapshots: snapshots.map(snapshot => Object.freeze(snapshot)),
+      sent: sent ? { key: sent.key, witness: requireSettingsWitness(sent.witness) } : null };
+  } catch {
+    return null;
+  }
 }
 
 /** R18/R22 — how long one write, every network step of it, runs before its outcome is called unknown. */
@@ -83,8 +116,14 @@ export class IndexingRulesEditor extends JfElement {
   /** R11 — the rule pairs captured by save-triggering events, saved in order; it outlives leaving Library. */
   private readonly queue = new SaveQueue<SavedIndexingRules>(next => this.sendRules(next), () => {
     this.indexingRulesSaving = this.queue.sending;
+    this.keepUnsettledRules();
     this.requestUpdate();
   });
+  /** R24 — the head's write while it is out: a reload before its answer settles it with this key. */
+  private inFlight: { key: string; witness: SettingsWitness } | null = null;
+  private restoreChecked = false;
+  /** R25 — the control the person last changed, for "Keep my draft". */
+  private lastControl: HTMLElement | null = null;
   /**
    * R8 — the queue head's sent write whose outcome is unknown: its key and base revision. It is sent
    * again with the same key and bytes, and settled, before anything newer; until then "Not sure this saved".
@@ -238,6 +277,8 @@ export class IndexingRulesEditor extends JfElement {
       const write = async (): Promise<OperationInvocationSuccess> => {
         signal.throwIfAborted();
         sent = true;
+        this.inFlight = { key: operationKey, witness };
+        this.keepUnsettledRules();
         const first = await invoke();
         return finished(first) ? first : this.followRunning(invoke, finished, signal);
       };
@@ -249,6 +290,7 @@ export class IndexingRulesEditor extends JfElement {
         } else receipt = (await write()).structuredData?.['witness'];
         const observed = settingsV2Schema.shape.witness.safeParse(receipt);
         this.retained = null;
+        this.inFlight = null;
         // Only this write's direct successor is known to hold exactly these rules; otherwise the next
         // write is refused and rebased after reading the saved rules.
         if (observed.success && observed.data && observed.data.lastCommittedOperationKey === operationKey
@@ -260,6 +302,7 @@ export class IndexingRulesEditor extends JfElement {
         this.indexingRulesMessage = 'Reading rules saved.';
         return 'saved';
       } catch (error) {
+        this.inFlight = null;
         const conflict = error instanceof OperationError && (error.httpStatus === 409 || error.errorCode === 'VERSION_CONFLICT');
         if (!conflict) {
           if (!sent && signal.aborted) {
@@ -318,6 +361,53 @@ export class IndexingRulesEditor extends JfElement {
     if (at && at.acceptedRevision === before.acceptedRevision && at.lastCommittedOperationKey === before.lastCommittedOperationKey
         && after.acceptedRevision === before.acceptedRevision + 1) this.savedWitness = after;
   }
+
+  /** R24 — what is not settled yet, kept in this window's sessionStorage; removed once nothing is. */
+  private keepUnsettledRules(): void {
+    const snapshots = this.queue.snapshots;
+    keepUnsettled(UNSETTLED_READING_RULES, snapshots.length && this.savedWitness ? {
+      base: { rules: this.savedRules, witness: this.savedWitness }, snapshots, sent: this.retained ?? this.inFlight } : null);
+  }
+
+  /**
+   * R24 — after a reload, the changes this window had not settled come back on the rules and revision
+   * they were based on, the latest as the draft. A write that was out is sent again first with its same
+   * key and bytes; the rest wait for Try again ("Your changes are not saved yet").
+   */
+  private restoreUnsettledRules(): void {
+    const kept = readUnsettledReadingRules();
+    if (!kept || this.readOnly) return;
+    this.savedRules = kept.base.rules;
+    this.savedWitness = kept.base.witness;
+    this.retained = kept.sent;
+    const draft = kept.snapshots.at(-1)!;
+    this.showRules(draft.schedule, draft.pauseOnBattery);
+    this.queue.restore(kept.snapshots, kept.sent !== null);
+    if (kept.sent) void this.queue.settleHead();
+  }
+
+  /** The draft shows these rules; no schedule shows the defaults and keeps none configured. */
+  private showRules(schedule: { enabled?: boolean; days?: number[] | null; startMinute?: number; endMinute?: number } | null | undefined,
+      pauseOnBattery: boolean): void {
+    this.indexingScheduleConfigured = schedule != null;
+    const time = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+    this.indexingRules = { enabled: schedule?.enabled ?? false,
+      days: schedule?.days ? [...schedule.days] : [1, 2, 3, 4, 5, 6, 7],
+      start: time(schedule?.startMinute ?? 540), end: time(schedule?.endMinute ?? 1020), pauseOnBattery };
+  }
+
+  /** R25 — after a conflict choice the keyboard stays in this editor: on `target`, else its first control. */
+  private async focusControl(target: HTMLElement | null): Promise<void> {
+    await this.updateComplete;
+    const first = this.shadowRoot?.querySelector<HTMLInputElement>('fieldset input');
+    const usable = target?.isConnected && !(target as HTMLInputElement).disabled ? target : first;
+    usable?.focus();
+  }
+
+  private readonly noteControl = (event: Event): void => {
+    const target = event.composedPath()[0];
+    if (target instanceof HTMLInputElement) this.lastControl = target;
+  };
 
   /** The saved rules and their revision, read within the write's bound ('bound' once it is reached). */
   private async observeSaved(signal: AbortSignal): Promise<{ rules: SavedIndexingRules; witness: SettingsWitness } | 'bound' | null> {
@@ -416,14 +506,7 @@ export class IndexingRulesEditor extends JfElement {
       const unchanged = JSON.stringify(this.indexingRules) === shown;
       const adopt = mode === 'discard' || !dirty && !queued && unchanged && this.savedWitness === witnessAtStart;
       if (adopt) { this.savedRules = saved; this.savedWitness = data.witness ?? null; }
-      if (adopt && unchanged) {
-        this.indexingScheduleConfigured = schedule != null;
-        const time = (minutes: number) => `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
-        this.indexingRules = { enabled: schedule?.enabled ?? false,
-          days: schedule?.days ? [...schedule.days] : [1, 2, 3, 4, 5, 6, 7],
-          start: time(schedule?.startMinute ?? 540), end: time(schedule?.endMinute ?? 1020),
-          pauseOnBattery: policy?.pauseOnBattery ?? false };
-      }
+      if (adopt && unchanged) this.showRules(schedule, policy?.pauseOnBattery ?? false);
       if (mode === 'discard') {
         this.conflictingRules = null;
         this.conflictWitness = null;
@@ -431,6 +514,7 @@ export class IndexingRulesEditor extends JfElement {
         this.indexingRulesMessage = '';
       }
       this.indexingRulesLoaded = true;
+      if (!this.restoreChecked) { this.restoreChecked = true; this.restoreUnsettledRules(); }
       return true;
     } catch (error) {
       if (serial === this.loadSerial) {
@@ -455,12 +539,15 @@ export class IndexingRulesEditor extends JfElement {
       this.savedWitness = this.conflictWitness;
       this.conflictingRules = null;
       this.conflictWitness = null;
-      await this.saveIndexingRules();
+      const saving = this.saveIndexingRules();
+      await this.focusControl(this.lastControl);
+      await saving;
       return;
     }
     this.indexingRulesSaving = true;
     await this.loadSettings('discard');
     this.indexingRulesSaving = false;
+    await this.focusControl(null);
   }
 
   private renderSavedRules() {
@@ -510,7 +597,8 @@ export class IndexingRulesEditor extends JfElement {
   override render() {
     return html`<section aria-labelledby="when-to-index">
       <h3 id="when-to-index" tabindex="-1">When to read files</h3>
-      <form @submit=${this.submitIndexingRules} @focusout=${this.saveOnLeave} novalidate aria-label="Reading rules">
+      <form @submit=${this.submitIndexingRules} @focusout=${this.saveOnLeave} @input=${this.noteControl} @change=${this.noteControl}
+        novalidate aria-label="Reading rules">
         <fieldset ?disabled=${!this.indexingRulesLoaded || this.readOnly}
           aria-label="When to read files" aria-describedby="indexing-rules-error">
           <div class="rule-choice"><label><input type="radio" name="indexing-hours" .checked=${!this.indexingRules.enabled}

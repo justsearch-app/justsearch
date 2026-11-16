@@ -17,6 +17,8 @@ export class SaveQueue<S> {
   private readonly items: S[] = [];
   private running: Promise<void> | null = null;
   private active = false;
+  /** The running drain stops after the head (R24); any later save-triggering event lifts this. */
+  private headOnly = false;
   private lastOutcome: SendOutcome | null = null;
   private changes = 0;
 
@@ -33,12 +35,35 @@ export class SaveQueue<S> {
   push(snapshot: S): Promise<void> {
     this.items.push(snapshot);
     this.changes++;
+    this.changed();
     return this.resume();
+  }
+
+  /**
+   * R24 — snapshots kept across a page reload, the head first. Nothing is sent: the editor settles an
+   * uncertain head with {@link settleHead}; the rest wait for the next save-triggering event.
+   */
+  restore(snapshots: readonly S[], uncertain: boolean): void {
+    this.items.splice(0, this.items.length, ...snapshots);
+    this.lastOutcome = uncertain ? 'uncertain' : 'stopped';
+    this.changes++;
+    this.changed();
+  }
+
+  /** Sends the head (again) alone; later snapshots wait for the next save-triggering event. */
+  settleHead(): Promise<void> {
+    if (!this.running) this.headOnly = true;
+    return this.start();
   }
 
   /** Sends the head (again) and drains; while sending, the running drain picks up what was pushed. */
   resume(): Promise<void> {
-    this.running ??= this.drain().finally(() => { this.running = null; this.changed(); });
+    this.headOnly = false;
+    return this.start();
+  }
+
+  private start(): Promise<void> {
+    this.running ??= this.drain().finally(() => { this.running = null; this.headOnly = false; this.changed(); });
     return this.running;
   }
 
@@ -46,13 +71,15 @@ export class SaveQueue<S> {
   clear(): S[] {
     this.lastOutcome = null;
     this.changes++;
-    return this.items.splice(0);
+    const dropped = this.items.splice(0);
+    this.changed();
+    return dropped;
   }
 
   private async drain(): Promise<void> {
     this.active = true;
     try {
-      while (this.items.length) {
+      for (let sent = 0; this.items.length && !(this.headOnly && sent > 0); sent++) {
         const head = this.items[0]!;
         this.changed();
         this.lastOutcome = await this.send(head);
@@ -60,5 +87,28 @@ export class SaveQueue<S> {
         if (this.items[0] === head) { this.items.shift(); this.changes++; }
       }
     } finally { this.active = false; }
+  }
+}
+
+/**
+ * R24 — an editor's unsettled saves in this window's sessionStorage, so the app's own reload (after an
+ * Engine restart) does not drop them. `null` removes the record. Storage that cannot be used keeps
+ * the saves in memory only.
+ */
+export function keepUnsettled(key: string, value: unknown): void {
+  try {
+    if (value === null) sessionStorage.removeItem(key); else sessionStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Unavailable or full storage: the queue in memory is unchanged.
+  }
+}
+
+/** The record {@link keepUnsettled} left in this window, unvalidated; null when none or unreadable. */
+export function readUnsettled(key: string): unknown {
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw === null ? null : JSON.parse(raw) as unknown;
+  } catch {
+    return null;
   }
 }

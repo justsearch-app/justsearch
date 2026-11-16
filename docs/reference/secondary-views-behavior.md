@@ -79,9 +79,16 @@ its changes one at a time, in the order they were made (leaving a field, a readi
 **Try again**, **Undo**). An unknown outcome (of a skip-rule or a reading-hours save) reads **Not sure
 this saved** with **Try again**, which checks the same save, with its same key and contents, before
 any newer change is sent; newer changes wait and read as not saved yet, also after leaving Library and
-coming back. Changes already made still save after leaving Library. When another window changed the
-same rules, the draft is kept and **Changed elsewhere** offers **Use the saved rules** or **Keep my
-draft** (which saves the draft as it is then); a save elsewhere of other settings is not a conflict.
+coming back. Changes already made still save after leaving Library. A reload of the window (the app
+reloads itself after an Engine restart) keeps them: the window keeps its unsettled changes in its
+session storage, sends a save whose answer was lost again with its same key and contents, and shows
+the rest as **Your changes are not saved yet** with **Try again**; nothing kept is sent before that
+save is settled. When another window changed the same rules, the draft is kept and **Changed
+elsewhere** offers **Use the saved rules** or **Keep my draft** (which saves the draft as it is then);
+a save elsewhere of other settings is not a conflict.
+After **Use the saved rules** focus goes to the first rule field (or **Add a rule** when there are
+none); after **Keep my draft** it goes back to the field being edited. **Add a rule** adds one empty
+field and focuses it; a list read again or an **Undo** completing keeps that field.
 Each reading-rules write carries the revision its draft was based on.
 
 Adding a skip rule asks in place, without moving focus: **Remove files already read that match your
