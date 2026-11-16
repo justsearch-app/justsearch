@@ -7,6 +7,8 @@ import type { UnifiedActionEntry } from '../operations/ActionLedgerClient.js';
 import { AdvisoryStore, type AdvisoryRecord, type AdvisorySnapshot } from './advisory/AdvisoryStore.js';
 import { deriveFrameStatus } from '../state/frameStatus.js';
 import { __resetAiStateForTest } from '../state/aiStateStore.js';
+import { __resetUserStateForTest } from '../state/UserStateDocument.js';
+import { setShowDeveloperTools } from '../state/developerToolsState.js';
 let pill: StatusPill;
 let current: AdvisorySnapshot;
 const listeners = new Set<(s: AdvisorySnapshot) => void>();
@@ -22,13 +24,16 @@ function record(key: string, options: Partial<AdvisoryRecord> = {}): AdvisoryRec
 }
 async function publish(records: AdvisoryRecord[]) { current = { ...current, advisories: records }; listeners.forEach(cb => cb(current)); await flush(); }
 beforeEach(async () => {
+  // Slice 8 (fm-15, H4'): Earlier's read state, "Mark all read" and Details on its rows are what
+  // Settings › Advanced › Show developer tools shows; these checks run with it on.
+  __resetUserStateForTest(); setShowDeveloperTools(true);
   __resetAiStateForTest(); vi.clearAllMocks();
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 503 })));
   current = { advisories: [], unreadCount: 0, isConnected: true, lastFrameKind: 'snapshot' };
   const store = { subscribe: (cb: (s: AdvisorySnapshot) => void) => { listeners.add(cb); cb(current); return () => listeners.delete(cb); }, acknowledge, acknowledgeAll };
   pill = new StatusPill(); pill.store = store as unknown as AdvisoryStore; document.body.append(pill); await flush();
 });
-afterEach(() => { pill.remove(); listeners.clear(); __resetAiStateForTest(); vi.unstubAllGlobals(); });
+afterEach(() => { pill.remove(); listeners.clear(); __resetAiStateForTest(); __resetUserStateForTest(); vi.unstubAllGlobals(); });
 function button(label: string) { return [...panel().shadowRoot!.querySelectorAll('button')].find(b => b.textContent!.trim() === label)!; }
 describe('Earlier (moved from the inbox drawer)', () => {
   it('omits empty sections; calm has one line and the two history destinations', async () => {

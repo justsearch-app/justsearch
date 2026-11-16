@@ -21,14 +21,8 @@ const SECTION_NAMES: Record<StatusSection, string> = {
   needs: 'Needs you', problems: 'Problems right now', running: 'Running', earlier: 'Earlier',
 };
 
-/** ref-09 header line: the search state, then what each non-empty section holds. */
-function summary(model: FrameStatus): string {
-  const n = (section: StatusSection) => model.sections[section].length;
-  const counts = [n('needs') ? `${n('needs')} need you` : '', n('problems') ? `${n('problems')} ${n('problems') === 1 ? 'problem' : 'problems'}` : '',
-    n('running') ? `${n('running')} running` : ''].filter(Boolean);
-  const state = ['needs', 'problems', 'working'].includes(model.pill.kind) ? null : model.pill.label;
-  return [state, ...counts].filter(Boolean).join(' · ') || model.pill.label;
-}
+/** fm-15, H5' — AI Brain's own way in is not offered on AI Brain. */
+const BRAIN = 'core.brain-surface';
 
 /**
  * The row's icon. History shows how an item ended (a failure is never drawn as a check); the words
@@ -58,7 +52,7 @@ function shownText(node: Node): string {
 /** Keyed rows preserve disclosures, focus and scroll through live source updates. */
 export class StatusPanel extends JfElement {
   static override properties = {
-    model: { attribute: false }, plugins: { attribute: false }, apiBase: { attribute: 'api-base' },
+    model: { attribute: false }, plugins: { attribute: false }, apiBase: { attribute: 'api-base' }, area: { attribute: false }, developer: { attribute: false },
     expanded: { state: true }, pluginsOpen: { state: true }, reviewing: { state: true }, always: { state: true }, gone: { state: true }, noticeGone: { state: true },
   };
   /** DE3 — the Needs-you row whose review is open inside the panel (ref-10), or null for the list. */
@@ -85,12 +79,19 @@ export class StatusPanel extends JfElement {
   private controlPress: { at: number; control: Element | null } | null = null;
   private keyPress: { key: string; control: Element } | null = null;
   declare model: FrameStatus | null;
+  /** The area the window shows (the Shell's active surface); "Open AI Brain" is not offered on AI Brain. */
+  declare area: string | null;
+  /**
+   * S8 H4' — Settings › Advanced › Show developer tools: Earlier's unread count, its unread markers,
+   * "Mark all read" and Details on its rows, which the default view leaves out.
+   */
+  declare developer: boolean;
   declare plugins: readonly StatusBarItem[];
   declare apiBase: string;
   declare expanded: ReadonlySet<string>;
   declare pluginsOpen: boolean;
   constructor() {
-    super(); this.model = null; this.plugins = []; this.apiBase = ''; this.expanded = new Set(); this.pluginsOpen = false;
+    super(); this.model = null; this.area = null; this.developer = false; this.plugins = []; this.apiBase = ''; this.expanded = new Set(); this.pluginsOpen = false;
     this.reviewing = null; this.always = false; this.gone = false; this.noticeGone = false;
   }
   private readonly overflow = new OverflowController(this, {
@@ -118,6 +119,7 @@ export class StatusPanel extends JfElement {
     h3 { margin: 0; font-size: var(--font-size-sm); font-weight: var(--jf-weight-medium); color: var(--text-secondary); }
     p { margin: var(--jf-space-1) 0; }
     .detail, time { color: var(--text-secondary); font-size: var(--font-size-xs); }
+    .header .detail { font-size: var(--font-size-sm); }
     .deadline { color: var(--text-warning); font-size: var(--font-size-xs); }
     article { padding-block: var(--jf-space-3); }
     .title { display: flex; align-items: baseline; gap: var(--jf-space-2); }
@@ -191,7 +193,11 @@ export class StatusPanel extends JfElement {
   private readonly pluginOutputs = new WeakMap<StatusBarItem, HTMLElement | string>();
   private focusSummary = false;
   private focusedRow: { id: string | null; section: string | null } | null = null;
+  /** S8-8' — the row whose control had focus before this render, so a control that leaves hands it on. */
+  private focusedControlRow: string | null = null;
   protected override willUpdate(changed: PropertyValues): void {
+    const active = this.shadowRoot?.activeElement;
+    this.focusedControlRow = active?.closest('article')?.getAttribute('data-fact') ?? null;
     if (changed.has('model') && this.reviewing && !this.reviewed()) {
       // Answered elsewhere, withdrawn or expired while open: it cannot be answered here any more.
       this.gone = this.answered !== this.reviewing; this.reviewing = null; this.focusSummary = true;
@@ -203,10 +209,16 @@ export class StatusPanel extends JfElement {
   protected override updated(): void {
     this.placeControls();
     for (const body of this.renderRoot.querySelectorAll<HTMLElement>('.plugin-body')) this.titlePlugin(body);
+    const lost = this.focusedControlRow !== null && !this.shadowRoot?.activeElement;
     if (this.focusSummary) {
       this.focusSummary = false;
       this.shadowRoot?.querySelector<HTMLElement>('[role="dialog"]')?.focus({ preventScroll: true });
+    } else if (lost) {
+      // The row stays but its focused control left (e.g. "Open AI Brain" on arriving at AI Brain).
+      const next = this.shadowRoot?.querySelector<HTMLElement>(`article[data-fact="${CSS.escape(this.focusedControlRow!)}"] button`);
+      (next ?? this.shadowRoot?.querySelector<HTMLElement>('[role="dialog"]'))?.focus({ preventScroll: true });
     }
+    this.focusedControlRow = null;
   }
   private static where(control: Element): string {
     const box = control.getBoundingClientRect();
@@ -294,7 +306,10 @@ export class StatusPanel extends JfElement {
     void this.updateComplete.then(() => {
       const row = this.shadowRoot?.querySelector<HTMLElement>(`article[data-fact="${CSS.escape(id)}"]`);
       row?.scrollIntoView({ block: 'nearest' });
-      row?.querySelector<HTMLElement>('button')?.focus();
+      // A row without controls (an Earlier row in the default view) takes focus itself.
+      const control = row?.querySelector<HTMLElement>('button');
+      if (row && !control) row.tabIndex = -1;
+      (control ?? row)?.focus();
     });
   }
   /** Back to the list; the request keeps waiting. True when a review was open (Escape uses this). */
@@ -346,11 +361,15 @@ export class StatusPanel extends JfElement {
   }
   private row(row: StatusFact): TemplateResult {
     const expanded = this.expanded.has(row.id);
+    const actions = (row.actions ?? []).filter(action => !(this.area === BRAIN && action.kind === 'navigate' && action.target === BRAIN));
+    // H4' — Earlier's Details only with developer tools, except on a failure; work rows keep theirs.
+    const details = !!row.details?.length || row.section === 'earlier' && (this.developer || row.tone === 'failure');
     return html`<article data-fact=${row.id}>
-      <div class="title"><span class="state-icon" aria-hidden="true" data-tone=${row.tone ?? nothing}>${rowGlyph(row)}</span><span class="text">${row.title}${row.after ? ` · ${row.after}` : nothing}${row.confidence == null ? nothing : html` <jf-status-badge .tone=${row.confidence < 0.5 ? 'warning' : 'neutral'} .label=${`${Math.round(row.confidence * 100)}% confidence`}></jf-status-badge>`} ${row.unread ? html`<span class="unread">Unread</span>` : nothing}</span>
-        ${row.occurredAt ? html`<time datetime=${row.occurredAt}>${formatRelativeIso(row.occurredAt)}</time>` : nothing}</div>
+      <div class="title"><span class="state-icon" aria-hidden="true" data-tone=${row.tone ?? nothing}>${rowGlyph(row)}</span><span class="text">${row.title}${row.after ? ` · ${row.after}` : nothing}${row.confidence == null ? nothing : html` <jf-status-badge .tone=${row.confidence < 0.5 ? 'warning' : 'neutral'} .label=${`${Math.round(row.confidence * 100)}% confidence`}></jf-status-badge>`} ${row.unread && this.developer ? html`<span class="unread">Unread</span>` : nothing}</span>
+        ${row.occurredAt ? html`<time datetime=${row.occurredAt}>${row.age ?? formatRelativeIso(row.occurredAt)}</time>` : nothing}</div>
       ${row.stale ? html`<p class="detail">Last seen · checking for an update</p>` : nothing}
       ${row.detail ? html`<p class="detail" title=${row.progressLabel ?? nothing} aria-label=${row.progressLabel ?? nothing}>${row.detail}</p>` : nothing}
+      ${row.note ? html`<p class="detail" data-note>${row.note}</p>` : nothing}
       ${row.deadline ? html`<p class="deadline" data-deadline><span aria-hidden="true">◷</span> ${row.deadline}</p>` : nothing}
       ${row.error ? html`<p class="error" role="alert">${row.error}</p>` : nothing}
       ${row.indeterminate && !row.stale ? html`<progress aria-label=${row.title}></progress>` : nothing}
@@ -358,9 +377,9 @@ export class StatusPanel extends JfElement {
       ${row.indexing && this.model ? html`<jf-indexing-controls .progress=${this.model.progress}
         .allowPause=${row.section === 'running'} api-base=${this.apiBase}></jf-indexing-controls>` : nothing}
       <div class="actions">
-        ${(row.actions ?? []).map(action => html`<button type="button" class=${action.kind === 'authorization-allow' ? 'primary' : nothing}
+        ${actions.map(action => html`<button type="button" class=${action.kind === 'authorization-allow' ? 'primary' : nothing}
           data-decision=${DECISIONS.has(action.kind) ? decisionId(action) : nothing} @click=${() => this.action(action, row)}>${action.label}</button>`)}
-        ${row.section === 'earlier' || row.details?.length ? html`<button type="button" aria-expanded=${expanded}
+        ${details ? html`<button type="button" aria-expanded=${expanded}
           @click=${() => this.toggle(row)}>${expanded ? 'Hide details' : 'Details'}</button>` : nothing}
       </div>
       ${expanded ? html`<div class="detail" data-expanded=${row.id}><slot name=${row.id}></slot>${row.details?.length ? repeat(row.details, detail => detail.id, detail => html`<p data-detail=${detail.id}>${detail.title}${detail.detail ? ` · ${detail.detail}` : ''}${detail.stale ? ' · last seen' : ''}</p>`) : row.occurredAt ?? row.title}
@@ -435,16 +454,18 @@ export class StatusPanel extends JfElement {
       }} @focusout=${(event: FocusEvent) => {
         if (!(event.relatedTarget instanceof Node) || !this.shadowRoot?.contains(event.relatedTarget)) this.focusedRow = null;
       }}>
-      <div class="header"><div><h2>What's going on</h2><p class="detail">${model ? summary(model) : 'Checking search status'}</p>
+      <div class="header"><div><h2>What's going on</h2>${model?.sentence || !model ? html`<p class="detail">${model?.sentence ?? 'Checking search status'}</p>` : nothing}
         ${this.gone ? html`<p class="detail" role="status">The request you were reviewing is no longer waiting.</p>` : nothing}
         ${this.renderNoticeGone()}</div>
         <button type="button" aria-label="Close status panel" @click=${() => this.dispatchEvent(new CustomEvent('status-close', { bubbles: true, composed: true }))}>×</button></div>
       ${model ? (['needs', 'problems', 'running', 'earlier'] as const).map(section => {
         const rows = model.sections[section];
         if (!rows.length) return nothing;
-        return html`<section aria-label=${SECTION_NAMES[section]}><div class="heading"><h3>${SECTION_NAMES[section]} ${section === 'earlier'
-          ? `${rows.filter(r => r.unread).length} unread` : rows.length}</h3><span></span>
-          ${section === 'earlier' ? html`<button type="button" aria-disabled=${rows.some(r => r.unread) ? 'false' : 'true'}
+        // H1 — no counts in the headings; Earlier's read state is a developer tool (H4').
+        const read = section === 'earlier' && this.developer;
+        return html`<section aria-label=${SECTION_NAMES[section]}><div class="heading"><h3>${SECTION_NAMES[section]}${read
+          ? ` ${rows.filter(r => r.unread).length} unread` : nothing}</h3><span></span>
+          ${read ? html`<button type="button" aria-disabled=${rows.some(r => r.unread) ? 'false' : 'true'}
             title=${rows.some(r => r.unread) ? nothing : 'All items are already read'}
             @click=${() => { if (rows.some(r => r.unread)) this.dispatchEvent(new CustomEvent('status-read-all', { bubbles: true, composed: true })); }}>Mark all read</button>` : nothing}</div>
           ${repeat(rows, row => row.id, row => this.row(row))}</section>`;

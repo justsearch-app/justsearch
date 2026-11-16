@@ -1,0 +1,344 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-16T10:08:19.416Z",
+  "revision": "e94eb4098fcf51974319bc86036dff0fef0588d4",
+  "tree": "3a78c12ab480f7041c974c3d746a2ad475a740ee",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.firstMinutes.test.ts\" \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/76wjg652/tmp/test-intent-vitest-7699-1794823683555.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 1064
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/76wjg652/tmp/test-intent-vitest-7699-1794823684620.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 5544
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.firstMinutes.test.ts",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.firstMinutes.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1ccd5117742064fa07e5b63d6dbfab51b75f1698be2b3662c6fd2038eca0634a",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S8-1 / H3' the first minutes: one \"Installing AI\" entry \"Search works\", then Running \"Installing AI\" with \"1.3 of 2.6 GB · about 24 min left\" and Pause, no stage rows",
+          "status": "passed"
+        },
+        {
+          "name": "S8-1 / H3' the first minutes: one \"Installing AI\" entry paused: \"Installing AI · Paused\" with Resume (7b's words), no time left",
+          "status": "passed"
+        },
+        {
+          "name": "S8-1 / H3' the first minutes: one \"Installing AI\" entry ETA only while downloading with an estimate, amounts only when known: unknown amounts",
+          "status": "passed"
+        },
+        {
+          "name": "S8-1 / H3' the first minutes: one \"Installing AI\" entry ETA only while downloading with an estimate, amounts only when known: no estimate",
+          "status": "passed"
+        },
+        {
+          "name": "S8-1 / H3' the first minutes: one \"Installing AI\" entry ETA only while downloading with an estimate, amounts only when known: preparing",
+          "status": "passed"
+        },
+        {
+          "name": "S8-1 / H3' the first minutes: one \"Installing AI\" entry ETA only while downloading with an estimate, amounts only when known: verifying",
+          "status": "passed"
+        },
+        {
+          "name": "S8-1 / H3' the first minutes: one \"Installing AI\" entry ETA only while downloading with an estimate, amounts only when known: setting up",
+          "status": "passed"
+        },
+        {
+          "name": "S8-1 / H3' the first minutes: one \"Installing AI\" entry a blocked stage's reason shows on the install row instead of its own row",
+          "status": "passed"
+        },
+        {
+          "name": "S8-1 / H3' the first minutes: one \"Installing AI\" entry a failed stage with no reason the row can carry keeps its own row",
+          "status": "passed"
+        },
+        {
+          "name": "S8-1 / H3' the first minutes: one \"Installing AI\" entry S8-7' after a reload the install is still one entry",
+          "status": "passed"
+        },
+        {
+          "name": "H2' \"Search works\" only when established not while the search verdict is checking",
+          "status": "passed"
+        },
+        {
+          "name": "H2' \"Search works\" only when established not while the search verdict is connecting",
+          "status": "passed"
+        },
+        {
+          "name": "H2' \"Search works\" only when established not while the search verdict is transitioning",
+          "status": "passed"
+        },
+        {
+          "name": "H2' \"Search works\" only when established not while the search verdict is unreachable",
+          "status": "passed"
+        },
+        {
+          "name": "H2' \"Search works\" only when established not with 0 fresh own searchable files",
+          "status": "passed"
+        },
+        {
+          "name": "H2' \"Search works\" only when established not with null fresh own searchable files",
+          "status": "passed"
+        },
+        {
+          "name": "H2' \"Search works\" only when established not from a stale observation",
+          "status": "passed"
+        },
+        {
+          "name": "H2' \"Search works\" only when established operational with searchable files: \"Search works\"",
+          "status": "passed"
+        },
+        {
+          "name": "H2' \"Search works\" only when established an outage says what today's summary says, never \"Search works\"",
+          "status": "passed"
+        },
+        {
+          "name": "H2'' \"Search works\" while only AI parts are missing (exact-word search runs) the pictured install (AI not installed or installing, only AI reasons, searchable files): \"Search works\"",
+          "status": "passed"
+        },
+        {
+          "name": "H2'' \"Search works\" while only AI parts are missing (exact-word search runs) not when the degraded verdict carries a search-unavailable cause (index.failed)",
+          "status": "passed"
+        },
+        {
+          "name": "H2'' \"Search works\" while only AI parts are missing (exact-word search runs) not when the degraded verdict carries a search-unavailable cause (index.corrupt)",
+          "status": "passed"
+        },
+        {
+          "name": "H2'' \"Search works\" while only AI parts are missing (exact-word search runs) not when the degraded verdict carries a search-unavailable cause (component.start_deadline)",
+          "status": "passed"
+        },
+        {
+          "name": "H2'' \"Search works\" while only AI parts are missing (exact-word search runs) not while the pill says search is limited (a reindex cause)",
+          "status": "passed"
+        },
+        {
+          "name": "H2'' \"Search works\" while only AI parts are missing (exact-word search runs) not while the engine is unreachable",
+          "status": "passed"
+        },
+        {
+          "name": "H2'' \"Search works\" while only AI parts are missing (exact-word search runs) not from a stale observation",
+          "status": "passed"
+        },
+        {
+          "name": "H2'' \"Search works\" while only AI parts are missing (exact-word search runs) not with 0 fresh own searchable files",
+          "status": "passed"
+        },
+        {
+          "name": "H2'' \"Search works\" while only AI parts are missing (exact-word search runs) not with null fresh own searchable files",
+          "status": "passed"
+        },
+        {
+          "name": "H3'' one row per folder; Earlier only for what this window witnessed reading, then searchable: one Earlier row with its age from the witnessed moment, no file count, no operation row",
+          "status": "passed"
+        },
+        {
+          "name": "H3'' one row per folder; Earlier only for what this window witnessed a folder already searchable at the first snapshot gets no Earlier row (H6)",
+          "status": "passed"
+        },
+        {
+          "name": "H3'' one row per folder; Earlier only for what this window witnessed path resolution and refresh do not reset the age",
+          "status": "passed"
+        },
+        {
+          "name": "H3'' one row per folder; Earlier only for what this window witnessed leaving searchable removes the Earlier row and shows the latest state; a later searchable is new",
+          "status": "passed"
+        },
+        {
+          "name": "H3'' one row per folder; Earlier only for what this window witnessed removed, then added back: the earlier row goes; the re-added folder is new",
+          "status": "passed"
+        },
+        {
+          "name": "H3'' one row per folder; Earlier only for what this window witnessed a folder without a stable id gets no Earlier row",
+          "status": "passed"
+        },
+        {
+          "name": "H3'' one row per folder; Earlier only for what this window witnessed an unconfirmed folder observation witnesses nothing",
+          "status": "passed"
+        },
+        {
+          "name": "H3'' one row per folder; Earlier only for what this window witnessed a rebuild that leaves a folder searchable is not \"became searchable\"; its rows say nothing of reading while it runs",
+          "status": "passed"
+        },
+        {
+          "name": "H3'' one row per folder; Earlier only for what this window witnessed the retained failure count still reaches the folder's problem row while it is read again",
+          "status": "passed"
+        },
+        {
+          "name": "H3'' one row per folder; Earlier only for what this window witnessed a successful add-folder operation leaves no Earlier row; its failure stays",
+          "status": "passed"
+        },
+        {
+          "name": "H4' words: what the default panel leaves out, and what developer tools bring back \"Allowed: …\" history is out of the default view and back with developer tools",
+          "status": "passed"
+        },
+        {
+          "name": "H4' words: what the default panel leaves out, and what developer tools bring back an allowed operation that failed becomes its own row in the default view, in today's failure words",
+          "status": "passed"
+        },
+        {
+          "name": "H4' words: what the default panel leaves out, and what developer tools bring back a denial keeps its row",
+          "status": "passed"
+        },
+        {
+          "name": "H4' words: what the default panel leaves out, and what developer tools bring back a retained \"Allowed\" request notice and \"Draft kept\" are out of the default view",
+          "status": "passed"
+        },
+        {
+          "name": "S8-5 what needs the person keeps its row an approval keeps its target, risk and irreversibility; failures and reduced search keep theirs",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:d91abbd21ecbe9b7183cd5cce96ab9f797a746b9cf8d4bb59f22d9437dd2122c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S8-1 the picture \"What's going on\", \"Search works\", Running \"Installing AI\" with amounts and Pause, Earlier with its age, footer",
+          "status": "passed"
+        },
+        {
+          "name": "S8-3 / H5' \"Open AI Brain\" only away from AI Brain shows on Search and Library, not on AI Brain, and follows the area while open",
+          "status": "passed"
+        },
+        {
+          "name": "S8-4 / H1 / H4' the default view and developer tools no counts, unread marker, Mark all read or Earlier Details by default; a failure keeps its Details",
+          "status": "passed"
+        },
+        {
+          "name": "S8-4 / H1 / H4' the default view and developer tools developer tools bring back gate history, Details, the unread count and Mark all read",
+          "status": "passed"
+        },
+        {
+          "name": "S8-9' / S8-8' through the real status pill Pause posts to the same endpoint, keeps focus on the control, and reads Resume once the status says paused",
+          "status": "passed"
+        },
+        {
+          "name": "S8-9' / S8-8' through the real status pill a refused request shows today's error and keeps focus",
+          "status": "passed"
+        },
+        {
+          "name": "S8-9' / S8-8' through the real status pill developer tools on and off, from the existing per-profile preference",
+          "status": "passed"
+        },
+        {
+          "name": "S8-9' / S8-8' through the real status pill a clicked notification for a row the default view leaves out opens the panel without error",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9220d865ffc5ba41043f5f3e8c4327104ae892e8729e0d2bfab0b34ea8f1e9f5",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "a focused \"Open AI Brain\" that leaves on arriving at AI Brain hands focus to its row's next control, not the page",
+          "status": "passed"
+        },
+        {
+          "name": "preserved: a focused row that leaves hands focus to the panel",
+          "status": "passed"
+        },
+        {
+          "name": "Pause, then the status says paused: the same control reads Resume and keeps focus",
+          "status": "passed"
+        },
+        {
+          "name": "preserved: an answer control that moved re-arms before a click counts",
+          "status": "passed"
+        },
+        {
+          "name": "developer tools on and off: the unread count, Mark all read and Earlier Details come and go",
+          "status": "passed"
+        },
+        {
+          "name": "the picture's panel at 600 px with text at double size, dark theme: whole, readable, nothing clipped",
+          "status": "passed"
+        },
+        {
+          "name": "the picture's panel at 600 px with text at double size, light theme: whole, readable, nothing clipped",
+          "status": "passed"
+        },
+        {
+          "name": "forced colours: the keyboard focus on Pause stays visible",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "origin/main",
+    "revision": "e94eb4098fcf51974319bc86036dff0fef0588d4",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.firstMinutes.test.ts\" \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/76wjg652/tmp/test-intent-vitest-7699-1794823691536.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 1084,
+        "output": "JSON report written to /home/elias/.cache/am/76wjg652/tmp/test-intent-vitest-7699-1794823691536.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/76wjg652/tmp/test-intent-vitest-7699-1794823692620.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 6562,
+        "output": "JSON report written to /home/elias/.cache/am/76wjg652/tmp/test-intent-vitest-7699-1794823692620.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.firstMinutes.test.ts",
+        "classification": "assertion",
+        "detail": "S8-1 / H3' the first minutes: one \"Installing AI\" entry \"Search works\", then Running \"Installing AI\" with \"1.3 of 2.6 GB · about 24 min left\" and Pause, no stage rows:  AssertionError: expected undefined to be 'Search works' // Object.is equality\n    at /home/elias/.cache/am/76wjg652/tmp/test-intent-before-rAtjWY/modules/ui-web/src/shell-v0/state/frameStatus.firstMinutes.test.ts:69:28\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-s8/modules/ui-web/n | S8-1 / H3' the first minutes"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
+        "classification": "assertion",
+        "detail": "S8-1 the picture \"What's going on\", \"Search works\", Running \"Installing AI\" with amounts and Pause, Earlier with its age, footer:  AssertionError: expected '1 running' to be 'Search works' // Object.is equality\n    at /home/elias/.cache/am/76wjg652/tmp/test-intent-before-rAtjWY/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:84:57\n    at processTicksAndRejections (node:internal/process/task_queues:104:5) | S8-3 / H5' \"Open AI Brain\" only away from AI Brain shows on Search"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes-lockdown.test.ts",
+        "classification": "assertion",
+        "detail": "a focused \"Open AI Brain\" that leaves on arriving at AI Brain hands focus to its row's next control, not the page:  Error: expected [ 'Pause download', 'Open AI Brain' ] to deeply equal [ 'Pause' ]\n    at Proxy.__VITEST_POLL_CHAIN__ (file:///home/elias/dev/justsearch/.claude/worktrees/fm-s8/modules/ui-web/node_modules/vitest/dist/chunks/test.DNmyFkvJ.js:3748:47)\n    at /home/elias/.cache/am/76wjg652/tmp/test-inte | Pause, then the status says paused: the same control reads Resume and keeps focus"
+      }
+    ]
+  },
+  "digest": "sha256:4c5512b84ff43dbf789a914e2b7cca8f001ad7d0f9b8327d9cd03128593346b7"
+}

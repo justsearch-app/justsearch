@@ -4,7 +4,9 @@ import type { AiState } from './aiStateStore.js';
 import { selectIndexingProgress, type IndexingProgress } from './indexingProgress.js';
 import { awaitsUnrequestedAi, gapOnlyAiProvides, isSearchUnavailableCause, isReindexCause, readinessNotice, warrantsSearchDegradationBanner } from './readinessNotice.js';
 import { aiEngineBody, aiEngineHeadline } from './aiVerdict.js';
-import { formatBytes, formatCount } from '../display/format.js';
+import { formatCount } from '../display/format.js';
+import { formatAmountOf, formatTimeLeft, runActivity } from './installFlow.js';
+import { composeStageRows } from './installComponents.js';
 import { indexingCountsLine, indexingCountsLabel, enrichingCountsLine, enrichingCountsLabel } from './statusProgress.js';
 import { indexingTaskStatus } from './indexingProgress.js';
 import { verdictHeadline } from './verdict.js';
@@ -96,7 +98,16 @@ export interface StatusFact {
   readonly review?: StatusReview;
   /** An answer that did not go through ("The request could not be cancelled. Try again."). */
   readonly error?: string;
+  /** fm-15 — how long ago, in the panel's words ("just now", "12 min", "3 h"); shown instead of the time. */
+  readonly age?: string;
+  /** S8 H3' — a second line under the detail: why part of a run cannot go on ("Search: Not enough disk space"). */
+  readonly note?: string;
 }
+/**
+ * S8 H3'' — what this window saw of each watched folder, by its path hash: whether it was last seen
+ * searchable, and when this window saw it become so. Window memory only: a reload starts empty.
+ */
+export type FolderMemory = ReadonlyMap<string, { readonly ready: boolean; readonly since?: number }>;
 interface PendingStatusAuthorization {
   readonly pendingId: string; readonly operationId: string; readonly argsSummary?: string;
   readonly requestedBy?: string; readonly expiresAt?: string;
@@ -114,7 +125,15 @@ export interface DurableStatusOperation {
   readonly observedAtMs?: number;
 }
 interface FrameStatusInput {
-  readonly gettingStarted?: { readonly visible: boolean; readonly known: boolean; readonly currentStep: number; readonly empty?: boolean };
+  /** `searchable`: fresh own searchable files (firstUse.ts), null while unknown or stale. */
+  readonly gettingStarted?: { readonly visible: boolean; readonly known: boolean; readonly currentStep: number; readonly empty?: boolean;
+    readonly searchable?: number | null };
+  /** S8 H4' — Settings › Advanced › Show developer tools: the history the default panel leaves out returns. */
+  readonly developer?: boolean;
+  /** S8 H3'' — the folder memory the previous derivation returned; absent, nothing was witnessed yet. */
+  readonly folders?: FolderMemory;
+  /** Each folder's retained failure count while it is read again (indexedRoots.ts `lastKnownFailed`). */
+  readonly lastKnownFailed?: Readonly<Record<string, number>>;
   readonly ai: AiState | null;
   readonly now: number;
   readonly contactLostAt: number | null;
@@ -161,6 +180,10 @@ export interface FrameStatus {
   readonly pill: StatusPillState;
   readonly sections: Readonly<Record<StatusSection, readonly StatusFact[]>>;
   readonly progress: IndexingProgress;
+  /** fm-15 — the one sentence under "What's going on": "Search works" when established, or the outage. */
+  readonly sentence?: string;
+  /** S8 H3'' — the folder memory for the next derivation. */
+  readonly folders?: FolderMemory;
 }
 const go = (label: string, target: string): StatusAction => ({ label, target, kind: 'navigate' });
 /** fm-12b — the top bar's and AI Brain's words for a failed install with parts missing. */
@@ -302,6 +325,14 @@ function activityWords(entry: UnifiedActionEntry): { title: string; detail?: str
     tone: outcome?.[1] ?? (/^Index (failed|gave up)/.test(entry.label) ? 'failure' : 'neutral') };
 }
 
+/** S8 H4' — outcomes that stay their own row while the decision that allowed them is not shown. */
+const UNFINISHED_OUTCOMES: ReadonlySet<string> = new Set(['FAILURE', 'FAILED', 'PARTIAL']);
+const ADD_FOLDER = 'core.add-watched-root';
+/** "just now", "12 min", "3 h" (fm-15's age beside an Earlier row). */
+function ageWords(ms: number): string {
+  const minutes = Math.floor(Math.max(0, ms) / 60_000);
+  return minutes < 1 ? 'just now' : minutes < 60 ? `${minutes} min` : `${Math.round(minutes / 60)} h`;
+}
 const OUTCOME_STATE: Readonly<Record<string, readonly [string, NonNullable<StatusFact['tone']>]>> = {
   SUCCESS: ['completed', 'success'], FAILURE: ['failed', 'failure'], FAILED: ['failed', 'failure'],
   UNDONE: ['undone', 'neutral'], PARTIAL: ['finished incomplete', 'warning'], STARTED: ['started', 'neutral'],
@@ -314,7 +345,7 @@ const OUTCOME_STATE: Readonly<Record<string, readonly [string, NonNullable<Statu
  * on it (`allowedBy`); rows without one (older rows, paths that cannot know it) are never joined and
  * keep their own words, and the decision shows just "Allowed". Every row stays listed in Activity.
  */
-function foldDecisions(activity: readonly UnifiedActionEntry[]): { folded: Set<string>; state: Map<string, { detail: string; tone?: NonNullable<StatusFact['tone']> }> } {
+function foldDecisions(activity: readonly UnifiedActionEntry[], keepFailures = false): { folded: Set<string>; state: Map<string, { detail: string; tone?: NonNullable<StatusFact['tone']> }> } {
   const decisions = new Map<string, { id: string; used: boolean; outcome?: string }>();
   for (const entry of activity) {
     if (entry.gate?.pendingId && entry.gate.disposition === 'APPROVED') {
@@ -329,7 +360,8 @@ function foldDecisions(activity: readonly UnifiedActionEntry[]): { folded: Set<s
     if (grant && ['ISSUED', 'CONSUMED'].includes(grant.action.toUpperCase())) {
       if (grant.action.toUpperCase() === 'CONSUMED') decision.used = true;
       folded.add(entry.id);
-    } else if (entry.kind === 'operation' && entry.outcome && OUTCOME_STATE[entry.outcome] && !entry.isRoutine && !entry.operationOutcomeKey) {
+    } else if (entry.kind === 'operation' && entry.outcome && OUTCOME_STATE[entry.outcome] && !entry.isRoutine && !entry.operationOutcomeKey
+      && !(keepFailures && UNFINISHED_OUTCOMES.has(entry.outcome))) {
       decision.outcome = entry.outcome;
       folded.add(entry.id);
     }
@@ -415,14 +447,20 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   }));
   const offeredRestores = new Set((input.advisories ?? []).flatMap(record =>
     record.toast?.restoresFolder ? [folderKey(record.toast.restoresFolder)] : []));
+  // S8 H4' — the default panel says each thing once in the person's words: successful approvals, a
+  // folder's add receipt (its folder row says it) and "Draft kept" are history developer tools show.
+  const developer = input.developer === true;
   for (const record of input.advisories ?? []) {
+    const extras = record.event.classExtras;
+    if (!developer && (record.event.classId === 'core.draft-kept' || record.event.classId === 'operation.completed'
+      && extras.operationId === ADD_FOLDER && extras.outcome === 'SUCCESS')) continue;
     if (record.event.classId === 'authorization.pending') {
-      const extras = record.event.classExtras;
       const id = typeof extras.pendingId === 'string' ? extras.pendingId : '';
       if (waiting.has(id) || ledgerRequests.has(id)) continue;
       const expired = typeof extras.expiresAt === 'string' && Date.parse(extras.expiresAt) <= now;
       const outcome = extras.disposition === 'DENIED' ? 'Denied by you' : extras.disposition === 'APPROVED'
         ? 'Allowed' : extras.disposition === 'EXPIRED' || expired ? 'Denied automatically' : 'Approval no longer pending';
+      if (outcome === 'Allowed' && !developer) continue;
       add({ ...advisoryStatusFact(record), title: outcome,
         tone: outcome === 'Allowed' ? 'success' : outcome === 'Denied by you' ? 'failure' : 'neutral', actions: [] });
       continue;
@@ -434,9 +472,11 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   // L4b/L5 — only an exact request id can hold a gate out of Earlier. Operation-id/recency
   // guesses can hide a newer answered request while an older request still waits. Legacy rows
   // have no request identity and remain history.
-  const decisions = foldDecisions(input.activity ?? []);
+  const decisions = foldDecisions(input.activity ?? [], !developer);
   for (const entry of input.activity ?? []) {
     if (entry.isRoutine || entry.operationOutcomeKey || decisions.folded.has(entry.id)) continue;
+    if (!developer && (entry.grant || entry.gate?.disposition === 'APPROVED'
+      || entry.kind === 'operation' && entry.operationId === ADD_FOLDER && entry.outcome === 'SUCCESS')) continue;
     const pendingId = entry.gate?.pendingId;
     if (pendingId && (waiting.has(pendingId) || entry.gate?.disposition === 'GATED' && terminal.has(pendingId))) continue;
     // L9 — a same-key copy withdrawn by another request's answer is not a decision: one row per decision.
@@ -465,15 +505,39 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
       ...(words.detail ? { detail: words.detail } : {}), tone: words.tone, occurredAt: entry.occurredAt,
       actions: [...addAgain, { kind: 'all-activity', target: 'core.activity-surface', label: 'All activity' }] });
   }
+  // S8 H3'' — one entry per folder, by its path hash. This window witnesses a folder becoming searchable
+  // only from a confirmed observation in which it was last seen not searchable; a folder searchable at
+  // the first observation, an unconfirmed one ("unknown", e.g. during a rebuild) or one without an id
+  // is no such witness. Leaving searchable or the list forgets it; adding it back is a new folder.
+  const folders = new Map(input.folders ?? []);
+  const stability = ai?.stability;
+  const provisional = stability?.kind === 'provisional';
+  const rebuilding = stability?.kind === 'provisional' && ['rebuilding', 'generation-switch'].includes(stability.cause);
+  const listed = new Set<string>();
   for (const root of input.roots ?? []) {
     // R4 — a folder is named by its folder name, with the full path as detail; the collection
     // ("default") is not a folder name. Until the path is resolved the row says what it is.
     const path = root.pathHash ? input.rootPaths?.get(root.pathHash) ?? null : null;
     const name = (path && folderName(path)) || 'A watched folder';
+    // The inputs Library reads the same folder with (provisional, rebuilding, retained failure count).
     const state = folderStatus(root, { relativeTime: '', verifiedRelativeTime: '',
-      provisional: false, enrichmentStages: progress.stages,
+      provisional, rebuilding,
+      enrichmentStages: progress.stages,
       enrichmentPending: progress.enrichingPending > 0, enrichmentBlocked: progress.blockedPending > 0,
-      indexingPaused: !!progress.pause, retryWaiting: progress.phase === 'waiting' });
+      indexingPaused: !!progress.pause, retryWaiting: progress.phase === 'waiting',
+      ...(root.pathHash && input.lastKnownFailed?.[root.pathHash] !== undefined ? { lastKnownFailed: input.lastKnownFailed[root.pathHash] } : {}) });
+    if (root.pathHash) {
+      listed.add(root.pathHash);
+      const seen = folders.get(root.pathHash);
+      const ready = state.state === 'ready';
+      if (input.rootsLive && state.state !== 'unknown' && seen?.ready !== ready) {
+        folders.set(root.pathHash, ready && seen ? { ready, since: now } : { ready });
+      }
+      const since = folders.get(root.pathHash)?.since;
+      if (since !== undefined) add({ id: `folder-searchable:${root.pathHash}`, section: 'earlier', tone: 'success',
+        title: path ? `Your ${name} folder is searchable` : 'A watched folder is searchable',
+        occurredAt: new Date(since).toISOString(), age: ageWords(now - since), actions: [] });
+    }
     const actions = [go('Show in Library', 'core.library-surface')];
     // ST5/B1 — the same folder conditions the Library headline counts (one source, folderStatus.ts).
     for (const item of folderAttention(root, state, name)) add({ id: item.kind === 'missing' ? `folder:${root.pathHash}` : item.kind === 'files' ? `files:${root.pathHash}` : `folder-${item.key}`, section: 'problems',
@@ -482,6 +546,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
       id: `folder-work:${root.pathHash}`, section: 'running', title: `${name}: ${state.metaText.replace(`${root.collection ?? 'default'} · `, '')}`, ...(path ? { detail: path } : {}),
       stale: !input.rootsLive, percent: state.state === 'enriching' ? rootCoverage(root, progress.stages)?.percent ?? null : null, actions });
   }
+  if (input.rootsLive) for (const hash of folders.keys()) if (!listed.has(hash)) folders.delete(hash);
   // Deduplicate the broadcast and request-scoped representations by the engine-issued identity.
   for (const request of input.authorizations ?? []) {
     if (terminal.has(request.pendingId) || request.expiresAt && Date.parse(request.expiresAt) <= now) continue;
@@ -603,16 +668,28 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   const install = ai?.installStatus;
   // G3''' (fm-12) — a run reads "Installing AI", and "Installing AI · N% · Paused" while paused.
   const installRun = !!ai && (install?.state === 'running' || ai.aiEngine.kind === 'installing');
-  if (ai && (install?.state === 'running' || ['installing', 'starting'].includes(ai.aiEngine.kind))) add({ id: 'ai-install', section: 'running',
-    title: !install?.paused && ai.aiEngine.kind === 'starting' ? 'Starting AI models' : 'Installing AI',
-    ...(install?.paused ? { after: 'Paused' } : {}),
-    stale: !ai.installObservationLive,
-    percent: ai.installObservationLive && (install?.totalBytes ?? 0) > 0 && (install?.downloadedBytes ?? -1) >= 0
-      ? Math.min(100, Math.round(install!.downloadedBytes! / install!.totalBytes! * 100)) : null,
-    detail: (install?.totalBytes ?? 0) > 0 && install?.downloadedBytes != null
-      ? `${formatBytes(install.downloadedBytes)} of ${formatBytes(install.totalBytes!)}` : install?.message ?? undefined,
-    actions: [...(install?.state === 'running' ? [{ kind: 'install-toggle' as const, target: install.paused ? 'resume' : 'pause', label: install.paused ? 'Resume download' : 'Pause download' }] : []),
-      go('Open AI Brain', 'core.brain-surface')] });
+  // S8 H3' — one entry for the run, in fm-12's words: "X of Y" only with known amounts, time left only
+  // while bytes move with the Engine's estimate (AI Brain's rule), what it does when it moves none; a
+  // stage that cannot go on says why on this row, which stands for the run's stage rows.
+  const installShown = !!ai && (install?.state === 'running' || ['installing', 'starting'].includes(ai.aiEngine.kind));
+  const carried = new Set<string>();
+  if (ai && installShown) {
+    const doing = runActivity(install);
+    const amounts = (install?.totalBytes ?? 0) > 0 && install?.downloadedBytes != null ? formatAmountOf(install.downloadedBytes, install.totalBytes!, 'total') : null;
+    const left = ai.installObservationLive && install?.state === 'running' && !install.paused && !doing ? formatTimeLeft(install.remainingSeconds) : null;
+    const stopped = install?.state === 'running' ? composeStageRows(install).filter(stage => ['blocked', 'failed'].includes(stage.state) && stage.blockedReason) : [];
+    for (const stage of stopped) carried.add(`aiinstall:${stage.id}`);
+    add({ id: 'ai-install', section: 'running',
+      title: !install?.paused && ai.aiEngine.kind === 'starting' ? 'Starting AI models' : 'Installing AI',
+      ...(install?.paused ? { after: 'Paused' } : {}),
+      stale: !ai.installObservationLive,
+      percent: ai.installObservationLive && (install?.totalBytes ?? 0) > 0 && (install?.downloadedBytes ?? -1) >= 0
+        ? Math.min(100, Math.round(install!.downloadedBytes! / install!.totalBytes! * 100)) : null,
+      ...(doing ?? amounts ?? install?.message ? { detail: doing ?? (amounts ? left ? `${amounts} · ${left}` : amounts : install!.message!) } : {}),
+      ...(stopped.length ? { note: stopped.map(stage => `${stage.label}: ${stage.blockedReason}`).join(' · ') } : {}),
+      actions: [...(install?.state === 'running' ? [{ kind: 'install-toggle' as const, target: install.paused ? 'resume' : 'pause', label: install.paused ? 'Resume' : 'Pause' }] : []),
+        go('Open AI Brain', 'core.brain-surface')] });
+  }
   if (ai?.status?.worker?.migration?.migrationState === 'AWAITING_ACCEPTANCE') add({
     id: 'rebuild-gaps', section: 'needs', title: 'Rebuild needs a decision about missing files',
     stale: !ai.indexingStatusLive, actions: [go('Review gaps in Library', 'core.library-surface')] });
@@ -624,6 +701,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     stale: !progress.activity.confirmed, actions: [go('Open Library', 'core.library-surface')] });
   for (const operation of input.operations ?? []) {
     const outcome = operation.outcome;
+    if (!developer && operation.operationId === ADD_FOLDER && outcome?.state === 'complete' && outcome.phase !== 'awaiting_acceptance') continue;
     const gaps = outcome?.phase === 'awaiting_acceptance';
     add({ id: `operation:${operation.id}`, section: gaps ? 'needs' : outcome?.state === 'failed' ? 'problems'
       : outcome?.state === 'complete' || outcome?.state === 'expired' ? 'earlier' : outcome?.state === 'unknown' ? 'problems' : 'running', title: operation.label,
@@ -635,6 +713,9 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   const durableTasks = new Set((input.operations ?? []).map(o => o.invocationTaskId));
   for (const task of input.tasks ?? []) {
     if (durableTasks.has(task.id) || task.operationKey || task.id.startsWith('ai:')) continue;
+    // S8 H3' — the install row stands for its stage rows (aiInstallTasksBridge.ts), except a stopped
+    // stage whose reason it cannot carry.
+    if (installShown && task.id.startsWith('aiinstall:') && (task.status !== 'failed' || carried.has(task.id))) continue;
     // Indexing SSE jobs can outlive their observation. Never let their retained "running" claim
     // override the aggregate selector, and do not duplicate the aggregate as a finished task.
     if (task.id.startsWith('idxjob:')) continue;
@@ -695,7 +776,15 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     const said = after ? `${pill.label} · ${after}` : pill.label;
     pill = { ...shown, words: said, label: `${pill.kind === 'calm' ? 'Search status' : said} · ${age === null ? 'not yet observed' : `last seen ${age < 1 ? 'just now' : `${age} min ago`}`} · ${ai?.connection.reachable || !pastGrace ? 'checking' : 'reconnecting'}` };
   }
-  return { pill, sections, progress };
+  // fm-15, H2' / H2'' — "Search works" (search by exact words, now) only from a fresh verdict with own
+  // searchable files: operational, or degraded with no search-unavailable cause, which is exact-word
+  // search running while only AI parts are missing (fm-15 pictures it during the install). Otherwise
+  // the outage in today's words, or nothing.
+  const outage = pill.kind === 'unreachable' || pill.kind === 'limited';
+  const searchRuns = ai?.verdict.kind === 'operational' || ai?.verdict.kind === 'degraded' && !ai.verdict.reasons.some(isSearchUnavailableCause);
+  const sentence = !outage && ai?.phase === 'connected' && searchRuns && (input.gettingStarted?.searchable ?? 0) > 0
+    ? 'Search works' : outage ? pill.label : undefined;
+  return { pill, sections, progress, ...(sentence ? { sentence } : {}), folders };
 }
 
 /**

@@ -2392,7 +2392,7 @@ export class Shell extends JfElement {
         .backendAddress=${this.apiBase || window.location.origin}
         @top-bar-select=${(e: CustomEvent<TopBarSelection>) => this.onTopBarSelect(e.detail)}
       >
-        <jf-status-pill slot="status" .store=${this.advisoryStore} api-base=${this.apiBase}
+        <jf-status-pill slot="status" .store=${this.advisoryStore} api-base=${this.apiBase} .area=${this.activeId}
           .pluginsVisible=${this.isStatusDeckVisible()}
           .multiplex=${this.shellEventsMultiplex}
           .authorizationHost=${() => this.shadowRoot?.querySelector('jf-authorization-host') ?? null}

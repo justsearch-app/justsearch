@@ -47,6 +47,7 @@ export class StatusPill extends JfElement {
   static override properties = {
     store: { attribute: false }, apiBase: { attribute: 'api-base' }, pluginsVisible: { type: Boolean, attribute: false },
     multiplex: { attribute: false }, authorizationHost: { attribute: false }, open: { state: true }, narrow: { state: true },
+    area: { attribute: false },
   };
   declare store: AdvisoryStore | null;
   declare apiBase: string;
@@ -54,6 +55,8 @@ export class StatusPill extends JfElement {
   declare multiplex: MultiplexedStream | null;
   declare authorizationHost: (() => AuthorizationHost | null) | null;
   declare open: boolean;
+  /** The area the window shows, from the Shell (fm-15, H5': the panel offers AI Brain only elsewhere). */
+  declare area: string | null;
   /** Window narrower than 1000 px: the state reads from the icon (badge, ring or dot); the name stays on the button. */
   declare narrow: boolean;
   private narrowQuery: MediaQueryList | null = null;
@@ -67,7 +70,7 @@ export class StatusPill extends JfElement {
   });
   constructor() {
     super(); this.store = null; this.apiBase = ''; this.pluginsVisible = true;
-    this.multiplex = null; this.authorizationHost = null; this.open = false; this.narrow = false;
+    this.multiplex = null; this.authorizationHost = null; this.open = false; this.narrow = false; this.area = null;
   }
   static styles = css`
     :host { display: inline-flex; min-width: 0; max-width: 100%; font-size: var(--font-size-sm); }
@@ -468,6 +471,7 @@ export class StatusPill extends JfElement {
         aria-keyshortcuts=${undo ? 'Control+Z' : nothing}>${this.transientActionLabel(action)}${undo ? html`<kbd aria-hidden="true">Ctrl+Z</kbd>` : nothing}</button>` : nothing}
       <div class="overlay" ?hidden=${!this.open} @click=${() => this.close()}></div>
       <jf-status-panel ?hidden=${!this.open} .model=${model} .plugins=${plugins} api-base=${this.apiBase}
+        .area=${this.area} .developer=${this.status.developer}
         @status-close=${() => this.close()}
         @status-action=${(e: CustomEvent<StatusAction>) => void this.act(e.detail)}
         @status-read=${(e: CustomEvent<string>) => {

@@ -94,6 +94,8 @@ describe('status pill and panel', () => {
   });
   it('ST15 updates preserve the scrolling element, expanded row and keyed plugin node', async () => {
     pill.open = true; await flush();
+    // Slice 8 (fm-15, H4'): Details on an Earlier row is a developer tool.
+    panel().developer = true;
     const earlier = { id: 'history1', section: 'earlier' as const, title: 'Retained advisory', unread: true };
     panel().model = deriveFrameStatus({ ai: null, now: Date.now(), contactLostAt: null, conditions: [earlier] });
     await panel().updateComplete;
