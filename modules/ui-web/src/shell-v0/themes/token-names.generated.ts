@@ -187,6 +187,8 @@ export type TokenName =
   | '--h-red'
   | '--h-teal'
   | '--halo-shadow'
+  | '--highlight-wash'
+  | '--highlight-wash-ring'
   | '--inspector-width-collapsed'
   | '--inspector-width-expanded'
   | '--jf-font-mono'
@@ -443,6 +445,8 @@ export const TOKEN_NAMES: readonly TokenName[] = [
   '--h-red',
   '--h-teal',
   '--halo-shadow',
+  '--highlight-wash',
+  '--highlight-wash-ring',
   '--inspector-width-collapsed',
   '--inspector-width-expanded',
   '--jf-font-mono',

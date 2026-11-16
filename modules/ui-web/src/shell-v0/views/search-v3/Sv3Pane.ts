@@ -36,7 +36,7 @@ import { detailsDocumentActions } from '../../components/detailsPane/detailsDocu
 import '../../components/ContextInspectorPane.js';
 import type { InspectorView } from '../../components/ContextInspectorPane.js';
 import '../../components/Button.js';
-import type { CitationHeader } from '../../components/chat/evidenceProjection.js';
+import { filenameOf, type CitationHeader } from '../../components/chat/evidenceProjection.js';
 import { PANE_LABEL } from './fixtures.js';
 import { SV3_PANE_CONTEXT_TAB } from './sv3-details.js';
 
@@ -134,6 +134,7 @@ export class Sv3Pane extends JfElement {
     contextView: { attribute: false },
     selectedItem: { attribute: false },
     sourceControl: { attribute: false },
+    resultQuery: { attribute: false },
   };
 
   /**
@@ -160,6 +161,12 @@ export class Sv3Pane extends JfElement {
   declare contextView: InspectorView | null;
   declare selectedItem: unknown;
   declare sourceControl: Sv3PaneSourceControl | null;
+  /**
+   * The query of the search result on show, or null when the pane shows anything else (a cited
+   * document, another window's selection). A result is closed by its file's name, and its found words
+   * are marked in the text; anything else keeps the pane's own words and an unmarked text.
+   */
+  declare resultQuery: string | null;
 
   constructor() {
     super();
@@ -174,6 +181,7 @@ export class Sv3Pane extends JfElement {
     this.contextView = null;
     this.selectedItem = null;
     this.sourceControl = null;
+    this.resultQuery = null;
   }
 
   /** Put the keyboard in the pane. */
@@ -216,7 +224,8 @@ export class Sv3Pane extends JfElement {
       <jf-details-pane
         ?overlay=${this.overlay}
         region-label=${PANE_LABEL.region}
-        close-label=${PANE_LABEL.dismiss}
+        close-label=${this.resultQuery !== null && this.docPath !== null
+          ? `Close ${filenameOf(this.docPath)}` : PANE_LABEL.dismiss}
         .tabs=${this.tabs}
         .activeTab=${tab}
         @details-close=${this.onClose}
@@ -232,6 +241,7 @@ export class Sv3Pane extends JfElement {
                 .highlightRange=${this.highlightRange}
                 .citation=${this.citation}
                 .citationHeader=${this.citationHeader}
+                .markQuery=${this.resultQuery ?? ''}
                 api-base=${this.apiBase}
               ></jf-document-pane>
             </div>`}

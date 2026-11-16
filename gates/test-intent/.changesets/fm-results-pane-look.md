@@ -1,0 +1,92 @@
+---
+schema: test-intent.v1
+task: t-20261113-fmimpl
+author-role: builder
+author-session: fm-pa-builder-59691a49
+---
+
+# Search results and the side pane look as drawn in fm-04 and fm-05
+
+The design review of the packaged app by the author of the pictures (2026-11-16) found the found
+words drawn as solid orange blocks, no selected look on the row whose file is in the pane, the pane's
+text grey, its found words unmarked, its name drawn as a tab and its path breaking mid-word. The
+orchestrator's delegated decisions PA1-PA5 say how each is drawn. The two new test files are isolated
+new sources; they carry an entry so their sources and evidence are on record. The changed existing
+files the gate flags are the generated token-name union and one test's stub host.
+
+Base: `2d51325e394b753a415eaa4ae5821dc940b6225d`. The evidence runs each new file whole (one check per
+file) on the candidate. The same two files were also run on a shared clone of the base: every
+new-behaviour case fails there by assertion (the unit file 5 of 5: `highlightSegments` and
+`splitFolderTail` are not functions; the browser file 17 of 19: the mark computes to the solid
+`oklch(0.5 0.11 70)` / `oklch(0.88 0.12 70)` instead of the picture's tint, the pane has no marks, the
+open row has `aria-current="false"` and no outline in forced colours, the pane's text computes to the
+muted grey, the title keeps its underline, the close button says "Close the cited document" and the
+path runs to two lines). The two preservation cases (a cited document keeps no marks and its own
+close label; the pane keeps its actions and the list its snippet size) pass on the base and on the
+candidate.
+
+```json
+{
+  "entries": [
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.paneMarks.test.ts",
+        "modules/ui-web/src/shell-v0/chrome/FirstMinutes.resultsPane-lockdown.test.ts"
+      ],
+      "class": "New",
+      "behaviour": "Found words in result snippets and in the pane's text of a search result are a faint warm tint behind the word (dark rgba(240,184,96,.22), light oklch(86% .14 85 / .55)) with the text in the normal text colour, 4 px corners, padding 0 2px in the list and 1px 2px plus the picture's 3 px ring in the pane; the marked text reads at 4.5:1 or more on its tint in both themes; forced colours use the system Mark/MarkText pair. The pane marks the same words the snippet marks (one matching: highlightSegments), in plain text and in rendered Markdown, only for the search result it shows; a cited document shows no marks and keeps 'Close the cited document'. The row whose file is in the pane has a raised tint with 8 px corners, no line under it, aria-current=true, the same look whether opened by pointer or Enter, its text where it was, and in forced colours a Highlight outline. The pane's document text is the normal text colour; a document shown on its own has a plain title (no underline, also in forced colours) and a close button named 'Close <file name>'. The path is one line shortened in the middle (the last folder and the facts stay whole, the start ends in an ellipsis), the whole folder stays in the text and the full path in the title; a short path shows whole. The pane's actions, the tab count and the snippet's size are unchanged.",
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "found words: solid bright orange blocks, several per row; the list reads as orange speckle before it reads as text. Picture: a faint warm tint behind the word, text in its normal colour. The row whose file is in the pane has no selected look ... Picture: tinted row, 8 px corners. Pane: the file's text is grey and reads as disabled; it is the content and should be the normal text colour. The found words are not marked in it. The name is drawn as a tab with an underline (picture: a plain title, no tab). The path breaks mid-word; shorten it from the middle.",
+          "location": "task t-20261113-fmimpl request, design review of the packaged app by the author of the pictures (2026-11-16), quoted (abridged) in the supplied PA builder brief"
+        },
+        {
+          "kind": "owner-words",
+          "quote": "--mark:rgba(240,184,96,.22); --mark-ring:rgba(240,184,96,.08); html.light{ --mark:oklch(86% .14 85 / .55); --mark-ring:oklch(86% .14 85 / .2) } .doc mark{background:var(--mark);color:var(--fg);border-radius:4px;padding:1px 2px;box-shadow:0 0 0 3px var(--mark-ring)} .rr p mark{background:var(--mark);color:var(--fg);border-radius:4px;padding:0 2px} .rr.sel{background:var(--r2);border-radius:8px;border-bottom-color:transparent} .dptabs .one{display:flex;align-items:center;gap:8px;padding:0 14px;font-size:13px;font-weight:500;color:var(--fg)}",
+          "location": "task t-20261113-fmimpl agreement, agreed picture fm-05-results-details (tmp/design/fm-05-results-details.html; the pictures are not in git, the words are quoted here)"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "PA1: the picture's mark through theme tokens (--highlight-wash, --highlight-wash-ring), text colour unchanged, radius 4 px, padding 0 2px (list) / 1px 2px (pane, with the ring); forced colours Mark/MarkText; contrast at least 4.5:1 in both themes. PA2: the pane marks the query's found words with the snippet's matching, only for the search result it shows. PA3: the row whose file is open in the pane gets the picture's selected look (raised tone, 8 px radius, bottom line hidden; a system-colour outline in forced colours) and aria-current as the list already uses; keyboard and pointer give the same look. PA4: the pane's text is the normal text colour; the name is a plain title; close is 'Close' plus the file name for a search result and stays 'Close the cited document' for a cited document; the path is shortened from the middle to one line with the full path in the title and available to screen readers. PA5: nothing else in the pane or list changes.",
+          "label": "agent choice"
+        }
+      ],
+      "evidence": "gates/test-intent/evidence/fm-results-pane-look.json",
+      "newChecks": [
+        "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.paneMarks.test.ts",
+        "modules/ui-web/src/shell-v0/chrome/FirstMinutes.resultsPane-lockdown.test.ts"
+      ]
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/themes/token-names.generated.ts"],
+      "class": "Incidental",
+      "assessment": {
+        "purpose": "Regenerated token-name union after adding --highlight-wash and --highlight-wash-ring to styles/tokens.css (the found-word tint and the reader's ring, dark and light values from the fm-05 picture).",
+        "callersAndStateOwners": "scripts/ci/gen-token-names.mjs writes it from tokens.css; tests and the theme editor import the union. No runtime state.",
+        "indirectBehaviours": "Two names added; no name removed or renamed.",
+        "evidence": "node scripts/ci/gen-token-names.mjs reported 256 tokens; npx tsc --noEmit passes; the full npx vitest run passes.",
+        "unresolvedRisks": "None known."
+      },
+      "sources": [
+        {
+          "kind": "owner-words",
+          "quote": "Picture: a faint warm tint behind the word, text in its normal colour.",
+          "location": "task t-20261113-fmimpl request, design review of the packaged app by the author of the pictures (2026-11-16), quoted in the supplied PA builder brief"
+        }
+      ]
+    },
+    {
+      "items": ["modules/ui-web/src/shell-v0/views/search-v3/first-minutes/HelpMatchesLifecycle.test.ts"],
+      "class": "Adaptation",
+      "moved": ["signature"],
+      "whatMoved": "The test's stub host for Sv3SearchController gains paneDocPath: () => null. The host interface already declared paneDocPath; the result list's view now reads it (the row whose file is in the pane), so a stub without it threw a TypeError inside view(). Inputs, the refinement failures injected, the observation (quick rows and the Help line stay visible) and the expected outcomes are unchanged; null is 'no pane open', the state these cases always ran in."
+    }
+  ]
+}
+```
+
+## Acceptance records

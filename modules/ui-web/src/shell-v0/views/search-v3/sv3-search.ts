@@ -223,6 +223,8 @@ export interface Sv3ResultsView {
   readonly filters: readonly Sv3ActiveFilter[];
   /** Whether an Ask about the chosen files can run, with the existing reason when it cannot. */
   readonly askAvailability: Availability;
+  /** The file the window's details pane is showing; its row is the current one. */
+  readonly openPath: string | null;
 }
 
 export const SV3_RESULTS_IDLE: Sv3ResultsView = {
@@ -235,6 +237,7 @@ export const SV3_RESULTS_IDLE: Sv3ResultsView = {
   facetSelections: {},
   filters: [],
   askAvailability: { kind: 'available' },
+  openPath: null,
 };
 
 /**
@@ -693,6 +696,16 @@ export class Sv3SearchController implements ReactiveController {
     this.host.requestUpdate();
   }
 
+  /**
+   * The query whose result the details pane shows, or null when the file on show is not a row of the
+   * list on screen. The pane marks this query's found words in the document, as the row's snippet does.
+   */
+  resultQuery(docPath: string | null): string | null {
+    const snapshot = this.snapshot;
+    if (!this.showing || docPath === null || snapshot === null || snapshot.query.trim() === '') return null;
+    return snapshot.results.some((hit) => hit.path === docPath) ? snapshot.query.trim() : null;
+  }
+
   view(askAvailability: Availability): Sv3ResultsView {
     const snapshot = this.snapshot;
     if (!this.showing || snapshot === null || snapshot.query.trim() === '') return SV3_RESULTS_IDLE;
@@ -703,6 +716,7 @@ export class Sv3SearchController implements ReactiveController {
       facetSelections: this.facets,
       filters: sv3ActiveFilters(this.chips, this.dates, this.facets),
       askAvailability,
+      openPath: this.host.paneDocPath(),
       restrictionError: snapshot.errorInfo?.status === 400 && snapshot.errorInfo.code !== 'SEARCH_SYNTAX_INVALID' ? snapshot.errorInfo.message : '',
     };
     // In flight beats every earlier conclusion; a failure beats rows that answered something else;

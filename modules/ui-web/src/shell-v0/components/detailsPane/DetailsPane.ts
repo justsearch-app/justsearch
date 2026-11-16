@@ -301,6 +301,15 @@ export class DetailsPane extends JfElement {
       color: var(--text-primary);
       border-block-end-color: var(--text-secondary);
     }
+    /* A document shown on its own is not one tab of several, so it is drawn as the pane's plain title
+       (first-minutes fm-05): the name in the normal text colour, no underline, the icon quiet. It is
+       still the strip's one tab underneath, so the keyboard lands on it as before. */
+    .tab[data-tab='document']:only-child {
+      border-block-end-color: transparent;
+      color: var(--text-primary);
+      cursor: default;
+    }
+    .tab[data-tab='document']:only-child svg { color: var(--text-secondary); }
     .tab:focus-visible {
       outline: var(--frame-focus-width) solid var(--focus-ring-color);
       outline-offset: calc(-1 * var(--frame-focus-width));
@@ -376,6 +385,8 @@ export class DetailsPane extends JfElement {
     }
     @media (forced-colors: active) {
       .tab[aria-selected='true'] { border-block-end-color: Highlight; color: Highlight; }
+      /* Forced colours paint a transparent edge in the text colour, so the title's edge takes the page's. */
+      .tab[data-tab='document']:only-child { border-block-end-color: Canvas; color: CanvasText; }
       .number { border: var(--frame-hairline) solid CanvasText; }
       .edge.before, .edge.after { background: Canvas; color: CanvasText; }
       /* The browser's text backplate would hide HighlightText on Highlight, so this pair opts out. */

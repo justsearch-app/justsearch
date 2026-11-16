@@ -124,6 +124,12 @@
      and `link` (this-is-clickable text, e.g. result titles). */
   --accent-highlight: oklch(50% 0.11 var(--h-amber));
   --accent-link: oklch(72% 0.13 var(--h-blue));
+  /* A found word in a result snippet or in the reader: a faint warm wash behind text that keeps its own
+     colour (first-minutes fm-04/fm-05). Translucent, so the word reads in whatever ink the theme gives
+     the text around it; the ring is the reader's softer halo around the same wash. Forced colours
+     replace both with the system Mark pair at the rule that draws the mark. */
+  --highlight-wash: rgb(240 184 96 / 22%);
+  --highlight-wash-ring: rgb(240 184 96 / 8%);
 
   /* Semantic state colors */
   --accent-success: oklch(70% 0.18 var(--h-green));
@@ -563,6 +569,8 @@
   /* 577 Phase 7 — light theme: pale highlight fill with dark ink; deep link blue. */
   --accent-highlight: oklch(88% 0.12 var(--h-amber));
   --accent-on-highlight: oklch(25% 0.06 var(--h-amber));
+  --highlight-wash: oklch(86% 0.14 85 / 55%);
+  --highlight-wash-ring: oklch(86% 0.14 85 / 20%);
   --accent-link: oklch(45% 0.18 var(--h-blue));
   --accent-on-link: #ffffff;
   --text-highlight: rgb(120, 78, 0);

@@ -1,0 +1,155 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-16T20:11:42.131Z",
+  "revision": "2d51325e394b753a415eaa4ae5821dc940b6225d",
+  "tree": "11e3e381fa8afb986d97aa880ed4c2507fa05740",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/resultRowPresentation.paneMarks.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/uvb5m_1z/tmp/test-intent-vitest-27260-1794859858893.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 802
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.resultsPane-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/uvb5m_1z/tmp/test-intent-vitest-27260-1794859859698.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 42431
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.paneMarks.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/resultRowPresentation.paneMarks.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c5aa09e9e4171bee4bc4f00ef83f4d418104cfe22636069350488b0ccac0e9d1",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "highlightSegments — the one matching for the snippet and the pane marks the same words the snippet marks, and keeps every character in order",
+          "status": "passed"
+        },
+        {
+          "name": "highlightSegments — the one matching for the snippet and the pane marks nothing for an empty query, stop words or excluded words",
+          "status": "passed"
+        },
+        {
+          "name": "highlightSegments — the one matching for the snippet and the pane treats the query as words, never as a pattern",
+          "status": "passed"
+        },
+        {
+          "name": "splitFolderTail — the middle of a long folder gives way first keeps the last folder whole, with its separator",
+          "status": "passed"
+        },
+        {
+          "name": "splitFolderTail — the middle of a long folder gives way first a folder with nothing before its last name is all tail",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.resultsPane-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.resultsPane-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:0704fbe02eb69be000ae7a0602f8be9e0e241b9f2c24890cbbf9d3fd2951be5d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PA1 found words are a faint warm tint behind text in its normal colour in the result snippets, dark",
+          "status": "passed"
+        },
+        {
+          "name": "PA1 found words are a faint warm tint behind text in its normal colour in the result snippets, light",
+          "status": "passed"
+        },
+        {
+          "name": "PA1 found words are a faint warm tint behind text in its normal colour in the pane’s document text, with the picture’s ring, dark",
+          "status": "passed"
+        },
+        {
+          "name": "PA1 found words are a faint warm tint behind text in its normal colour in the pane’s document text, with the picture’s ring, light",
+          "status": "passed"
+        },
+        {
+          "name": "PA1 found words are a faint warm tint behind text in its normal colour in forced colours both take the system Mark pair",
+          "status": "passed"
+        },
+        {
+          "name": "PA2 the pane marks the found words only for the search result it shows a Markdown result is marked in its rendered text as well",
+          "status": "passed"
+        },
+        {
+          "name": "PA2 the pane marks the found words only for the search result it shows a cited document keeps what it shows today: no marks, and its own close label",
+          "status": "passed"
+        },
+        {
+          "name": "PA3 the row whose file is in the pane looks selected pointer and keyboard give the same look, dark",
+          "status": "passed"
+        },
+        {
+          "name": "PA3 the row whose file is in the pane looks selected pointer and keyboard give the same look, light",
+          "status": "passed"
+        },
+        {
+          "name": "PA3 the row whose file is in the pane looks selected in forced colours the selected row has a system-colour outline",
+          "status": "passed"
+        },
+        {
+          "name": "PA4 the pane’s title, path and text the text is the normal text colour, dark",
+          "status": "passed"
+        },
+        {
+          "name": "PA4 the pane’s title, path and text the text is the normal text colour, light",
+          "status": "passed"
+        },
+        {
+          "name": "PA4 the pane’s title, path and text the name is a plain title with a close button named for the file, dark",
+          "status": "passed"
+        },
+        {
+          "name": "PA4 the pane’s title, path and text the name is a plain title with a close button named for the file, light",
+          "status": "passed"
+        },
+        {
+          "name": "PA4 the pane’s title, path and text in forced colours the title has no underline either",
+          "status": "passed"
+        },
+        {
+          "name": "PA4 the pane’s title, path and text the path is one line, shortened in the middle, with the whole path kept, dark",
+          "status": "passed"
+        },
+        {
+          "name": "PA4 the pane’s title, path and text the path is one line, shortened in the middle, with the whole path kept, light",
+          "status": "passed"
+        },
+        {
+          "name": "PA4 the pane’s title, path and text a short path is shown whole, with no ellipsis",
+          "status": "passed"
+        },
+        {
+          "name": "PA5 nothing else in the list or pane changes the pane keeps its two actions and the list its snippet size",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:a6ecffc5b2f57cdd6be80c9407c303fc1bd55a05b5bfff1945d37ca7450d480f"
+}
