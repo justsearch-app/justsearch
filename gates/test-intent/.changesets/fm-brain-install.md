@@ -114,6 +114,36 @@ already downloaded is kept on disk." (unchanged BrainSurface.pausedInstall and u
 it), so W7's "What it downloaded is kept on disk." is not shown; without a count the body is "An earlier
 download is paused." alone; (i) a refused Try again moves focus to the stopped view's heading.
 
+A fourth builder session (builder-fm-s7b-20261116d) repaired two findings of a second code review under
+the orchestrator's repair decisions RS7 and RS8 (delegated choices, cited in the flow check's entry). Each
+counterexample is a new case in BrainInstall.flow.test.ts that failed on the previous candidate
+(46a2e06915, a shared clone with the new check file copied in) by assertion and passes now. RS7: after
+Accept for Best match first over an installed AI, the store published the earlier run's completed status
+again, then the new run failed; Try again sent only acceptTerms (expected enableRerankerOnCompletion as
+well). RS8: after a restart Understand meaning's model file is on disk and its tokenizer missing, nothing
+else; Repair is offered (held before), but while the repair runs the steps were hidden (0 steps), a
+cancelled repair lost the repair alert, and a failed one said "AI isn't installed yet" after Cancel
+install. Three more new cases hold on 46a2e06915 and guard the repairs: the intent follows Try again to
+its new run past that run's stale failed status (RS7), its own run completing clears it (RS7), and a
+model file the first install itself placed is still not an installation once that run failed (RS8, G6').
+
+Named for the acceptor: (j) the completion intent is bound to its run by the run's start: at Accept (and
+at Try again) the page notes the start of the run it shows then, binds the intent to the first status
+with another start, and clears it only when a status of that run reads completed; the start operation's
+answer carries no start, so binding waits for the Engine's status; (k) the Engine publishes no per-file
+plan or placement data in its install status, so RS8 uses the page's own observation: when the page
+first sees a run, it keeps the final model files the last model presence showed (per part and variant
+file), and a final file counts as an existing installation while it is still shown; supporting files the
+run plans never remove it; (l) the case RS8 names: with no observation before the run (a reload during a
+repair or after it ended), only the Engine's plan speaks, as before (parts it found on disk are installed
+with no bytes, every other part of the run is its own), so after a reload during a repair that plans work
+for every part with a model file, the page shows that run as a first install and, once it failed or was
+cancelled, not as an installation until the Engine reports one; the page adds no new claim there. The
+fourth session re-ran the page evidence with --before origin/main and the same two overlays; every check
+passes on the candidate and fails on the base by assertion. On origin/main (dea8a9f97b) 39 of the flow
+check's 45 cases fail; the six that hold are the four named above for the first session, RS8 "before the
+run, Repair is offered" and RS8's cancelled repair (the base counts any file as an installation).
+
 ```json
 {
   "entries": [
@@ -124,7 +154,7 @@ download is paused." alone; (i) a refused Try again moves focus to the stopped v
       "change": "added",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "AI Brain's install flow rendered from the Engine's recorded statuses: the consent's five parts with page names, sizes, licences and Terms, Cancel starting nothing and Accept starting the install, \"Up to\" with staged bytes (S7b-1); unknown sizes and a missing manifest block Accept with a reason, a missing licence says so (S7b-10); progress heading, amounts, time left only when estimated, Done only after model presence observed after the part's last file, Waiting or a stage's refusal reason (S7b-2); Pause/Resume words and Cancel's toast without a promise of continuing (S7b-3); the stopped view with Done/Stopped/Waiting, Try again, Cancel install and Detail for support, no red, no connection claim (S7b-4); Try again's run covering only what is missing (S7b-5); Cancel install bound to the failed run (S7b-6); not installed after a first install that stopped with nothing placed, partial-only, supporting-only, unknown presence (S7b-7, G6'); restart reconstruction (S7b-8). Bytes an earlier download left: the action is \"Install AI\" with the most it can download, named so in its accessible name, never \"Resume Download\" or a promise to continue (G4', gap 2); a first install that runs, a paused run and a stopped download show only the install view, without steps, graphics card or Advanced settings, and the steps return after completion and after Cancel install (gap 3). Review repairs: Try again after a failed Best match first download asks the Engine to switch it on when done, as the consent accepted, and not when that choice was saved differently since (RS1); after a restart a complete GPU runtime package with no model file is not an installation (RS2); a damaged installation found on disk after a restart offers Repair, its repair run keeps the steps, and a failed (after Cancel install) or cancelled repair run keeps the repair classification (RS3); after Cancel install with model presence unreadable the page says it is checking, not \"AI isn't installed yet\", until presence resolves (RS4); a part the Engine reports verifying, in the download phase, reads \"Checking the downloaded files\" with no time left (RS5, W7).",
+      "behaviour": "AI Brain's install flow rendered from the Engine's recorded statuses: the consent's five parts with page names, sizes, licences and Terms, Cancel starting nothing and Accept starting the install, \"Up to\" with staged bytes (S7b-1); unknown sizes and a missing manifest block Accept with a reason, a missing licence says so (S7b-10); progress heading, amounts, time left only when estimated, Done only after model presence observed after the part's last file, Waiting or a stage's refusal reason (S7b-2); Pause/Resume words and Cancel's toast without a promise of continuing (S7b-3); the stopped view with Done/Stopped/Waiting, Try again, Cancel install and Detail for support, no red, no connection claim (S7b-4); Try again's run covering only what is missing (S7b-5); Cancel install bound to the failed run (S7b-6); not installed after a first install that stopped with nothing placed, partial-only, supporting-only, unknown presence (S7b-7, G6'); restart reconstruction (S7b-8). Bytes an earlier download left: the action is \"Install AI\" with the most it can download, named so in its accessible name, never \"Resume Download\" or a promise to continue (G4', gap 2); a first install that runs, a paused run and a stopped download show only the install view, without steps, graphics card or Advanced settings, and the steps return after completion and after Cancel install (gap 3). Review repairs: Try again after a failed Best match first download asks the Engine to switch it on when done, as the consent accepted, and not when that choice was saved differently since (RS1); after a restart a complete GPU runtime package with no model file is not an installation (RS2); a damaged installation found on disk after a restart offers Repair, its repair run keeps the steps, and a failed (after Cancel install) or cancelled repair run keeps the repair classification (RS3); after Cancel install with model presence unreadable the page says it is checking, not \"AI isn't installed yet\", until presence resolves (RS4); a part the Engine reports verifying, in the download phase, reads \"Checking the downloaded files\" with no time left (RS5, W7). Second review repairs: a completed status left from the earlier run does not clear the accepted consent's completion intent, which follows Try again to its new run and is cleared only when its own run completes (RS7); a model file on disk before a repair run, whose tokenizer that run downloads, keeps the steps during the run and the repair classification after it was cancelled or failed (and Cancel install), while a model file the first install itself placed is still not an installation (RS8).",
       "sources": [
         {
           "kind": "owner-words",
@@ -268,6 +298,22 @@ download is paused." alone; (i) a refused Try again moves focus to the stopped v
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "W7 (repair decisions, 2026-11-16) Words adopted, the source for exact assertions: \"Checking the downloaded files\" (verification), \"Setting up the downloaded parts\" (configuration/activation), the Cancel toast \"Install cancelled. Completed parts stay on this computer.\", and after restart with a paused download \"An earlier download is paused.\" followed by \"What it downloaded is kept on disk.\" only when the Engine reports downloaded bytes greater than 0.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "RS7 (repair decisions, 2026-11-16, second review) Completion intent belongs to the run it was accepted for (that run's identity); a status left over from an earlier run never clears it; it is cleared when its own run completes, or when the user changes that choice (RS1).",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "RS8 (repair decisions, 2026-11-16, second review) Existing-installation evidence is per final model file: a final file counts when it was present before the current run placed anything (from the Engine's per-file plan or placement data if published; else presence observed before this run started); supporting files planned or downloaded by a repair never remove a model's evidence. If the Engine publishes no per-file data and no pre-run observation exists (reload during a repair), keep the classification from the last disk evidence and say nothing new; name that case in your report.",
           "label": "agent choice"
         }
       ],

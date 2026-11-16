@@ -106,6 +106,28 @@ export function modelFilePresent(part: ModelPresencePart): boolean {
   return (part.presentVariantFiles?.length ?? 0) > 0 || (part.complete === true && MODEL_PACKAGES.has(part.id));
 }
 
+/** RS8 — the final model files model presence shows, per part (null: complete, its files not listed). */
+export type ModelFiles = ReadonlyMap<string, ReadonlySet<string> | null>;
+
+export function modelFiles(parts: readonly ModelPresencePart[]): ModelFiles {
+  const files = new Map<string, ReadonlySet<string> | null>();
+  for (const p of parts) {
+    if (!modelFilePresent(p)) continue;
+    files.set(p.id, (p.presentVariantFiles?.length ?? 0) > 0 ? new Set(p.presentVariantFiles) : null);
+  }
+  return files;
+}
+
+/** RS8 — a final model file seen earlier is still on this computer. */
+export function modelFileKept(before: ModelFiles, now: ModelFiles): boolean {
+  for (const [id, files] of before) {
+    const still = now.get(id);
+    if (still === undefined) continue;
+    if (files === null || still === null || [...files].some(f => still.has(f))) return true;
+  }
+  return false;
+}
+
 /** When the page saw each part reported installed, and when its last model-presence request began. */
 export interface DoneEvidence {
   installedSeenAt: ReadonlyMap<string, number>;

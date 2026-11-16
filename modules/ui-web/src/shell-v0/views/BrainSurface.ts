@@ -77,6 +77,9 @@ import {
   formatTotalSize,
   partName,
   modelFilePresent,
+  modelFiles,
+  modelFileKept,
+  type ModelFiles,
   runActivity,
   stoppedRunId,
   dismissStoppedRun,
@@ -593,6 +596,9 @@ export function composeInstallConsent(
   return { downloadTotal, consentTotal, upTo: staged > 0, packages, termsUnavailable: !manifest?.packages?.length };
 }
 
+/** RS1/RS7 — see `BrainSurface.completionIntent`. */
+interface CompletionIntent { feature: 'reranker' | 'pictures' | 'chat'; choice: boolean | null; before: number; run: number | null }
+
 /**
  * 574 A3 — map the legacy `.status-dot.<state>` class word onto the `jf-status-dot`
  * atom's (tone, live) projection. The bespoke per-state dot CSS (online glow / starting
@@ -720,6 +726,12 @@ export class BrainSurface extends JfElement {
   /** Slice 7b — when this page first saw each part of the current run reported installed (G3'). */
   private readonly installedSeenAt = new Map<string, number>();
   private installRunStart: number | null = null;
+  /**
+   * RS8 — per run (its start), the final model files model presence showed before the page first saw
+   * that run; null when the page saw the run before any observation (a reload during it). Kept at first
+   * sight, so a status flipping back to an earlier run never re-dates what a later run placed.
+   */
+  private readonly preRunModelFiles = new Map<number, ModelFiles | null>();
   /** When the model-presence request behind `modelPresence` began; null while presence is unknown. */
   private presenceRequestedAt: number | null = null;
   private presenceInFlight = false;
@@ -731,8 +743,11 @@ export class BrainSurface extends JfElement {
   /**
    * RS1 — what the accepted consent asked the Engine to switch on once its download is done, with the
    * saved choice at that moment. "Try again" asks the same unless that choice changed since.
+   * RS7 — it belongs to the run it was started for (`run`, that run's start; null until the Engine
+   * reports a run other than the one shown when it was asked, `before`): only that run completing
+   * clears it, never a status left over from an earlier run.
    */
-  private completionIntent: { feature: 'reranker' | 'pictures' | 'chat'; choice: boolean | null } | null = null;
+  private completionIntent: CompletionIntent | null = null;
   private installAnnouncementKey = '';
   private installAnnouncement = '';
   private focusHeadlineVisit = 0;
@@ -1424,8 +1439,7 @@ export class BrainSurface extends JfElement {
         const previous = this.installStatus;
         this.installStatus = s.installStatus;
         this.observeInstallParts(s.installStatus);
-        // RS1 — a completed run has done what its consent asked; nothing is left to try again.
-        if (s.installStatus.state === 'completed') this.completionIntent = null;
+        this.followCompletionIntent(s.installStatus);
         if ((previous?.state !== s.installStatus.state && previous != null)
           || (previous?.phase === 'activation_required' && s.installStatus.phase !== 'activation_required')) {
           void this.refreshInstallPlanPreview();
@@ -1811,9 +1825,12 @@ export class BrainSurface extends JfElement {
    * model file in the Engine's model presence (`modelFilePresent`: supporting files alone, such as the
    * GPU runtime's, never count), or the Engine's own evidence of one (`installedFully`, a running
    * model, a verdict of an installed AI). A file the current or just-ended run placed is not an
-   * earlier installation: the Engine lists the parts its plan found already on disk as installed with
-   * no bytes to download, and every other part of the run as its own. Null while model presence is
-   * not observed.
+   * earlier installation. RS8 — the Engine publishes no per-file plan, so a final file counts when
+   * model presence showed it before the page first saw the run and still shows it: supporting files
+   * a repair plans for that part never remove it. Without such an observation (a reload during the
+   * run) only the Engine's plan speaks: it lists the parts it found already on disk as installed with
+   * no bytes to download, every other part of the run as its own. Null while model presence is not
+   * observed.
    */
   private existingInstallation(): boolean | null {
     if (this.installStatus?.installedFully === true
@@ -1823,6 +1840,8 @@ export class BrainSurface extends JfElement {
     if (!packages) return null;
     const status = this.installStatus;
     const runOwn = status?.state === 'running' || status?.state === 'failed' || status?.state === 'cancelled';
+    const before = runOwn ? this.preRunModelFiles.get(status?.startedAtEpochMs ?? 0) : null;
+    if (before && modelFileKept(before, modelFiles(packages))) return true;
     const placedByRun = (id: string) => runOwn && (status?.packages ?? []).some(p => p.packageId === id
       && p.state !== 'skipped' && !(p.state === 'installed' && (p.bytesTotal ?? 0) === 0));
     return packages.some(p => modelFilePresent(p) && !placedByRun(p.id));
@@ -1843,6 +1862,10 @@ export class BrainSurface extends JfElement {
     if (start !== this.installRunStart) {
       this.installRunStart = start;
       this.installedSeenAt.clear();
+      if (start > 0 && !this.preRunModelFiles.has(start)) {
+        const seen = this.modelPresence?.packages;
+        this.preRunModelFiles.set(start, seen ? modelFiles(seen) : null);
+      }
     }
     let fresh = false;
     for (const p of status.packages ?? []) {
@@ -2711,6 +2734,20 @@ export class BrainSurface extends JfElement {
     } finally { --this.planReads; }
   }
 
+  /** RS7 — binds the completion intent to its run; that run completing has done what it asked. */
+  private followCompletionIntent(status: InstallStatus): void {
+    const intent = this.completionIntent;
+    if (!intent) return;
+    const start = status.startedAtEpochMs ?? 0;
+    if (intent.run === null && start > 0 && start !== intent.before) intent.run = start;
+    if (intent.run !== null && start === intent.run && status.state === 'completed') this.completionIntent = null;
+  }
+
+  /** RS7 — the completion intent for the run a start request is about to begin. */
+  private intentForNewRun(feature: 'reranker' | 'pictures' | 'chat', choice: boolean | null): CompletionIntent {
+    return { feature, choice, before: this.installStatus?.startedAtEpochMs ?? 0, run: null };
+  }
+
   /** RS1 — a choice the person makes on this page after the consent replaces its completion intent. */
   private dropCompletionIntent(...features: Array<'reranker' | 'pictures' | 'chat'>): void {
     if (this.completionIntent && features.includes(this.completionIntent.feature)) this.completionIntent = null;
@@ -2765,7 +2802,7 @@ export class BrainSurface extends JfElement {
     this.consentInclude = [];
     this.installConsentOpen = false;
     this.completionIntent = feature === 'reranker' || feature === 'pictures' || feature === 'chat'
-      ? { feature, choice: this.savedCompletionChoice(feature) } : null;
+      ? this.intentForNewRun(feature, this.savedCompletionChoice(feature)) : null;
     await this.withBusy('install-start', async () => {
       this.runtimeError = null;
       const data = (await this.invokeOp('core.start-ai-install', { acceptTerms: true,
@@ -2838,6 +2875,8 @@ export class BrainSurface extends JfElement {
     // RS1 — the accepted consent's completion intent, unless its choice was saved differently since.
     const intent = this.completionIntent;
     const keep = intent !== null && this.savedCompletionChoice(intent.feature) === intent.choice;
+    // RS7 — the intent now belongs to the run this request begins.
+    this.completionIntent = keep ? this.intentForNewRun(intent.feature, intent.choice) : null;
     const data = await this.withBusy('install-start', async () => {
       this.runtimeError = null;
       const started = (await this.invokeOp('core.start-ai-install', { acceptTerms: true,
@@ -2848,7 +2887,6 @@ export class BrainSurface extends JfElement {
       if (started) void refreshAiInstallNow();
       return started;
     });
-    if (!keep) this.completionIntent = null;
     if (!data && this.retryFrom === flow.id) {
       // RS6 — refused: the stopped view stays, and focus goes to its heading.
       this.installFlowFocus = 'headline';

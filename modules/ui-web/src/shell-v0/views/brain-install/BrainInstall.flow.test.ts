@@ -543,6 +543,74 @@ describe('RS1 Try again keeps what the accepted consent asked to switch on', () 
   });
 });
 
+describe('RS7 the completion intent belongs to the run it was accepted for', () => {
+  // The same installed AI and Best match first consent as RS1; the earlier run is the completed one.
+  let reranker: boolean | null;
+  const EARLIER = 1_794_799_000_000;
+  const additions = (state: string, startedAtEpochMs: number) => ({ state, phase: 'download', installedFully: true, repairNeeded: false, startedAtEpochMs,
+    downloadedBytes: 0, totalBytes: 189_843, errorCode: state === 'failed' ? 'REQUIRED_DOWNLOADS_FAILED' : '', lastError: state === 'failed' ? 'reranker: curl exit 18' : '',
+    message: '', packages: [{ packageId: 'reranker', label: 'Search reranker', stage: 'enrichment', state: state === 'completed' ? 'installed' : state === 'failed' ? 'failed' : 'downloading',
+      bytesDownloaded: 0, bytesTotal: 189_843 }], stages: [] });
+  function installed(status: Record<string, unknown>): AiState {
+    return { phase: 'connected', installObservationLive: true, runtimeObservationLive: true, snapshotLive: true,
+      index: { ownDocumentCount: { known: true, value: 8 } }, capabilities: { chat: false },
+      runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }, { id: 'reranker', status: 'inactive', reason: 'disabled', modelActive: false }] },
+      aiEngine: computeAiEngineVerdict({ installStatus: status as never, runtimeStatus: { onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] } as never,
+        runtime: { mode: 'offline', installed: { known: true, value: true } } as never, reachable: true, snapshotLive: true, engineState: 'Down' }),
+      runtime: { mode: 'offline', installed: { known: true, value: true } }, installStatus: { ...status, updatedAtEpochMs: Date.now() } } as unknown as AiState;
+  }
+  async function publishStatus(el: Brain, status: Record<string, unknown>) {
+    store.current = installed(status);
+    for (const listener of store.listeners) listener(store.current);
+    await settle(el);
+  }
+  async function acceptBestMatchFirst(): Promise<Brain> {
+    reranker = false;
+    preview = { totalDownloadBytes: 189_843, components: [
+      { id: 'embedding', label: 'Embedding model', state: 'installed', totalBytes: 173_860, downloadBytes: 0 },
+      { id: 'reranker', label: 'Search reranker', state: 'to-download', declinable: true, totalBytes: 189_843, downloadBytes: 189_843 },
+    ] } as InstallPlanPreview;
+    presence = { packages: [{ id: 'embedding', complete: true, presentVariantFiles: ['model.onnx'] }, { id: 'reranker', complete: false, presentVariantFiles: [] }] };
+    const stub = (globalThis.fetch as ReturnType<typeof vi.fn>).getMockImplementation() as (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => String(input).endsWith('/api/settings/v2') && init?.method !== 'POST'
+      ? json({ ui: {}, llm: {}, rerankerEnabled: reranker, witness: { acceptedRevision: 0, lastCommittedOperationKey: null } })
+      : stub(input, init)));
+    store.current = installed({ state: 'completed', installedFully: true, startedAtEpochMs: EARLIER });
+    const el = await mount();
+    el.shadowRoot!.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Use Best match first"]')!.click(); await settle(el);
+    await press(el, 'Accept and download');
+    expect(operations.map(o => o.args)).toEqual([{ acceptTerms: true, enableRerankerOnCompletion: true }]);
+    return el;
+  }
+  it('a completed status the store keeps from the earlier run, then a failure: Try again still switches it on', async () => {
+    const el = await acceptBestMatchFirst();
+    // The store publishes again before the Engine reports the new run: the earlier run's completed status.
+    await publishStatus(el, { state: 'completed', installedFully: true, startedAtEpochMs: EARLIER });
+    await publishStatus(el, additions('failed', EARLIER + 60_000));
+    expect(headline(el)).toBe('The download stopped');
+    await press(el, 'Try again');
+    expect(operations[1]!.args).toEqual({ acceptTerms: true, enableRerankerOnCompletion: true });
+  });
+  it('the intent follows Try again to its new run, past that run\'s stale failed status, until a failure of the new run', async () => {
+    const el = await acceptBestMatchFirst();
+    await publishStatus(el, additions('failed', EARLIER + 60_000));
+    await press(el, 'Try again');
+    await publishStatus(el, additions('failed', EARLIER + 60_000));
+    await publishStatus(el, additions('running', EARLIER + 120_000));
+    await publishStatus(el, additions('failed', EARLIER + 120_000));
+    await press(el, 'Try again');
+    expect(operations.map(o => o.args)).toEqual([1, 2, 3].map(() => ({ acceptTerms: true, enableRerankerOnCompletion: true })));
+  });
+  it('its own run completing clears it: a later failed run\'s Try again switches nothing on', async () => {
+    const el = await acceptBestMatchFirst();
+    await publishStatus(el, additions('running', EARLIER + 60_000));
+    await publishStatus(el, additions('completed', EARLIER + 60_000));
+    await publishStatus(el, additions('failed', EARLIER + 120_000));
+    await press(el, 'Try again');
+    expect(operations[1]!.args).toEqual({ acceptTerms: true });
+  });
+});
+
 describe('RS2 supporting files alone never establish an installation (G6\')', () => {
   it('after a restart, a complete GPU runtime package with no model file is not an installation', async () => {
     show('restartAfterFailedNothingPlaced');
@@ -596,6 +664,77 @@ describe('RS3 an existing installation is known from disk, not from what this pa
     await publishStatus(el, ended('cancelled'));
     expect(headline(el)).not.toMatch(/isn't installed/);
     expect(el.shadowRoot!.querySelector('[data-testid="install-repair-needed"]')).not.toBeNull();
+  });
+});
+
+describe('RS8 a model file present before the run is installation evidence, whatever the run downloads', () => {
+  // After a restart: Understand meaning's model file is on disk, its tokenizer is missing; nothing else
+  // of the AI is there. Repair plans the tokenizer for Understand meaning and the other parts whole.
+  const steps = (el: Brain) => el.shadowRoot!.querySelectorAll('.path-step').length;
+  const repairRun = ENGINE.retryRunning!.status! as { startedAtEpochMs: number; packages: Array<Record<string, unknown>> } & Record<string, unknown>;
+  const TOKENIZER = 711_396;
+  const run = (state: 'running' | 'failed' | 'cancelled') => ({ ...repairRun, state, phase: 'download', downloadedBytes: 0,
+    errorCode: state === 'failed' ? 'REQUIRED_DOWNLOADS_FAILED' : '', lastError: state === 'failed' ? 'embedding: curl exit 18' : '',
+    packages: repairRun.packages.map(p => p.packageId === 'chat' || p.packageId === 'cuda-runtime' ? p
+      : p.packageId === 'embedding' ? { ...p, state: state === 'failed' ? 'failed' : 'downloading', bytesDownloaded: 0, bytesTotal: TOKENIZER }
+        : { ...p, state: 'pending', bytesDownloaded: 0, bytesTotal: 172_032 }) });
+  const damaged = () => {
+    show('restartAfterFailedNothingPlaced');
+    presence = { packages: (ENGINE.restartAfterFailedNothingPlaced!.presence!.packages)
+      .map(p => p.id === 'embedding' ? { ...p, complete: false, presentVariantFiles: ['model.onnx'], missingFiles: ['tokenizer.json'] } : p) };
+    preview = ENGINE.failedPartsMissing!.preview!;
+  };
+  const publishStatus = async (el: Brain, status: Record<string, unknown>) => {
+    store.current = engineState('retryRunning', status as never);
+    for (const listener of store.listeners) listener(store.current);
+    await settle(el);
+  };
+  it('before the run, Repair is offered', async () => {
+    damaged();
+    const el = await mount();
+    expect(headline(el)).toBe('Installed — repair available');
+    expect(el.shadowRoot!.querySelector('[data-testid="install-repair-needed"]')).not.toBeNull();
+  });
+  it('while the repair downloads the tokenizer, the steps stay', async () => {
+    damaged();
+    const el = await mount();
+    await publishStatus(el, run('running'));
+    expect(headline(el)).toMatch(/^Installing AI/);
+    expect(steps(el)).toBeGreaterThan(0);
+  });
+  it('a cancelled repair keeps the repair classification', async () => {
+    damaged();
+    const el = await mount();
+    await publishStatus(el, run('running'));
+    await publishStatus(el, run('cancelled'));
+    expect(headline(el)).not.toMatch(/isn't installed/);
+    expect(el.shadowRoot!.querySelector('[data-testid="install-repair-needed"]')).not.toBeNull();
+  });
+  it('a failed repair keeps the repair classification once its stopped view is closed', async () => {
+    damaged();
+    const el = await mount();
+    await publishStatus(el, run('running'));
+    await publishStatus(el, run('failed'));
+    expect(headline(el)).toBe('The download stopped');
+    await press(el, 'Cancel install');
+    expect(headline(el)).toBe('Installed — repair available');
+    expect(el.shadowRoot!.querySelector('[data-testid="install-repair-needed"]')).not.toBeNull();
+  });
+  it('a model file the first install placed is still not an installation once that run failed', async () => {
+    show('restartAfterFailedNothingPlaced');
+    const el = await mount();
+    expect(headline(el)).toBe("AI isn't installed yet");
+    // The first install starts; the page sees it before any file is placed.
+    await publishStatus(el, { ...run('running'), repairNeeded: false });
+    // It places Understand meaning's model file, then fails on the tokenizer.
+    presence = { packages: (ENGINE.restartAfterFailedNothingPlaced!.presence!.packages)
+      .map(p => p.id === 'embedding' ? { ...p, complete: false, presentVariantFiles: ['model.onnx'], missingFiles: ['tokenizer.json'] } : p) };
+    window.dispatchEvent(new Event('focus')); await settle(el);
+    await publishStatus(el, { ...run('failed'), repairNeeded: true });
+    expect(headline(el)).toBe('The download stopped');
+    await press(el, 'Cancel install');
+    expect(headline(el)).not.toBe('Installed — repair available');
+    expect(el.shadowRoot!.querySelector('[data-testid="install-repair-needed"]')).toBeNull();
   });
 });
 
