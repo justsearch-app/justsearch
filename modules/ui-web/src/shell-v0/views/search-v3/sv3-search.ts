@@ -338,12 +338,13 @@ export class Sv3SearchController implements ReactiveController {
     if (this.showing) this.rerun();
   }
 
-  /** The card's facet chips — the default window's handler, on the same store. */
-  onCardFacetToggle(detail: { field: string; value: string | null } | undefined): void {
+  /** The card's facet chips — the default window's handler, on the same store. A kind filter that stands
+   *  for several kinds flips them in one press (one re-run). */
+  onCardFacetToggle(detail: { field: string; value: string | readonly string[] | null } | undefined): void {
     if (detail === undefined) return;
     if (this.host.draft().draftReview ? !this.hasPlace : !this.host.draft().draftMayIssue()) return;
     if (detail.value === null) for (const value of getFacetSelections()[detail.field] ?? []) toggleFacetValue(detail.field, value);
-    else toggleFacetValue(detail.field, detail.value);
+    else for (const value of typeof detail.value === 'string' ? [detail.value] : detail.value) toggleFacetValue(detail.field, value);
     this.rerun();
   }
 

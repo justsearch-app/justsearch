@@ -2360,7 +2360,7 @@ export class SearchV3View extends JfElement {
   }
 
   private onCardFacetToggle(event: Event): void {
-    this.search.onCardFacetToggle((event as CustomEvent<{ field: string; value: string | null }>).detail);
+    this.search.onCardFacetToggle((event as CustomEvent<{ field: string; value: string | readonly string[] | null }>).detail);
   }
 
   private onCardSelection(event: Event): void {

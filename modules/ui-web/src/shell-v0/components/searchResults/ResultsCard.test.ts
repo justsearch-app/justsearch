@@ -306,15 +306,18 @@ describe('ResultsCard — facet chips (ports SearchSurface.facets.test.ts, tempd
     await el.updateComplete;
     const rowEl = el.shadowRoot;
     expect(rowEl).not.toBeNull();
+    // fm-04 PF1: the kinds are the row's own filters, in a person's words with the count.
+    const kinds = Array.from(rowEl!.querySelectorAll('[data-testid="kind-filter"]')).map((c) => ({
+      text: c.textContent?.replace(/\s+/g, ' ').trim() ?? '',
+      count: c.querySelector('.facet-count')?.textContent ?? null,
+    }));
+    expect(kinds).toEqual([{ text: 'Text files 20', count: '20' }, { text: 'Code 8', count: '8' }]);
     const chips = Array.from(rowEl!.querySelectorAll('.facet-chip')).map((c) => ({
       text: c.textContent ?? '',
       count: c.querySelector('.facet-count')?.textContent ?? null,
     }));
-    expect(chips.some((c) => c.text.startsWith('markdown') && c.count === '20')).toBe(true);
-    expect(chips.some((c) => c.text.startsWith('code') && c.count === '8')).toBe(true);
     expect(chips.some((c) => c.text.startsWith('en') && c.count === '25')).toBe(true);
     const groups = Array.from(rowEl!.querySelectorAll('.facet-group-label')).map((g) => g.textContent);
-    expect(groups).toContain('Type');
     expect(groups).toContain('Language');
   });
 
@@ -325,10 +328,10 @@ describe('ResultsCard — facet chips (ports SearchSurface.facets.test.ts, tempd
 
   it('a selected value absent from the current counts still renders (dismissable)', async () => {
     const el = await mount(FACET_SNAPSHOT, { facetSelections: { file_kind: ['pdf'] } });
-    const chips = Array.from(el.shadowRoot?.querySelectorAll('.facet-chip') ?? []).map((c) =>
+    const chips = Array.from(el.shadowRoot?.querySelectorAll('[data-testid="kind-filter"]') ?? []).map((c) =>
       c.textContent?.trim(),
     );
-    expect(chips.some((t) => t?.startsWith('pdf'))).toBe(true);
+    expect(chips).toContain('Documents');
   });
 
   it('a chip click emits card-facet-toggle with the field/value', async () => {
@@ -337,8 +340,8 @@ describe('ResultsCard — facet chips (ports SearchSurface.facets.test.ts, tempd
     el.addEventListener('card-facet-toggle', (e) =>
       events.push((e as CustomEvent<{ field: string; value: string }>).detail),
     );
-    const chip = Array.from(el.shadowRoot?.querySelectorAll('.facet-chip') ?? []).find((c) =>
-      c.textContent?.includes('markdown'),
+    const chip = Array.from(el.shadowRoot?.querySelectorAll('[data-testid="kind-filter"]') ?? []).find((c) =>
+      c.textContent?.includes('Text files'),
     ) as HTMLButtonElement;
 
     chip.click();

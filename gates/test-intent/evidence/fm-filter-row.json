@@ -1,0 +1,166 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-16T22:48:11.784Z",
+  "revision": "075b738f0a3994558a4f4b4de1fc6ad6fe7ff087",
+  "tree": "9f3b83118205ca14260f2b5cef9079cdf871fc23",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/kindFilters.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.filterRow.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ciybs_d7/tmp/test-intent-vitest-30550-1794869257831.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2959
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.filterRow-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/ciybs_d7/tmp/test-intent-vitest-30550-1794869260792.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 30990
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/kindFilters.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/kindFilters.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:bd870af39fd811560a31175fb3d7265ad432ec20e29b29be824927ffbc40df75",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PF1 every engine kind reads as a word a person would use, never its raw name",
+          "status": "passed"
+        },
+        {
+          "name": "PF1 kinds sharing a word are one filter with their summed count, most matches first",
+          "status": "passed"
+        },
+        {
+          "name": "PF2 one kind among the results shows no kind filters; a chosen kind stays so it can be undone",
+          "status": "passed"
+        },
+        {
+          "name": "PF1 pending counts keep the known kinds without numbers; a chosen kind absent from counts stays",
+          "status": "passed"
+        },
+        {
+          "name": "PF1 choosing a word chooses all of its kinds; choosing it again lets go of the chosen ones",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.filterRow.test.ts",
+      "file": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.filterRow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:eb15f1201b4baed5b47f39c78601f9732605d185119d73262f0eb6094cbe7c4e",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PF1 kind filters read as a person would say them, plural with the count, as drawn",
+          "status": "passed"
+        },
+        {
+          "name": "PF1 the packaged app's \"text 36\" reads \"Text files 36\" beside another kind",
+          "status": "passed"
+        },
+        {
+          "name": "PF1 a press on a filter that stands for several kinds chooses them all at once",
+          "status": "passed"
+        },
+        {
+          "name": "PF2 one kind among the results shows no kind filters and no All; dates and More filters stay",
+          "status": "passed"
+        },
+        {
+          "name": "PF2 a chosen kind stays on the row so it can be undone, even when it is the only kind",
+          "status": "passed"
+        },
+        {
+          "name": "PF3 the chosen filter is marked for assistive tech; Any time and More filters only when they hold a choice",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.filterRow-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.filterRow-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4d38d68580f653717629bb92e2ec7fc95faa0f57aa777e57c431acf792bfa89f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PF1 kind filters use the words a person would, with the count the picture's row: All, Documents 2, Mail 1, Any time, More filters (dark)",
+          "status": "passed"
+        },
+        {
+          "name": "PF1 kind filters use the words a person would, with the count the picture's row: All, Documents 2, Mail 1, Any time, More filters (light)",
+          "status": "passed"
+        },
+        {
+          "name": "PF1 kind filters use the words a person would, with the count choosing Documents narrows to both of its kinds in one search",
+          "status": "passed"
+        },
+        {
+          "name": "PF2 one kind among the results shows no kind filters only Any time and More filters (dark)",
+          "status": "passed"
+        },
+        {
+          "name": "PF2 one kind among the results shows no kind filters only Any time and More filters (light)",
+          "status": "passed"
+        },
+        {
+          "name": "PF3 the chosen filter is the strong one; the rest are grey; all 12 px as drawn, and after a choice (dark)",
+          "status": "passed"
+        },
+        {
+          "name": "PF3 the chosen filter is the strong one; the rest are grey; all 12 px as drawn, and after a choice (light)",
+          "status": "passed"
+        },
+        {
+          "name": "PF3 in forced colours the chosen filter keeps a visible state the pressed filter takes the system selection pair; the rest do not",
+          "status": "passed"
+        },
+        {
+          "name": "PF4 the search field has a Clear × while it holds text shown only with text, at the field's end, 14 px and muted (dark)",
+          "status": "passed"
+        },
+        {
+          "name": "PF4 the search field has a Clear × while it holds text shown only with text, at the field's end, 14 px and muted (light)",
+          "status": "passed"
+        },
+        {
+          "name": "PF4 the search field has a Clear × while it holds text a click empties the field, keeps the caret there and leaves Search as clearing by keyboard does",
+          "status": "passed"
+        },
+        {
+          "name": "PF4 the search field has a Clear × while it holds text reachable by keyboard: Tab from the field, then Enter",
+          "status": "passed"
+        },
+        {
+          "name": "PF4 the search field has a Clear × while it holds text Escape in the field behaves as before: it does not empty the field",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:6f78d6924b5640b0a1519f3108530554d0e06eccb7a6f8c1e400c5595d987c4c"
+}

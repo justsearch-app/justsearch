@@ -33,6 +33,8 @@ type IconName =
   | 'loader-2'
   | 'hard-drive'
   | 'x'
+  // fm-04 — the results row's "More filters" (lucide `funnel`).
+  | 'funnel'
   | 'chevron-down'
   | 'bot'
   | 'send'
@@ -113,6 +115,7 @@ const PATHS: Record<IconName, SVGTemplateResult> = {
   'loader-2': svg`<path d="M21 12a9 9 0 1 1-6.219-8.56" />`,
   'hard-drive': svg`<line x1="22" x2="2" y1="12" y2="12" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /><line x1="6" x2="6.01" y1="16" y2="16" /><line x1="10" x2="10.01" y1="16" y2="16" />`,
   x: svg`<path d="M18 6 6 18" /><path d="m6 6 12 12" />`,
+  funnel: svg`<path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z" />`,
   'folder-tree': svg`<path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z" /><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z" /><path d="M3 5a2 2 0 0 0 2 2h3" /><path d="M3 3v13a2 2 0 0 0 2 2h3" />`,
   'chevron-down': svg`<path d="m6 9 6 6 6-6" />`,
   bot: svg`<path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2" /><path d="M20 14h2" /><path d="M15 13v2" /><path d="M9 13v2" />`,

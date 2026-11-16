@@ -47,6 +47,7 @@ import '../../views/search-v3/Sv3Filters.js';
 import { matchCountLabel } from './matchCountLabel.js';
 import { isAdvancedMode, subscribeUiMode } from '../../state/uiModeState.js';
 import { renderFacetChips, facetChipStyles } from './facetChips.js';
+import { kindFilters, kindFilterToggle } from './kindFilters.js';
 import {
   renderWhyDisclosure,
   whyThisResultStyles,
@@ -824,18 +825,26 @@ export class ResultsCard extends JfElement {
     const start = new Date(); start.setHours(0, 0, 0, 0);
     const preset = to === undefined && [7, 30, 365].find(days => { const day = new Date(start); day.setDate(day.getDate() - days); return from === day.getTime(); });
     const label = from === undefined && to === undefined ? 'Any time' : preset === 7 ? 'Past week' : preset === 30 ? 'Past month' : preset === 365 ? 'Past year' : 'Custom dates';
-    const facets = this.snapshot?.facets as Parameters<typeof renderFacetChips>[0];
+    const pending = this.snapshot?.countsPending === true;
+    const selected = this.facetSelections.file_kind ?? [];
+    const kinds = kindFilters(pending ? undefined : (this.snapshot?.facets as SearchFacetCounts | null | undefined)?.file_kind, pending ? this.lastFacets?.file_kind : undefined, selected);
+    const more = [getFilters().pathPrefix, getFilters().sizeFromBytes ?? getFilters().sizeToBytes].filter(v => v !== undefined).length
+      + ['mime_base', 'language', 'meta_author'].reduce((n, field) => n + (this.facetSelections[field]?.length ?? 0), 0);
     return html`<div class="result-filters" role="group" aria-label="Result filters">
-      <button type="button" class="text-filter" data-testid="type-all" aria-pressed=${String(!(this.facetSelections.file_kind?.length))}
+      ${kinds.length === 0 ? nothing : html`<button type="button" class="text-filter" data-testid="type-all" aria-pressed=${String(selected.length === 0)}
         @click=${() => this.emitCard('card-facet-toggle', { field: 'file_kind', value: null })}>All</button>
-      ${renderFacetChips(this.snapshot?.countsPending ? null : facets, this.facetSelections,
-        { fields: ['file_kind'], pendingValues: this.snapshot?.countsPending ? this.lastFacets : null,
-          onToggle: (field, value) => this.emitCard('card-facet-toggle', { field, value }) })}
-      <button type="button" class="text-filter date-filter" data-testid="date-filter"
+      <span class="kind-filters" data-facet-field="file_kind">${kinds.map(kind => html`<button type="button" class="text-filter"
+        data-testid="kind-filter" aria-pressed=${String(kind.chosen)}
+        aria-label=${`${kind.label}${kind.count !== undefined ? `, ${kind.count} ${kind.count === 1 ? 'file' : 'files'}` : ''}`}
+        @click=${() => { const values = kindFilterToggle(kind, selected);
+          this.emitCard('card-facet-toggle', { field: 'file_kind', value: values.length === 1 ? values[0] : values }); }}
+        >${kind.label}${kind.count !== undefined ? html` <span class="facet-count">${kind.count}</span>` : nothing}</button>`)}</span>`}
+      <button type="button" class="text-filter date-filter ${label === 'Any time' ? '' : 'on'}" data-testid="date-filter"
         aria-label=${`Modified date: ${label}`} aria-haspopup="menu" aria-expanded=${String(this.dateMenuOpen)}
-        @click=${this.openDateMenu}>${label}${icon({ name: 'chevron-down', size: 12 })}</button>
-      <button type="button" class="text-filter" data-testid="more-filters" aria-expanded=${String(this.moreFiltersOpen)}
-        @click=${() => { this.moreFiltersOpen = !this.moreFiltersOpen; }}>More filters</button>
+        @click=${this.openDateMenu}>${label}${icon({ name: 'chevron-down', size: 13 })}</button>
+      <button type="button" class="text-filter more-filter ${more > 0 ? 'on' : ''}" data-testid="more-filters" aria-expanded=${String(this.moreFiltersOpen)}
+        aria-label=${more > 0 ? `More filters, ${more} set` : nothing}
+        @click=${() => { this.moreFiltersOpen = !this.moreFiltersOpen; }}>${icon({ name: 'funnel', size: 13 })}More filters</button>
     </div>`;
   }
 
@@ -881,10 +890,18 @@ export class ResultsCard extends JfElement {
       .result-filters { display: flex; flex-wrap: wrap; align-items: center; gap: var(--jf-space-2); }
       .result-filters .facet-row { margin: 0; }
       .result-filters .facet-group-label { display: none; }
+      /* fm-04: the chosen filter is the strong one (normal text colour, medium); the rest are muted. */
+      .kind-filters { display: contents; }
       .text-filter { font: inherit; font-size: var(--font-size-xs); font-weight: 400; color: var(--text-secondary); border: 0; border-radius: 4px; background: transparent; padding: var(--jf-space-1); cursor: pointer; }
-      .text-filter.active, .text-filter[aria-pressed='true'], .text-filter[aria-expanded='true'], [data-testid='more-filters'] { font-weight: 500; color: var(--text-primary); }
-      .date-filter { display: inline-flex; align-items: center; gap: var(--jf-space-1); font-weight: 500; color: var(--text-primary); }
+      .text-filter[aria-pressed='true'], .text-filter.on { font-weight: 500; color: var(--text-primary); }
+      .text-filter .facet-count { opacity: 1; }
+      .date-filter, .more-filter { display: inline-flex; align-items: center; gap: 3px; }
       .text-filter:focus-visible { outline: 2px solid var(--focus-ring-color); }
+      /* Forced colours erase the colour difference, so the pressed filter takes the selection pair (as the facet chips do). */
+      @media (forced-colors: active) {
+        .text-filter[aria-pressed='true'] { forced-color-adjust: none; background: Highlight; color: HighlightText; }
+        .text-filter[aria-pressed='true']:focus-visible { outline-color: Highlight; outline-offset: 2px; }
+      }
       .row time { margin-inline-start: auto; color: var(--text-secondary); font-size: var(--font-size-xs); font-weight: 400; flex: none; }
       .hit-why summary, .hit-why-explain { color: var(--text-primary); font-weight: 500; }
       .hit-why-signal, .hit-why-explain { border: 0; background: transparent; }

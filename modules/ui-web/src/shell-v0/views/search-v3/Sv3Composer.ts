@@ -1173,9 +1173,14 @@ export class Sv3Composer extends JfElement {
       .search-field { display: flex; align-items: center; gap: var(--space-3); min-block-size: 46px; box-sizing: border-box; padding: var(--space-2) 14px; }
       .search-field .field { flex: 1; min-width: 0; padding: 0; display: flex; align-items: center; gap: var(--space-3); }
       .search-field .editor { flex: 1; min-width: 0; }
+      .search-clear { display: grid; place-items: center; flex: none; min-inline-size: 24px; min-block-size: 24px; padding: 0; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--muted-foreground); cursor: pointer; }
+      .search-clear:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
       .search-field textarea { min-height: 0; height: auto; min-block-size: 1.5em; padding: 0; line-height: 1.5; white-space: pre; overflow: auto; resize: none; }
       .search-field .footer { margin: 0; padding: 0; flex: none; }
       .search-field .footer:has(.controls:empty) { display: none; }
+      /* With Clear shown, an empty control row takes no room, so Clear sits at the field's end (the rule above never
+         matches: the template leaves whitespace in '.controls'; the empty field keeps its geometry). */
+      .search-field:has(.search-clear) .footer:not(:has(.controls > *)) { display: none; }
       .search-field .actions:empty { display: none; }
       .recents { --ring: var(--foreground); border: 0; background: transparent; margin-block-start: calc(var(--space-5) + 2px); padding: 0; }
       .recent-heading { padding-inline: var(--space-1); color: var(--muted-foreground); }
@@ -1528,6 +1533,14 @@ export class Sv3Composer extends JfElement {
     this.draft = '';
   }
 
+  /** The search field's Clear: what emptying the field by keyboard does, with the caret left in it. */
+  private clearSearch(): void {
+    const field = this.shadowRoot?.querySelector<HTMLTextAreaElement>('textarea[data-testid="sv3-composer-input"]');
+    if (field) field.value = '';
+    this.setDraft('', false);
+    this.focusField();
+  }
+
   /**
    * Tempdoc 864 Layer 1(a) — PUT THE CARET IN THE FIELD. The composer owns its own focus, exactly as
    * it owns its own draft: the window says "the reader is at a ready composer now" and this decides
@@ -1704,6 +1717,10 @@ export class Sv3Composer extends JfElement {
                   >`
                 : nothing}
             </div>
+            ${this.tier === 'search' && this.draft !== ''
+              ? html`<button type="button" class="search-clear" data-testid="sv3-search-clear" aria-label="Clear search"
+                  title="Clear" @click=${this.clearSearch}>${icon({ name: 'x', size: 14 })}</button>`
+              : nothing}
           </div>
           ${this.tier === 'search' && this.searchError
             ? html`<p class="notice" role="alert" id="sv3-search-error" data-testid="sv3-search-error">${this.searchError}</p>`

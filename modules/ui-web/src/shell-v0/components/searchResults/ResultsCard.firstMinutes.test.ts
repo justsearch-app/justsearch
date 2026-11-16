@@ -61,7 +61,8 @@ it('S5-3 uses known library roots to hide a redundant folder trail', async () =>
   expect(el.shadowRoot!.querySelector('.path')!.textContent).toContain('notes');
 });
 it('S5-5 shows All and Type as text and keeps other facets behind More filters', async () => {
-  const el = await mount({ facets: { file_kind: { pdf: 2 }, language: { en: 2 } } });
+  // Two kinds: with one there is nothing to choose between and the row shows none (fm-04 PF2).
+  const el = await mount({ facets: { file_kind: { pdf: 2, code: 1 }, language: { en: 2 } } });
   expect(el.shadowRoot!.querySelector('[data-testid="type-all"]')?.getAttribute('aria-pressed')).toBe('true');
   expect(el.shadowRoot!.querySelector('[data-facet-field="language"]')).toBeNull();
   expect(el.shadowRoot!.querySelector('[data-testid="more-filters"]')).not.toBeNull();
@@ -70,7 +71,7 @@ it('S5-5 pending responses retain known Type values without old counts', async (
   const el = await mount({ facets: { file_kind: { pdf: 2, code: 1 } } });
   el.snapshot = { ...el.snapshot!, results: [], facets: undefined, isSearching: true, countsPending: true };
   await el.updateComplete;
-  expect(el.shadowRoot!.querySelector('[data-facet-field="file_kind"]')?.textContent).toContain('pdf');
+  expect(el.shadowRoot!.querySelector('[data-facet-field="file_kind"]')?.textContent).toContain('Documents');
   expect(el.shadowRoot!.querySelectorAll('.facet-count')).toHaveLength(0);
 });
 it('S5-5 date presets use local day boundaries and clear the opposite bound', async () => {
