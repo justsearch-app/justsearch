@@ -98,3 +98,13 @@ attributes) after a Clear click with the same after Ctrl+A, Backspace in a separ
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "5a45532b-8cb3-46a5-b8d4-e2cf9739790d",
+  "verdict": "accept",
+  "digest": "sha256:7e323f14b178d087103cbc92d23ab08d0f376cbd2ab26fc335ddf865cd67d4f8"
+}
+```
