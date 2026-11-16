@@ -129,3 +129,13 @@ Registrar's Ledger with high contrast in Dark 1.17-1.31).
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "985a9628-fae2-4fd2-8652-641a7e5a9c50",
+  "verdict": "accept",
+  "digest": "sha256:8b6c120b2799310213110026501fc08615f24bbf1986714c083ec45465a3141c"
+}
+```
