@@ -158,3 +158,13 @@ remembered 360, 450 and 560 open at 360, 450 and 560 with a 331, 421 and 531 px 
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "a2c00207-35bb-416d-b7de-14db2ccd5b34",
+  "verdict": "accept",
+  "digest": "sha256:e330656dd869023fef3a697d573f96cc6d6f511caff35353f61fa5e2f1d8340d"
+}
+```
