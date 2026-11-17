@@ -274,13 +274,17 @@ class PassageTests(unittest.TestCase):
             text = (corpus / linux.OPEN_FILE).read_text().lower()
         self.assertEqual(text.count(linux.QUERY), 1)
         self.assertGreaterEqual(text[:text.index(linux.QUERY)].count('\n'), 100)
+        # The pane check requires the whole match line in view; that equals the word in view only
+        # while the line cannot wrap at the pane's narrowest width.
+        line = next(l for l in text.splitlines() if linux.QUERY in l)
+        self.assertLessEqual(len(line), 48)
 
     def test_h5_both_adapters_open_the_clicked_passage_and_keep_the_external_viewer(self):
         # ResultsCard.ts:625,636; sv3-search.ts:448; Sv3Pane.ts:236,246;
         # documentPane/DocumentPane.ts:716,1427. Ordinary query-marked text isn't an anchored passage.
         from contextlib import ExitStack
         for adapter in (linux, windows):
-            for case in ('match', 'top-of-file', 'wrong-document', 'no-anchor', 'wrong-term', 'hidden', 'offscreen'):
+            for case in ('match', 'top-of-file', 'wrong-document', 'no-anchor', 'wrong-term', 'hidden', 'offscreen', 'clipped'):
                 with self.subTest(platform=adapter.__name__, case=case), ExitStack() as stack:
                     hit = {NavigationTests.key: 'exact-row'}
                     action = {NavigationTests.key: 'exact-actions'}
@@ -303,6 +307,7 @@ class PassageTests(unittest.TestCase):
 const line=node('Orchid '+(fixture.case==='wrong-term'?'wrong':'lighthouse')+' release qualification.');
 line.getAttribute=name=>name==='data-line'?(fixture.case==='top-of-file'?'0':'120'):null;
 if (fixture.case==='offscreen') line.getBoundingClientRect=()=>({...box(true),top:100,bottom:120});
+if (fixture.case==='clipped') line.getBoundingClientRect=()=>({...box(true),top:10,bottom:30});
 const region={...node(''),scrollTop:fixture.case==='top-of-file'?0:2400};
 const root={querySelector:selector=>selector==='.scroll-region'?region:null};
 const pane={...node('',fixture.case!=='hidden'),docPath:fixture.path+(fixture.case==='wrong-document'?'.other':''),

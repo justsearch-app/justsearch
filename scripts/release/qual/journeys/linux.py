@@ -276,7 +276,8 @@ if (!visible(region) || !(region.scrollTop > 0)) return null;
 const frame = region.getBoundingClientRect();
 const line = all(pane.shadowRoot,'pre.source [data-line].hl-strong,pre.source [data-line].hl-weak').find(e => {
  const r = e.getBoundingClientRect();
- return visible(e) && r.bottom > frame.top && r.top < frame.bottom &&
+ // The whole line, not a fragment: the corpus's match line is short enough never to wrap.
+ return visible(e) && r.top >= frame.top && r.bottom <= frame.bottom &&
   e.innerText.toLowerCase().includes(arguments[1].toLowerCase());
 });
 return line ? {path:pane.docPath, passage:line.innerText.trim(), scrollTop:region.scrollTop} : null;
