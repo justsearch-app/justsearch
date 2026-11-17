@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-17T02:40:41.587Z",
-  "revision": "13f038745663d0f61d4128f8e961de61b91183f2",
-  "tree": "f6a845d37db47e7d599007c216d9ac0ce1bce419",
+  "createdAt": "2026-11-17T03:11:57.406Z",
+  "revision": "1239245a079711e8b9e6a79e00d899fa7917ffbd",
+  "tree": "9d2636557ea8bfdd108d38775aee5f22efe2a008",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.countWords-lockdown.test.ts\" \"src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts\" \"src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-827195-1794883188957.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.countWords-lockdown.test.ts\" \"src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts\" \"src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-2621937-1794885062356.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 24426
+      "durationMs": 25321
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-827195-1794883213385.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-2621937-1794885087678.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 1185
+      "durationMs": 1276
     }
   ],
   "checks": [
@@ -80,7 +80,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a successful core.reconfigure save is no row; a failed one is",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:070b5902a696f22a8d02d0ca45110e13d92d072da2f0e6930d6d9647ec28288f",
+      "contentDigest": "sha256:14c18c759d04fcafd8d10133dc1b0d363834883f6f67a39915868a72842f9f51",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a successful core.apply-settings save is no row; a failed one is",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:070b5902a696f22a8d02d0ca45110e13d92d072da2f0e6930d6d9647ec28288f",
+      "contentDigest": "sha256:14c18c759d04fcafd8d10133dc1b0d363834883f6f67a39915868a72842f9f51",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -110,7 +110,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a core.reconfigure advisory that succeeded is no row; one that failed is",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:070b5902a696f22a8d02d0ca45110e13d92d072da2f0e6930d6d9647ec28288f",
+      "contentDigest": "sha256:14c18c759d04fcafd8d10133dc1b0d363834883f6f67a39915868a72842f9f51",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -125,7 +125,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a core.apply-settings advisory that succeeded is no row; one that failed is",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:070b5902a696f22a8d02d0ca45110e13d92d072da2f0e6930d6d9647ec28288f",
+      "contentDigest": "sha256:14c18c759d04fcafd8d10133dc1b0d363834883f6f67a39915868a72842f9f51",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -140,7 +140,7 @@
       "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#the close button draws the app's close icon, not a text cross",
       "file": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:070b5902a696f22a8d02d0ca45110e13d92d072da2f0e6930d6d9647ec28288f",
+      "contentDigest": "sha256:14c18c759d04fcafd8d10133dc1b0d363834883f6f67a39915868a72842f9f51",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -155,7 +155,7 @@
       "id": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts#a not-installed page with a current reading shows no graphics card; installed, it does",
       "file": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:135e55a95ae68a0d703c5925c1afd0c76bdfe88f3af5a74b450a250198d54313",
+      "contentDigest": "sha256:0c63345af63af0dd37608def4d24aea76e16cba27b444e28bae45838b3bc96f4",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -198,71 +198,71 @@
     }
   ],
   "failBefore": {
-    "ref": "012aae15e5",
-    "revision": "012aae15e5e5218cf6258c347b98fd6aa4624daf",
+    "ref": "02435b349e",
+    "revision": "02435b349e94876f35c77dd658bb975cddaebe61",
     "overlays": [],
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.countWords-lockdown.test.ts\" \"src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts\" \"src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-827195-1794883216050.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.countWords-lockdown.test.ts\" \"src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts\" \"src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-2621937-1794885091573.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 24084,
-        "output": "JSON report written to /home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-827195-1794883216050.json\n\n"
+        "durationMs": 24559,
+        "output": "JSON report written to /home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-2621937-1794885091573.json\n\n"
       },
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-827195-1794883240136.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/StatusPanel.firstMinutes.test.ts\" \"src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-2621937-1794885116133.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 1236,
-        "output": "JSON report written to /home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-827195-1794883240136.json\n\n"
+        "durationMs": 1084,
+        "output": "JSON report written to /home/elias/.cache/am/fehoqyko/tmp/test-intent-vitest-2621937-1794885116133.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.countWords-lockdown.test.ts#a count of 0 shows no line while the top bar says \"Reading files\"",
         "classification": "assertion",
-        "detail": "first-reading count words through the running app a count of 0 shows no line while the top bar says \"Reading files\":  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-b4XNbg/modules/ui-web/src/shell-v0/chrome/FirstMinutes.countWords-lockdown.test.ts:143:76\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-ph/modules/ui-web/node_module"
+        "detail": "first-reading count words through the running app a count of 0 shows no line while the top bar says \"Reading files\":  AssertionError: expected 1 to be +0 // Object.is equality\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-JtkAGz/modules/ui-web/src/shell-v0/chrome/FirstMinutes.countWords-lockdown.test.ts:143:76\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-ph/modules/ui-web/node_module"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts#\"Reading files\" is words without an outline or fill in dark",
         "classification": "assertion",
-        "detail": "first-minutes repairs through the running app \"Reading files\" is words without an outline or fill in dark:  AssertionError: expected { fill: false, outline: false, …(1) } to deeply equal { fill: true, outline: true, …(1) }\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-b4XNbg/modules/ui-web/src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts:225:16\n    at file:///home/elias/dev/justsea"
+        "detail": "first-minutes repairs through the running app \"Reading files\" is words without an outline or fill in dark:  AssertionError: expected { fill: false, outline: false, …(1) } to deeply equal { fill: true, outline: true, …(1) }\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-JtkAGz/modules/ui-web/src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts:225:16\n    at file:///home/elias/dev/justsea"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts#\"Reading files\" is words without an outline or fill in light",
         "classification": "assertion",
-        "detail": "first-minutes repairs through the running app \"Reading files\" is words without an outline or fill in light:  AssertionError: expected { fill: false, outline: false, …(1) } to deeply equal { fill: true, outline: true, …(1) }\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-b4XNbg/modules/ui-web/src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts:225:16\n    at file:///home/elias/dev/justsea"
+        "detail": "first-minutes repairs through the running app \"Reading files\" is words without an outline or fill in light:  AssertionError: expected { fill: false, outline: false, …(1) } to deeply equal { fill: true, outline: true, …(1) }\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-JtkAGz/modules/ui-web/src/shell-v0/chrome/FirstMinutes.repairs-lockdown.test.ts:225:16\n    at file:///home/elias/dev/justsea"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a successful core.reconfigure save is no row; a failed one is",
         "classification": "assertion",
-        "detail": "PH3 settings saves and the close mark a successful core.reconfigure save is no row; a failed one is:  AssertionError: expected 'What\\'s going onSearch works × Runnin…' not to match /Apply Settings/\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-b4XNbg/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:112:43\n    at file:///home/elias/dev/justsearch/.claude/worktree"
+        "detail": "PH3 settings saves and the close mark a successful core.reconfigure save is no row; a failed one is:  AssertionError: expected 'What\\'s going onSearch works × Runnin…' not to match /Apply Settings/\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-JtkAGz/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:112:43\n    at file:///home/elias/dev/justsearch/.claude/worktree"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a successful core.apply-settings save is no row; a failed one is",
         "classification": "assertion",
-        "detail": "PH3 settings saves and the close mark a successful core.apply-settings save is no row; a failed one is:  AssertionError: expected 'What\\'s going onSearch works × Runnin…' not to match /Apply Settings/\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-b4XNbg/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:112:43\n    at file:///home/elias/dev/justsearch/.claude/worktree"
+        "detail": "PH3 settings saves and the close mark a successful core.apply-settings save is no row; a failed one is:  AssertionError: expected 'What\\'s going onSearch works × Runnin…' not to match /Apply Settings/\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-JtkAGz/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:112:43\n    at file:///home/elias/dev/justsearch/.claude/worktree"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a core.reconfigure advisory that succeeded is no row; one that failed is",
         "classification": "assertion",
-        "detail": "PH3 settings saves and the close mark a core.reconfigure advisory that succeeded is no row; one that failed is:  AssertionError: expected 'Your Documents folder is searchable |…' not to match / completed/\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-b4XNbg/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:120:82\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm"
+        "detail": "PH3 settings saves and the close mark a core.reconfigure advisory that succeeded is no row; one that failed is:  AssertionError: expected 'Your Documents folder is searchable |…' not to match / completed/\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-JtkAGz/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:120:82\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a core.apply-settings advisory that succeeded is no row; one that failed is",
         "classification": "assertion",
-        "detail": "PH3 settings saves and the close mark a core.apply-settings advisory that succeeded is no row; one that failed is:  AssertionError: expected 'Your Documents folder is searchable |…' not to match / completed/\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-b4XNbg/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:120:82\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm"
+        "detail": "PH3 settings saves and the close mark a core.apply-settings advisory that succeeded is no row; one that failed is:  AssertionError: expected 'Your Documents folder is searchable |…' not to match / completed/\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-JtkAGz/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:120:82\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#the close button draws the app's close icon, not a text cross",
         "classification": "assertion",
-        "detail": "PH3 settings saves and the close mark the close button draws the app's close icon, not a text cross:  AssertionError: expected '×' to be '' // Object.is equality\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-b4XNbg/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:131:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-ph/modules/ui-web/node_modules/"
+        "detail": "PH3 settings saves and the close mark the close button draws the app's close icon, not a text cross:  AssertionError: expected '×' to be '' // Object.is equality\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-JtkAGz/modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts:134:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-ph/modules/ui-web/node_modules/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts#a not-installed page with a current reading shows no graphics card; installed, it does",
         "classification": "assertion",
-        "detail": "PH4 the graphics card waits for an installed AI a not-installed page with a current reading shows no graphics card; installed, it does:  AssertionError: expected <section …(2)>…(3)</section> to be null\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-b4XNbg/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts:150:22\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-ph/modules/u"
+        "detail": "PH4 the graphics card waits for an installed AI a not-installed page with a current reading shows no graphics card; installed, it does:  AssertionError: expected <section …(2)>…(3)</section> to be null\n    at /home/elias/.cache/am/fehoqyko/tmp/test-intent-before-JtkAGz/modules/ui-web/src/shell-v0/views/brain-first-minutes/BrainOverview.placement.test.ts:150:22\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-ph/modules/u"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.focus-lockdown.test.ts#the consent is centred below the top bar and opens on Cancel in dark",
@@ -276,5 +276,5 @@
       }
     ]
   },
-  "digest": "sha256:a7b2c4152ff13a593de4f32c8858f62a19ec0d76fa262b5e2b13c3e184013b5b"
+  "digest": "sha256:32ad5c2c77fcb4c72f88acf0d6a573f1daae601fb5eb37a40eed4d9fd1411121"
 }
