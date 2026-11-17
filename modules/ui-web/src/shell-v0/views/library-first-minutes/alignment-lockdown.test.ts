@@ -271,7 +271,7 @@ describe('PG1 Library: one left edge and one right edge for the tab row, the pag
     }
   }, 90_000);
 
-  it.each([[1024, 700], [1920, 1080], [800, 700]] as const)('Browse at %ix%i', async (width, height) => {
+  it.each([[1024, 700], [1920, 1080], [800, 700], [640, 700], [600, 700]] as const)('Browse at %ix%i', async (width, height) => {
     const page = await library(width, height);
     await page.getByRole('tab', { name: 'core.browse-surface' }).or(page.getByRole('tab', { name: /Browse/ })).first().click();
     await page.getByRole('treeitem', { name: /folder-00/ }).waitFor({ timeout: 15_000 });

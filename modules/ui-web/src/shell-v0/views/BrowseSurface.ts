@@ -126,7 +126,8 @@ export class BrowseSurface extends JfElement {
     .notice:empty { padding: 0; }
     @media (max-width: 640px) {
       .row, .column-heads { grid-template-columns: minmax(0, 1fr) 4.5rem 6rem 3.75rem; }
-      .body, .header, .search-bar { padding-inline: .75rem; }
+      /* Narrow: still the Library page's edge (1rem here), as the tab row above. */
+      .body, .header, .search-bar { padding-inline: calc(var(--surface-content-gutter) + var(--library-page-edge, .75rem)); }
       .row-name { gap: .25rem; }
     }
     @media (max-height: 30rem) { .column-heads { position: static; } .column-heads::before { content: none; } }

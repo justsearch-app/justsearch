@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-17T04:55:10.864Z",
+  "revision": "e3a24c92091b3172af106fc9c1ca692724a68201",
+  "tree": "863aa9100c4062edd30fea1837fa9f30fa20268e",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/library-first-minutes/alignment-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/9kjfdf3g/tmp/test-intent-vitest-19272-1794891242617.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 34454
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/alignment-lockdown.test.ts#Browse at 640x700",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/alignment-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ce46924b9f3b19ad9b4da4cdfef175dff4f246cd8c4bae7bd516060d8edea5c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PG1 Library: one left edge and one right edge for the tab row, the page and the foot Browse at 640x700",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/alignment-lockdown.test.ts#Browse at 600x700",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/alignment-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:7ce46924b9f3b19ad9b4da4cdfef175dff4f246cd8c4bae7bd516060d8edea5c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PG1 Library: one left edge and one right edge for the tab row, the page and the foot Browse at 600x700",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "02435b349e",
+    "revision": "02435b349e94876f35c77dd658bb975cddaebe61",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/library-first-minutes/alignment-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/9kjfdf3g/tmp/test-intent-vitest-19272-1794891279320.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 31290,
+        "output": "JSON report written to /home/elias/.cache/am/9kjfdf3g/tmp/test-intent-vitest-19272-1794891279320.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/alignment-lockdown.test.ts#Browse at 640x700",
+        "classification": "assertion",
+        "detail": "PG1 Library: one left edge and one right edge for the tab row, the page and the foot Browse at 640x700:  AssertionError: first tab label on the page left edge: 32.0 against 12.0: expected 20 to be less than or equal to 1\n    at near (/home/elias/.cache/am/9kjfdf3g/tmp/test-intent-before-8sm0xj/modules/ui-web/src/shell-v0/views/library-first-minutes/alignment-lockdown.test.ts:252:128)\n    at /home/elias"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/alignment-lockdown.test.ts#Browse at 600x700",
+        "classification": "assertion",
+        "detail": "PG1 Library: one left edge and one right edge for the tab row, the page and the foot Browse at 600x700:  AssertionError: first tab label on the page left edge: 32.0 against 12.0: expected 20 to be less than or equal to 1\n    at near (/home/elias/.cache/am/9kjfdf3g/tmp/test-intent-before-8sm0xj/modules/ui-web/src/shell-v0/views/library-first-minutes/alignment-lockdown.test.ts:252:128)\n    at /home/elias"
+      }
+    ]
+  },
+  "digest": "sha256:4b0b5279d8400e3ccc27d5fff93a108b589cc8c928ac414861ea119800a7c8db"
+}
