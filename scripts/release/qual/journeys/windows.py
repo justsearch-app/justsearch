@@ -1089,7 +1089,7 @@ public class QualAssociation {
 
 def search_open(run):
     from corpus import OPEN_FILE
-    from linux import open_result_passage, search_api, submit_search
+    from linux import open_result_passage, search_api, settled_result_row, submit_search
     run.require('ui'); run.require('folder')
     result = search_api(run)
     fixture = str(Path(run.require('corpus')) / OPEN_FILE)
@@ -1103,10 +1103,8 @@ def search_open(run):
     before = ps_json(PROCESSES, array=True)
     run.nav('Search')
     submit_search(run.wd)
-    hit = wait_for(lambda: run.wd.execute("""
-return all(document,'[data-testid="search-result-row"]').find(e =>
- (e.getAttribute('data-addressable-id') || '').toLowerCase() === arguments[0].toLowerCase()) || null;
-""", [fixture]), 'Exact fixture row in search DOM', seconds=45, error=ProductFailure)
+    hit = wait_for(lambda: settled_result_row(run.wd, fixture, ignore_case=True),
+                   'Exact fixture row after search refinement', seconds=45, error=ProductFailure)
     open_result_passage(run, hit, fixture)
     action = run.wd.execute("return arguments[0].querySelector('button[data-testid=\"row-actions\"]')", [hit])
     if not action:

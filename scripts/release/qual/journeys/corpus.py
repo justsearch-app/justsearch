@@ -20,7 +20,10 @@ def generate(root):
     from PIL import Image, ImageDraw, ImageFont
     root = Path(root)
     root.mkdir(parents=True, exist_ok=False)
-    (root / OPEN_FILE).write_text('Orchid lighthouse release qualification.\nThe receiving viewer must display this filename.\n')
+    # Keep the only query match below the first screen but within the pane's initial text window.
+    (root / OPEN_FILE).write_text(''.join(f'Notebook entry {n}.\n' for n in range(1, 121))
+                                 + 'Orchid lighthouse release qualification.\n'
+                                 + 'The receiving viewer must display this filename.\n')
     (root / 'long-manual.md').write_text('# Harbour maintenance manual\n\n' + '\n\n'.join(
         f'## Section {n}\nThe amber harbour beacon is inspected each morning. '
         'Keep the maintenance journal beside the brass clock. ' * 6 for n in range(70)))

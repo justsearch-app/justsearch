@@ -513,7 +513,7 @@ class WindowsOperationalTests(unittest.TestCase):
         passage.assert_called_once_with(run, exact, fixture)
         run.wd.element.assert_called_once_with('textarea[data-testid="sv3-composer-input"]')
         self.assertIn('data-addressable-id',run.wd.execute.call_args_list[0].args[0])
-        self.assertEqual(run.wd.execute.call_args_list[0].args[1],[fixture])
+        self.assertEqual(run.wd.execute.call_args_list[0].args[1],[fixture,linux.QUERY,True])
         self.assertIn('row-actions',run.wd.execute.call_args_list[1].args[0])
         self.assertEqual(run.wd.execute.call_args_list[1].args[1],[exact])
         run.wd.click_element.assert_not_called()

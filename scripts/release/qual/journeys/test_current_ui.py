@@ -1,7 +1,9 @@
 """Journey control fixtures for the UI at ab9271581f, without an app or VM."""
 import copy
 import json
+from pathlib import Path
 import subprocess
+import tempfile
 from types import SimpleNamespace as NS
 import unittest
 from unittest.mock import Mock, patch
@@ -265,12 +267,20 @@ console.log(JSON.stringify(value));
 
 
 class PassageTests(unittest.TestCase):
+    def test_h5_fixture_has_one_query_hit_below_the_first_screen(self):
+        with tempfile.TemporaryDirectory() as temp:
+            corpus = Path(temp) / 'corpus'
+            linux.generate(corpus)
+            text = (corpus / linux.OPEN_FILE).read_text().lower()
+        self.assertEqual(text.count(linux.QUERY), 1)
+        self.assertGreaterEqual(text[:text.index(linux.QUERY)].count('\n'), 100)
+
     def test_h5_both_adapters_open_the_clicked_passage_and_keep_the_external_viewer(self):
         # ResultsCard.ts:625,636; sv3-search.ts:448; Sv3Pane.ts:236,246;
         # documentPane/DocumentPane.ts:716,1427. Ordinary query-marked text isn't an anchored passage.
         from contextlib import ExitStack
         for adapter in (linux, windows):
-            for case in ('match', 'wrong-document', 'no-anchor', 'wrong-term', 'hidden', 'offscreen'):
+            for case in ('match', 'top-of-file', 'wrong-document', 'no-anchor', 'wrong-term', 'hidden', 'offscreen'):
                 with self.subTest(platform=adapter.__name__, case=case), ExitStack() as stack:
                     hit = {NavigationTests.key: 'exact-row'}
                     action = {NavigationTests.key: 'exact-actions'}
@@ -291,8 +301,10 @@ class PassageTests(unittest.TestCase):
                             self.assertTrue(opened)
                             return execute_dom(script, {'case': case, 'path': path}, args, """
 const line=node('Orchid '+(fixture.case==='wrong-term'?'wrong':'lighthouse')+' release qualification.');
+line.getAttribute=name=>name==='data-line'?(fixture.case==='top-of-file'?'0':'120'):null;
 if (fixture.case==='offscreen') line.getBoundingClientRect=()=>({...box(true),top:100,bottom:120});
-const root={querySelector:selector=>selector==='.scroll-region'?node(''):null};
+const region={...node(''),scrollTop:fixture.case==='top-of-file'?0:2400};
+const root={querySelector:selector=>selector==='.scroll-region'?region:null};
 const pane={...node('',fixture.case!=='hidden'),docPath:fixture.path+(fixture.case==='wrong-document'?'.other':''),
   shadowRoot:root};
 const all=(rootOrDoc,selector)=>rootOrDoc===root
@@ -320,6 +332,48 @@ const all=(rootOrDoc,selector)=>rootOrDoc===root
                         with self.assertRaisesRegex(AssertionError, 'passage'):
                             adapter.search_open(run)
                         self.assertNotIn('search', run.facts)
+
+
+class SettledResultTests(unittest.TestCase):
+    def test_h11_windows_clicks_only_the_visible_refined_row_for_the_submitted_query(self):
+        corpus = r'C:\corpus'
+        fixture = str(Path(corpus) / linux.OPEN_FILE)
+        run = Mock()
+        run.require.side_effect = lambda key: corpus if key == 'corpus' else True
+        states = ('quick', 'refining', 'searching', 'different-query', 'no-pass', 'hidden', 'settled')
+        observations = []
+
+        def execute(script, args):
+            state = states[len(observations)]
+            observations.append(state)
+            return execute_dom(script, {'state': state, 'path': fixture, 'query': linux.QUERY}, args, """
+const {state,path,query}=fixture;
+const row={getBoundingClientRect:()=>box(state!=='hidden'),getAttribute:()=>state==='settled'?path.toLowerCase():path,
+ 'element-6066-11e4-a52e-4f735466cecf':state};
+const root={};
+const card={...node(''),shadowRoot:root,snapshot:{query:state==='different-query'?'other':query,
+ isRefining:state==='refining',isSearching:state==='searching',
+ passStage:state==='no-pass'?null:state==='quick'?'quick':'refined'}};
+const all=(rootOrDoc,selector)=>selector==='[data-testid="search-result-row"]'?[row]:
+ selector==='jf-results-card'&&rootOrDoc===document?[card]:[];
+""")
+        run.wd.execute.side_effect = execute
+
+        def poll(fn, description, **kwargs):
+            for _ in states:
+                if row := fn():
+                    return row
+            self.fail(description)
+
+        with patch.object(linux, 'search_api'), patch.object(windows, 'wait_for', poll), \
+             patch.object(windows.Path, 'read_text', return_value='{"viewer":"notepad.exe"}'), \
+             patch.object(windows, 'default_viewer', return_value={'executable': 'notepad.exe'}), \
+             patch.object(windows, 'ps_json', return_value=[]), \
+             patch.object(linux, 'open_result_passage', side_effect=EndOfControlProbe) as opened:
+            with self.assertRaises(EndOfControlProbe):
+                windows.search_open(run)
+        opened.assert_called_once_with(run, {NavigationTests.key: 'settled'}, fixture)
+        self.assertEqual(observations, list(states))
 
 
 class AIAndUpdateTests(unittest.TestCase):

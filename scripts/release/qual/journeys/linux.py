@@ -249,6 +249,19 @@ def submit_search(wd):
     wd.keys(field, QUERY + '\ue007')
 
 
+def settled_result_row(wd, fixture, *, ignore_case=False):
+    return wd.execute("""
+const path = value => arguments[2] ? value.toLowerCase() : value;
+const card = all(document,'jf-results-card').find(e => {
+ const s = e.snapshot;
+ return visible(e) && s?.query === arguments[1] &&
+  !s.isSearching && !s.isRefining && s.passStage === 'refined';
+});
+return card?.shadowRoot ? all(card.shadowRoot,'[data-testid="search-result-row"]').find(e =>
+ visible(e) && path(e.getAttribute('data-addressable-id') || '') === path(arguments[0])) || null : null;
+""", [fixture, QUERY, ignore_case])
+
+
 def open_result_passage(run, hit, fixture):
     # The predecessor prepares saved state before the result-anchoring redesign.
     if getattr(run.args, 'phase', None) == 'predecessor':
@@ -259,14 +272,14 @@ const path = value => arguments[2] ? value.replaceAll('\\\\', '/').toLowerCase()
 const pane = all(document,'jf-document-pane[data-testid="sv3-pane-document"]').find(e =>
  visible(e) && typeof e.docPath === 'string' && path(e.docPath) === path(arguments[0]));
 const region = pane?.shadowRoot?.querySelector('.scroll-region');
-if (!visible(region)) return null;
+if (!visible(region) || !(region.scrollTop > 0)) return null;
 const frame = region.getBoundingClientRect();
 const line = all(pane.shadowRoot,'pre.source [data-line].hl-strong,pre.source [data-line].hl-weak').find(e => {
  const r = e.getBoundingClientRect();
  return visible(e) && r.bottom > frame.top && r.top < frame.bottom &&
   e.innerText.toLowerCase().includes(arguments[1].toLowerCase());
 });
-return line ? {path:pane.docPath, passage:line.innerText.trim()} : null;
+return line ? {path:pane.docPath, passage:line.innerText.trim(), scrollTop:region.scrollTop} : null;
 """, [fixture, QUERY, getattr(run, 'platform', None) == 'windows']),
         'In-app pane displays the exact result’s anchored passage containing ' + QUERY,
         seconds=45, error=ProductFailure)
@@ -282,15 +295,8 @@ def search_open(run):
     run.nav('Search')
     submit_search(run.wd)
     fixture = run.require('corpus') + '/' + OPEN_FILE
-    hit = wait_for(lambda: run.wd.execute("""
-const card=all(document,'jf-results-card').find(e=>{
- const s=e.snapshot, r=e.getBoundingClientRect();
- return r.width>0 && r.height>0 && s?.query===arguments[1] &&
-  !s.isSearching && !s.isRefining && s.passStage!=='quick';
-});
-return card?.shadowRoot ? all(card.shadowRoot,'[data-testid="search-result-row"]').find(e=>
- e.getAttribute('data-addressable-id')===arguments[0] && e.getBoundingClientRect().height>0) || null : null;
-""", [fixture, QUERY]), 'Exact fixture row after search refinement', seconds=45)
+    hit = wait_for(lambda: settled_result_row(run.wd, fixture),
+                   'Exact fixture row after search refinement', seconds=45)
     open_result_passage(run, hit, fixture)
     # WebDriver's real secondary mouse click opens the result's context menu.
     hit_key = hit['element-6066-11e4-a52e-4f735466cecf']

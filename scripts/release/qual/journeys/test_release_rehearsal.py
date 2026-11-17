@@ -39,6 +39,7 @@ const root={querySelectorAll:s=>s==='*'?[]:s.includes('search-result-row')?rows:
 const card={snapshot:{query:'lighthouse',isSearching:false,isRefining:stage==='refining',passStage:stage==='quick'?'quick':'refined'},
  shadowRoot:root,getBoundingClientRect:()=>({width:100,height:100})};
 global.document={querySelectorAll:s=>s==='*'||s==='jf-results-card'?[card]:[]};
+global.getComputedStyle=()=>({visibility:'visible'});
 const fn=new Function('arguments',JSON.parse(process.argv[3]));
 console.log(JSON.stringify(fn(JSON.parse(process.argv[4]))));
 '''
