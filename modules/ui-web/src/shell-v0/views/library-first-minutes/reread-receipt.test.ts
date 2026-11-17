@@ -1,12 +1,13 @@
 // @vitest-environment happy-dom
 // SPDX-License-Identifier: Apache-2.0
 // fm-07 (fm-rest-a) — Library after "Read everything again", and a folder's meaning line while it is read:
-//  L1 while reading visibly runs (the headline says so) the page shows no second "Reading" line and no
-//     sentence about the request being accepted or its completion being unconfirmed.
-//  L2 between the confirmation and reading becoming visible, one plain line: "Starting to read
-//     everything again."
-//  L3 the completed and the failed outcome keep their messages; with no reading visibly running and the
-//     outcome still unconfirmed or unreadable, the page says so and offers its check action.
+//  L1' from the confirmation until the outcome completes or fails (it reads accepted or running), exactly
+//      one line under the headline, "Reading everything again.", the same element throughout: before
+//      reading shows, while it runs and between folders; never "accepted", "Completion has not yet been
+//      confirmed", "Check reading outcome" or the activity paragraph. A lost or unconfirmed status keeps it.
+//  L2' a completed outcome says "Everything has been read again." until the person leaves Library.
+//  L3 the failed outcome keeps its message and alert; an outcome in no known state, or one that cannot be
+//     read, keeps the uncertain sentence and its check action.
 //  L4 while a folder is scanned or read, its "Search by meaning" fact says only what is known about
 //     meaning ("Needs AI"), never anything about word search.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -60,57 +61,137 @@ const outcome = (state: string) => () => Response.json({ state, historySince: 0 
 beforeEach(() => { vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('No backend in this test'); })); });
 afterEach(() => { document.body.replaceChildren(); __resetAiStateForTest(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
-describe('L1 while reading visibly runs, the headline says it once', () => {
-  it('the Engine still runs the request: no second "Reading" line, no accepted or unconfirmed sentence', async () => {
+const LINE = 'Reading everything again.';
+const DONE = 'Everything has been read again.';
+const NEVER = /accepted|Completion has not yet been confirmed|recorded request|Check reading outcome/;
+const line = (el: LibrarySurface) => [...el.shadowRoot!.querySelectorAll('.action-message')].find(node => node.textContent!.trim() === LINE);
+/** The status ticks; a tick 5 s after the last outcome read reads the outcome again (Library's own rule). */
+let clock = Date.parse('2026-11-17T10:00:00Z');
+async function tick(el: LibrarySurface, reading: boolean) {
+  clock += 5_000;
+  observe(reading); await settle(el);
+}
+const outcomeReads = (el: LibrarySurface) => (el.host_.data.fetch as ReturnType<typeof vi.fn>).mock.calls
+  .filter(([path]) => String(path).startsWith('/api/operation-history/')).length;
+
+describe("L1' one constant line from the confirmation until the outcome completes", () => {
+  beforeEach(() => { vi.spyOn(Date, 'now').mockImplementation(() => clock); });
+
+  it('accepted -> running without visible reading -> reading visible -> a gap between folders -> complete', async () => {
+    let state = 'accepted';
+    const el = await library({ reading: false, outcome: () => Response.json({ state, historySince: 0 }) });
+    await reread(el);
+    // Accepted: the outcome was read and says accepted; reading does not show yet.
+    expect(outcomeReads(el)).toBe(1);
+    expect(headline(el)).not.toBe('Reading');
+    expect(said(el)).toEqual([LINE]);
+    const node = line(el)!;
+    expect(node.getAttribute('role')).toBe('status');
+    expect(checkAction(el)).toBeNull();
+    expect(el.shadowRoot!.textContent).not.toMatch(NEVER);
+    // The Engine reports running at once; reading becomes visible later.
+    state = 'running';
+    await tick(el, false);
+    expect(outcomeReads(el)).toBe(2);
+    expect(headline(el)).not.toBe('Reading');
+    expect(said(el)).toEqual([LINE]);
+    expect(line(el)).toBe(node);
+    expect(el.shadowRoot!.textContent).not.toMatch(NEVER);
+    // Reading shows.
+    await tick(el, true);
+    expect(outcomeReads(el)).toBe(3);
+    expect(headline(el)).toBe('Reading');
+    expect(said(el)).toEqual([LINE]);
+    expect(line(el)).toBe(node);
+    expect(el.shadowRoot!.textContent).not.toMatch(NEVER);
+    // Between folders: no reading shows for a moment, the outcome still says running.
+    await tick(el, false);
+    expect(outcomeReads(el)).toBe(4);
+    expect(headline(el)).not.toBe('Reading');
+    expect(said(el)).toEqual([LINE]);
+    expect(line(el)).toBe(node);
+    expect(checkAction(el)).toBeNull();
+    expect(el.shadowRoot!.textContent).not.toMatch(NEVER);
+    // A status refresh with no outcome read (inside 4 s) leaves the same element too.
+    clock += 1_000; observe(true); await settle(el);
+    expect(outcomeReads(el)).toBe(4);
+    expect(said(el)).toEqual([LINE]);
+    expect(line(el)).toBe(node);
+    // L2' — complete.
+    state = 'complete';
+    await tick(el, false);
+    expect(said(el)).toEqual([DONE]);
+    expect(el.shadowRoot!.textContent).not.toMatch(NEVER);
+    expect(checkAction(el)).toBeNull();
+  });
+
+  it('reading visible from the first moment: the same one line, not a second "Reading"', async () => {
     const el = await library({ reading: true, outcome: outcome('running') });
     await reread(el);
     expect(headline(el)).toBe('Reading');
-    expect(said(el)).toEqual([]);
-    expect(el.shadowRoot!.textContent).not.toMatch(/accepted|Completion has not yet been confirmed/);
+    expect(said(el)).toEqual([LINE]);
+    expect(el.shadowRoot!.textContent).not.toMatch(NEVER);
   });
-  it('the request completed while reading still runs: its message, without a second "Reading" line', async () => {
+
+  it('a lost status while the outcome runs still shows only the line; the headline says what is known', async () => {
+    const el = await library({ reading: false, outcome: outcome('running') });
+    await reread(el);
+    const node = line(el)!;
+    __resetAiStateForTest(); await settle(el);
+    expect(headline(el)).not.toBe('Reading');
+    expect(said(el)).toEqual([LINE]);
+    expect(line(el)).toBe(node);
+    expect(el.shadowRoot!.textContent).not.toMatch(NEVER);
+  });
+});
+
+describe("L2' the completed outcome", () => {
+  it('"Everything has been read again." alone, kept while in Library, gone after leaving and returning', async () => {
+    const el = await library({ reading: false, outcome: outcome('complete') });
+    await reread(el);
+    expect(said(el)).toEqual([DONE]);
+    observe(true); await settle(el);
+    expect(said(el)).toEqual([DONE]);
+    el.remove(); document.body.append(el); await settle(el);
+    expect(said(el)).toEqual([]);
+  });
+  it('completed while reading still runs: the same sentence, without a second "Reading" line', async () => {
     const el = await library({ reading: true, outcome: outcome('complete') });
     await reread(el);
     expect(headline(el)).toBe('Reading');
-    expect(said(el)).toEqual(['Read again completed for the recorded request. Current reading activity is shown below.']);
+    expect(said(el)).toEqual([DONE]);
   });
 });
 
-describe('L2 between the confirmation and reading becoming visible', () => {
-  it('one plain line "Starting to read everything again.", then nothing while reading runs', async () => {
-    const el = await library({ reading: false, outcome: outcome('accepted') });
-    await reread(el);
-    expect(said(el)).toEqual(['Starting to read everything again.']);
-    expect(checkAction(el)).toBeNull();
-    observe(true); await settle(el);
-    expect(headline(el)).toBe('Reading');
-    expect(said(el)).toEqual([]);
+describe('L3 outcomes that are not in progress keep their messages', () => {
+  it('failed keeps its message and alert role', async () => {
+    const failed = await library({ reading: false, outcome: () => Response.json({ state: 'failed', historySince: 0 }) });
+    await reread(failed);
+    expect(failed.shadowRoot!.querySelector('.action-message[role="alert"]')?.textContent).toContain('Read again did not complete');
+    expect(said(failed)).not.toContain(LINE);
   });
-});
-
-describe('L3 outcomes keep their messages', () => {
-  it('reading ended but the outcome is still unconfirmed: the page says so and offers its check action', async () => {
-    const el = await library({ reading: false, outcome: outcome('running') });
+  it('an outcome in no known state: the uncertain sentence and its check action', async () => {
+    const el = await library({ reading: false, outcome: outcome('expired') });
     await reread(el);
-    observe(true); await settle(el);
-    observe(false); await settle(el);
-    expect(said(el)[0]).toContain('Read again accepted. Completion has not yet been confirmed.');
+    expect(said(el)[0]).toContain('Read again accepted. Its outcome is unavailable; check again before retrying.');
     expect(checkAction(el)).not.toBeNull();
   });
-  it('an outcome that cannot be read: the page says so and offers its check action', async () => {
+  it('an outcome that cannot be read: the uncertain sentence and its check action', async () => {
     const el = await library({ reading: false });
     await reread(el);
     expect(said(el)[0]).toContain('Read again accepted. Its outcome could not be read; check again before retrying.');
     expect(checkAction(el)).not.toBeNull();
   });
-  it('completed and failed keep their messages', async () => {
-    const done = await library({ reading: false, outcome: outcome('complete') });
-    await reread(done);
-    expect(said(done)[0]).toContain('Read again completed for the recorded request.');
-    done.remove();
-    const failed = await library({ reading: false, outcome: () => Response.json({ state: 'failed', historySince: 0 }) });
-    await reread(failed);
-    expect(failed.shadowRoot!.querySelector('.action-message[role="alert"]')?.textContent).toContain('Read again did not complete');
+  it('a later read that fails replaces the line with the uncertain sentence', async () => {
+    let ok = true;
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
+    const el = await library({ reading: false, outcome: () => ok ? Response.json({ state: 'running', historySince: 0 }) : new Response('{}', { status: 503 }) });
+    await reread(el);
+    expect(said(el)).toEqual([LINE]);
+    ok = false;
+    await tick(el, false);
+    expect(said(el)[0]).toContain('Its outcome could not be read');
+    expect(checkAction(el)).not.toBeNull();
   });
 });
 

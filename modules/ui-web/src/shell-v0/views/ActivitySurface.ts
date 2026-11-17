@@ -504,6 +504,8 @@ export class ActivitySurface extends JfElement {
     /* The page column, inside the scroller beside the details pane: the scroller and the header's
        line span what the pane leaves; the feed sits on a centred column within it. */
     .main > .header { padding-inline: calc(var(--surface-content-gutter) + var(--density-header-pad-x)); }
+    /* The page's heading on the size ladder's heading step (the browser's own h2 is 1.5em, off the ladder). */
+    .header h2 { font-size: var(--font-size-lg); }
     .main > .body { padding-inline: calc(var(--surface-content-gutter) + var(--density-inner-pad-x)); }
     jf-action-ledger {
       display: block;

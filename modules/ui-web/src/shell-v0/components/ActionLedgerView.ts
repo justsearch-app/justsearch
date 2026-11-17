@@ -34,6 +34,7 @@ import { repeat } from 'lit/directives/repeat.js';
 import '@lit-labs/virtualizer';
 import { FlowLayout } from '@lit-labs/virtualizer/layouts/flow.js';
 import { JfElement } from '../primitives/JfElement.js';
+import { selectStyles } from '../primitives/selectStyles.js';
 import {
   ActionLedgerClient,
   indexLabel,
@@ -330,6 +331,7 @@ export class ActionLedgerView extends JfElement {
   // tempdoc 558 §S1 — the row styles are single-sourced in eventRow.ts (shared with the History tab).
   static styles = [
     eventRowStyles,
+    selectStyles,
     css`
       :host {
         display: block;

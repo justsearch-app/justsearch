@@ -2,6 +2,7 @@
 import { SignalWatcher } from '@lit-labs/signals';
 import { css, html, nothing, type PropertyValues } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
+import { selectStyles } from '../primitives/selectStyles.js';
 import { selectIndexingProgress, type IndexingProgress } from '../state/indexingProgress.js';
 import { getOperationClient, type OperationInvocationSuccess } from '../operations/OperationClient.js';
 import { requestSurfaceNavigation, requestIndexingRuleNavigation } from '../controllers/navigateRequest.js';
@@ -70,7 +71,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
     this.message = '';
   }
 
-  static styles = css`
+  static styles = [selectStyles, css`
     :host { display: inline-block; max-width: 100%; min-width: 0; }
     .actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
     label { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; font-size: var(--font-size-xs); }
@@ -84,7 +85,8 @@ class IndexingControls extends SignalWatcher(JfElement) {
     button:focus-visible, select:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
     p { margin: 0; font-size: var(--font-size-xs); overflow-wrap: anywhere; }
     p:not(:empty) { margin-top: .25rem; }
-    :host([compact]) button, :host([compact]) select { border: 0; background: transparent; }
+    :host([compact]) button { border: 0; background: transparent; }
+    :host([compact]) select { border: 0; }
     .pause-menu { position: relative; }
     .pause-menu > button { display: inline-flex; align-items: center; gap: .4rem; }
     /* "Pause reading" in a tab row is a text action: body size, like the actions beside it. */
@@ -95,12 +97,6 @@ class IndexingControls extends SignalWatcher(JfElement) {
     .pause-options button { display: block; width: 100%; text-align: start; }
     .pause-options button:hover { background: var(--surface-2); }
     :host([compact]) select { font-size: var(--font-size-xs); }
-    /* Drawn by the page in the theme's colours, never by the platform's own (light) control: the page's
-       select colour-scheme rule does not reach into this shadow root, also not in the desktop app's WebKit view. */
-    select { appearance: none; padding-inline-end: 1.6rem; }
-    option { background: var(--surface-1); color: var(--text-primary); }
-    .select { position: relative; display: inline-flex; align-items: center; }
-    .select .chevron { position: absolute; inset-inline-end: .45rem; display: inline-flex; pointer-events: none; color: var(--text-secondary); }
     /* fm-15 — in a status panel entry the controls are its text actions, as the entry's own. */
     :host([entry]) { display: block; margin-top: var(--jf-space-2); }
     :host([entry]) .actions { gap: var(--jf-space-3); }
@@ -111,7 +107,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
       button, select { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
       button:focus-visible, select:focus-visible { outline-color: Highlight; }
     }
-  `;
+  `];
 
   protected override willUpdate(changed: PropertyValues): void {
     if (this.toolbar) {
@@ -221,12 +217,12 @@ class IndexingControls extends SignalWatcher(JfElement) {
         this.requestUpdate();
       }}>
       ${this.action === 'pause' && !this.entry ? html`<label><span class=${this.compact ? 'visually-hidden' : ''}>Pause duration</span>
-        <span class="select"><select aria-label="Pause duration"
+        <select aria-label="Pause duration"
           .value=${String(this.duration)} @change=${(e: Event) => { this.duration = Number((e.target as HTMLSelectElement).value); }}>
           <option value="0">Until I resume</option>
           <option value="900000">15 minutes</option>
           <option value="3600000">1 hour</option>
-        </select><span class="chevron" aria-hidden="true">${icon({ name: 'chevron-down', size: 12 })}</span></span></label>` : nothing}
+        </select></label>` : nothing}
       <button type="button" aria-disabled=${unavailable ? 'true' : 'false'} aria-describedby="control-state"
         @click=${() => void this.invoke()}>${this.action === 'settings' ? 'Open Settings at Reset to defaults' : this.action === 'hours' ? this.compact ? 'Change when to read files' : 'Change hours' : this.action === 'battery' ? this.compact ? 'Change when to read files' : 'Change battery setting' : resume ? 'Resume reading' : 'Pause reading'}</button>
       ${!this.compact && this.action !== 'settings' && this.action !== 'hours' && this.reasons.includes('schedule')
