@@ -25,6 +25,7 @@
 
 import { html, css, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
+import { selectStyles } from '../primitives/selectStyles.js';
 
 export interface PanePickerCandidate {
   readonly id: string;
@@ -49,7 +50,7 @@ export class PanePicker extends JfElement {
     this.onPick = null;
   }
 
-  static styles = css`
+  static styles = [selectStyles, css`
     :host {
       display: block;
       width: 100%;
@@ -72,8 +73,6 @@ export class PanePicker extends JfElement {
       color: var(--text-muted);
     }
     select {
-      background: var(--surface-0);
-      color: var(--text-primary);
       border: 1px solid var(--border-subtle);
       border-radius: 0.25rem;
       padding: 0.125rem 0.375rem;
@@ -85,7 +84,7 @@ export class PanePicker extends JfElement {
       opacity: 0.5;
       cursor: not-allowed;
     }
-  `;
+  `];
 
   private handleChange(e: Event): void {
     const target = e.target as HTMLSelectElement;

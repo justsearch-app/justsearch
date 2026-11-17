@@ -340,7 +340,7 @@ export class LibrarySurface extends JfElement {
     reindexOutcome: { state: true },
     reindexOutcomeError: { state: true },
     reindexOutcomeBusy: { state: true },
-    reindexPending: { state: true },
+    reindexInProgress: { state: true },
     pendingPath: { state: true },
     pendingCollection: { state: true },
     pendingPreview: { state: true },
@@ -475,12 +475,10 @@ export class LibrarySurface extends JfElement {
   declare reindexOutcomeError: boolean;
   declare reindexOutcomeBusy: boolean;
   /**
-   * The accepted "Read everything again" whose outcome, as last read, is accepted and not yet started
-   * (or not read yet): until reading becomes visible the page says it is starting (fm-07).
+   * L1' — "Read everything again" was confirmed and its outcome, as last read, is accepted or running (or
+   * not read yet): the page says one constant line, whatever the headline says at that instant.
    */
-  declare reindexPending: boolean;
-  /** Reading was visible in the headline while the request was open: "starting" is no longer true. */
-  private reindexSeenReading = false;
+  declare reindexInProgress: boolean;
   /** Read everything again ended: its completion or failure was read. */
   private reindexSettled = false;
   private bulkOutcomeKey: string | null = null;
@@ -630,7 +628,7 @@ export class LibrarySurface extends JfElement {
     this.reindexOutcome = null;
     this.reindexOutcomeError = false;
     this.reindexOutcomeBusy = false;
-    this.reindexPending = false;
+    this.reindexInProgress = false;
     this.pendingPath = '';
     this.pendingCollection = '';
     this.pendingPreview = null;
@@ -1101,8 +1099,7 @@ export class LibrarySurface extends JfElement {
     this.actionMessage = null;
     this.reindexOutcome = null;
     this.reindexOutcomeError = false;
-    this.reindexPending = false;
-    this.reindexSeenReading = false;
+    this.reindexInProgress = false;
     this.reindexSettled = false;
     this.reindexReadSerial++;
     this.reindexOutcomeBusy = false;
@@ -1163,7 +1160,6 @@ export class LibrarySurface extends JfElement {
       && !this.otherSources.sources.some(source => source.collection === this.collectionConfirm)) {
       this.collectionConfirm = null;
     }
-    if (this.reindexOutcome && !this.reindexSettled && this.headline().reading) this.reindexSeenReading = true;
     const active = deepActiveElement();
     this.focusedFolderToggle = active instanceof HTMLElement && active.matches('.folder-toggle')
       && this.shadowRoot?.activeElement ? active : null;
@@ -2455,10 +2451,11 @@ export class LibrarySurface extends JfElement {
     this.reindexOutcomeBusy = false;
     this.reindexOutcomeKey = typeof key === 'string' && /^[0-9a-f-]{36}$/.test(key) ? key : null;
     this.reindexOutcomeError = false;
-    this.reindexOutcome = 'Read again accepted. Completion has not yet been confirmed.';
-    this.reindexPending = true;
-    this.reindexSeenReading = false;
     this.reindexSettled = false;
+    // With its request key the outcome can be read: from now until it completes or fails, one line. A
+    // receipt without a key has no outcome to read, and says so.
+    this.reindexInProgress = this.reindexOutcomeKey !== null;
+    this.reindexOutcome = this.reindexInProgress ? null : 'Read again accepted. Completion has not yet been confirmed.';
     if (this.reindexOutcomeKey) await this.checkReindexOutcome();
   }
 
@@ -2477,23 +2474,25 @@ export class LibrarySurface extends JfElement {
       // The pass changed what each folder holds: read the folders again, counts included, so the rows'
       // file counts are the ones after this pass rather than before it (live refreshes carry no counts).
       if (outcome.state === 'complete' || outcome.state === 'failed') void readIndexedRoots(path => this.doFetch(path), true, this.apiBase);
-      // Accepted and not yet started: reading cannot have shown yet. A running outcome without visible
-      // reading is said as unconfirmed, with its check action.
-      this.reindexPending = outcome.state === 'accepted';
+      // L1' — accepted or running is the request in progress, whether or not reading shows at this
+      // instant (it shows later than the Engine reports running, and not between folders).
+      this.reindexInProgress = outcome.state === 'accepted' || outcome.state === 'running';
       this.reindexSettled = outcome.state === 'complete' || outcome.state === 'failed';
-      if (outcome.state === 'complete') {
-        this.reindexOutcome = 'Read again completed for the recorded request. Current reading activity is shown below.';
+      if (this.reindexInProgress) {
+        this.reindexOutcome = null;
+      } else if (outcome.state === 'complete') {
+        this.reindexOutcome = 'Everything has been read again.';
         this.reindexOutcomeKey = null;
       } else if (outcome.state === 'failed') {
         this.reindexOutcome = `Read again did not complete${outcome.result?.code ? ` (${outcome.result.code})` : ''}. Check folder availability and retry Read again; failed files can also be retried below.`;
         this.reindexOutcomeKey = null;
       } else {
-        this.reindexOutcome = `Read again accepted. ${['accepted', 'running'].includes(outcome.state) ? 'Completion has not yet been confirmed.' : 'Its outcome is unavailable; check again before retrying.'}`;
+        this.reindexOutcome = 'Read again accepted. Its outcome is unavailable; check again before retrying.';
       }
     } catch {
       if (serial === this.reindexReadSerial) {
         this.reindexOutcome = 'Read again accepted. Its outcome could not be read; check again before retrying.';
-        this.reindexPending = false;
+        this.reindexInProgress = false;
       }
     } finally {
       if (serial === this.reindexReadSerial) this.reindexOutcomeBusy = false;
@@ -2906,20 +2905,19 @@ export class LibrarySurface extends JfElement {
   }
 
   /**
-   * fm-07 — what the page says about "Read everything again" besides its headline. While reading runs
-   * the headline says it once: no receipt that the request was accepted or is unconfirmed, and no second
-   * reading line. Before reading shows, one plain line says it is starting; once reading was seen, or
-   * when the status cannot tell, an open outcome is said as unconfirmed with its check action. A
-   * completion or failure keeps its message.
+   * fm-07 — what the page says about "Read everything again" besides its headline. L1' from the
+   * confirmation until the outcome completes or fails, one constant line, the same element throughout,
+   * whatever the headline or the status says at that instant (the headline says what is known about
+   * status). L2' a completion says so in one sentence until the person leaves Library. L3 a failure keeps
+   * its message and alert; an outcome that is neither, or cannot be read, is said as uncertain with its
+   * check action (nothing while reading visibly runs).
    */
   private renderReindexOutcome(): TemplateResult | typeof nothing {
+    if (this.reindexInProgress) return html`<div class="action-message" role="status">Reading everything again.</div>`;
     if (!this.reindexOutcome) return nothing;
     const { reading } = this.headline();
-    const statusKnown = this.indexProgress.live && this.indexingActivity.confirmed && !this.contactUnconfirmed && !this.rootsUnconfirmed;
     if (!this.reindexSettled && reading) return nothing;
-    if (this.reindexPending && !this.reindexSeenReading && statusKnown) {
-      return html`<div class="action-message" role="status">Starting to read everything again.</div>`;
-    }
+    if (this.reindexSettled && !this.reindexOutcomeError) return html`<div class="action-message" role="status">${this.reindexOutcome}</div>`;
     return html`<div class="action-message" role=${this.reindexOutcomeError ? 'alert' : 'status'}>
         ${this.reindexOutcome}
         ${this.reindexOutcomeKey ? html`<jf-button label="Check reading outcome" .disabled=${this.reindexOutcomeBusy}

@@ -22,10 +22,11 @@
 
 import { html, css, type TemplateResult } from 'lit';
 import { JsonFormsRendererBase } from '../JsonFormsRendererBase.js';
+import { selectStyles } from '../../primitives/selectStyles.js';
 import { registerXUiRenderer } from './XUiRendererControl.js';
 
 export class EnterActionPickerRenderer extends JsonFormsRendererBase {
-  static styles = css`
+  static styles = [selectStyles, css`
     :host {
       display: block;
       margin-block-end: var(--justsearch-shell-form-control-spacing, 0.75rem);
@@ -34,8 +35,6 @@ export class EnterActionPickerRenderer extends JsonFormsRendererBase {
       padding: 0.375rem 0.5rem;
       border: 1px solid var(--justsearch-shell-form-input-border, #ccc);
       border-radius: var(--justsearch-shell-form-input-radius, 4px);
-      background: var(--justsearch-shell-form-input-bg, transparent);
-      color: inherit;
       font: inherit;
       min-width: 8rem;
     }
@@ -43,7 +42,7 @@ export class EnterActionPickerRenderer extends JsonFormsRendererBase {
       opacity: 0.5;
       cursor: not-allowed;
     }
-  `;
+  `];
 
   override render(): TemplateResult {
     if (!this.visible) {

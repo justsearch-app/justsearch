@@ -306,7 +306,7 @@ it('V6: when Read everything again completes, the folders are read again so the 
     : new Response('{}', { status: 503 }));
   await reread(el);
   expect(invoked).toBe(1);
-  expect(el.shadowRoot!.textContent).toContain('Read again completed');
+  expect(el.shadowRoot!.textContent).toContain('Everything has been read again.');
   expect(reads.some(path => path.includes('counts=true')), JSON.stringify(reads)).toBe(true);
   expect(must(el.shadowRoot, '.files-found').textContent).toBe('12 files');
   vi.unstubAllGlobals();

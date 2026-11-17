@@ -530,6 +530,8 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   const listed = new Set<string>();
   // fm-15 — a folder's ordinary work on a live observation, which the one reading entry speaks for.
   const ordinaryWork = new Set<string>();
+  // S9 — a folder that merely waits (paused reading, or a retry), which a hold entry speaks for.
+  const waitingWork = new Set<string>();
   for (const root of input.roots ?? []) {
     // R4 — a folder is named by its folder name, with the full path as detail; the collection
     // ("default") is not a folder name. Until the path is resolved the row says what it is.
@@ -563,6 +565,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     for (const item of folderAttention(root, state, name)) add({ id: item.kind === 'missing' ? `folder:${root.pathHash}` : item.kind === 'files' ? `files:${root.pathHash}` : `folder-${item.key}`, section: 'problems',
       title: item.title, detail: [item.detail, path].filter(Boolean).join(' · '), stale: !input.rootsLive || (item.kind === 'files' && state.failedIsLastKnown === true), actions });
     if (input.rootsLive && ['scanning', 'indexing', 'enriching'].includes(state.state)) ordinaryWork.add(`folder-work:${root.pathHash}`);
+    if (input.rootsLive && state.state === 'waiting') waitingWork.add(`folder-work:${root.pathHash}`);
     if (['scanning', 'indexing', 'enriching', 'waiting'].includes(state.state)) add({
       id: `folder-work:${root.pathHash}`, section: 'running', title: `${name}: ${state.metaText.replace(`${root.collection ?? 'default'} · `, '')}`, ...(path ? { detail: path } : {}),
       stale: !input.rootsLive, percent: state.state === 'enriching' ? rootCoverage(root, progress.stages)?.percent ?? null : null, actions });
@@ -675,7 +678,12 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   if (!developer && sections.running.some(row => row.id === 'indexing')) {
     sections.running = sections.running.filter(row => !ordinaryWork.has(row.id));
   }
-  if (fileRows.length && !Object.values(sections).flat().some(row => row.id === 'indexing')) add({ id: FILE_ACTIVITY_ID,
+  // S9 — paused or held, the hold entry speaks for reading as the reading entry does while it runs: no
+  // entry per folder that merely waits or does ordinary work, and no "Recent file activity" (developer
+  // tools show them). A folder that needs the person keeps its entry; file failures keep theirs.
+  const held = !developer && sections.needs.some(row => row.id === 'indexing-hold');
+  if (held) sections.running = sections.running.filter(row => !ordinaryWork.has(row.id) && !waitingWork.has(row.id));
+  if (fileRows.length && !held && !Object.values(sections).flat().some(row => row.id === 'indexing')) add({ id: FILE_ACTIVITY_ID,
     section: 'running', title: 'Recent file activity', stale: true, details: fileRows,
     actions: [go('Open AI Brain', 'core.brain-surface')] });
   const limited = ai?.verdict.reasons.some(code => isSearchUnavailableCause(code) || isReindexCause(code)) ?? false;
