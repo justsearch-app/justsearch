@@ -107,8 +107,10 @@ passes on the candidate (run-evidence with --before 012aae15e5).
       ],
       "evidence": "gates/test-intent/evidence/fm-review-fixes.json",
       "newChecks": [
-        "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a successful settings save is no row; a failed one is",
-        "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a settings save advisory that succeeded is no row; one that failed is",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a successful core.reconfigure save is no row; a failed one is",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a successful core.apply-settings save is no row; a failed one is",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a core.reconfigure advisory that succeeded is no row; one that failed is",
+        "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#a core.apply-settings advisory that succeeded is no row; one that failed is",
         "modules/ui-web/src/shell-v0/components/StatusPanel.firstMinutes.test.ts#the close button draws the app's close icon, not a text cross"
       ]
     },
