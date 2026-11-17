@@ -181,12 +181,12 @@ it.each([false, true])('D4 complete/incomplete=%s keeps preview paths, sizes, fe
   const { page } = await open(incomplete); await opener(page).click();
   const preview = page.locator('[data-testid="removal-confirm"]');
   const text = ((await preview.textContent()) + ' ' + (await band(page).count() ? await band(page).getAttribute('consequence') : '')).replace(/\s+/g, ' ');
-  expect(text).toContain(`This deletes 1 file (${incomplete ? 'size unknown' : '3.0 MB'}) from this computer.`);
+  expect(text).toContain(`This deletes 1 file (${incomplete ? 'size unknown' : '3 MB'}) from this computer.`);
   expect(text).toContain("Answers and Text in scans and images won't work until you download it again.");
   expect(text).toContain("Each file is checked first; a file JustSearch can't confirm it downloaded is kept.");
   expect(text).toContain('Your documents, the index and conversations are not touched.');
   expect(await preview.locator('li').allTextContents()).toEqual([
-    `answer.gguf · ${incomplete ? 'size unknown' : '3.0 MB'}`, `${longPath} · size unknown · not verified as JustSearch’s download`]);
+    `answer.gguf · ${incomplete ? 'size unknown' : '3 MB'}`, `${longPath} · size unknown · not verified as JustSearch’s download`]);
   const heading = await band(page).count() ? await band(page).getAttribute('heading') : await preview.locator('strong').textContent();
   expect(heading).toBe('Remove Chat model files?');
 }, 60_000);
@@ -209,7 +209,7 @@ it.each(['removed', 'refused', 'partial', 'interrupted'])('D7 %s outcome and foc
   const outcome = page.locator('[data-testid="removal-outcome"]'); await expect.poll(() => outcome.evaluate(el => el.matches(':focus'))).toBe(true);
   expect(await outcome.getAttribute('role')).toBe(state === 'removed' ? 'status' : 'alert');
   expect(await outcome.textContent()).toContain('Observed outcome');
-  expect(await outcome.locator('li').allTextContents()).toEqual(['answer.gguf · 3.0 MB', `${longPath} · custom file kept`]);
+  expect(await outcome.locator('li').allTextContents()).toEqual(['answer.gguf · 3 MB', `${longPath} · custom file kept`]);
 }, 60_000);
 it('D7 a running removal observed after reload blocks conflicting actions', async () => {
   const { page, view } = await open(); view.removal = { state: 'running', packageId: 'chat', label: 'Chat model' };

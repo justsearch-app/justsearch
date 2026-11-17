@@ -179,7 +179,7 @@ describe('AI Brain redesign behaviour', () => {
     window.dispatchEvent(new Event('focus')); await settle(el);
     settingsRelease(json({ ui: { chatEnabled: true }, llm: {} })); previewRelease(json({ components: [] })); await settle(el);
     expect(switches(el, 'Answer questions')[0]!.getAttribute('aria-checked')).toBe('false');
-    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('8.0 KB');
+    expect(el.shadowRoot!.querySelector('[data-feature="reranker"]')!.textContent).toContain('8 KB');
   });
   it('a missing declined answer package asks for its real size and licence and downloads after consent', async () => {
     preview.components = preview.components!.map(c => c.id === 'chat' ? component('chat', 'declined', true) : c);
@@ -228,7 +228,7 @@ describe('AI Brain redesign behaviour', () => {
   // Slice 7a (AM8): the meter shows a current reading in fm-14's words, and only then.
   it('graphics memory uses all-app device data and stale or absent values draw no meter', async () => {
     const el = await mount(); const card = () => el.shadowRoot!.querySelector('.graphics-card');
-    expect(card()?.textContent).toContain('4.0 KB of 8.0 KB in use · Test adapter');
+    expect(card()?.textContent).toContain('4 KB of 8 KB in use · Test adapter');
     emit({ status: { operating: { gpu: { stale: true, adapterTotalBytes: 8192, adapterFreeBytes: 4096 } } } as AiState['status'] }); await el.updateComplete;
     expect(card()).toBeNull(); expect(el.shadowRoot!.textContent).not.toContain('Memory use unknown');
   });

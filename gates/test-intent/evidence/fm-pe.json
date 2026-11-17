@@ -1,0 +1,240 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-16T21:54:06.124Z",
+  "revision": "c7bec80dd9a93084f4f5f7fb7a791e80f067c5be",
+  "tree": "5c2248794e2c9a2acc6805acd23998cf858eb2f4",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/display/format.test.ts\" \"src/shell-v0/views/brain-install/BrainInstall.flow.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cngu76ct/tmp/test-intent-vitest-67688-1794866032200.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3793
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/library-first-minutes/browse-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/cngu76ct/tmp/test-intent-vitest-67688-1794866035993.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2832
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/display/format.test.ts#writes at most three figures, a decimal only below 10, and no trailing zeros (PE1)",
+      "file": "modules/ui-web/src/shell-v0/display/format.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c19812c451bac556d5a6486a9ab177c207a42fa695dab1cf8179d54ef24c31be",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formatBytes writes at most three figures, a decimal only below 10, and no trailing zeros (PE1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/format.test.ts#never writes four figures: a value that would round to 1000 moves to the next unit (PE1)",
+      "file": "modules/ui-web/src/shell-v0/display/format.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c19812c451bac556d5a6486a9ab177c207a42fa695dab1cf8179d54ef24c31be",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formatBytes never writes four figures: a value that would round to 1000 moves to the next unit (PE1)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/format.test.ts#writes both amounts in the unit of the whole, each with at most three figures (PE1, PE2)",
+      "file": "modules/ui-web/src/shell-v0/display/format.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c19812c451bac556d5a6486a9ab177c207a42fa695dab1cf8179d54ef24c31be",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formatBytesOf writes both amounts in the unit of the whole, each with at most three figures (PE1, PE2)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/format.test.ts#keeps the amount between zero and the whole",
+      "file": "modules/ui-web/src/shell-v0/display/format.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c19812c451bac556d5a6486a9ab177c207a42fa695dab1cf8179d54ef24c31be",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formatBytesOf keeps the amount between zero and the whole",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/display/format.test.ts#scales B / KB / MB / GB / TB in steps of 1024, with a space before the unit",
+      "file": "modules/ui-web/src/shell-v0/display/format.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:c19812c451bac556d5a6486a9ab177c207a42fa695dab1cf8179d54ef24c31be",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "formatBytes scales B / KB / MB / GB / TB in steps of 1024, with a space before the unit",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts#writes gigabyte amounts in the one size format, in the line and in a part row",
+      "file": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:85c6c6a4715edd57632e43178ea59190af5e60fe95cd613710630c22c0a6b39d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S7b-2 progress (fm-12) writes gigabyte amounts in the one size format, in the line and in a part row",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts#names the five parts as the page does, with sizes, licences and Terms, under the pictured words",
+      "file": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:85c6c6a4715edd57632e43178ea59190af5e60fe95cd613710630c22c0a6b39d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S7b-1 consent (fm-11) names the five parts as the page does, with sizes, licences and Terms, under the pictured words",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts#after a cancelled run the action is Install AI with the most it can download, never Resume",
+      "file": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:85c6c6a4715edd57632e43178ea59190af5e60fe95cd613710630c22c0a6b39d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S7b-3 G4' bytes an earlier download left promise no resuming after a cancelled run the action is Install AI with the most it can download, never Resume",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/browse-lockdown.test.ts#the browser tree has real roving focus, stable row geometry, reachable actions and a shared keyboard menu",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/browse-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eae627e0041da1666c38176f9377c1b3751e0e589f7aa4f4ddbcb94f7d86507",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the browser tree has real roving focus, stable row geometry, reachable actions and a shared keyboard menu",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "2d51325e39",
+    "revision": "2d51325e394b753a415eaa4ae5821dc940b6225d",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/display/format.test.ts\" \"src/shell-v0/views/brain-install/BrainInstall.flow.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/cngu76ct/tmp/test-intent-vitest-67688-1794866040340.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 3220,
+        "output": "JSON report written to /home/elias/.cache/am/cngu76ct/tmp/test-intent-vitest-67688-1794866040340.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/library-first-minutes/browse-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/cngu76ct/tmp/test-intent-vitest-67688-1794866043561.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2297,
+        "output": "JSON report written to /home/elias/.cache/am/cngu76ct/tmp/test-intent-vitest-67688-1794866043561.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/display/format.test.ts#writes at most three figures, a decimal only below 10, and no trailing zeros (PE1)",
+        "classification": "assertion",
+        "detail": "formatBytes writes at most three figures, a decimal only below 10, and no trailing zeros (PE1):  AssertionError: expected '2.60 GB' to be '2.6 GB' // Object.is equality\n    at /home/elias/.cache/am/cngu76ct/tmp/test-intent-before-YO3LKE/modules/ui-web/src/shell-v0/display/format.test.ts:29:48\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-pe/modules/ui-web/node_modules/@vitest/ru"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/format.test.ts#never writes four figures: a value that would round to 1000 moves to the next unit (PE1)",
+        "classification": "assertion",
+        "detail": "formatBytes never writes four figures: a value that would round to 1000 moves to the next unit (PE1):  AssertionError: expected '1000 B' to be '1 KB' // Object.is equality\n    at /home/elias/.cache/am/cngu76ct/tmp/test-intent-before-YO3LKE/modules/ui-web/src/shell-v0/display/format.test.ts:42:31\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-pe/modules/ui-web/node_modules/@vitest/runne"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/format.test.ts#writes both amounts in the unit of the whole, each with at most three figures (PE1, PE2)",
+        "classification": "assertion",
+        "detail": "formatBytesOf writes both amounts in the unit of the whole, each with at most three figures (PE1, PE2):  AssertionError: expected undefined to be type of 'function'\n    at /home/elias/.cache/am/cngu76ct/tmp/test-intent-before-YO3LKE/modules/ui-web/src/shell-v0/display/format.test.ts:52:27\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-pe/modules/ui-web/node_modules/@vitest/runner/dist/ch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/format.test.ts#keeps the amount between zero and the whole",
+        "classification": "assertion",
+        "detail": "formatBytesOf keeps the amount between zero and the whole:  AssertionError: expected undefined to be type of 'function'\n    at /home/elias/.cache/am/cngu76ct/tmp/test-intent-before-YO3LKE/modules/ui-web/src/shell-v0/display/format.test.ts:63:27\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-pe/modules/ui-web/node_modules/@vitest/runner/dist/ch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/display/format.test.ts#scales B / KB / MB / GB / TB in steps of 1024, with a space before the unit",
+        "classification": "assertion",
+        "detail": "formatBytes scales B / KB / MB / GB / TB in steps of 1024, with a space before the unit:  AssertionError: expected '51.0 MB' to be '51 MB' // Object.is equality\n    at /home/elias/.cache/am/cngu76ct/tmp/test-intent-before-YO3LKE/modules/ui-web/src/shell-v0/display/format.test.ts:20:37\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-pe/modules/ui-web/node_modules/@vitest/run"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts#writes gigabyte amounts in the one size format, in the line and in a part row",
+        "classification": "assertion",
+        "detail": "S7b-2 progress (fm-12) writes gigabyte amounts in the one size format, in the line and in a part row:  AssertionError: expected [ 'Related words', '0.50 of 1.19 GB' ] to deeply equal [ 'Related words', '0.5 of 1.2 GB' ]\n    at /home/elias/.cache/am/cngu76ct/tmp/test-intent-before-YO3LKE/modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts:245:29\n    at file:///home/elias/dev/just"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts#names the five parts as the page does, with sizes, licences and Terms, under the pictured words",
+        "classification": "assertion",
+        "detail": "S7b-1 consent (fm-11) names the five parts as the page does, with sizes, licences and Terms, under the pictured words:  AssertionError: expected [ Array(5) ] to deeply equal [ Array(5) ]\n    at /home/elias/.cache/am/cngu76ct/tmp/test-intent-before-YO3LKE/modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts:156:18\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-pe/modules/ui-web/node"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/brain-install/BrainInstall.flow.test.ts#after a cancelled run the action is Install AI with the most it can download, never Resume",
+        "classification": "assertion",
+        "detail": "S7b-3 G4' bytes an earlier download left promise no resuming after a cancelled run the action is Install AI with the most it can download, never Resume:  AssertionError: expected [ 'Install AI · 2.60 GB', …(2) ] to include 'Install AI · 2.6 GB'\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch/.claude/worktrees/fm-pe/modules/ui-web/node_modules/@vitest/expect/dist/index.js:1319:15)\n    at Proxy.<anonymous> (file:///home/elias/dev/justsearch"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/browse-lockdown.test.ts#the browser tree has real roving focus, stable row geometry, reachable actions and a shared keyboard menu",
+        "classification": "assertion",
+        "detail": "the browser tree has real roving focus, stable row geometry, reachable actions and a shared keyboard menu:  AssertionError: expected 'a.csv\\n0 bytes\\n1 Jan 2000' to contain '0 B'\n    at /home/elias/.cache/am/cngu76ct/tmp/test-intent-before-YO3LKE/modules/ui-web/src/shell-v0/views/library-first-minutes/browse-lockdown.test.ts:61:36\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-pe/modules/ui"
+      }
+    ]
+  },
+  "digest": "sha256:aeb9f3525260c8bffb5d0a14122065fe66b0b101a56fecb3c5e14b3995e16fb3"
+}

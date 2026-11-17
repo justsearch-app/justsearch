@@ -307,7 +307,7 @@ export class BrowseSurface extends JfElement {
         <span class="icon" data-kind=${file ? fileKindPresentation(file.fileKind, file.mimeBase, file.path).kind : 'folder'}>${icon({ name: folder ? 'folder' : fileKindPresentation(file?.fileKind, file?.mimeBase, file?.path).icon, size: 16 })}</span>
         <span class="name">${folder?.name ?? file?.name}</span></span>
       <span class="meta">${folder ? this.folderCount(folder)
-        : size !== undefined && size >= 0 ? size < 1024 ? `${size} bytes` : formatBytes(size) : ''}</span>
+        : size !== undefined && size >= 0 ? formatBytes(size) : ''}</span>
       <span class="meta">${date && Number.isFinite(date.getTime()) ? formatShortDate(date) : ''}</span>
       <span class="actions" @click=${(event: Event) => event.stopPropagation()} @keydown=${(event: KeyboardEvent) => event.stopPropagation()}>
         ${file ? html`<button type="button" class="jf-btn" aria-label="Open file" tabindex=${focused ? '0' : '-1'}

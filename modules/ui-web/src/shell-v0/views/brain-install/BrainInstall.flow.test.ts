@@ -154,7 +154,7 @@ describe('S7b-1 consent (fm-11)', () => {
     expect(words(consent)).toContain('2.6 GB will be downloaded to this computer. Each part comes from its own author, under the licence shown.');
     const rows = [...(consent?.querySelectorAll('li') ?? [])].map(li => [...li.children].map(c => words(c)));
     expect(rows).toEqual([
-      ['Understand meaning', '1.19 GB', 'Apache-2.0', 'Terms'],
+      ['Understand meaning', '1.2 GB', 'Apache-2.0', 'Terms'],
       ['Related wordshelps Understand meaning', '956 MB', 'Apache-2.0', 'Terms'],
       ['Best match first', '341 MB', 'Apache-2.0', 'Terms'],
       ['Names of people and places', '132 MB', 'AFL-3.0', 'Terms'],
@@ -230,6 +230,19 @@ describe('S7b-2 progress (fm-12)', () => {
     ]);
     expect(labels(el)).toEqual(expect.arrayContaining(['Pause', 'Cancel']));
     expect(words(panel(el))).not.toMatch(/repair/i);
+  });
+
+  // PE1/PE2: the amounts are written as every other size ('0.5 of 1.2 GB', never '0.50 of 1.19 GB').
+  it('writes gigabyte amounts in the one size format, in the line and in a part row', async () => {
+    const status = structuredClone(ENGINE.runningRetrying!.status!) as { downloadedBytes: number; totalBytes: number;
+      packages: Array<{ packageId: string; bytesDownloaded: number; bytesTotal: number }> };
+    const GiB = 1024 ** 3;
+    Object.assign(status, { downloadedBytes: Math.round(1.3 * GiB), totalBytes: Math.round(2.6 * GiB) });
+    Object.assign(status.packages.find(p => p.packageId === 'splade')!, { bytesDownloaded: GiB / 2, bytesTotal: Math.round(1.19 * GiB) });
+    show('runningRetrying'); store.current = engineState('runningRetrying', status as never);
+    const el = await mount();
+    expect(words(el.shadowRoot!.querySelector('[role="progressbar"]')?.parentElement)).toContain('1.3 of 2.6 GB · about');
+    expect(partRows(el)[1]).toEqual(['Related words', '0.5 of 1.2 GB']);
   });
 
   it('without an estimate there is no time left', async () => {
@@ -310,15 +323,15 @@ describe('S7b-3 G4\' bytes an earlier download left promise no resuming', () => 
     show('cancelledNothingPlaced'); preview = shippedPreview(400 * 1024 ** 2);
     const el = await mount();
     expect(partRows(el)).toEqual([]);
-    expect(labels(el)).toContain('Install AI · 2.60 GB');
+    expect(labels(el)).toContain('Install AI · 2.6 GB');
     expect(labels(el).filter(l => /resume|continue/i.test(l ?? ''))).toEqual([]);
-    const action = buttons(el).find(b => b.label === 'Install AI · 2.60 GB')!;
+    const action = buttons(el).find(b => b.label === 'Install AI · 2.6 GB')!;
     await action.updateComplete;
     const control = action.shadowRoot!.querySelector<Control>('jf-control')!; await control.updateComplete;
     const native = control.shadowRoot!.querySelector('button')!;
-    expect(native.getAttribute('aria-label') ?? words(native)).toMatch(/^Install AI · 2\.60 GB$/);
+    expect(native.getAttribute('aria-label') ?? words(native)).toMatch(/^Install AI · 2\.6 GB$/);
     expect(words(panel(el))).not.toMatch(/Resume Download|resum|continues|where it stopped/i);
-    await press(el, 'Install AI · 2.60 GB');
+    await press(el, 'Install AI · 2.6 GB');
     expect(words(dialog(el))).toContain('Up to 2.6 GB will be downloaded to this computer.');
   });
 });

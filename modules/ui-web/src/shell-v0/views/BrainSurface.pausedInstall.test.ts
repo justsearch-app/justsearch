@@ -93,7 +93,7 @@ describe('BrainSurface — idle panel over a paused download', () => {
   it('acknowledges the retained bytes instead of claiming "AI isn\'t installed yet"', async () => {
     const text = await renderFor(PAUSED);
     expect(text).toContain('Download Paused');
-    expect(text).toContain('1.06 GB already downloaded is kept on disk');
+    expect(text).toContain('1.1 GB already downloaded is kept on disk');
     expect(text).not.toContain("AI isn't installed yet");
     expect(text).not.toContain('Install AI models to get started');
   });
@@ -144,7 +144,7 @@ describe('BrainSurface — the consent dialog re-asks the backend before opening
 
   it('shows the plan as of the click, not as of mount', async () => {
     const previewFetches: string[] = [];
-    let totalDownloadBytes = 10_890_000_000; // "10.14 GB" — the stale mount-time plan
+    let totalDownloadBytes = 10_890_000_000; // "10 GB" — the stale mount-time plan
     globalThis.fetch = (async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes('/api/ai/install/plan-preview')) {
@@ -167,11 +167,11 @@ describe('BrainSurface — the consent dialog re-asks the backend before opening
     el._unifiedAiState = { installObservationLive: true, runtimeObservationLive: true, snapshotLive: true, aiEngine: { kind: 'not_installed', stability: { kind: 'settled' }, installFailure: null } };
     el.requestUpdate(); await el.updateComplete;
     expect(previewFetches.length).toBe(1);
-    expect(el.shadowRoot?.textContent ?? '').toContain('10.14 GB');
+    expect(el.shadowRoot?.textContent ?? '').toContain('10 GB');
 
     // The backend moves on while the surface sits mounted — files finish, or a cancelled run's bytes
     // are kept. Nothing in the old code path would ever ask again.
-    totalDownloadBytes = 9_750_000_000; // "9.08 GB"
+    totalDownloadBytes = 9_750_000_000; // "9.1 GB"
 
     // Set the observed verdict last: `connectedCallback`'s store subscription overwrites
     // `_unifiedAiState` on mount, and only the not_installed verdict renders the install action.
@@ -189,8 +189,8 @@ describe('BrainSurface — the consent dialog re-asks the backend before opening
 
     expect(previewFetches.length).toBe(2);
     const text = el.shadowRoot?.textContent ?? '';
-    expect(text).toContain('9.08 GB');
-    expect(text).not.toContain('10.14 GB');
+    expect(text).toContain('9.1 GB');
+    expect(text).not.toContain('10 GB');
     document.body.removeChild(el);
   });
 });

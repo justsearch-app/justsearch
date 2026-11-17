@@ -108,7 +108,7 @@ it('K5/M1/M7/M11: expert history and activity are opt-in, unavailable removals a
 it('K6/M5: Browse column heads, stable root count, byte and shared date presentation, no inline styles', async () => {
   const { el } = await browse(); must<HTMLElement>(el.shadowRoot, '[role="treeitem"]').click(); await settle(el);
   expect(must(el.shadowRoot, '.column-heads').textContent).toMatch(/Name\s*Size\s*Changed/);
-  expect(el.shadowRoot!.textContent).toContain('50,000+ files'); expect(el.shadowRoot!.textContent).toContain('90 bytes');
+  expect(el.shadowRoot!.textContent).toContain('50,000+ files'); expect(el.shadowRoot!.textContent).toContain('90 B');
   expect(el.shadowRoot!.textContent).toContain('2000'); expect(el.shadowRoot!.querySelector('[style]')).toBeNull();
   expect(el.shadowRoot!.querySelector('[aria-label="Open file"]')).not.toBeNull();
 });

@@ -174,9 +174,9 @@ describe('group subtotal — present only where it AGGREGATES more than one comp
   it('sums ONLY its own group members', () => {
     const s = subtotals([EMBEDDING, BIG_RERANKER, SPLADE, NER, CITATION, CUDA, CHAT]);
     // 616.3 + 481.5 + 259.9 + 22.6 MB = 1.3803 GB — the enrichment tier alone, not the 9 GB list.
-    expect(s['improves-results']).toBe('4 components · 1.29 GB');
+    expect(s['improves-results']).toBe('4 components · 1.3 GB');
     // The three one-member groups get NO subtotal: their single row already states that figure, and
-    // "1 component · 1.12 GB" directly above "1.12 GB" is the same number twice.
+    // "1 component · 1.1 GB" directly above "1.1 GB" is the same number twice.
     expect(s['required']).toBeNull();
     expect(s['adds-feature']).toBeNull();
     expect(s['infrastructure']).toBeNull();
@@ -200,7 +200,7 @@ describe('group subtotal — present only where it AGGREGATES more than one comp
   it('counts every member, installed or not — the cost of a CATEGORY, not of the current disk', () => {
     // Deliberately distinct from `composeComponentSummary`, which is a claim about what is on disk.
     const s = subtotals([BIG_RERANKER, { ...SPLADE, state: 'declined', declined: true }]);
-    expect(s['improves-results']).toBe('2 components · 1.02 GB');
+    expect(s['improves-results']).toBe('2 components · 1 GB');
   });
 });
 
@@ -240,13 +240,13 @@ describe('composeComponentSummary — the stock-take that replaced the repetitio
 
   it('counts what is installed and adds up what it costs on disk', () => {
     expect(composeComponentSummary([installed(EMBEDDING), installed(CHAT)])).toBe(
-      '2 installed · 7.08 GB on disk',
+      '2 installed · 7.1 GB on disk',
     );
   });
 
   it('counts ONLY installed components — a pending download has not spent disk yet', () => {
     expect(composeComponentSummary([installed(EMBEDDING), RERANKER, CUDA, CHAT])).toBe(
-      '1 installed · 1.12 GB on disk',
+      '1 installed · 1.1 GB on disk',
     );
   });
 

@@ -149,7 +149,7 @@ describe('BrainSurface Models list renders the skip reason (941)', () => {
   it('replaces the never-downloaded byte count with the status word', async () => {
     const text = await modelsText(MIXED_PACKAGES);
     // The installed package still shows its size…
-    expect(text).toContain('114.4 MB');
+    expect(text).toContain('114 MB');
     // …while the ~4.7 GB a skipped package would have taken is NOT presented as though it landed.
     // The badge stands in its place; a size for a download that never ran is the claim this fixes.
     expect(text).not.toMatch(/\bGB\b/);

@@ -23,7 +23,7 @@ it('S5-8 reader shows full folder pages size and one scan note with document tex
   const pane = new DocumentPane(); pane.docPath = '/notes/sub/scan.pdf'; pane.sizeBytes = 1024;
   document.body.append(pane);
   for (let n = 0; n < 3; n++) await new Promise(resolve => setTimeout(resolve, 0)); await pane.updateComplete;
-  expect(pane.shadowRoot!.querySelector('.path')!.textContent!.trim()).toBe('/notes/sub · 2 pages · 1.0 KB');
+  expect(pane.shadowRoot!.querySelector('.path')!.textContent!.trim()).toBe('/notes/sub · 2 pages · 1 KB');
   expect(pane.shadowRoot!.querySelectorAll('.scan-note')).toHaveLength(1);
   expect(pane.shadowRoot!.querySelector('.scan-note')!.textContent).toBe('Read from a scan. A few words may be wrong.');
   expect(pane.shadowRoot!.querySelector('.preview-source')).toBeNull();

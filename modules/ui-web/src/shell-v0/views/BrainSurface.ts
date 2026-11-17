@@ -24,7 +24,7 @@ import { authorizedFetch } from '../api/authorizedFetch.js';
 import { saveAbsoluteSettings, createSettingsAttempt, executeSettingsAttempt, requireSettingsWitness, SettingsAttemptError, type SettingsAttempt } from '../../api/settingsAttempt.js';
 import type { SettingsV2 } from '../../api/generated/schema-types/settings-v2.js';
 import { present } from '../display/present.js';
-import { formatBytes } from '../display/format.js';
+import { formatBytes, formatBytesOf } from '../display/format.js';
 import { projectFact } from '../display/facts.js';
 import { takeReadingMemoryFocus, subscribeReadingMemoryFocus } from '../router/readingMemoryIntent.js';
 import { takeMemberTabIntent, subscribeMemberTab, requestMemberTab } from '../router/memberTabIntent.js';
@@ -71,10 +71,7 @@ import {
 // Slice 7b — the install flow's words (fm-11, fm-12, fm-12b): part names, sizes, part states.
 import {
   composePartRows,
-  formatAmountOf,
-  formatPartSize,
   formatTimeLeft,
-  formatTotalSize,
   partName,
   modelFilePresent,
   modelFiles,
@@ -525,7 +522,7 @@ export interface InstallConsentContent {
    */
   downloadTotal: string | null;
   /**
-   * Slice 7b (G2') — the consent's own total, in its sizes (2.6 GB, 341 MB). With bytes an earlier
+   * Slice 7b (G2') — the consent's own total (2.6 GB, 341 MB). With bytes an earlier
    * download left staged, reuse is not guaranteed, so this is the most the install can download
    * (the staged bytes included) and `upTo` is true.
    */
@@ -565,7 +562,7 @@ export function composeInstallConsent(
 
   // G2' — staged bytes may be reused or not: the consent then states the most it downloads.
   const staged = typeof preview?.resumableBytes === 'number' && preview.resumableBytes > 0 ? preview.resumableBytes : 0;
-  const consentTotal = typeof totalBytes === 'number' && totalBytes > 0 ? formatTotalSize(totalBytes + staged) : null;
+  const consentTotal = typeof totalBytes === 'number' && totalBytes > 0 ? formatBytes(totalBytes + staged) : null;
 
   const excludedTiers = new Set(
     (preview?.tiers ?? [])
@@ -2354,11 +2351,6 @@ export class BrainSurface extends JfElement {
     return bytes != null && bytes >= 0 ? formatBytes(bytes) : 'size unknown';
   }
 
-  /** A consent row's download, in the consent's sizes (G2'). */
-  private consentPartSize(id: string): string {
-    const bytes = this.planPreview?.components?.find(c => c.id === id)?.downloadBytes;
-    return bytes != null && bytes >= 0 ? formatPartSize(bytes) : 'size unknown';
-  }
 
   private consentReady(): boolean {
     const content = composeInstallConsent(this.manifest, this.planPreview);
@@ -3950,7 +3942,7 @@ export class BrainSurface extends JfElement {
     const rows = pending ? [] : composePartRows(status, this.doneEvidence(), view);
     const done = status?.downloadedBytes ?? 0;
     const total = status?.totalBytes ?? 0;
-    const amounts = total > 0 && !pending ? formatAmountOf(done, total, 'total') : null;
+    const amounts = total > 0 && !pending ? formatBytesOf(done, total) : null;
     const doing = stopped ? null : runActivity(status);
     const left = stopped || paused || doing ? null : formatTimeLeft(status?.remainingSeconds);
     const line = doing ?? (amounts ? `${amounts}${left ? ` · ${left}` : ''}` : null);
@@ -4068,7 +4060,7 @@ export class BrainSurface extends JfElement {
                     return html`
                       <li>
                         <span class="consent-pkg">${part.name}${part.note ? html`<small>${part.note}</small>` : nothing}</span>
-                        <span class="consent-size">${this.consentPartSize(p.id)}</span>
+                        <span class="consent-size">${this.packageDownloadSize(p.id)}</span>
                         <span class="consent-license">${p.license ?? 'licence not declared'}</span>
                         ${p.termsUrl
                           ? html`<a href=${p.termsUrl} target="_blank" rel="noopener noreferrer"

@@ -57,7 +57,10 @@ it('the browser tree has real roving focus, stable row geometry, reachable actio
     const file = page.locator('.row.file').first();
     await expect.poll(() => file.isVisible(), { timeout: 3000 }).toBe(true);
     expect(await root.innerText()).toContain('50,000+ files');
-    expect(await file.innerText()).toContain('0 bytes'); expect(await file.innerText()).toContain('2000');
+    // PE1/PE2: Browse's Size column writes sizes as everywhere else ('0 B', '90 B'), never 'bytes'.
+    expect(await file.innerText()).toContain('0 B'); expect(await file.innerText()).toContain('2000');
+    expect(await page.locator('.row.file').nth(1).innerText()).toContain('90 B');
+    expect(await page.locator('.row.file').allInnerTexts()).not.toContainEqual(expect.stringContaining('bytes'));
     expect(await page.locator('jf-browse-surface [style]').count()).toBe(0);
     await page.keyboard.press('ArrowRight');
     expect(await file.evaluate(el => el === (el.getRootNode() as ShadowRoot).activeElement)).toBe(true);

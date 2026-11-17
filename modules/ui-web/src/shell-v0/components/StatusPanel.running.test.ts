@@ -81,7 +81,7 @@ describe('Running (moved from the task tray and indexing overlay)', () => {
 });
 const progress = (extra: Partial<IndexingProgress>): IndexingProgress => ({ ...selectIndexingProgress(null, false, 0, []), ...extra });
 describe('progress readout facts', () => {
-  it.each([[null, '412 files remaining'], [8 * 1024 ** 3, '412 files remaining · 8.00 GB']])('only a faithful byte weight is shown (%s)', (pendingBytes, expected) => {
+  it.each([[null, '412 files remaining'], [8 * 1024 ** 3, '412 files remaining · 8 GB']])('only a faithful byte weight is shown (%s)', (pendingBytes, expected) => {
     expect(indexingCountsLine(progress({ jobsPending: 412, pendingBytes }))).toBe(expected);
   });
   it('indexing and meaning-search estimates use their own rates and retain the indicative qualifier', () => {

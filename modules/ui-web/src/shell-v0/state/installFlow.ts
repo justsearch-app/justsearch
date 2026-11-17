@@ -3,18 +3,15 @@
  * installFlow.ts — slice 7b: the words of AI Brain's install flow (fm-11 consent, fm-12 progress,
  * fm-12b a stopped download), derived from what the Engine publishes.
  *
- * Parts carry the names of the page's steps. Sizes use a formatting context of their own (MB without
- * decimals; GB with two decimals for a part and one for a total), binary like the shared formatter,
- * which stays as it is for its other callers.
+ * Parts carry the names of the page's steps. Sizes are written by the shared formatter (display/format.ts),
+ * as everywhere else in the app.
  *
  * A part is "Done" only from positive evidence: the Engine's model presence shows every final file of
  * the part placed, in an observation taken after the run reported the part's last file. The run's own
  * per-file "installed" flips between two files of one part, so it is never enough on its own.
  */
 import type { AiInstallStatus } from '../../api/generated/schema-types/ai-install-status.js';
-
-const MB = 1024 * 1024;
-const GB = 1024 * MB;
+import { formatBytesOf } from '../display/format.js';
 
 /** Page step names per package; a package the pictures do not name keeps the Engine's label. */
 const PART_NAMES: Record<string, { name: string; note?: string }> = {
@@ -30,31 +27,6 @@ const PART_ORDER = Object.keys(PART_NAMES);
 export function partName(id: string | null | undefined, label?: string | null): { name: string; note: string | null } {
   const known = id ? PART_NAMES[id] : undefined;
   return known ? { name: known.name, note: known.note ?? null } : { name: label || id || 'Part', note: null };
-}
-
-function mb(bytes: number): string {
-  return bytes > 0 && bytes < MB ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${Math.round(bytes / MB)} MB`;
-}
-
-/** One part's size: 956 MB, 1.19 GB. */
-export function formatPartSize(bytes: number): string {
-  return bytes >= GB ? `${(bytes / GB).toFixed(2)} GB` : mb(bytes);
-}
-
-/** A total: 2.6 GB, 341 MB. */
-export function formatTotalSize(bytes: number): string {
-  return bytes >= GB ? `${(bytes / GB).toFixed(1)} GB` : mb(bytes);
-}
-
-/** "1.3 of 2.6 GB", "120 of 956 MB": both amounts in the unit of the whole. */
-export function formatAmountOf(done: number, total: number, kind: 'part' | 'total'): string {
-  const d = Math.max(0, Math.min(done, total));
-  if (total >= GB) {
-    const digits = kind === 'part' ? 2 : 1;
-    return `${(d / GB).toFixed(digits)} of ${(total / GB).toFixed(digits)} GB`;
-  }
-  if (total >= MB) return `${Math.round(d / MB)} of ${Math.round(total / MB)} MB`;
-  return `${Math.round(d / 1024)} of ${Math.max(1, Math.round(total / 1024))} KB`;
 }
 
 /** "about 24 min left"; only for a positive estimate the Engine reports. */
@@ -178,7 +150,7 @@ export function composePartRows(
     const done = partDone(p, evidence);
     const total = p.bytesTotal ?? 0;
     const got = Math.max(0, Math.min(p.bytesDownloaded ?? 0, total));
-    const amount = total > 0 ? formatAmountOf(got, total, 'part') : null;
+    const amount = total > 0 ? formatBytesOf(got, total) : null;
     const percent = !done && total > 0 && got > 0 ? Math.min(100, Math.floor((got / total) * 100)) : null;
     let words: string;
     if (done) words = 'Done';
