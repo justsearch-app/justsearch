@@ -54,6 +54,8 @@ import { describeExactPath } from '../../../api/exclusionPolicy.js';
 import type { Sv3DraftDomain } from './sv3-draft-domain.js';
 import { SV3_RESULT_NO_DOCUMENT } from './fixtures.js';
 import { SV3_SOURCE_INDEX_ABSENT } from './sv3-citation-anchor.js';
+import { sv3ResultMatch } from './sv3-result-match.js';
+import type { DocumentMatchAnchor } from '../../components/documentPane/DocumentPane.js';
 
 type SearchDraft = Pick<Sv3DraftDomain, 'draftMayIssue' | 'enterResults' | 'humanTask' | 'draftReview'
   | 'revokeHumanTask' | 'tier' | 'prepareAsk' | 'applyPreparation' | 'reconcileForgotten'>;
@@ -72,7 +74,8 @@ interface SearchHost extends Pick<ReactiveControllerHost, 'addController' | 'req
   forgetCompletionOwner(): object | undefined;
   paneDocPath(): string | null;
   closePane(): void;
-  openResult(path: string): void;
+  /** Open a result's file in the pane, at its first returned passage when it has one. */
+  openResult(path: string, match: DocumentMatchAnchor | null): void;
   announceWarning(message: string): void;
   confirmForget(prompt: ForgetConsent, signal: AbortSignal): Promise<boolean>;
   publishForgetCompletion(detail: IndexedForgetCompletion): void;
@@ -442,7 +445,7 @@ export class Sv3SearchController implements ReactiveController {
     }
   }
 
-  /** Open a hit in the document pane — the one pane writer, with no citation to anchor. */
+  /** Open a hit in the document pane — the one pane writer, with no citation, at the hit's passage. */
   onCardOpen(id: string | undefined): void {
     const hit = this.snapshot?.results.find((candidate) => candidate.id === id);
     if (hit === undefined) return;
@@ -450,7 +453,7 @@ export class Sv3SearchController implements ReactiveController {
       this.host.announceWarning(SV3_RESULT_NO_DOCUMENT);
       return;
     }
-    this.host.openResult(hit.path);
+    this.host.openResult(hit.path, sv3ResultMatch(hit));
   }
 
   onCardScopeFile(path: string): void {

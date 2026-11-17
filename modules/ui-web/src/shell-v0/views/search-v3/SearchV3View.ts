@@ -260,8 +260,9 @@ import {
 } from './sv3-run.js';
 import { type Sv3CitationOpen, type Sv3RunDecision, type Sv3StopState } from './Sv3Main.js';
 import type { CitationHeader } from '../../components/chat/evidenceProjection.js';
-import type { DocumentCitationAnchor } from '../../components/documentPane/DocumentPane.js';
+import type { DocumentCitationAnchor, DocumentMatchAnchor } from '../../components/documentPane/DocumentPane.js';
 import { SV3_SOURCE_INDEX_ABSENT } from './sv3-citation-anchor.js';
+import { sv3NextPaneMatch } from './sv3-result-match.js';
 import { setAiActivity, subscribeAiState, type AiState } from '../../state/aiStateStore.js';
 import { selectIndexingProgress } from '../../state/indexingProgress.js';
 import '../../components/IndexingControls.js';
@@ -712,6 +713,7 @@ export class SearchV3View extends JfElement {
     paneDocPath: { state: true },
     paneTab: { state: true },
     paneCitation: { state: true },
+    paneMatch: { state: true },
     paneCitationHeader: { state: true },
     paneSource: { state: true },
     paneWidthPx: { state: true },
@@ -791,6 +793,8 @@ export class SearchV3View extends JfElement {
    * The reader derives its own lines from it; this window converts nothing.
    */
   declare paneCitation: DocumentCitationAnchor | null;
+  /** The opened search result's passage, taken from the result list when it was opened (`sv3-result-match.ts`). */
+  declare paneMatch: DocumentMatchAnchor | null;
   /**
    * Which turn's which source the open pane is showing, so a claim match that lands AFTER the pane
    * opened can be re-resolved onto it (§4). `rag.citations` arrives at retrieval time and
@@ -1115,9 +1119,11 @@ export class SearchV3View extends JfElement {
     forgetCompletionOwner: () => this.forgetCompletionOwner,
     paneDocPath: () => this.paneDocPath,
     closePane: () => this.closePane(),
-    openResult: docPath => {
+    openResult: (docPath, match) => {
       this.details.rememberOpener();
+      const next = sv3NextPaneMatch({ docPath: this.paneDocPath, match: this.paneMatch }, docPath, match);
       this.openPane({ docPath, anchor: null, turnId: '', sourceIndex: SV3_SOURCE_INDEX_ABSENT });
+      this.paneMatch = next;
       if (this.paneOverlay) this.details.focusPane();
     },
     announceWarning: message => emitEphemeralToast({ message, severity: 'warning' }),
@@ -1214,6 +1220,7 @@ export class SearchV3View extends JfElement {
     this.paneTab = null;
     this.paneHighlight = null;
     this.paneCitation = null;
+    this.paneMatch = null;
     this.paneSource = null;
     this.paneCitationHeader = null;
     this.paneWidthPx = SV3_PANE_DEFAULT_PX;
@@ -2077,6 +2084,7 @@ export class SearchV3View extends JfElement {
     this.paneTab = detail.sourceIndex === SV3_SOURCE_INDEX_ABSENT ? SV3_PANE_DOCUMENT_TAB : sv3SourceTab(detail.sourceIndex);
     this.paneHighlight = null;
     this.paneCitation = detail.anchor ?? null;
+    this.paneMatch = null;
     this.paneSource = { turnId: detail.turnId, sourceIndex: detail.sourceIndex,
       ...(detail.sourceUnavailable ? { sourceUnavailable: detail.sourceUnavailable } : {}) };
     this.paneCitationHeader = this.details.headerFor(detail.turnId, detail.sourceIndex, this.paneCitation);
@@ -2118,6 +2126,7 @@ export class SearchV3View extends JfElement {
     this.paneDocPath = null;
     this.paneTab = null;
     this.paneCitation = null;
+    this.paneMatch = null;
     this.paneSource = null;
     this.paneCitationHeader = null;
   }
@@ -2667,6 +2676,7 @@ export class SearchV3View extends JfElement {
         .sizeBytes=${this.search.snapshot?.results.find(hit => hit.path === this.paneDocPath)?.sizeBytes}
         .highlightRange=${this.paneHighlight}
         .citation=${this.paneCitation}
+        .match=${this.paneMatch}
         .citationHeader=${this.paneCitationHeader}
         .tabs=${this.details.tabs()}
         .activeTab=${this.paneTab}

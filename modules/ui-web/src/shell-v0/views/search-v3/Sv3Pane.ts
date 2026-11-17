@@ -27,7 +27,7 @@ import { sv3Shared } from './sv3-shared-styles.js';
 // another window having been mounted first — a surface that leaned on a sibling window's
 // registration would render an unknown element whenever it was reached first.
 import '../../components/documentPane/DocumentPane.js';
-import type { DocumentCitationAnchor, DocumentLineRange } from '../../components/documentPane/DocumentPane.js';
+import type { DocumentCitationAnchor, DocumentLineRange, DocumentMatchAnchor } from '../../components/documentPane/DocumentPane.js';
 import '../../components/detailsPane/DetailsPane.js';
 import type { DetailsPane, DetailsTab } from '../../components/detailsPane/DetailsPane.js';
 import '../../components/detailsPane/DetailsPluginTab.js';
@@ -129,6 +129,7 @@ export class Sv3Pane extends JfElement {
     docPath: { attribute: false },
     sizeBytes: { attribute: false },
     citation: { attribute: false },
+    match: { attribute: false },
     highlightRange: { attribute: false },
     citationHeader: { attribute: false },
     apiBase: { type: String, attribute: 'api-base' },
@@ -153,6 +154,8 @@ export class Sv3Pane extends JfElement {
    * nothing here converts, clamps or interprets it.
    */
   declare citation: DocumentCitationAnchor | null;
+  /** The search result's passage the pane opens at, forwarded as it is; the reader checks it. */
+  declare match: DocumentMatchAnchor | null;
   declare highlightRange: DocumentLineRange | null;
   /** Tempdoc 849 §7 — the citation header, forwarded VERBATIM: this region derives no part of it. */
   declare citationHeader: CitationHeader | null;
@@ -178,6 +181,7 @@ export class Sv3Pane extends JfElement {
     this.docPath = null;
     this.highlightRange = null;
     this.citation = null;
+    this.match = null;
     this.citationHeader = null;
     this.apiBase = '';
     this.overlay = false;
@@ -245,6 +249,7 @@ export class Sv3Pane extends JfElement {
                 .sizeBytes=${this.sizeBytes}
                 .highlightRange=${this.highlightRange}
                 .citation=${this.citation}
+                .match=${this.match}
                 .citationHeader=${this.citationHeader}
                 .markQuery=${this.resultQuery ?? ''}
                 api-base=${this.apiBase}
