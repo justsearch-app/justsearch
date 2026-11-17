@@ -6,19 +6,33 @@
     "root": {
       "advisories": [
         {
+          "ghsa_id": "GHSA-FC5Q-39XC-VJPF",
+          "severity": "high"
+        },
+        {
           "ghsa_id": "GHSA-VFJ7-8CJW-P6XM",
           "severity": "high"
         }
       ]
     },
     "runtime-client": {
-      "advisories": []
+      "advisories": [
+        {
+          "ghsa_id": "GHSA-FC5Q-39XC-VJPF",
+          "severity": "high"
+        }
+      ]
     },
     "shell": {
       "advisories": []
     },
     "ui-web": {
-      "advisories": []
+      "advisories": [
+        {
+          "ghsa_id": "GHSA-FC5Q-39XC-VJPF",
+          "severity": "high"
+        }
+      ]
     },
     "wire-contract": {
       "advisories": []
