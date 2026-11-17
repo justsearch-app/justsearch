@@ -224,7 +224,7 @@ describe('unifiedActivity (pure projection)', () => {
 
   it('projects a kind=index terminal outcome row with a system-attributed label', () => {
     // Tempdoc 550 thesis I: indexing terminal outcomes are the system-operation contributor to the
-    // one log; Activity shows them with an originator=system "Indexed · <collection>" label.
+    // one log; Activity shows them with an originator=system "Read · <collection>" label.
     const backend: BackendLedgerEntry[] = [
       backendEntry({
         id: 'index:2026-05-28T00:00:00.000Z:default:abc123:DONE',
@@ -246,10 +246,10 @@ describe('unifiedActivity (pure projection)', () => {
       }),
     ];
     const rows = unifiedActivity(backend, []);
-    const done = rows.find(r => r.kind === 'index' && r.label.startsWith('Indexed'))!;
+    const done = rows.find(r => r.kind === 'index' && r.label.startsWith('Read ·'))!;
     expect(done.originator).toBe('system');
     expect(done.label).toContain('default');
-    const failed = rows.find(r => r.label.startsWith('Index failed'))!;
+    const failed = rows.find(r => r.label.startsWith("Couldn't read"))!;
     expect(failed.label).toContain('help');
   });
 
@@ -271,9 +271,9 @@ describe('unifiedActivity (pure projection)', () => {
       [],
     );
     const exhausted = rows.find(r => r.kind === 'index')!;
-    expect(exhausted.label).toContain('Index gave up');
+    expect(exhausted.label).toContain('Gave up reading');
     expect(exhausted.label).toContain('docs');
-    expect(exhausted.label).not.toContain('Index failed');
+    expect(exhausted.label).not.toContain("Couldn't read");
   });
 });
 
@@ -583,14 +583,14 @@ describe('scan rollup + index tiering (tempdoc 812)', () => {
     const row = rollup();
     expect(row.isScanRollup).toBe(true);
     expect(row.scanId).toBe('scan-1');
-    expect(row.label).toBe('Indexed 5184 documents · scifact · 6m 12s');
+    expect(row.label).toBe('Read 5184 files · scifact · 6m 12s');
     expect(row.isRoutine).toBeUndefined(); // the audit record is never de-flooded
   });
 
   it('states failures and incompleteness rather than rounding them away', () => {
     expect(rollup({ docsFailed: 3 }).label).toContain('3 failed');
     expect(rollup({ outcome: 'PARTIAL', docsDone: 12 }).label).toContain('(incomplete)');
-    expect(rollup({ outcome: 'STARTED' }).label).toBe('Indexing · scifact…');
+    expect(rollup({ outcome: 'STARTED' }).label).toBe('Reading · scifact…');
     expect(rollup({ durationMs: 45_000 }).label).toContain('45s');
     expect(rollup({ durationMs: 3_780_000 }).label).toContain('1h 03m');
   });

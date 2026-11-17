@@ -366,7 +366,7 @@ export class ActivityDetails extends JfElement {
 
   private renderIndex(row: FeedRow, paths: Readonly<Record<string, string>>): TemplateResult {
     const path = row.entry.pathHash ? paths[row.entry.pathHash] : undefined;
-    return html`<h4>Indexing</h4><dl data-testid="activity-details-index">
+    return html`<h4>Reading</h4><dl data-testid="activity-details-index">
       <dt>Result</dt><dd>${indexResultWords(row.entry.indexState)}</dd>
       <dt>Collection</dt><dd>${row.entry.collection ?? 'default'}</dd>
       <dt>File</dt><dd data-testid="activity-details-file">${path ?? 'Not resolved yet'}</dd>
@@ -387,8 +387,8 @@ export class ActivityDetails extends JfElement {
 
   private renderMembers(record: SelectedRecord): TemplateResult {
     const failed = record.members.filter((m) => m.problem).length;
-    return html`<h4>${record.kind === 'scan' ? 'Documents retained' : 'Records'}</h4>
-      ${record.members.length === 0 ? html`<p class="note" data-testid="activity-details-members-none">No per-document records
+    return html`<h4>${record.kind === 'scan' ? 'Files retained' : 'Records'}</h4>
+      ${record.members.length === 0 ? html`<p class="note" data-testid="activity-details-members-none">No per-file records
         are retained for this scan.</p>` : html`
         ${failed ? html`<p data-testid="activity-details-members-failed">${count(failed, 'record')} failed.</p>` : nothing}
         <ul data-testid="activity-details-members">${record.members.map((member) => html`<li data-testid="activity-details-member"

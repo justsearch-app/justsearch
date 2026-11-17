@@ -64,10 +64,10 @@ export function indexResultOf(state: string | undefined): IndexResult {
 export function indexLabel(state: string | undefined, where: string): string {
   // Tempdoc 885 item 21b: RETRY_EXHAUSTED is the other terminal failure — retried for a week
   // and never readable. Named distinctly because "Index failed" would suggest a bad file.
-  if (state === 'FAILED') return `Index failed · ${where}`;
-  if (state === JOB_STATE_RETRY_EXHAUSTED) return `Index gave up · ${where}`;
-  if (state === 'DONE') return `Indexed · ${where}`;
-  return `Index state unknown${state ? ` (${state})` : ''} · ${where}`;
+  if (state === 'FAILED') return `Couldn't read · ${where}`;
+  if (state === JOB_STATE_RETRY_EXHAUSTED) return `Gave up reading · ${where}`;
+  if (state === 'DONE') return `Read · ${where}`;
+  return `Reading outcome unknown${state ? ` (${state})` : ''} · ${where}`;
 }
 
 /** A backend action-ledger entry (operation or navigation). Mirrors ActionLedgerController. */
@@ -329,13 +329,13 @@ export function projectBackend(e: BackendLedgerEntry): UnifiedActionEntry {
     // per-document rows are the detail of.
     const where = e.collection ? ` · ${e.collection}` : '';
     if (e.outcome === 'STARTED') {
-      label = `Indexing${where}…`;
+      label = `Reading${where}…`;
     } else {
       const dur = formatScanDuration(e.durationMs);
       const failed = (e.docsFailed ?? 0) > 0 ? ` · ${e.docsFailed} failed` : '';
       const partial = e.outcome === 'PARTIAL' ? ' (incomplete)' : '';
       label =
-        `Indexed ${e.docsDone ?? 0} documents${where}${dur ? ' · ' + dur : ''}${failed}${partial}`;
+        `Read ${e.docsDone ?? 0} ${e.docsDone === 1 ? 'file' : 'files'}${where}${dur ? ' · ' + dur : ''}${failed}${partial}`;
     }
   } else if (e.kind === 'operation') {
     // tempdoc 558 Deepening 3 — the outcome is a STRUCTURED facet (the row projects it as a glyph +

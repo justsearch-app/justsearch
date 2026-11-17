@@ -60,8 +60,8 @@ const FAQ: FaqItem[] = [
     a: 'Select text in a document and choose "Summarize" from the menu that appears, or type a request such as "summarize the budget notes" in the search bar. Summaries need the local chat model, which is installed only on a machine with an NVIDIA GPU with at least 7.5 GB of video memory. The model runs on your machine. See Network for downloads, update checks, optional trace export, and connected tools.',
   },
   {
-    q: 'Why is indexing slow?',
-    a: 'Initial indexing can take time for large folders. Once complete, incremental updates are fast. Check the Health tab of the System view for indexing status.',
+    q: 'Why is reading my files slow?',
+    a: 'Reading a large folder for the first time can take a while. After that, changes are picked up quickly. The Health tab of the System view shows how reading is going.',
   },
   {
     q: 'How do I ask the AI a question?',
@@ -103,13 +103,13 @@ const SHORTCUTS: ShortcutRow[] = [
 // Labels are the operation catalog's (registry-operation.en.properties) as rendered by the Library
 // header and the Health quick actions (LibrarySurface.ts, HealthSurface.ts renderActions).
 const TROUBLESHOOTING: string[] = [
-  'If search results look stale, use "Reindex" in Library or in the Health tab of the System view.',
-  'If indexing seems stuck, use "Recover component" in the Health tab of the System view (shown when Settings → Developer → View tier is Operator), or "Rebuild search index" there to rebuild the whole index from scratch, which takes a long time.',
+  'If search results look stale, use "Read everything again" in Library, or "Read changed files" in the Health tab of the System view.',
+  'If reading seems stuck, use "Recover component" in the Health tab of the System view (shown when Settings → Developer → View tier is Operator), or "Rebuild all search data" there to rebuild the whole index from scratch, which takes a long time.',
   'Use "Copy Diagnostic Summary" above before reporting a bug; review it before posting.',
 ];
 
 const NETWORK: string[] = [
-  'The UI connects to the local backend over loopback. Indexing, retrieval, and built-in inference run locally.',
+  'The UI connects to the local backend over loopback. Reading, retrieval, and built-in inference run locally.',
   'Desktop builds with an embedded release URL check GitHub for updates on launch, including CI-built branch candidates and pre-releases. GitHub sees your IP address and request time; the check sends no document content or queries. There is no off switch yet.',
   'Install AI downloads models and runtimes from github.com and huggingface.co with consent. Repair and upgrades can download them again. On Windows, supported NVIDIA hardware also gets an automatically selected CUDA build of llama-server unless you chose your own executable.',
   'Trace export is off by default. Enabling API or index tracing and setting an OTLP endpoint sends traces there; they can include file paths and document excerpts. An endpoint alone does not enable tracing.',
@@ -564,7 +564,7 @@ export class HelpSurface extends JfElement {
                 ${icon({ name: 'shield', size: 16 })} Local-first
               </div>
               <p class="report-description">
-                Search, indexing, and built-in inference run on this machine.
+                Search, reading, and built-in inference run on this machine.
                 The UI talks to the local backend over loopback; network activity is listed below.
               </p>
             </div>

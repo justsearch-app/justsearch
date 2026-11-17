@@ -104,8 +104,8 @@ export const TRACE_FACET_ALTITUDE: Record<TraceFacet, 'user' | 'diagnostic'> = {
 
 /** User-tier wording for the effective retrieval mode (the closed wire vocabulary). */
 const MODE_WORDING: Record<string, string> = {
-  TEXT: 'Keyword search',
-  VECTOR: 'Semantic search',
+  TEXT: 'Word search',
+  VECTOR: 'Search by meaning',
   HYBRID: 'Hybrid search',
   SPLADE: 'SPLADE search',
 };
@@ -139,7 +139,7 @@ const EXPANSION_SKIP_WORDING: Record<string, string> = {
  */
 export const DEGRADATION_REASON_WORDING: Record<string, string> = {
   // embedding / index-model readiness
-  INITIALIZING: 'semantic search is still warming up',
+  INITIALIZING: 'search by meaning is still warming up',
   NO_EMBEDDING_MODEL: 'no embedding model is loaded',
   NEW_INDEX_NO_FINGERPRINT: 'the index is still being prepared',
   LEGACY_INDEX_NO_FINGERPRINT: 'the index needs a one-time rebuild',
@@ -156,12 +156,12 @@ export const DEGRADATION_REASON_WORDING: Record<string, string> = {
   EMBEDDING_GENERATION_FAILED: 'query encoding failed',
   EMBEDDING_EXCEPTION: 'query encoding hit an error',
   SKIPPED_SHORT_QUERY:
-    'Semantic ranking was skipped because the query is too short to produce a useful semantic signal.',
+    'Ranking by meaning was skipped because the query is too short to produce a useful semantic signal.',
   SKIPPED_NO_DISCRIMINATIVE_TERM:
-    'Semantic ranking was skipped — every word in this query is common across your documents.',
+    'Ranking by meaning was skipped — every word in this query is common across your documents.',
   // Spec D §6.3 (ADR-0050 decision 1): a query encoder leg did not finish inside the search's
   // semantic sub-budget, so the search answered with the legs it had.
-  SEMANTIC_BUDGET_EXCEEDED: 'semantic search did not answer in time',
+  SEMANTIC_BUDGET_EXCEEDED: 'search by meaning did not answer in time',
 };
 
 /**
@@ -280,10 +280,10 @@ export function userSummaryParts(trace: SearchTrace): string[] {
     if (d.vectorBlockedReason.startsWith('SKIPPED_')) {
       parts.push(
         DEGRADATION_REASON_WORDING[d.vectorBlockedReason]
-          ?? `Semantic ranking was skipped (${d.vectorBlockedReason})`,
+          ?? `Ranking by meaning was skipped (${d.vectorBlockedReason})`,
       );
     } else {
-      parts.push(degradationPhrase('semantic ranking blocked', d.vectorBlockedReason));
+      parts.push(degradationPhrase('ranking by meaning blocked', d.vectorBlockedReason));
     }
   }
   if (d?.hybridFallback && d.hybridFallbackReason) {

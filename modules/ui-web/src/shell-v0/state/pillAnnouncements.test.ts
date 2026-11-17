@@ -89,7 +89,7 @@ describe('FC10 a fresh install where nobody asked for AI says nothing of AI it d
   ] as const)('an AI install the person started that %s still needs them, shown and spoken alike', async (_case, install) => {
     const { shown, spoken } = await pillWith(observe(install));
     expect(shown).toBe('1 needs you');
-    expect(spoken.some((text) => /needs? you|AI install failed|Install Failed|Download Paused|Semantic search degraded|Service degraded/i.test(text)),
+    expect(spoken.some((text) => /needs? you|AI install failed|Install Failed|Download Paused|Search by meaning degraded|Service degraded/i.test(text)),
       `something spoken says so: ${spoken.join(' | ')}`).toBe(true);
   });
 });

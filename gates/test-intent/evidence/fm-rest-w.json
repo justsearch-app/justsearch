@@ -1,0 +1,367 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-17T11:57:52.781Z",
+  "revision": "b63294eff82721866fe2a66b3b8e5d90ccfc0277",
+  "tree": "dfa39326bc4f005c34bc34a2008a767fb7f5617f",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/first-minutes-wording.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-vitest-29260-1794916661184.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 3135
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words each cause row in the first-minutes names",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readiness notices say reading, search by meaning and word search words each cause row in the first-minutes names",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words the banner headlines and bodies in the first-minutes names",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readiness notices say reading, search by meaning and word search words the banner headlines and bodies in the first-minutes names",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words the shared caveats in the first-minutes names",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readiness notices say reading, search by meaning and word search words the shared caveats in the first-minutes names",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words the rebuild verdict body in the first-minutes names",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "readiness notices say reading, search by meaning and word search words the rebuild verdict body in the first-minutes names",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#says the AI engine prepares search by meaning",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "progress and coverage say reading and search by meaning says the AI engine prepares search by meaning",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#names a blocked embedding stage as search by meaning and the fallback as word search",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "progress and coverage say reading and search by meaning names a blocked embedding stage as search by meaning and the fallback as word search",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words the coverage caveats and labels",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "progress and coverage say reading and search by meaning words the coverage caveats and labels",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words a reading record, its outcome and its source",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Activity says the app read files words a reading record, its outcome and its source",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words a scan as reading a number of files, singular and plural",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Activity says the app read files words a scan as reading a number of files, singular and plural",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words the retrieval mode and the meaning-ranking reasons",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "the search trace says search by meaning and word search words the retrieval mode and the meaning-ranking reasons",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#state/readinessNotice.ts",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "guard: no old names in display text state/readinessNotice.ts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#state/verdict.ts",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "guard: no old names in display text state/verdict.ts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#state/indexingProgress.ts",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "guard: no old names in display text state/indexingProgress.ts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#state/enrichmentCoverage.ts",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "guard: no old names in display text state/enrichmentCoverage.ts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#views/BrainSurface.ts",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "guard: no old names in display text views/BrainSurface.ts",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#aggregate-substrate/strategies/searchTraceExplain.ts",
+      "file": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:9eba6fc6f39d275069e52a479efd1868dea887d3cf45f4cae35bf8a8abac65b7",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "guard: no old names in display text aggregate-substrate/strategies/searchTraceExplain.ts",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b63294eff8",
+    "revision": "b63294eff82721866fe2a66b3b8e5d90ccfc0277",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/first-minutes-wording.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-vitest-29260-1794916669762.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2420,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-vitest-29260-1794916669762.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words each cause row in the first-minutes names",
+        "classification": "assertion",
+        "detail": "readiness notices say reading, search by meaning and word search words each cause row in the first-minutes names:  AssertionError: expected 'Outside indexing hours.' to be 'Outside reading hours.' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:40:49\n    at file:///home/elias/dev/justse"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words the banner headlines and bodies in the first-minutes names",
+        "classification": "assertion",
+        "detail": "readiness notices say reading, search by meaning and word search words the banner headlines and bodies in the first-minutes names:  AssertionError: expected 'Semantic search paused; keyword searc…' to be 'Search by meaning paused; word search…' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:63:30\n    a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words the shared caveats in the first-minutes names",
+        "classification": "assertion",
+        "detail": "readiness notices say reading, search by meaning and word search words the shared caveats in the first-minutes names:  AssertionError: expected 'Showing keyword-ranked results — sema…' to be 'Showing keyword-ranked results — rank…' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:86:37\n    a"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words the rebuild verdict body in the first-minutes names",
+        "classification": "assertion",
+        "detail": "readiness notices say reading, search by meaning and word search words the rebuild verdict body in the first-minutes names:  AssertionError: expected 'Semantic search is paused while the i…' to be 'Search by meaning is paused while the…' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:93:8\n    at"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#says the AI engine prepares search by meaning",
+        "classification": "assertion",
+        "detail": "progress and coverage say reading and search by meaning says the AI engine prepares search by meaning:  AssertionError: expected 'Indexing embeddings…' to be 'Preparing search by meaning…' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:99:67\n    at file:///home/elias/dev/jus"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#names a blocked embedding stage as search by meaning and the fallback as word search",
+        "classification": "assertion",
+        "detail": "progress and coverage say reading and search by meaning names a blocked embedding stage as search by meaning and the fallback as word search:  AssertionError: expected 'Semantic search unavailable' to be 'Search by meaning unavailable' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:110:39\n    at file:///home/elia"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words the coverage caveats and labels",
+        "classification": "assertion",
+        "detail": "progress and coverage say reading and search by meaning words the coverage caveats and labels:  AssertionError: expected 'keyword search ready · semantic searc…' to be 'word search ready · search by meaning…' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:115:43"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words a reading record, its outcome and its source",
+        "classification": "assertion",
+        "detail": "Activity says the app read files words a reading record, its outcome and its source:  AssertionError: expected 'Indexed · docs' to be 'Read · docs' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:125:40\n    at file:///home/elias/dev/justsearch/.claude/worktr"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words a scan as reading a number of files, singular and plural",
+        "classification": "assertion",
+        "detail": "Activity says the app read files words a scan as reading a number of files, singular and plural:  AssertionError: expected 'Indexed 2 documents · docs · 45s' to be 'Read 2 files · docs · 45s' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:141:22\n    at file:///home/eli"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#words the retrieval mode and the meaning-ranking reasons",
+        "classification": "assertion",
+        "detail": "the search trace says search by meaning and word search words the retrieval mode and the meaning-ranking reasons:  AssertionError: expected [ 'Keyword search' ] to deeply equal [ 'Word search' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:149:111\n    at file:///home/elias/dev/justsearch/.claude/worktrees"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#state/readinessNotice.ts",
+        "classification": "assertion",
+        "detail": "guard: no old names in display text state/readinessNotice.ts:  AssertionError: expected [ { line: 144, …(1) }, …(16) ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:193:18\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-re"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#state/verdict.ts",
+        "classification": "assertion",
+        "detail": "guard: no old names in display text state/verdict.ts:  AssertionError: expected [ { line: 491, …(1) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:193:18\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest/modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#state/indexingProgress.ts",
+        "classification": "assertion",
+        "detail": "guard: no old names in display text state/indexingProgress.ts:  AssertionError: expected [ { line: 694, …(1) }, …(5) ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:193:18\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-res"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#state/enrichmentCoverage.ts",
+        "classification": "assertion",
+        "detail": "guard: no old names in display text state/enrichmentCoverage.ts:  AssertionError: expected [ { line: 49, …(1) }, …(4) ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:193:18\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#views/BrainSurface.ts",
+        "classification": "assertion",
+        "detail": "guard: no old names in display text views/BrainSurface.ts:  AssertionError: expected [ { line: 3697, …(1) } ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:193:18\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest/mod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/first-minutes-wording.test.ts#aggregate-substrate/strategies/searchTraceExplain.ts",
+        "classification": "assertion",
+        "detail": "guard: no old names in display text aggregate-substrate/strategies/searchTraceExplain.ts:  AssertionError: expected [ { line: 107, …(1) }, …(3) ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/fmw/t/test-intent-before-itSfwj/modules/ui-web/src/shell-v0/first-minutes-wording.test.ts:193:18\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-res"
+      }
+    ]
+  },
+  "digest": "sha256:897b32c82ceedfba4626ef3db2148d2ee1276bf5254817b710d550993ba6b405"
+}

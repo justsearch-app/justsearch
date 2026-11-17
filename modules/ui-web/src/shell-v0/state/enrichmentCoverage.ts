@@ -46,7 +46,7 @@ export interface EnrichmentProgress {
  * 2's "we already have an honest vocabulary elsewhere" constraint). Says what IS true (keyword search
  * works) before what is not yet.
  */
-export const ENRICHMENT_CATCHING_UP_CAVEAT = 'keyword search ready · semantic search still catching up';
+export const ENRICHMENT_CATCHING_UP_CAVEAT = 'word search ready · search by meaning still catching up';
 
 /**
  * The caveat a completion claim carries when the semantic layers CANNOT be built at all — no
@@ -58,14 +58,14 @@ export const ENRICHMENT_CATCHING_UP_CAVEAT = 'keyword search ready · semantic s
  * first, then what does not — so the two tiers read as one vocabulary rather than two moods.
  */
 export const ENRICHMENT_BLOCKED_CAVEAT =
-  'keyword search ready · semantic search waiting for AI install';
+  'word search ready · search by meaning waiting for AI install';
 
 /**
  * The short STATUS label for the blocked state — {@link ENRICHMENT_IN_PROGRESS_LABEL}'s twin, for a
  * card whose subject is the work (Health's queue card). Its terminal "Up to date" is a coverage
  * claim (813 §4), and coverage is exactly what is missing here.
  */
-export const ENRICHMENT_BLOCKED_LABEL = 'Semantic search waiting for AI install';
+export const ENRICHMENT_BLOCKED_LABEL = 'Search by meaning waiting for AI install';
 
 /**
  * The short status label for a card whose subject is the WORK, not a folder — Health's queue card,
@@ -73,7 +73,7 @@ export const ENRICHMENT_BLOCKED_LABEL = 'Semantic search waiting for AI install'
  * Deliberately the phrase the Brain surface's own progress card already uses for this exact work, so
  * the two name the same thing the same way rather than inventing a second vocabulary.
  */
-export const ENRICHMENT_IN_PROGRESS_LABEL = 'Building semantic search';
+export const ENRICHMENT_IN_PROGRESS_LABEL = 'Preparing search by meaning';
 
 /**
  * 813 §19 (W1) — the BODY tier of a progress surface whose own phase noun ("Enriching") is already
@@ -86,7 +86,7 @@ export const ENRICHMENT_IN_PROGRESS_LABEL = 'Building semantic search';
  * line and the Health "Now" strip's enrichment row) outside the shared-vocabulary module, which is
  * the fork this module exists to prevent.
  */
-export const ENRICHMENT_BODY = 'semantic search catching up';
+export const ENRICHMENT_BODY = 'search by meaning catching up';
 
 const positive = (n: number | undefined | null): boolean => typeof n === 'number' && n > 0;
 

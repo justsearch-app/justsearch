@@ -142,7 +142,7 @@ describe('WP3.3 complete surface sweep', () => {
       const card = dom(el.renderEnrichmentProgress());
       expect(card.textContent, which).toContain(expectedReason(which));
       expect(card.querySelector('.spin, [class*="spin"]') === null, which).toBe(which !== 'chat');
-      if (which !== 'chat') expect(card.textContent, which).not.toContain('Building semantic search');
+      if (which !== 'chat') expect(card.textContent, which).not.toContain('Preparing search by meaning');
       if (unconfirmed(which)) expect(card.textContent).toContain('pending when last observed');
     }
   });
@@ -154,7 +154,7 @@ describe('WP3.3 complete surface sweep', () => {
       Object.assign(el._unifiedAiState.aiEngine, { awaitingChatEnable });
       const panel = dom(el.renderSimplePanel());
       expect(panel.textContent, `${which}, ${jobs} files`).not.toContain(expectedReason(which));
-      expect(panel.textContent).not.toContain('Indexing embeddings');
+      expect(panel.textContent).not.toContain('Preparing search by meaning');
       expect(panel.textContent).not.toContain('Reading embeddings');
     }
   });
@@ -299,7 +299,7 @@ describe('WP3.3 complete surface sweep', () => {
     if (result.kind === 'unavailable') {
       expect(result.transient).toBeFalsy();
       expect(result.reason).not.toContain('Reading in progress');
-      expect(result.reason).toContain('documents');
+      expect(result.reason).toContain('files');
     }
   });
 
@@ -339,7 +339,7 @@ describe('WP3.3 complete surface sweep', () => {
       const callout = dom(el.renderCompatibilityCallouts());
       // Slice 7a (AM9, X7): populated causes and the fallback both in read words on Brain.
       expect(callout.textContent).toContain(reasons.length ? 'Read everything again to restore full search.' : 'Read everything again');
-      expect(callout.textContent).not.toContain('built before semantic search');
+      expect(callout.textContent).not.toContain('built before search by meaning');
       if (unconfirmed(which)) expect(callout.textContent, which).toContain(UNCONFIRMED);
     }
   });
@@ -350,7 +350,7 @@ describe('WP3.3 complete surface sweep', () => {
       state.verdict = { kind: 'degraded', severity: 'warn', reasons: ['index.throughput_stalled'] };
       const banner = await searchBanner(state);
       if (unconfirmed(which)) expect(banner.textContent, which).toContain(UNCONFIRMED);
-      else expect(banner.textContent, which).toContain('Semantic search degraded');
+      else expect(banner.textContent, which).toContain('Search by meaning degraded');
     }
   });
 

@@ -691,8 +691,8 @@ export function selectIndexingProgress(
       PAUSE_REASON_WORDING.get(reason) ?? 'Reading is on hold; reason unavailable.').join(' '),
       work.blockedPending > 0 && (!work.embeddingBlocked || work.applicable.embedding)
         ? work.embeddingBlocked && status.worker?.enrichment?.embeddingAvailable === false
-          ? 'Embedding cannot run right now. Keyword search remains available.'
-          : 'Some enrichment cannot run right now. Keyword search remains available.' : '',
+          ? 'Embedding cannot run right now. Word search remains available.'
+          : 'Some enrichment cannot run right now. Word search remains available.' : '',
       (pause.reasons ?? [pause.reason]).includes('user_paused') && pause.untilEpochMs != null
         ? `Until ${formatDeadline(new Date(pause.untilEpochMs))}.` : '',
       pause.waiting && pause.reason !== 'settings_recovery'
@@ -804,7 +804,7 @@ function indexingActivity(
   if (phase === 'error') {
     const failed = count(status.worker?.failure?.failedJobs);
     return { summary: 'Reading error',
-      detail: readEnrichmentWork(status).incomplete ? 'Some enrichment failed or is missing. Keyword search remains available.' : failed > 0 ? `${formatCount(failed)} ${failed === 1 ? 'file could' : 'files could'} not be read.`
+      detail: readEnrichmentWork(status).incomplete ? 'Some enrichment failed or is missing. Word search remains available.' : failed > 0 ? `${formatCount(failed)} ${failed === 1 ? 'file could' : 'files could'} not be read.`
         : 'Some files could not be read.',
       confirmed: true, enrichmentDeferred };
   }
@@ -820,18 +820,18 @@ function indexingActivity(
   }
   if (phase === 'unknown') return { ...EMPTY.activity, detail: 'Enrichment status could not be read.' };
   if (phase === 'blocked' && !readEnrichmentWork(status).embeddingBlocked) {
-    return { summary: 'Enrichment unavailable', detail: ['Some enrichment cannot run right now. Keyword search remains available.', ...details].join(' '),
+    return { summary: 'Enrichment unavailable', detail: ['Some enrichment cannot run right now. Word search remains available.', ...details].join(' '),
       confirmed: true, enrichmentDeferred: true };
   }
   if (phase === 'blocked' && status.worker?.enrichment?.embeddingEnabled !== false) {
-    return { summary: 'Semantic search unavailable', detail: ['Embedding cannot run right now. Keyword search remains available.', ...details].join(' '),
+    return { summary: 'Search by meaning unavailable', detail: ['Embedding cannot run right now. Word search remains available.', ...details].join(' '),
       confirmed: true, enrichmentDeferred: true };
   }
   const summary = phase === 'indexing'
     ? energy || gpuCauses.length > 0 ? 'Text reading continues' : 'Reading'
     : phase === 'enriching'
       ? energy ? 'Meaning processing is waiting to save energy' : gpuCauses.length > 0 ? 'Meaning processing is waiting for the GPU' : 'Search is ready — still improving'
-      : phase === 'blocked' ? 'Semantic search waiting for AI install'
+      : phase === 'blocked' ? 'Search by meaning waiting for AI install'
         : status.worker?.core?.indexHealthy === true ? 'Ready — fully searchable' : 'Reading queue empty';
   return { summary, detail: details.join(' ') || null, confirmed: true, enrichmentDeferred };
 }

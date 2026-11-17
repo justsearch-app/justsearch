@@ -1108,7 +1108,7 @@ describe('enrichment status truthfulness', () => {
     } } as Parameters<typeof snapshot>[0]);
     const progress = select(status, true);
     expect(progress.phase).toBe('blocked');
-    expect(progress.activity.summary).toBe('Semantic search unavailable');
+    expect(progress.activity.summary).toBe('Search by meaning unavailable');
     expect(progress.enrichingEtaSeconds).toBeNull();
     status.worker!.enrichment!.embeddingAvailable = true;
     expect(selectIndexingPhase(status)).toBe('enriching');

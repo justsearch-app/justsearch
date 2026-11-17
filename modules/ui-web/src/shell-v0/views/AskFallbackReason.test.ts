@@ -20,13 +20,13 @@ describe('Ask retrieval explanation', () => {
   }
 
   it('Search Ask shows its fallback cause without opening sources', () => {
-    expect(askNote('complete')).toContain('semantic search did not answer in time');
+    expect(askNote('complete')).toContain('search by meaning did not answer in time');
     expect(askNote('complete')).toContain('encoder busy with other work');
   });
 
   it('Search Ask keeps its fallback cause on an empty terminal error', () => {
     expect(askNote('failed')).toContain('No matching documents found in the index');
-    expect(askNote('failed')).toContain('semantic search did not answer in time');
+    expect(askNote('failed')).toContain('search by meaning did not answer in time');
     expect(askNote('failed')).toContain('encoder busy with other work');
   });
 });

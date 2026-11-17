@@ -444,7 +444,7 @@ describe('D1-14 — semantic pause during an in-place build', () => {
       severity: 'warn',
       reasons: ['rebuilding', 'source:embedding_model_change', 'index.embedding_rebuilding'],
     });
-    expect(verdictBody(verdict)).toContain('keyword search remains available');
+    expect(verdictBody(verdict)).toContain('word search remains available');
   });
 
   it('carries the physical encoder reload through rebuilding and generation-switch transitions', () => {
@@ -466,7 +466,7 @@ describe('D1-14 — semantic pause during an in-place build', () => {
     for (const { stability, reasons } of cases) {
       const verdict = computeVerdict({ phase: 'connected', stability, readiness: reloading });
       expect(verdict).toEqual({ kind: 'transitioning', severity: 'info', reasons });
-      expect(verdictBody(verdict)).toContain('keyword search remains available');
+      expect(verdictBody(verdict)).toContain('word search remains available');
     }
   });
 
@@ -492,7 +492,7 @@ describe('D1-14 — semantic pause during an in-place build', () => {
       readiness: known(readyReadiness),
     });
     expect(beside.reasons).not.toContain('encoders.reloading');
-    expect(verdictBody(beside)).not.toContain('keyword search remains available');
+    expect(verdictBody(beside)).not.toContain('word search remains available');
 
     const stale = computeVerdict({ phase: 'stale', stability: rebuilding, readiness: reloading });
     expect(stale.reasons).not.toContain('encoders.reloading');
@@ -592,7 +592,7 @@ describe('D1-15 — migration readiness reasons remain reachable through transit
     expect(verdictHeadline(verdict)).toBe('Migration needs operator review');
     expect(verdictBody(verdict)).toContain('current index remains available');
     expect(verdictBody(verdict)).toContain('operator');
-    expect(verdictBody(verdict)).not.toContain('keyword');
+    expect(verdictBody(verdict)).not.toMatch(/keyword|word (results|search)/);
   });
 });
 

@@ -3252,7 +3252,7 @@ export class SettingsSurface extends JfElement {
     const progress = selectIndexingProgress(s?.status, s?.indexingStatusLive ?? false,
       s?.episodeMaxPendingJobs ?? 0, s?.enrichSettleSamples ?? []);
     return html`<section class="section" data-testid="settings-indexing">
-      <h3>Indexing</h3>
+      <h3>Reading files</h3>
       <p>${progress.activity.summary}${progress.activity.detail ? ` — ${progress.activity.detail}` : ''}</p>
       ${progress.pause?.reason !== 'settings_recovery' ? html`<p>Pause reading while keeping your files searchable. Resume clears your manual pause; reading hours and battery rules still apply.</p>` : nothing}
       <jf-indexing-controls allow-pause .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>

@@ -3694,7 +3694,7 @@ export class BrainSurface extends JfElement {
             ${icon({ name: 'zap', size: 18 })}
             <div class="status-content">
               <div class="observed-heading">
-                Semantic search build — last known
+                Search by meaning build — last known
               </div>
               <div class="status-description">
                 ${progress.activity.summary}${this._unifiedAiState?.snapshotLive ? '' : ` — ${reasonFor('binding.unreachable').wording}`} — these figures are the last observed

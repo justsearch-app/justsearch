@@ -173,7 +173,7 @@ describe('first use through the real frame', { timeout: 60_000 }, () => {
     await page.evaluate(() => (window as unknown as AppWindow).finishAdd({ success: true })); await settle(page);
     expect(await focusedLabel(page)).toBe('Add a folder');
     await page.evaluate(() => (window as unknown as AppWindow).observe(1, 1)); await settle(page);
-    expect(await page.getByText('Folder added. Indexing activity is shown below.', { exact: true }).count()).toBe(0);
+    expect(await page.getByText('Folder added. Reading progress is shown below.', { exact: true }).count()).toBe(0);
     await page.evaluate(() => (window as unknown as AppWindow).observe(0, 0)); await settle(page);
     expect(await page.getByText('Nothing to search yet', { exact: true }).count()).toBe(1);
   });

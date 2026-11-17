@@ -11,7 +11,7 @@ import { indexResultOf } from './ActionLedgerClient.js';
 import { transportOf, type FeedRow, type SelectedRecord } from './activityFeed.js';
 
 const SOURCE_WORDS: Record<string, string> = {
-  WORKER_INDEXER: 'Background indexing',
+  WORKER_INDEXER: 'Background reading',
   URL_BAR: 'You, from the address bar',
   URL_DEEPLINK: 'A link from another app',
   PALETTE: 'You, from the command palette',
@@ -84,7 +84,7 @@ export function groupSourceWords(members: readonly FeedRow[]): string {
 /** What an index record's state establishes, in words; an unrecognised state is disclosed beside "Unknown". */
 export function indexResultWords(state: string | undefined): string {
   const result = indexResultOf(state);
-  return result === 'indexed' ? 'Indexed' : result === 'failed'
+  return result === 'indexed' ? 'Read' : result === 'failed'
     ? (state === 'RETRY_EXHAUSTED' ? 'Gave up after retrying' : 'Failed') : `Unknown${state ? ` (${state})` : ''}`;
 }
 

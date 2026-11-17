@@ -25,14 +25,14 @@ describe('readinessNotice — searches answered on the CPU (b6d536 X2)', () => {
     expect(severityForCodes([stuck, onCpu])).toBe('info');
     const notice = readinessNotice(degraded('info', [stuck, onCpu]));
     expect(notice?.headline).toBe('Reduced search capability.');
-    expect(notice?.body).not.toContain('keyword');
+    expect(notice?.body).not.toMatch(/keyword|word (results|search)/);
     expect(notice?.causes).toEqual([
-      'The semantic search encoder is stalled',
+      'Search by meaning is stalled',
       'Searches are running on the CPU while the GPU is busy',
     ]);
     // Beside a genuine retrieval cause, the impairing notice names that cause, not the stall.
     const impaired = readinessNotice(degraded('warn', ['index.dense_unavailable', stuck, onCpu]));
-    expect(impaired?.headline).toBe('Semantic search degraded.');
-    expect(impaired?.causes).not.toContain('The semantic search encoder is stalled');
+    expect(impaired?.headline).toBe('Search by meaning degraded.');
+    expect(impaired?.causes).not.toContain('Search by meaning is stalled');
   });
 });

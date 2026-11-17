@@ -72,11 +72,11 @@ describe('searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut)', () =
       stages: [{ id: 'expansion', status: 'skipped', reason: 'TIMEOUT' }],
     });
     const parts = userSummaryParts(trace);
-    expect(parts).toContain('Keyword search');
+    expect(parts).toContain('Word search');
     expect(parts).toContain('AI expansion timed out');
-    expect(parts).toContain('semantic ranking blocked (ENCODER_OOM)');
+    expect(parts).toContain('ranking by meaning blocked (ENCODER_OOM)');
     const user = renderToHost(trace).querySelector('[data-testid="search-explain-user"]');
-    expect(user?.textContent).toContain('Keyword search');
+    expect(user?.textContent).toContain('Word search');
   });
 
   it('echoes a correction and an executed expansion in the user grammar', () => {
@@ -204,7 +204,7 @@ describe('searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut)', () =
     expect(row?.textContent).toContain('Query understanding');
     expect(row?.textContent).toContain('executed (INFORMATIONAL)');
     expect(row?.textContent).not.toMatch(/disabled|bypassed|LLM/);
-    expect(userSummaryParts(trace)).toEqual(['Keyword search']);
+    expect(userSummaryParts(trace)).toEqual(['Word search']);
   });
 
   it('renders disabled classification without inventing a detected value', () => {
@@ -215,7 +215,7 @@ describe('searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut)', () =
     const row = renderToHost(trace).querySelector('[data-stage="query-understanding"]');
     expect(row?.textContent).toContain('disabled (DISABLED)');
     expect(row?.textContent).not.toContain('INFORMATIONAL');
-    expect(userSummaryParts(trace)).toEqual(['Keyword search']);
+    expect(userSummaryParts(trace)).toEqual(['Word search']);
   });
 
   it('STAGE_LABELS covers the closed StageId vocabulary exactly', () => {
@@ -237,7 +237,7 @@ describe('searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut)', () =
       },
     });
     const parts = userSummaryParts(trace);
-    expect(parts).toContain('semantic ranking blocked — the index needs a one-time rebuild');
+    expect(parts).toContain('ranking by meaning blocked — the index needs a one-time rebuild');
     // The raw enum code never appears in the user line.
     expect(parts.join(' · ')).not.toContain('LEGACY_INDEX_NO_FINGERPRINT');
   });
@@ -299,10 +299,10 @@ describe('searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut)', () =
     });
     const parts = userSummaryParts(trace);
     expect(parts).toContain(
-      'fell back from hybrid — semantic search did not answer in time (encoder busy with other work)',
+      'fell back from hybrid — search by meaning did not answer in time (encoder busy with other work)',
     );
     expect(parts).toContain(
-      'SPLADE skipped — semantic search did not answer in time (search models still loading)',
+      'SPLADE skipped — search by meaning did not answer in time (search models still loading)',
     );
     const line = parts.join(' · ');
     expect(line).not.toContain('SEMANTIC_BUDGET_EXCEEDED');
@@ -332,7 +332,7 @@ describe('searchTraceExplain strategy (549 D1 + 577 Phase 3 altitude cut)', () =
       },
     });
     expect(userSummaryParts(trace)).toContain(
-      'Semantic ranking was skipped — every word in this query is common across your documents.',
+      'Ranking by meaning was skipped — every word in this query is common across your documents.',
     );
   });
 

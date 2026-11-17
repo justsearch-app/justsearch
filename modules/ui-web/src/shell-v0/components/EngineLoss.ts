@@ -290,7 +290,7 @@ export class EngineLossTreatment extends JfElement {
         data-testid="engine-loss">
         <div class="mark" aria-hidden="true">${icon({ name: 'power', size: 18 })}</div>
         <h2 id="engine-loss-title">${title}</h2>
-        <p id="engine-loss-body">Searching and indexing are on hold. Your files and your index are safe.${retries}${reason ? ` ${reason}` : ''}</p>
+        <p id="engine-loss-body">Searching and reading are on hold. Your files and your index are safe.${retries}${reason ? ` ${reason}` : ''}</p>
         ${desktop ? nothing : html`<p>The engine runs outside this browser. Restart it where it runs, then try again.</p>`}
         <div class="actions">
           ${desktop

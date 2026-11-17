@@ -669,7 +669,7 @@ describe('HealthSurface — Queue card status vocabulary (630 D1)', () => {
       expect(subs).not.toContain('Up to date');
       expect(subs).not.toContain('Idle');
       // 446 of 2000 passages settled ⇒ the card names the work AND its honest percent.
-      expect(subs).toContain('Building semantic search — 22%');
+      expect(subs).toContain('Preparing search by meaning — 22%');
     } finally {
       teardown(el);
     }
@@ -714,9 +714,9 @@ describe('HealthSurface — Queue card status vocabulary (630 D1)', () => {
     try {
       const subs = queueSubs(el);
       expect(subs).not.toContain('Up to date');
-      expect(subs).toContain('Semantic search waiting for AI install');
+      expect(subs).toContain('Search by meaning waiting for AI install');
       // Nothing is progressing, so no percent and no "Building…" present tense.
-      expect(subs.join(' ')).not.toContain('Building semantic search');
+      expect(subs.join(' ')).not.toContain('Preparing search by meaning');
       expect(subs.join(' ')).not.toContain('%');
     } finally {
       teardown(el);
@@ -766,7 +766,7 @@ describe('HealthSurface — Queue card status vocabulary (630 D1)', () => {
     const el = await mount();
     try {
       const subs = queueSubs(el);
-      expect(subs).toContain('Building semantic search — 64%');
+      expect(subs).toContain('Preparing search by meaning — 64%');
       expect(subs).not.toContain('Up to date');
       expect(subs).not.toContain('Idle');
     } finally {
@@ -785,7 +785,7 @@ describe('HealthSurface — Queue card status vocabulary (630 D1)', () => {
     const el = await mount();
     try {
       const subs = queueSubs(el);
-      expect(subs).toContain('Building semantic search — 75%');
+      expect(subs).toContain('Preparing search by meaning — 75%');
       expect(subs).not.toContain('Up to date');
     } finally {
       teardown(el);
@@ -804,7 +804,7 @@ describe('HealthSurface — Queue card status vocabulary (630 D1)', () => {
     try {
       const subs = queueSubs(el);
       expect(subs).toContain('Up to date');
-      expect(subs.some((s) => s.startsWith('Building semantic search'))).toBe(false);
+      expect(subs.some((s) => s.startsWith('Preparing search by meaning'))).toBe(false);
     } finally {
       teardown(el);
     }

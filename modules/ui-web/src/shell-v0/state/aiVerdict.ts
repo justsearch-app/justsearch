@@ -548,7 +548,7 @@ export function aiEngineBody(v: AiEngineVerdict): string {
       // §15 decision 1 copy — honest about chat being off while the engine finishes background work.
       return 'AI engine is finishing document understanding — chat is off.';
     case 'indexing':
-      return 'Indexing embeddings…';
+      return 'Preparing search by meaning…';
   }
 }
 

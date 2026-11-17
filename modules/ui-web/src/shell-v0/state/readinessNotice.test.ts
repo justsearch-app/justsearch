@@ -40,9 +40,9 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
       reasons: ['rebuilding', 'source:embedding_model_change', 'index.embedding_rebuilding'],
     };
     const notice = readinessNotice(paused);
-    expect(notice?.headline).toBe('Semantic search paused; keyword search available.');
-    expect(notice?.body).toContain('Keyword search remains available');
-    expect(notice?.causes).toEqual(['Semantic search is being rebuilt — keyword results are complete, semantic ranking resumes when it finishes.']);
+    expect(notice?.headline).toBe('Search by meaning paused; word search available.');
+    expect(notice?.body).toContain('Word search remains available');
+    expect(notice?.causes).toEqual(['Search by meaning is being rebuilt — word results are complete, ranking by meaning resumes when it finishes.']);
     expect(warrantsSearchDegradationBanner(paused)).toBe(true);
     expect(readinessNotice({ ...paused, reasons: ['rebuilding', 'source:embedding_model_change'] })).toBeNull();
   });
@@ -52,16 +52,16 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
       reasons: ['rebuilding', 'encoders.reloading'],
     };
     const notice = readinessNotice(reloading);
-    expect(notice?.headline).toBe('Semantic search paused; keyword search available.');
-    expect(notice?.body).toContain('Keyword search remains available');
-    expect(notice?.causes).toEqual(['Semantic search models are reloading']);
+    expect(notice?.headline).toBe('Search by meaning paused; word search available.');
+    expect(notice?.body).toContain('Word search remains available');
+    expect(notice?.causes).toEqual(['Search by meaning models are reloading']);
 
     const both = readinessNotice({
       ...reloading,
       severity: 'warn',
       reasons: ['rebuilding', 'index.embedding_rebuilding', 'encoders.reloading'],
     });
-    expect(both?.causes).toEqual(['Semantic search models are reloading']);
+    expect(both?.causes).toEqual(['Search by meaning models are reloading']);
   });
   it('D1-15: presents activating and parked-candidate transitions while A remains available', () => {
     const activating = readinessNotice({
@@ -84,7 +84,7 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     expect(awaiting?.headline).toBe('Index migration needs operator review.');
     expect(awaiting?.body).toContain('current index remains available');
     expect(awaiting?.body).toContain('operator');
-    expect(awaiting?.body).not.toContain('keyword');
+    expect(awaiting?.body).not.toMatch(/keyword|word (results|search)/);
     expect(awaiting?.causes).toEqual(['An index migration is waiting for an operator to review data gaps']);
 
     // Even an incomplete stability projection must not turn this recognized serving
@@ -93,7 +93,7 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
       degraded('warn', ['migration.awaiting_gap_acceptance', 'encoders.reloading']),
     );
     expect(degradedAwaiting?.body).toContain('current index remains available');
-    expect(degradedAwaiting?.body).not.toContain('keyword');
+    expect(degradedAwaiting?.body).not.toMatch(/keyword|word (results|search)/);
   });
   it('keeps paused and overdue migration advice ahead of the physical reload detail', () => {
     for (const marker of ['paused', 'overdue'] as const) {
@@ -136,7 +136,7 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     const n = readinessNotice(degraded('info', ['lambdamart.not_configured']));
     expect(n!.headline).toBe('Reduced search capability.');
     expect(n!.body).toContain('still fully semantic');
-    expect(n!.body).not.toContain('keyword results');
+    expect(n!.body).not.toContain('word results');
     expect(n!.causes).toEqual(['Learned re-ranking (LambdaMART) is not configured']);
   });
 
@@ -154,9 +154,9 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
 
   it('an IMPAIRING degradation (severity warn) keeps the "Semantic search degraded / keyword results" wording', () => {
     const n = readinessNotice(degraded('warn', ['encoders.health.embedding_not_ready']));
-    expect(n!.headline).toBe('Semantic search degraded.');
-    expect(n!.body).toContain('keyword results');
-    expect(n!.causes).toEqual(['The semantic embedding index is not ready']);
+    expect(n!.headline).toBe('Search by meaning degraded.');
+    expect(n!.body).toContain('word results');
+    expect(n!.causes).toEqual(['Search by meaning is not ready']);
     expect(n!.remedy).toEqual({
       kind: 'operation',
       operationId: 'core.trigger-offline-processing',
@@ -169,7 +169,7 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     expect(n!.remedy).toEqual({ kind: 'operation', operationId: 'core.rebuild-index' });
     // Tempdoc 600's core fix: the causes slot now names the SPECIFIC cause (no longer empty).
     expect(n!.causes).toEqual([
-      'The index was built before semantic search was available — rebuild it to enable meaning-based results.',
+      'The index was built before search by meaning was available — rebuild it to enable meaning-based results.',
     ]);
   });
 
@@ -183,11 +183,11 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     const n = readinessNotice(degraded('info', ['index.schema_mismatch']));
     expect(n!.headline).toBe('Index format is out of date.');
     // Round 10's defect verbatim: dense retrieval was provably live under both these claims.
-    expect(n!.body).not.toContain('keyword-only');
+    expect(n!.body).not.toMatch(/keyword-only|word search only/);
     expect(n!.body).not.toContain('degraded');
     expect(n!.headline).not.toContain('Reindex required');
     expect(n!.body).toContain('Search is fully working');
-    expect(n!.body).toContain('semantic and keyword retrieval are active');
+    expect(n!.body).toContain('search by meaning and word search are active');
     // A rebuild IS what adopts the newer index format, so the remedy stays actionable.
     expect(n!.remedy).toEqual({ kind: 'operation', operationId: 'core.rebuild-index' });
     // The headline+body already ARE the cause; no bullet that restates them.
@@ -201,8 +201,8 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     expect(classifyConsequence(['index.schema_open_refused'])).toBe('search-unavailable');
     const n = readinessNotice(degraded('error', ['index.schema_open_refused']));
     expect(n?.body).toContain('before searching');
-    expect(n?.body).not.toContain('keyword');
-    expect(SEARCH_UNAVAILABLE_CAVEAT).not.toContain('keyword');
+    expect(n?.body).not.toMatch(/keyword|word (results|search)/);
+    expect(SEARCH_UNAVAILABLE_CAVEAT).not.toMatch(/keyword|word (results|search)/);
   });
 
   it('804 §D1: the advisory notice still lists OTHER info causes (fresh install: schema + LambdaMART)', () => {
@@ -215,10 +215,10 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     const n = readinessNotice(degraded('warn', ['index.embedding_mismatch']));
     expect(n!.headline).toBe('Reindex required.');
     expect(n!.body).toBe(
-      'Semantic search is degraded until the index is rebuilt — results may be keyword-only.',
+      'Search by meaning is degraded until the index is rebuilt — results may be word search only.',
     );
     expect(n!.causes).toEqual([
-      'The embedding model changed — rebuild the index to restore semantic search.',
+      'The embedding model changed — rebuild the index to restore search by meaning.',
     ]);
     expect(n!.remedy).toEqual({ kind: 'operation', operationId: 'core.rebuild-index' });
   });
@@ -236,7 +236,7 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     // Only the cause a rebuild actually clears is listed under the one Force-Rebuild remedy. The
     // advisory schema code and the two rebuild-proof causes are NOT presented as reindex causes.
     expect(n!.causes).toEqual([
-      'The embedding model changed — rebuild the index to restore semantic search.',
+      'The embedding model changed — rebuild the index to restore search by meaning.',
     ]);
     expect(n!.causes.join(' ')).not.toContain('LambdaMART');
     expect(n!.causes.join(' ')).not.toContain('local AI model is offline');
@@ -251,12 +251,12 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     expect(n!.headline).toBe('AI features unavailable.');
     // The round-11 defect verbatim: dense retrieval + the cross-encoder were live under this claim.
     // (The honest body does name keyword retrieval — as ACTIVE; what must be gone is the fallback
-    // claim "Showing keyword results", i.e. keyword INSTEAD of semantic.)
-    expect(n!.body).not.toContain('keyword results');
-    expect(n!.body).not.toContain('Showing keyword');
-    expect(n!.headline).not.toContain('Semantic search degraded');
+    // claim "Showing word results", i.e. keyword INSTEAD of semantic.)
+    expect(n!.body).not.toContain('word results');
+    expect(n!.body).not.toMatch(/Showing (key)?word/);
+    expect(n!.headline).not.toContain('Search by meaning degraded');
     expect(n!.body).toContain('Search is fully working');
-    expect(n!.body).toContain('semantic and keyword retrieval are active');
+    expect(n!.body).toContain('search by meaning and word search are active');
     expect(n!.causes).toEqual(['The local AI model is offline']);
     // Causes + remedy behave exactly as the impairing branch always did.
     expect(n!.remedy).toEqual({ kind: 'navigate', target: 'core.brain-surface', label: 'Open Brain' });
@@ -265,7 +265,7 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
   it('804 §B5: the live-observed pair (inference.offline + lambdamart) words as AI-features-off', () => {
     const n = readinessNotice(degraded('warn', ['lambdamart.not_configured', 'inference.offline']));
     expect(n!.headline).toBe('AI features unavailable.');
-    expect(n!.body).not.toContain('keyword results');
+    expect(n!.body).not.toContain('word results');
     // RE-PINNED, tempdoc 805 §G.2: the AI branch now SCOPES its cause list to AI codes, the same way
     // the reindex branch scopes to rebuild-clearable causes (804 §B5). Pre-805 the LambdaMART row was
     // listed here too — under the "Chat and answer features are unavailable" consequence and the
@@ -280,8 +280,8 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     const n = readinessNotice(
       degraded('warn', ['encoders.health.embedding_not_ready', 'inference.offline']),
     );
-    expect(n!.headline).toBe('Semantic search degraded.');
-    expect(n!.body).toContain('Showing keyword results');
+    expect(n!.headline).toBe('Search by meaning degraded.');
+    expect(n!.body).toContain('Showing word results');
     expect(n!.body).not.toContain('Search is fully working');
   });
 
@@ -289,7 +289,7 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     // The calm wording is an assertion about retrieval health; a code we cannot classify is not
     // evidence for it (same doctrine as severityForCodes' unknown ⇒ warn default).
     const n = readinessNotice(degraded('warn', ['inference.offline', 'some.future.code']));
-    expect(n!.headline).toBe('Semantic search degraded.');
+    expect(n!.headline).toBe('Search by meaning degraded.');
     expect(n!.body).not.toContain('Search is fully working');
   });
 
@@ -314,16 +314,16 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     expect(severityForCodes(['chunk_embedding.not_ready', 'lambdamart.not_configured'])).toBe('warn');
 
     const n = readinessNotice(degraded('warn', ['chunk_embedding.not_ready', 'lambdamart.not_configured']));
-    expect(n!.headline).toBe('Semantic search partially degraded.');
+    expect(n!.headline).toBe('Search by meaning partially degraded.');
     // The round-11 defect verbatim: this claim was false against the trace.
-    expect(n!.body).not.toContain('keyword results');
-    expect(n!.body).not.toContain('Showing keyword');
-    expect(n!.headline).not.toBe('Semantic search degraded.');
+    expect(n!.body).not.toContain('word results');
+    expect(n!.body).not.toMatch(/Showing (key)?word/);
+    expect(n!.headline).not.toBe('Search by meaning degraded.');
     // The measured truth: the passage leg is reduced, document-level semantic ranking still serves.
     expect(n!.body).toContain('Passage-level precision is reduced');
-    expect(n!.body).toContain('still ranked semantically');
+    expect(n!.body).toContain('still ranked by meaning');
     // Cause SCOPING: only the passage cause is presented under the passage consequence.
-    expect(n!.causes).toEqual(['Passage embeddings are not ready']);
+    expect(n!.causes).toEqual(['Passage-level search by meaning is not ready']);
     expect(n!.causes.join(' ')).not.toContain('LambdaMART');
     // The remedy is the one that actually computes passage embeddings (CAUSE_ROWS' chunk rows).
     expect(n!.remedy).toEqual({ kind: 'operation', operationId: 'core.trigger-offline-processing' });
@@ -337,10 +337,10 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     expect(severityForCodes(codes)).toBe('warn');
 
     const n = readinessNotice(degraded('warn', codes));
-    expect(n!.headline).toBe('Semantic search partially degraded.');
-    expect(n!.body).not.toContain('keyword results');
+    expect(n!.headline).toBe('Search by meaning partially degraded.');
+    expect(n!.body).not.toContain('word results');
     // Cause SCOPING: the OCR cause is not filed under the passage consequence.
-    expect(n!.causes).toEqual(['Passage embeddings are still being computed']);
+    expect(n!.causes).toEqual(['Passage-level search by meaning is still being prepared']);
     // In-progress carries no remedy row ⇒ the always-actionable Open Health reference (and the
     // scoping means it does NOT inherit some other cause's remedy either).
     expect(n!.remedy).toEqual({ kind: 'navigate', target: 'core.health-surface', label: 'Open Health' });
@@ -348,24 +348,24 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
 
   it('805 §G.2: a real retrieval block ALONGSIDE the passage gap outranks it (keyword wording returns)', () => {
     const n = readinessNotice(degraded('warn', ['chunk_embedding.not_ready', 'index.dense_unavailable']));
-    expect(n!.headline).toBe('Semantic search degraded.');
-    expect(n!.body).toContain('Showing keyword results');
+    expect(n!.headline).toBe('Search by meaning degraded.');
+    expect(n!.body).toContain('Showing word results');
     // Impairing-branch scoping: the passage cause is not filed under the retrieval-fallback claim.
-    expect(n!.causes).toEqual(['Semantic search is unavailable right now — showing keyword results.']);
+    expect(n!.causes).toEqual(['Search by meaning is unavailable right now — showing word results.']);
   });
 
   it('805 §G.2: an UNCLASSIFIED code alongside the passage gap stays conservative (never the calmer claim)', () => {
     const n = readinessNotice(degraded('warn', ['chunk_embedding.not_ready', 'some.future.code']));
-    expect(n!.headline).toBe('Semantic search degraded.');
+    expect(n!.headline).toBe('Search by meaning degraded.');
     expect(n!.causes).toEqual(['Degraded: some.future.code']);
   });
 
   it('805 §G.2: a passage gap alongside an AI cause words as PASSAGE (passage outranks ai-unavailable)', () => {
     const n = readinessNotice(degraded('warn', ['chunk_embedding.not_ready', 'inference.offline']));
-    expect(n!.headline).toBe('Semantic search partially degraded.');
+    expect(n!.headline).toBe('Search by meaning partially degraded.');
     // The AI branch's "Search is fully working" would over-claim while passage vectors are missing.
     expect(n!.body).not.toContain('Search is fully working');
-    expect(n!.causes).toEqual(['Passage embeddings are not ready']);
+    expect(n!.causes).toEqual(['Passage-level search by meaning is not ready']);
   });
 
   it('804 §B5 + 805 §G.2: the AI branch scopes its cause list to AI codes only', () => {
@@ -384,10 +384,10 @@ describe('readinessNotice (595 §4.2) — projects the ONE verdict into the sear
     const n = readinessNotice(degraded('warn', ['index.dense_unavailable']));
     // NOT a reindex cause (a reindex won't add a missing/unloaded embedder) → the impairing headline,
     // not "Reindex required".
-    expect(n!.headline).toBe('Semantic search degraded.');
-    expect(n!.body).toContain('keyword results');
+    expect(n!.headline).toBe('Search by meaning degraded.');
+    expect(n!.body).toContain('word results');
     expect(n!.body).not.toContain('fully semantic');
-    expect(n!.causes).toEqual(['Semantic search is unavailable right now — showing keyword results.']);
+    expect(n!.causes).toEqual(['Search by meaning is unavailable right now — showing word results.']);
     // No false one-click rebuild remedy (the model isn't loaded) → the always-actionable Open Health ref.
     expect(n!.remedy).toEqual({ kind: 'navigate', target: 'core.health-surface', label: 'Open Health' });
   });
@@ -402,11 +402,11 @@ describe('classifyConsequence (805 §G.2)', () => {
   it('Spec D K3: a standing stuck encoder impairs retrieval and is worded as itself', () => {
     const code = 'encoders.health.semantic_stuck';
     expect(classifyConsequence([code])).toBe('retrieval-impaired');
-    expect(reasonFor(code).wording).toBe('The semantic search encoder is stalled');
+    expect(reasonFor(code).wording).toBe('Search by meaning is stalled');
     expect(severityForCodes([code])).toBe('warn');
     const notice = readinessNotice(degraded('warn', [code]));
-    expect(notice?.headline).toBe('Semantic search degraded.');
-    expect(notice?.causes).toEqual(['The semantic search encoder is stalled']);
+    expect(notice?.headline).toBe('Search by meaning degraded.');
+    expect(notice?.causes).toEqual(['Search by meaning is stalled']);
   });
 
   it('retrieval-impaired: a positively-known dense block', () => {
@@ -425,7 +425,7 @@ describe('classifyConsequence (805 §G.2)', () => {
 
   it('passage-reduced: the chunk-embedding codes, which are NOT a keyword fallback', () => {
     // The membership move this workstream exists for: pre-805 both codes sat in
-    // RETRIEVAL_IMPAIRING_CODES, which is how a passage-vector gap licensed "Showing keyword results"
+    // RETRIEVAL_IMPAIRING_CODES, which is how a passage-vector gap licensed "Showing word results"
     // over a trace with dense retrieval + the cross-encoder live (round 11, tempdoc 734 R11-F1).
     expect(classifyConsequence(['chunk_embedding.not_ready'])).toBe('passage-reduced');
     expect(classifyConsequence(['chunk_embedding.in_progress'])).toBe('passage-reduced');
@@ -436,8 +436,8 @@ describe('classifyConsequence (805 §G.2)', () => {
     const n = readinessNotice(degraded('warn', ['index.model_not_installed']));
     expect(n?.headline).toBe('An index model is unavailable.');
     expect(n?.body).toContain('Text search remains available');
-    expect(n?.body).not.toContain('keyword');
-    expect(MODEL_UNAVAILABLE_CAVEAT).not.toContain('keyword');
+    expect(n?.body).not.toMatch(/keyword|word (results|search)/);
+    expect(MODEL_UNAVAILABLE_CAVEAT).not.toMatch(/keyword|word (results|search)/);
   });
 
   it('ai-unavailable: the AI-model codes, retrieval untouched', () => {
@@ -482,15 +482,15 @@ describe('classifyConsequence (805 §G.2)', () => {
     // The gate (scripts/ci/check-consequence-classification.mjs) enforces the containment; this pins
     // that the caveats say what their class licenses.
     expect(KEYWORD_FALLBACK_CAVEAT).toContain('keyword-ranked results');
-    expect(PASSAGE_REDUCED_CAVEAT).not.toContain('keyword');
-    expect(PASSAGE_REDUCED_CAVEAT).toContain('still ranked semantically');
-    expect(OPTIONAL_CAPABILITY_CAVEAT).not.toContain('keyword');
+    expect(PASSAGE_REDUCED_CAVEAT).not.toMatch(/keyword|word (results|search)/);
+    expect(PASSAGE_REDUCED_CAVEAT).toContain('still ranked by meaning');
+    expect(OPTIONAL_CAPABILITY_CAVEAT).not.toMatch(/keyword|word (results|search)/);
     // Round-14 finding 8 — the calm caveat NAMES its feature (the pre-fix "an optional ranking
     // model" named none and was resolved to the wrong one), and the AI-model class keeps a
     // separate wording so it never borrows a feature name its cause is not about.
     expect(OPTIONAL_CAPABILITY_CAVEAT).toContain('Learned re-ranking (LambdaMART)');
     expect(AI_UNAVAILABLE_CAVEAT).not.toContain('LambdaMART');
-    expect(AI_UNAVAILABLE_CAVEAT).not.toContain('keyword');
+    expect(AI_UNAVAILABLE_CAVEAT).not.toMatch(/keyword|word (results|search)/);
   });
 });
 
@@ -642,7 +642,7 @@ describe('readinessNotice — index and inference rows', () => {
 
   it('S4: the two new inference codes are calm and stay OUT of the banner', () => {
     expect(reasonFor('inference.gpu_yielded_to_indexing').wording).toBe(
-      'The GPU is indexing your files — chat resumes when it finishes',
+      'The GPU is reading your files — chat resumes when it finishes',
     );
     expect(reasonFor('inference.up_for_background').wording).toBe(
       'Chat is turned off; the AI engine is running background document processing',
@@ -743,7 +743,7 @@ it.each([
   expect(notice?.causes).toEqual([wording]);
   expect(notice?.headline).toBe('Enrichment incomplete.');
   expect(classifyConsequence([code])).toBe('enrichment-incomplete');
-  expect(notice?.body).toBe("Results may miss some documents' semantic matches; keyword search covers them");
+  expect(notice?.body).toBe("Results may miss some documents' semantic matches; word search covers them");
   expect(notice?.body).not.toContain('fully');
   expect(warrantsSearchDegradationBanner(degraded('warn', [code]))).toBe(true);
 });
@@ -762,7 +762,7 @@ describe('index ownership refusal', () => {
     expect(notice?.headline).toBe('Search is unavailable');
     expect(notice?.body).toBe(detail);
     expect(notice?.remedy).toEqual(OPEN_HEALTH);
-    expect(notice?.body).not.toMatch(/keyword/i);
+    expect(notice?.body).not.toMatch(/keyword|word (results|search)/i);
     expect(classifyConsequence(['index.ownership_unproven'])).toBe('search-unavailable');
   });
 });

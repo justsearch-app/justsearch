@@ -533,7 +533,7 @@ describe('classification and quick filters (A9, A10)', () => {
     await settle();
     const burst = q('[data-testid="ledger-burst"]');
     expect(burst).toHaveLength(1);
-    expect(burst[0]!.textContent).toContain('Indexed 2 · 1 failed · docs');
+    expect(burst[0]!.textContent).toContain('Read 2 · 1 failed · docs');
   });
 
   it('A9 — a burst counts a record only as its state establishes; an unknown state is counted and named, never indexed', async () => {
@@ -543,8 +543,8 @@ describe('classification and quick filters (A9, A10)', () => {
     await settle();
     const burst = q('[data-testid="ledger-burst"]');
     expect(burst).toHaveLength(1);
-    expect(burst[0]!.textContent).not.toContain('Indexed 2');
-    expect(burst[0]!.textContent).toContain('Indexed 1 · 1 with unknown state · docs');
+    expect(burst[0]!.textContent).not.toContain('Read 2');
+    expect(burst[0]!.textContent).toContain('Read 1 · 1 with unknown state · docs');
   });
 
   it('A9 — a resolved file name keeps what the state established: failed, gave up and unknown never read as indexed', async () => {
@@ -555,10 +555,10 @@ describe('classification and quick filters (A9, A10)', () => {
     await settle();
     await settle();
     const label = (key: string): string => (q(`.item[data-key="${key}"]`)[0]?.textContent ?? '').replace(/\s+/g, ' ');
-    expect(label('index:1')).toContain('Index failed · corpus/h1.pdf');
-    expect(label('index:2')).toContain('Index gave up · corpus/h2.pdf');
-    expect(label('index:3')).toContain('Index state unknown (PAUSED) · corpus/h3.pdf');
-    expect(label('index:4')).toContain('Indexed · corpus/h4.pdf');
+    expect(label('index:1')).toContain("Couldn't read · corpus/h1.pdf");
+    expect(label('index:2')).toContain('Gave up reading · corpus/h2.pdf');
+    expect(label('index:3')).toContain('Reading outcome unknown (PAUSED) · corpus/h3.pdf');
+    expect(label('index:4')).toContain('Read · corpus/h4.pdf');
   });
 
   it('a command palette use is not one of Your actions: its journaled no-op stays with the routine rows of All', async () => {

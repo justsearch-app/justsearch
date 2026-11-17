@@ -79,7 +79,7 @@ describe('FA3a a reduced search the person asked AI for', () => {
     const model = derive(observe(NOT_INSTALLED, { chatOn: true, queue: 'empty' }));
     expect(model.pill).toMatchObject({ kind: 'needs', label: '1 needs you' });
     expect(model.sections.needs.map(row => [row.id, row.title, row.actions?.[0]?.target]))
-      .toEqual([['search-reduced', 'Semantic search degraded', 'core.brain-surface']]);
+      .toEqual([['search-reduced', 'Search by meaning degraded', 'core.brain-surface']]);
   });
 });
 
@@ -94,7 +94,7 @@ describe('FA3b the search banner above the composer', () => {
     ['the AI install the person started failed', FAILED, {}],
     ['the AI install the person started was interrupted', INTERRUPTED, {}],
   ] as const)('stays when the person asked for AI and it cannot run: %s', (_case, install, patch) => {
-    expect(projectSv3Degradation(observe(install, patch))?.headline).toBe('Semantic search degraded.');
+    expect(projectSv3Degradation(observe(install, patch))?.headline).toBe('Search by meaning degraded.');
   });
 });
 

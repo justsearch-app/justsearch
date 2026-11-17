@@ -358,7 +358,7 @@ describe('aiStateStore — system-health verdict (595)', () => {
     expect(verdict).toEqual({ kind: 'degraded', severity, reasons: [reason] });
     expect(verdictHeadline(verdict)).toBe('Search index unavailable');
     expect(readinessNotice(verdict)?.headline).toBe('Search index unavailable.');
-    expect(readinessNotice(verdict)?.body).not.toContain('keyword');
+    expect(readinessNotice(verdict)?.body).not.toMatch(/keyword|word (results|search)/);
     if (reason === 'index.schema_open_refused') {
       expect(readinessNotice(verdict)?.body).toContain('before searching');
     }

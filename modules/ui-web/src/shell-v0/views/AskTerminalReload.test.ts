@@ -27,6 +27,6 @@ it('reloaded Search Ask shows no-evidence and keeps its retrieval explanation', 
   expect(host.textContent).toContain('Nothing in your files matched this question.');
   expect(host.textContent).not.toContain('The answer failed');
   expect(host.textContent).not.toContain('(empty response)');
-  expect(host.textContent).toContain('semantic search did not answer in time');
+  expect(host.textContent).toContain('search by meaning did not answer in time');
   expect(host.textContent).toContain('search models still loading');
 });

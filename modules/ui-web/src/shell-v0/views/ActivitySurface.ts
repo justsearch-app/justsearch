@@ -614,7 +614,7 @@ export class ActivitySurface extends JfElement {
           <h2>Activity</h2>
           <div class="sub">
             What happened, who did it and how it ended — your actions, the
-            assistant's, indexing and the engine's own work, in one list
+            assistant's, file reading and the engine's own work, in one list
             updated live. Choose a record for its details. For raw diagnostic output, see Logs.
           </div>
         </div>

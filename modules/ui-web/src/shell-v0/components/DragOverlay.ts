@@ -81,16 +81,16 @@ export class DragOverlay extends JfElement {
     if (!this.active) return nothing;
     const headline =
       this.dragKind === 'folder'
-        ? 'Drop folder to index'
+        ? 'Drop folder to add it to your library'
         : this.dragKind === 'file'
           ? 'Drop files here'
-          : 'Drop to add to index';
+          : 'Drop to add to your library';
     return html`
       <div class="overlay">
         <div class="panel">
           <div class="icon-ring">${icon({ name: 'folder-plus', size: 36 })}</div>
           <h3>${headline}</h3>
-          <p class="sub">Files will be added to your search index</p>
+          <p class="sub">Files will be read and become searchable</p>
         </div>
       </div>
     `;

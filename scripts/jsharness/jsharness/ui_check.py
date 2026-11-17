@@ -735,7 +735,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     async def setup_search_semantic_paused(page):
         await _view_setup("search")(page)
-        headline = page.get_by_text("Semantic search paused; keyword search available.", exact=True)
+        headline = page.get_by_text("Search by meaning paused; word search available.", exact=True)
         await headline.wait_for(state="visible", timeout=10_000)
         if await headline.count() != 1:
             raise AssertionError("semantic-search limitation must be explained exactly once")
