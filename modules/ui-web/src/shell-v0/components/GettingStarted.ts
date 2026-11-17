@@ -69,7 +69,7 @@ export class GettingStarted extends JfElement {
     .error { color: var(--text-danger); }
     .folder-row { display: flex; align-items: center; gap: var(--jf-space-3); padding-block: var(--jf-space-3); border-block: 1px solid var(--border-subtle); }
     .folder-row p { flex: 1; margin: 0; color: var(--text-primary); }
-    .folder-row button { flex: none; border: 0; border-radius: 4px; padding: var(--jf-space-1); background: transparent; color: var(--text-primary); font: inherit; font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; }
+    .folder-row button { flex: none; border: 0; border-radius: 4px; padding: var(--jf-space-1); background: transparent; color: var(--text-primary); font: inherit; font-size: var(--font-size-sm); font-weight: 500; cursor: pointer; }
     .folder-row button:focus-visible { outline: 2px solid var(--focus-ring-color); }
     @media (forced-colors: active) { .mark, .error, .path, p { color: CanvasText; } .card, input { border-color: CanvasText; } }
   `;
