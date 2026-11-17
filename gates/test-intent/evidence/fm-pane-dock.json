@@ -1,0 +1,215 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-17T01:24:37.591Z",
+  "revision": "5a2ac8226ef4cb4dbc4cb081c3db6caea7686f3d",
+  "tree": "7f23c17d8d2a6dbcf70184ccd9d5730ef56621a1",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-50404-1794878621987.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 386
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-50404-1794878622375.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 55214
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2edd50faf08724b2efe9bb88ae04863f69b217d1e6469b7efdb0b834741eedac",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1024 px with a 0 px sidebar the automatic pane is 384 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1100 px with a 0 px sidebar the automatic pane is 400 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1280 px with a 0 px sidebar the automatic pane is 400 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1333 px with a 0 px sidebar the automatic pane is 400 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1400 px with a 0 px sidebar the automatic pane is 420 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1600 px with a 0 px sidebar the automatic pane is 480 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1920 px with a 0 px sidebar the automatic pane is 576 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1920 px with a 48 px sidebar the automatic pane is 576 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1920 px with a 256 px sidebar the automatic pane is 576 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1973 px with a 0 px sidebar the automatic pane is 592 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 2560 px with a 0 px sidebar the automatic pane is 592 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 3840 px with a 256 px sidebar the automatic pane is 592 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 592 is 560 of content and 16 px of padding on each side",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 the main column keeps its 640 beside the automatic pane",
+          "status": "passed"
+        },
+        {
+          "name": "PJ4 what the docked pane leaves alone at or below 1040 px it is the constrained-window width it had (no change at the default window)",
+          "status": "passed"
+        },
+        {
+          "name": "PJ4 what the docked pane leaves alone with no published share (split stage, no layout) it is the automatic width from before the rule",
+          "status": "passed"
+        },
+        {
+          "name": "PJ4 what the docked pane leaves alone a remembered or dragged width is still clamped 360-560",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:5827c62d0f2c4965c490f895969a0b9d42e18edccb0cb45db52d939aa3d5f3d3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PJ1 the pane docks to the window’s right edge; its surface and lines span its width at 1920 with no sidebar (none/0 px) in dark",
+          "status": "passed"
+        },
+        {
+          "name": "PJ1 the pane docks to the window’s right edge; its surface and lines span its width at 1920 with no sidebar (none/0 px) in light",
+          "status": "passed"
+        },
+        {
+          "name": "PJ1 the pane docks to the window’s right edge; its surface and lines span its width at 1920 with an expanded sidebar (expanded/256 px) in dark",
+          "status": "passed"
+        },
+        {
+          "name": "PJ1 the pane docks to the window’s right edge; its surface and lines span its width at 1920 with an expanded sidebar (expanded/256 px) in light",
+          "status": "passed"
+        },
+        {
+          "name": "PJ1 the pane docks to the window’s right edge; its surface and lines span its width at 1920 with a collapsed sidebar (collapsed/48 px) in dark",
+          "status": "passed"
+        },
+        {
+          "name": "PJ1 the pane docks to the window’s right edge; its surface and lines span its width at 1920 with a collapsed sidebar (collapsed/48 px) in light",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 at 1100 px wide the automatic pane is 400 px, at the window edge",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 at 1400 px wide the automatic pane is 420 px, at the window edge",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 at 1600 px wide the automatic pane is 480 px, at the window edge",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 at 1920 px wide the automatic pane is 576 px, at the window edge",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 at 2400 px wide the automatic pane is 592 px, at the window edge",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 at 2400 px the pane’s content stays at most 560 px, 16 px in from each side",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 live resize follows the window and writes nothing",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 a remembered width still wins over the automatic one, at the window edge",
+          "status": "passed"
+        },
+        {
+          "name": "PJ3 no list+pane cap: the list keeps its 960 and is centred in what the pane leaves with no sidebar (none/0 px) at 1920",
+          "status": "passed"
+        },
+        {
+          "name": "PJ3 no list+pane cap: the list keeps its 960 and is centred in what the pane leaves with an expanded sidebar (expanded/256 px) at 1920",
+          "status": "passed"
+        },
+        {
+          "name": "PJ3 no list+pane cap: the list keeps its 960 and is centred in what the pane leaves with a collapsed sidebar (collapsed/48 px) at 1920",
+          "status": "passed"
+        },
+        {
+          "name": "PJ3 no list+pane cap: the list keeps its 960 and is centred in what the pane leaves with no sidebar (none/0 px) at 2400",
+          "status": "passed"
+        },
+        {
+          "name": "PJ3 no list+pane cap: the list keeps its 960 and is centred in what the pane leaves the frame publishes no list+pane width any more",
+          "status": "passed"
+        },
+        {
+          "name": "PJ3 no list+pane cap: the list keeps its 960 and is centred in what the pane leaves a wheel in either gutter beside the list moves the list",
+          "status": "passed"
+        },
+        {
+          "name": "PJ4 at the default window and in a split nothing changes at 1024×700 the pane, grip, main column and list keep their pixel geometry",
+          "status": "passed"
+        },
+        {
+          "name": "PJ4 at the default window and in a split nothing changes in a stacked split at 1920 the pane keeps the width it had (540) at its split’s edge",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:3342479b9f8ca5fec88ea306208d296b9db79a74e12e269dd59674ff1c82adf9"
+}

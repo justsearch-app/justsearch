@@ -355,8 +355,8 @@ export class SearchV3View extends JfElement {
   static styles = [
     sv3Tokens,
     sv3Shared,
-    sv3PageWidthStyles,
     css`
+      ${sv3PageWidthStyles}
       /* Search sits on the app's page background, the same one the top bar uses (design: #0a0a0c dark). */
       :host, :host([theme='light']) { --background: var(--surface-0); }
       :host {
@@ -880,7 +880,7 @@ export class SearchV3View extends JfElement {
 
   /** Watches the window box so the pane's presentation follows it (Phase F8). */
   private boxObserver: ResizeObserver | null = null;
-  private readonly pageWidth = new Sv3PageWidth(this, () => [this.availableWidth(), this.sidebarOccupiedWidth(), this.paneTab !== null && !this.paneOverlay, this.paneWidthPx]);
+  private readonly pageWidth = new Sv3PageWidth(this, () => [this.availableWidth(), this.sidebarOccupiedWidth(), this.paneWidthPx]);
   /** 859 §B — the dock's own box watcher, and the node it is currently bound to. */
   private dockObserver: ResizeObserver | null = null;
   private observedRecentList: HTMLElement | null = null;

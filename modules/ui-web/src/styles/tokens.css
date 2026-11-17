@@ -413,11 +413,12 @@
      scroller, a tab row's line, a header's line) keeps its full width and adds
      --surface-content-gutter to its inline padding, so its content sits on the column while its
      line and its scroll area stay full width. A region inside a full-width scroller may instead take
-     max-width + margin-inline: auto. Search with its side pane open centres the list and the pane
-     together in --surface-content-with-pane-max-width. The split stage resets the gutter and the
-     with-pane width (Shell.ts Stage). Also SurfaceLayout's data-fill="reading" column. */
+     max-width + margin-inline: auto. Search's side pane docks to the window's right edge, the list
+     centred in what it leaves; its automatic width is --surface-pane-share of the window (400-592 px,
+     the picture author's decision of 17 November). The split stage resets the gutter and the share
+     (Shell.ts Stage). Also SurfaceLayout's data-fill="reading" column. */
   --surface-content-max-width: 960px;
-  --surface-content-with-pane-max-width: 1280px;
+  --surface-pane-share: 30%;
   /* Unregistered, so `100%` resolves where the gutter is used: against the region's containing block. */
   --surface-content-gutter: max(0px, calc((100% - var(--surface-content-max-width)) / 2));
   /* Tempdoc 816 §3/§4a.3 — the MEASURE tokens: role-derived inline-size bounds in CONTENT units.
