@@ -16,7 +16,7 @@ import type { LibrarySurface } from '../LibrarySurface.js';
 import type { IndexedRootView } from '../../../api/generated/schema-types/indexed-root-view.js';
 import { createMockHostApi } from '../../plugin-api/testHostApi.js';
 import { getOperationClient } from '../../operations/OperationClient.js';
-import { __feedContactForTest, __feedForTest, __resetAiStateForTest, type StatusSnapshot } from '../../state/aiStateStore.js';
+import { __feedContactForTest, __feedForTest, __resetAiStateForTest, __tickClockForTest, type StatusSnapshot } from '../../state/aiStateStore.js';
 
 const KEY = '0194f72c-0000-7000-8000-000000000001';
 /** No AI installed: meaning work waits for it (the packaged app's first minutes). */
@@ -137,8 +137,9 @@ describe("L1' one constant line from the confirmation until the outcome complete
     const el = await library({ reading: false, outcome: outcome('running') });
     await reread(el);
     const node = line(el)!;
-    __resetAiStateForTest(); await settle(el);
-    expect(headline(el)).not.toBe('Reading');
+    // The status goes stale: two minutes pass without a fresh observation.
+    clock += 120_000; __tickClockForTest(); await settle(el);
+    expect(headline(el)).toBe('Reading status unconfirmed');
     expect(said(el)).toEqual([LINE]);
     expect(line(el)).toBe(node);
     expect(el.shadowRoot!.textContent).not.toMatch(NEVER);

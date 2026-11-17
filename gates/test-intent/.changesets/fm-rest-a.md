@@ -98,7 +98,7 @@ the sentence after the confirmation and after completion (second entry).
         },
         {
           "oldAssertion": "indexingSurfaceSweep.test.ts framePanel(): the reading entry's expanded Details render without developer tools (S33.4 cases: file rows, last observed, stage disclosure).",
-          "newAssertion": "framePanel() sets developer = true; every S33.4 assertion is unchanged.",
+          "newAssertion": "framePanel() sets developer = true; that is this changeset's only change to the file. Four expected sentences in the same file changed with the wording part (changeset fm-rest-w.md lists the file); every other S33.4 assertion is unchanged.",
           "reason": "S1/S4 as above."
         },
         {
@@ -171,5 +171,16 @@ the sentence after the confirmation and after completion (second entry).
   "verdict": "reject",
   "digest": "sha256:094b26228cd50ea7476f16f3bd8248ece232065547a4b65ebaabc59c40356ade",
   "note": "LibrarySurface.folderActions.test.ts dropped the only check that pressing 'Check reading outcome' reads the outcome again and says the result. L1' removes the action only while the outcome is accepted or running; L3 keeps it for unknown or unreadable outcomes, so the guarded behaviour did not change there. A no-op mutation of the action passes every test of the candidate and fails the base test. Repair: keep the tick read, and add a step (or a case) where the outcome is unknown or unreadable, then reads complete after pressing 'Check reading outcome'."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "86458551-a839-4ca6-9f89-aac13a24171d",
+  "verdict": "reject",
+  "digest": "sha256:c3d4064d193cf6fa55067026ba5c82a117337b416570c3dc4e3294adae96f9b6",
+  "note": "reread-receipt.test.ts 'a lost status while the outcome runs still shows only the line' never produces a lost status: __resetAiStateForTest clears the store's listeners, so Library keeps its last observation (headline 'Your files are searchable' before and after). Hiding the L1' line when status is unconfirmed passes this file and folderActions, review-repairs, slice-6b1 and render. Repair: make the status stale (advance the mocked clock about 120 s, then __tickClockForTest), assert the headline says 'Reading status unconfirmed', and assert the same line element remains."
 }
 ```
