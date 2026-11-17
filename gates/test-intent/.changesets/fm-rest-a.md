@@ -184,3 +184,13 @@ the sentence after the confirmation and after completion (second entry).
   "note": "reread-receipt.test.ts 'a lost status while the outcome runs still shows only the line' never produces a lost status: __resetAiStateForTest clears the store's listeners, so Library keeps its last observation (headline 'Your files are searchable' before and after). Hiding the L1' line when status is unconfirmed passes this file and folderActions, review-repairs, slice-6b1 and render. Repair: make the status stale (advance the mocked clock about 120 s, then __tickClockForTest), assert the headline says 'Reading status unconfirmed', and assert the same line element remains."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "b5e7a732-72e7-488b-bec2-923f6753a968",
+  "verdict": "accept",
+  "digest": "sha256:6e53e6ad4039c9824a7d1a12e940c5a490bbef23528f94f2c3d575f8113a0b5c"
+}
+```
