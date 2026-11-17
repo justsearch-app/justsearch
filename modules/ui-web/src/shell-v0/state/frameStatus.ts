@@ -328,13 +328,16 @@ function activityWords(entry: UnifiedActionEntry): { title: string; detail?: str
 /** S8 H4' — outcomes that stay their own row while the decision that allowed them is not shown. */
 const UNFINISHED_OUTCOMES: ReadonlySet<string> = new Set(['FAILURE', 'FAILED', 'PARTIAL']);
 const ADD_FOLDER = 'core.add-watched-root';
-/** The Engine's one history name for a settings save (settings.apply-public, OperationHistoryProjection). */
-const SETTINGS_SAVE = 'core.apply-settings';
+/**
+ * The Engine's history names for a settings save: the Settings page's Apply records core.reconfigure;
+ * settings.apply-public is projected as core.apply-settings (OperationHistoryProjection).
+ */
+const SETTINGS_SAVES = ['core.reconfigure', 'core.apply-settings'] as const;
 /**
  * Successes the default panel leaves out: a folder's add receipt (its folder row says it) and a
  * settings save (PH3, fm-15: the setting itself shows the change). Their failures stay rows.
  */
-const QUIET_SUCCESSES: ReadonlySet<string> = new Set([ADD_FOLDER, SETTINGS_SAVE]);
+const QUIET_SUCCESSES: ReadonlySet<string> = new Set([ADD_FOLDER, ...SETTINGS_SAVES]);
 /** "just now", "12 min", "3 h" (fm-15's age beside an Earlier row). */
 function ageWords(ms: number): string {
   const minutes = Math.floor(Math.max(0, ms) / 60_000);
