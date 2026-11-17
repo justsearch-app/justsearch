@@ -87,3 +87,13 @@ holds and they pass unchanged.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "d5886b95-ce0e-4a81-a866-f77d0505bec4",
+  "verdict": "accept",
+  "digest": "sha256:251728cc6159968633daeb20942420262d93d05733347d51aec16a39e7e4b454"
+}
+```

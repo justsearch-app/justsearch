@@ -88,3 +88,13 @@ panel it reads; every assertion is unchanged.
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "d5886b95-ce0e-4a81-a866-f77d0505bec4",
+  "verdict": "accept",
+  "digest": "sha256:2a83b19476982a1788919f8166c86e0eceaa1a33c7120538fc3da37e030e3a21"
+}
+```
