@@ -146,3 +146,15 @@ the base and the candidate.
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-dcu2ampi",
+  "verdict": "accept",
+  "digest": "sha256:de5392932b6903a91bddb72a7cb734a67f9a2105a26540585404b80e7ebfaad0"
+}
+```
