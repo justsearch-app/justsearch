@@ -129,3 +129,13 @@ and the word " download" after a step's size. Each change is listed with its inp
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "ef0324c8-7f54-42ca-8c0b-38fc4b7316ef",
+  "verdict": "accept",
+  "digest": "sha256:b0757d89d1008075c2e12e17d889690124fa84d35cb30dbb52ccca7eef009023"
+}
+```
