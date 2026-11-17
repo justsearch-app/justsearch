@@ -151,6 +151,6 @@ describe('PH4 the graphics card waits for an installed AI', () => {
     el.remove();
     store.current = { ...ready(), status: { ...(ready().status as object), ...gpu } } as unknown as AiState; preview = plan('installed');
     const installed = await mount();
-    expect(words(card(installed))).toContain('3.00 GB of 12.00 GB in use · RTX 4070');
+    expect(words(card(installed))).toContain('3 GB of 12 GB in use · RTX 4070');
   });
 });

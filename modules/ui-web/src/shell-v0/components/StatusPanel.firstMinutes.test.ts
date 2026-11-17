@@ -124,6 +124,9 @@ describe('PH3 settings saves and the close mark', () => {
   it('another operation labelled like a settings save still shows its success', async () => {
     await show(pictured(false, { activity: [save('core.rebuild-index', 'SUCCESS')] }));
     expect(text(panel.shadowRoot!)).toMatch(/Apply Settings/);
+    const other: AdvisoryRecord = { ...unread, key: 'a-other', event: { ...unread.event, id: 'a-other',
+      classId: 'operation.completed', classExtras: { operationId: 'core.rebuild-index', outcome: 'SUCCESS' } } } as AdvisoryRecord;
+    expect(pictured(false, { advisories: [other] }).sections.earlier.map(fact => fact.title).join(' | ')).toMatch(/ completed/);
   });
   it('the close button draws the app\'s close icon, not a text cross', async () => {
     await show(pictured());

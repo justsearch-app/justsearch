@@ -10,8 +10,8 @@ author-session: builder-fm-ph-20261116
 The picture author reviewed the packaged app; the owner delegated its open items ("just ask the other
 agent to make the decisions"). The orchestrator's delegated decisions PH1-PH5 (PH6: nothing else
 changes) are quoted in each entry with the review's words. Frontend only. Every new check was added to
-an existing file; no existing assertion changed. Each fails on the base 012aae15e5 by assertion and
-passes on the candidate (run-evidence with --before 012aae15e5).
+an existing file; no existing assertion changed. Each fails on the base 02435b349e by assertion and
+passes on the candidate (run-evidence with --before 02435b349e).
 
 ```json
 {
