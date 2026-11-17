@@ -340,6 +340,7 @@ export class LibrarySurface extends JfElement {
     reindexOutcome: { state: true },
     reindexOutcomeError: { state: true },
     reindexOutcomeBusy: { state: true },
+    reindexPending: { state: true },
     pendingPath: { state: true },
     pendingCollection: { state: true },
     pendingPreview: { state: true },
@@ -473,6 +474,15 @@ export class LibrarySurface extends JfElement {
   declare reindexOutcome: string | null;
   declare reindexOutcomeError: boolean;
   declare reindexOutcomeBusy: boolean;
+  /**
+   * The accepted "Read everything again" whose outcome, as last read, is accepted and not yet started
+   * (or not read yet): until reading becomes visible the page says it is starting (fm-07).
+   */
+  declare reindexPending: boolean;
+  /** Reading was visible in the headline while the request was open: "starting" is no longer true. */
+  private reindexSeenReading = false;
+  /** Read everything again ended: its completion or failure was read. */
+  private reindexSettled = false;
   private bulkOutcomeKey: string | null = null;
   declare bulkOutcome: OperationOutcomeView | null;
   private reindexOutcomeKey: string | null = null;
@@ -620,6 +630,7 @@ export class LibrarySurface extends JfElement {
     this.reindexOutcome = null;
     this.reindexOutcomeError = false;
     this.reindexOutcomeBusy = false;
+    this.reindexPending = false;
     this.pendingPath = '';
     this.pendingCollection = '';
     this.pendingPreview = null;
@@ -1090,6 +1101,9 @@ export class LibrarySurface extends JfElement {
     this.actionMessage = null;
     this.reindexOutcome = null;
     this.reindexOutcomeError = false;
+    this.reindexPending = false;
+    this.reindexSeenReading = false;
+    this.reindexSettled = false;
     this.reindexReadSerial++;
     this.reindexOutcomeBusy = false;
     this.gapDecisionError = null;
@@ -1149,6 +1163,7 @@ export class LibrarySurface extends JfElement {
       && !this.otherSources.sources.some(source => source.collection === this.collectionConfirm)) {
       this.collectionConfirm = null;
     }
+    if (this.reindexOutcome && !this.reindexSettled && this.headline().reading) this.reindexSeenReading = true;
     const active = deepActiveElement();
     this.focusedFolderToggle = active instanceof HTMLElement && active.matches('.folder-toggle')
       && this.shadowRoot?.activeElement ? active : null;
@@ -2441,6 +2456,9 @@ export class LibrarySurface extends JfElement {
     this.reindexOutcomeKey = typeof key === 'string' && /^[0-9a-f-]{36}$/.test(key) ? key : null;
     this.reindexOutcomeError = false;
     this.reindexOutcome = 'Read again accepted. Completion has not yet been confirmed.';
+    this.reindexPending = true;
+    this.reindexSeenReading = false;
+    this.reindexSettled = false;
     if (this.reindexOutcomeKey) await this.checkReindexOutcome();
   }
 
@@ -2459,6 +2477,10 @@ export class LibrarySurface extends JfElement {
       // The pass changed what each folder holds: read the folders again, counts included, so the rows'
       // file counts are the ones after this pass rather than before it (live refreshes carry no counts).
       if (outcome.state === 'complete' || outcome.state === 'failed') void readIndexedRoots(path => this.doFetch(path), true, this.apiBase);
+      // Accepted and not yet started: reading cannot have shown yet. A running outcome without visible
+      // reading is said as unconfirmed, with its check action.
+      this.reindexPending = outcome.state === 'accepted';
+      this.reindexSettled = outcome.state === 'complete' || outcome.state === 'failed';
       if (outcome.state === 'complete') {
         this.reindexOutcome = 'Read again completed for the recorded request. Current reading activity is shown below.';
         this.reindexOutcomeKey = null;
@@ -2469,7 +2491,10 @@ export class LibrarySurface extends JfElement {
         this.reindexOutcome = `Read again accepted. ${['accepted', 'running'].includes(outcome.state) ? 'Completion has not yet been confirmed.' : 'Its outcome is unavailable; check again before retrying.'}`;
       }
     } catch {
-      if (serial === this.reindexReadSerial) this.reindexOutcome = 'Read again accepted. Its outcome could not be read; check again before retrying.';
+      if (serial === this.reindexReadSerial) {
+        this.reindexOutcome = 'Read again accepted. Its outcome could not be read; check again before retrying.';
+        this.reindexPending = false;
+      }
     } finally {
       if (serial === this.reindexReadSerial) this.reindexOutcomeBusy = false;
     }
@@ -2854,14 +2879,18 @@ export class LibrarySurface extends JfElement {
     await editor?.focusIndexingRule(control);
   }
 
-  private renderHeader(): TemplateResult {
+  /** The page's headline, and whether it says reading runs now (confirmed, files being read). */
+  private headline(): { readonly text: string; readonly reading: boolean } {
     const count = this.attentionItems().length;
     // The person's own files (Help excluded). Unknown own files are never said to be searchable: once
     // the Engine has answered without them (an older Engine), the headline says only what is known.
     const documents = this.ownDocuments;
     const ownUnknown = this.indexProgress.phase === 'indexing' ? this.indexingActivity.summary : 'Checking your folders';
-    const headline = this.loading ? 'Loading your Library…'
-      : !this.indexProgress.live || this.contactUnconfirmed || this.rootsUnconfirmed ? 'Reading status unconfirmed'
+    const statusUnconfirmed = !this.indexProgress.live || this.contactUnconfirmed || this.rootsUnconfirmed;
+    const reading = !this.loading && !statusUnconfirmed && !count && !this.provisional && this.indexingActivity.confirmed
+      && this.indexProgress.phase === 'indexing';
+    const text = this.loading ? 'Loading your Library…'
+      : statusUnconfirmed ? 'Reading status unconfirmed'
         : count ? `${count} ${count === 1 ? 'thing needs' : 'things need'} your attention`
           : this.provisional ? this.provisionalHeadline
             : !this.indexingActivity.confirmed ? this.indexingActivity.summary
@@ -2869,12 +2898,41 @@ export class LibrarySurface extends JfElement {
               : !this.roots.length ? (documents.known && documents.value > 0 || this.otherSources.sources.some(source => source.docCount > 0) ? 'Your files are searchable' : 'Add a folder to start searching')
                 : !documents.known ? ownUnknown
                   : documents.value === 0 ? 'Reading your files' : 'Your files are searchable';
-    return html`<div class="header"><div class="header-left"><h2>${headline}</h2></div></div>`;
+    return { text, reading };
+  }
+
+  private renderHeader(): TemplateResult {
+    return html`<div class="header"><div class="header-left"><h2>${this.headline().text}</h2></div></div>`;
+  }
+
+  /**
+   * fm-07 — what the page says about "Read everything again" besides its headline. While reading runs
+   * the headline says it once: no receipt that the request was accepted or is unconfirmed, and no second
+   * reading line. Before reading shows, one plain line says it is starting; once reading was seen, or
+   * when the status cannot tell, an open outcome is said as unconfirmed with its check action. A
+   * completion or failure keeps its message.
+   */
+  private renderReindexOutcome(): TemplateResult | typeof nothing {
+    if (!this.reindexOutcome) return nothing;
+    const { reading } = this.headline();
+    const statusKnown = this.indexProgress.live && this.indexingActivity.confirmed && !this.contactUnconfirmed && !this.rootsUnconfirmed;
+    if (!this.reindexSettled && reading) return nothing;
+    if (this.reindexPending && !this.reindexSeenReading && statusKnown) {
+      return html`<div class="action-message" role="status">Starting to read everything again.</div>`;
+    }
+    return html`<div class="action-message" role=${this.reindexOutcomeError ? 'alert' : 'status'}>
+        ${this.reindexOutcome}
+        ${this.reindexOutcomeKey ? html`<jf-button label="Check reading outcome" .disabled=${this.reindexOutcomeBusy}
+          .onActivate=${() => this.checkReindexOutcome()}>Check reading outcome</jf-button>` : nothing}
+        ${this.retryWaiting || this.indexProgress.phase === 'blocked' || reading ? nothing
+          : html`<p>${this.indexingActivity.summary}${this.indexingActivity.detail ? ` — ${this.indexingActivity.detail}` : ''}</p>`}
+      </div>`;
   }
 
   private meaningText(root: IndexedRootView, status: FolderStatus): string {
     const words = status.state === 'ready' || status.state === 'enriching' || status.state === 'keyword-only' || status.state === 'unverified';
-    const fallback = words ? ' · word search is available' : ' · word search availability not known';
+    // fm-07 — while the folder is scanned or read, the line says only what is known about meaning.
+    const fallback = words ? ' · word search is available' : status.state === 'scanning' || status.state === 'indexing' ? '' : ' · word search availability not known';
     if (!this.indexingActivity.confirmed || this.rootsUnconfirmed || this.provisional || status.state === 'unknown' || status.state === 'unavailable') return `Not known${words ? ' · word search was available at the last check' : fallback}`;
     const stages = this.enrichmentStages;
     if (stages && Object.entries(root.failedStages ?? {}).some(([id, failed]) => failed && (id === 'chunkVectors' ? stages.embedding : stages[id as keyof EnrichmentApplicability]))) return `Some files failed${fallback}`;
@@ -2981,13 +3039,7 @@ export class LibrarySurface extends JfElement {
       ${this.activeTab === 'folders' ? html`<jf-interrupted-imports api-base=${this.apiBase} .host_=${this.host_}></jf-interrupted-imports>` : nothing}
       ${this.renderAttention()}
       <div class="action-message" role="status" aria-live="polite">${this.actionMessage ?? ''}</div>
-      ${this.reindexOutcome ? html`<div class="action-message" role=${this.reindexOutcomeError ? 'alert' : 'status'}>
-        ${this.reindexOutcome}
-        ${this.reindexOutcomeKey ? html`<jf-button label="Check reading outcome" .disabled=${this.reindexOutcomeBusy}
-          .onActivate=${() => this.checkReindexOutcome()}>Check reading outcome</jf-button>` : nothing}
-        ${this.retryWaiting || this.indexProgress.phase === 'blocked' ? nothing
-          : html`<p>${this.indexingActivity.summary}${this.indexingActivity.detail ? ` — ${this.indexingActivity.detail}` : ''}</p>`}
-      </div>` : nothing}
+      ${this.renderReindexOutcome()}
 
 
       ${this.developer && !this.isTauri

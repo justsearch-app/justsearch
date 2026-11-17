@@ -16,8 +16,8 @@ function model(worker: unknown, extra: Partial<AiState> = {}) {
     episodeMaxPendingJobs: 1600, enrichSettleSamples: [], status: raw(worker), ...extra,
   } as AiState });
 }
-async function render(m: ReturnType<typeof model>) {
-  const panel = new StatusPanel(); panel.model = m; document.body.append(panel); await panel.updateComplete; return panel;
+async function render(m: ReturnType<typeof model>, developer = false) {
+  const panel = new StatusPanel(); panel.model = m; panel.developer = developer; document.body.append(panel); await panel.updateComplete; return panel;
 }
 afterEach(() => document.body.replaceChildren());
 describe('Running (moved from the task tray and indexing overlay)', () => {
@@ -37,7 +37,8 @@ describe('Running (moved from the task tray and indexing overlay)', () => {
     const row = m.sections.running.find(r => r.id === 'indexing')!;
     expect(row.percent).toBe(60); expect(row.detail).toContain('60%');
     expect(row.details!.find(r => r.id === 'stage:embedding')!.detail).toBe('60 / 100');
-    const panel = await render(m); const disclosure = [...panel.shadowRoot!.querySelectorAll('button')].find(b => b.textContent === 'Details')!;
+    // fm-15 (fm-rest-a S1/S4): the reading entry's Details are a developer tool.
+    const panel = await render(m, true); const disclosure = [...panel.shadowRoot!.querySelectorAll('button')].find(b => b.textContent === 'Details')!;
     disclosure.click(); await panel.updateComplete;
     expect(panel.shadowRoot!.querySelector('[data-detail="stage:embedding"]')!.textContent).toContain('60 / 100');
     expect(panel.shadowRoot!.querySelector('[data-detail="stage:splade"]')).toBeNull();

@@ -367,8 +367,12 @@ export class StatusPanel extends JfElement {
     this.expanded = next;
     this.dispatchEvent(new CustomEvent('status-read', { detail: row.id, bubbles: true, composed: true }));
   }
-  /** H4' — Earlier's Details only with developer tools, except on a failure; work rows keep theirs. */
+  /**
+   * H4' — Earlier's Details only with developer tools, except on a failure; work rows keep theirs, but
+   * the reading entry in Running (fm-15: title, numbers, bar and Pause reading) only with developer tools.
+   */
   private hasDetails(row: StatusFact): boolean {
+    if (row.indexing && row.section === 'running' && !this.developer) return false;
     return !!row.details?.length || row.section === 'earlier' && (this.developer || row.tone === 'failure');
   }
   private row(row: StatusFact): TemplateResult {
@@ -385,7 +389,7 @@ export class StatusPanel extends JfElement {
       ${row.error ? html`<p class="error" role="alert">${row.error}</p>` : nothing}
       ${row.indeterminate && !row.stale ? html`<progress aria-label=${row.title}></progress>` : nothing}
       ${row.percent != null && !row.stale ? html`<progress aria-label=${row.title} max="100" value=${row.percent}></progress>` : nothing}
-      ${row.indexing && this.model ? html`<jf-indexing-controls .progress=${this.model.progress}
+      ${row.indexing && this.model ? html`<jf-indexing-controls entry .progress=${this.model.progress}
         .allowPause=${row.section === 'running'} api-base=${this.apiBase}></jf-indexing-controls>` : nothing}
       <div class="actions">
         ${actions.map(action => html`<button type="button" class=${action.kind === 'authorization-allow' ? 'primary' : nothing}
