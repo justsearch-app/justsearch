@@ -115,3 +115,15 @@ column at 200% text. Each is listed below; every other assertion in those files 
   ]
 }
 ```
+
+## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "ol8xhfrk-verifier",
+  "verdict": "accept",
+  "digest": "sha256:e8ddc6b79ef23e1a9d9b7d3cd6bb79b219f0673ec99972fd09d8d553195ca9fe"
+}
+```
