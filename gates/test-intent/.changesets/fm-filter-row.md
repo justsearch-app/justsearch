@@ -137,3 +137,13 @@ attributes) after a Clear click with the same after Ctrl+A, Backspace in a separ
   "digest": "sha256:7e323f14b178d087103cbc92d23ab08d0f376cbd2ab26fc335ddf865cd67d4f8"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "3e3b8057-c591-41e1-b6a8-b9446cc33ec1",
+  "verdict": "accept",
+  "digest": "sha256:390873d8e43e0291a503203d0524c9e64df611123e3fad8cbab7d8a9d3d1bc9a"
+}
+```
