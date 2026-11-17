@@ -286,3 +286,13 @@ are not in the evidence: inside the first window, the last character, 10 charact
   "digest": "sha256:ac0228383eb377bffcf6b66a41a484d13fab5a5b24a8fbe2a5bd4a3decf1c514"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "verifier-l7hqoqnt",
+  "verdict": "accept",
+  "digest": "sha256:12bcc8bb73709547d1cf3b9322159fb4dc0d1680563744d044535fa6de189b01"
+}
+```
