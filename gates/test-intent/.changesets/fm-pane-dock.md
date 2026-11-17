@@ -168,3 +168,14 @@ remembered 360, 450 and 560 open at 360, 450 and 560 with a 331, 421 and 531 px 
   "digest": "sha256:e330656dd869023fef3a697d573f96cc6d6f511caff35353f61fa5e2f1d8340d"
 }
 ```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "0cya1ir_-verifier",
+  "verdict": "accept",
+  "digest": "sha256:e330656dd869023fef3a697d573f96cc6d6f511caff35353f61fa5e2f1d8340d",
+  "note": "Audit on 354f99d56a: new checks fail on 10ecbfb1ae by assertion and pass on the candidate; rewritten assertions limited to PJ1-PJ5/PJ2'; 4 of 4 mutations caught. Not pinned: split-layout drag limits (PJ4'); 563 vs 560 text column at 592."
+}
+```
