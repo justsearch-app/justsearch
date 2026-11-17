@@ -129,3 +129,13 @@ column at 200% text. Each is listed below; every other assertion in those files 
   "digest": "sha256:e8ddc6b79ef23e1a9d9b7d3cd6bb79b219f0673ec99972fd09d8d553195ca9fe"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "a7gvjcit-verifier",
+  "verdict": "accept",
+  "digest": "sha256:25bd63b6edc3b91458f45121c6cd6e9b214c09245171cbc179975472cfb86b37"
+}
+```
