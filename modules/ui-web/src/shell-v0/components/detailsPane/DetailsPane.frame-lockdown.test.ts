@@ -219,12 +219,13 @@ describe('Search\u2019s details pane', () => {
     await openPane(page);
     const grip = page.locator('[data-testid="sv3-pane-grip"]');
     await grip.focus();
+    // PJ2′: Search's grip moves the pane's outer width, 392-592 (360-560 of content plus 16 px padding each side).
     for (let i = 0; i < 20; i += 1) await page.keyboard.press('ArrowLeft');
     await settle(page);
-    expect((await box(page)).width).toBe(560);
+    expect((await box(page)).width).toBe(592);
     for (let i = 0; i < 20; i += 1) await page.keyboard.press('ArrowRight');
     await settle(page);
-    expect((await box(page)).width).toBe(360);
+    expect((await box(page)).width).toBe(392);
   }, 60_000);
 
   it('arrow keys move through the tabs and the keyboard stays on the tab strip', async () => {

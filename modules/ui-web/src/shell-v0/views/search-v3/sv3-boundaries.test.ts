@@ -38,6 +38,7 @@ import {
   SV3_MAIN_MIN_PX,
   SV3_PANE_DEFAULT_PX,
   SV3_PANE_INLINE_MIN_PX,
+  SV3_PANE_DOCKED_MAX_PX,
   SV3_PANE_MAX_PX,
   SV3_PANE_MIN_PX,
   SV3_SIDEBAR_COLLAPSED_PX,
@@ -101,14 +102,15 @@ describe('sv3 boundaries — the sidebar ceiling', () => {
 
 describe('sv3 boundaries — the pane ceiling', () => {
   it('stops at the details pane\u2019s 560 on a box wide enough that the ceiling is the binding term', () => {
-    expect(sv3PaneMaxWidth(2400, 0)).toBe(SV3_PANE_MAX_PX);
-    expect(clampSv3PaneWidth(5000, 2400, 0)).toBe(560);
+    // PJ2': the ceiling is the pane's outer 592 (560 of content plus 16 px padding each side).
+    expect(sv3PaneMaxWidth(2400, 0)).toBe(SV3_PANE_DOCKED_MAX_PX);
+    expect(clampSv3PaneWidth(5000, 2400, 0)).toBe(592);
   });
 
   it('clamps a drag to the spec floor and to the ceiling', () => {
     expect(clampSv3PaneWidth(10, 1568, 256)).toBe(SV3_PANE_MIN_PX);
     expect(clampSv3PaneWidth(500, 1568, 256)).toBe(500);
-    expect(clampSv3PaneWidth(100_000, 1568, 256)).toBe(SV3_PANE_MAX_PX);
+    expect(clampSv3PaneWidth(100_000, 1568, 256)).toBe(SV3_PANE_DOCKED_MAX_PX);
     expect(clampSv3PaneWidth(100_000, 1300, 256)).toBe(1300 - 256 - SV3_MAIN_MIN_PX);
   });
 
@@ -116,7 +118,7 @@ describe('sv3 boundaries — the pane ceiling', () => {
     expect(resolveInitialSv3PaneWidth(null, 1568, 256)).toBe(SV3_PANE_DEFAULT_PX);
     expect(resolveInitialSv3PaneWidth(500, 1920, 256)).toBe(500);
     // Remembered before the ceiling existed: an older, wider choice comes back at the ceiling.
-    expect(resolveInitialSv3PaneWidth(700, 1920, 256)).toBe(SV3_PANE_MAX_PX);
+    expect(resolveInitialSv3PaneWidth(700, 1920, 256)).toBe(SV3_PANE_DOCKED_MAX_PX);
     expect(resolveInitialSv3PaneWidth(200, 1920, 256)).toBe(SV3_PANE_MIN_PX);
     // Remembered from a wider window: 1400 − 256 − 640 = 504.
     expect(resolveInitialSv3PaneWidth(900, 1400, 256)).toBe(504);
@@ -173,7 +175,7 @@ describe('sv3 boundaries — BOTH open (the F8 improvement the spec does not hav
     // still apply, and the pane presents inline rather than flashing an overlay it will leave.
     expect(sv3PaneIsInline(Number.POSITIVE_INFINITY)).toBe(true);
     expect(clampSv3SidebarWidth(900, Number.POSITIVE_INFINITY, 0)).toBe(900);
-    expect(clampSv3PaneWidth(900, Number.POSITIVE_INFINITY, 0)).toBe(SV3_PANE_MAX_PX);
+    expect(clampSv3PaneWidth(900, Number.POSITIVE_INFINITY, 0)).toBe(SV3_PANE_DOCKED_MAX_PX);
     expect(resolveInitialSv3PaneWidth(null, Number.POSITIVE_INFINITY, 0)).toBe(SV3_PANE_DEFAULT_PX);
   });
 

@@ -1,63 +1,55 @@
 // SPDX-License-Identifier: Apache-2.0
 /**
- * Search's half of the page-width rule (owner decision, 15 November): "Search with the side pane
- * open: list and pane together, centred, at most 1280 px, the pane 400 px growing to at most 560".
- * The arithmetic is `sv3-boundaries.ts`'s; this module reads the frame's cap, writes the gutter the
- * window's rows and scroller use, owns whether the pane's width is the reader's or automatic, and
- * moves the list for a wheel in the gutter after an open pane.
+ * Search's half of the page-width rule. The owner's rule of 15 November centred the list and the pane
+ * together; the picture author's decision of 17 November, delegated by the owner, replaced that half:
+ * "The pane docks to the window's right edge. Pane width: 400 px at the default window, then 30 % of
+ * the window width, up to 592 px ... The list keeps the maximum width it already has for plain results
+ * and is centred in the space left of the pane." The arithmetic is `sv3-boundaries.ts`'s; this module
+ * reads the frame's share, and owns whether the pane's width is the reader's or automatic.
  *
- * With the pane closed, the main column takes the frame's own `--surface-content-gutter` in CSS (it
- * resolves against each row's containing block). With the pane open inline, the window measures one
- * gutter for the list and the pane together and publishes it as `--sv3-page-gutter`: padding inside
- * the main column's rows and scroller, a margin after the pane. Rows and the scroller keep their full
- * width, so a wheel anywhere beside the list still scrolls it. Reflow never writes the remembered width.
+ * The pane is the window's last flex track, so it sits against the window's right edge and its
+ * surface and lines span its own width. The main column's rows and scroller take the frame's
+ * `--surface-content-gutter` in CSS, which resolves against each row's containing block: the space the
+ * sidebar and the pane leave, so the list is centred there whether the pane is open or not. Rows and
+ * the scroller keep their full width, so a wheel anywhere beside the list still scrolls it. Reflow
+ * never writes the remembered width.
  */
-import { css, type ReactiveController, type ReactiveControllerHost } from 'lit';
-import { sv3AutomaticPaneWidth, sv3PageGutter } from './sv3-boundaries.js';
+import { css } from 'lit';
+import { sv3AutomaticPaneWidth } from './sv3-boundaries.js';
 
 /**
- * The rows of the window's main column, on the page column. Before the window's own sheet (which tests
- * read as the last entry), so every rule here is scoped by :host to outrank the own sheet's paddings.
+ * The rows of the window's main column, on the page column. Interpolated at the top of the window's
+ * own sheet (which tests read as its third entry), so every rule here is scoped by :host to outrank
+ * the own sheet's paddings that follow it.
  */
 export const sv3PageWidthStyles = css`
-  :host {
-    --sv3-gutter-start: var(--sv3-page-gutter, var(--surface-content-gutter, 0px));
-    --sv3-gutter-end: var(--surface-content-gutter, 0px);
-  }
   :host .branch-origin {
-    padding-inline: calc(var(--sv3-gutter-start) + var(--space-4)) calc(var(--sv3-gutter-end) + var(--space-4));
+    padding-inline: calc(var(--surface-content-gutter, 0px) + var(--space-4));
   }
   :host .indexing-pause-note, :host .column > .recovery-notice {
-    padding-inline: calc(var(--sv3-gutter-start) + var(--floating-content-inset)) calc(var(--sv3-gutter-end) + var(--floating-content-inset));
+    padding-inline: calc(var(--surface-content-gutter, 0px) + var(--floating-content-inset));
   }
-  :host .dock, :host .forget-row { padding-inline: var(--sv3-gutter-start) var(--sv3-gutter-end); }
-  :host(:not([pane-overlay])) jf-sv3-pane { margin-inline-end: var(--sv3-page-gutter, 0px); }
-  :host button.pane-grip { right: calc(var(--pane-width) + var(--sv3-page-gutter, 0px)); }
+  :host .dock, :host .forget-row { padding-inline: var(--surface-content-gutter, 0px); }
 `;
 
-/** The window's measures: its width, the sidebar's occupancy, whether the pane is open inline, the pane's width. */
-type Sv3PageMeasures = () => readonly [available: number, sidebar: number, paneInline: boolean, paneWidth: number];
+/** The window's measures: its width, the sidebar's occupancy, the pane's width. */
+type Sv3PageMeasures = () => readonly [available: number, sidebar: number, paneWidth: number];
 
-export class Sv3PageWidth implements ReactiveController {
+export class Sv3PageWidth {
   /** The pane's width is the reader's (remembered, dragged or nudged) rather than automatic. */
   chosen = false;
-  /** The sidebar occupancy the gutter was last written for. */
+  /** The sidebar occupancy the pane's width was last computed for. */
   private sidebar = -1;
 
-  constructor(private readonly host: ReactiveControllerHost & HTMLElement, private readonly measures: Sv3PageMeasures) {
-    host.addController(this);
-  }
-
-  hostConnected(): void { this.host.addEventListener('wheel', this.onWheel, { passive: true }); }
-  hostDisconnected(): void { this.host.removeEventListener('wheel', this.onWheel); }
+  constructor(private readonly host: HTMLElement, private readonly measures: Sv3PageMeasures) {}
 
   /**
-   * The frame's width for the list and the pane together (`--surface-content-with-pane-max-width`),
-   * or `Infinity` where the frame publishes none: a split stage, or a DOM without layout.
+   * The frame's share of the window for the docked pane (`--surface-pane-share`, a percentage), or
+   * `null` where the frame publishes none: a split stage, or a DOM without layout.
    */
-  private cap(): number {
-    const raw = getComputedStyle(this.host).getPropertyValue('--surface-content-with-pane-max-width').trim();
-    return raw.endsWith('px') ? Number.parseFloat(raw) : Number.POSITIVE_INFINITY;
+  private share(): number | null {
+    const raw = getComputedStyle(this.host).getPropertyValue('--surface-pane-share').trim();
+    return raw.endsWith('%') ? Number.parseFloat(raw) / 100 : null;
   }
 
   /** A remembered width is the reader's choice; none leaves the pane automatic. */
@@ -77,21 +69,10 @@ export class Sv3PageWidth implements ReactiveController {
     return sidebar !== this.sidebar;
   }
 
-  /** Write the gutter; the pane's width to show: the reader's, or the automatic one. */
+  /** The pane's width to show: the reader's, or the automatic one. */
   sync(): number {
-    const [available, sidebar, paneInline, current] = this.measures();
+    const [available, sidebar, current] = this.measures();
     this.sidebar = sidebar;
-    const cap = this.cap();
-    const gutter = paneInline ? sv3PageGutter(available, sidebar, cap) : 0;
-    if (gutter > 0) this.host.style.setProperty('--sv3-page-gutter', `${gutter}px`);
-    else this.host.style.removeProperty('--sv3-page-gutter');
-    return this.chosen ? current : sv3AutomaticPaneWidth(available, sidebar, cap);
+    return this.chosen ? current : sv3AutomaticPaneWidth(available, sidebar, this.share());
   }
-
-  /** The gutter after an open pane is the window's own background: a wheel there moves the list. */
-  private readonly onWheel = (event: WheelEvent): void => {
-    if (event.composedPath()[0] !== this.host || this.host.style.getPropertyValue('--sv3-page-gutter') === '') return;
-    const main = this.host.shadowRoot?.querySelector('jf-sv3-main');
-    main?.shadowRoot?.querySelector('.scroller')?.scrollBy({ left: event.deltaX, top: event.deltaY });
-  };
 }

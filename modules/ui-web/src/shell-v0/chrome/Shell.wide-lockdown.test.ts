@@ -3,7 +3,9 @@
 // below it each area's content is one centred column of at most 960 px (tab-row lines span the
 // window, content on the column); Search with side pane: list+pane centred at most 1280 px, pane 400
 // px growing to at most 560; extra height to lists; first-launch/empty-search blocks centred as
-// drawn." Measured through the real frame: the real Shell, Stage, top bar and every area, in headless
+// drawn." Search's list+pane half is replaced by the picture author's decision of 17 November (PJ1-PJ3:
+// the pane docks to the window's right edge, max(400, 30 % of the window) up to 592, the list centred
+// in what it leaves; Shell.paneDock-lockdown.test.ts holds the new rule). Measured through the real frame: the real Shell, Stage, top bar and every area, in headless
 // Chromium over a private Vite server with a stubbed backend (no Engine, no shared dev stack). Run with
 // npx vitest run --config vitest.config.lockdown.ts src/shell-v0/chrome/Shell.wide-lockdown.test.ts
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -24,7 +26,6 @@ const ACTIVITY = 'core.activity-surface';
 const HELP = 'core.help-surface';
 const PANE_KEY = 'justsearch.searchV3.pane.width.v1';
 const COLUMN = 960;
-const WITH_PANE = 1280;
 
 const HARNESS = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <link rel="stylesheet" href="/src/styles/tokens.css"></head><body><script type="module">
@@ -478,7 +479,7 @@ describe('SW-1 Activity with a record open', () => {
   }, 60_000);
 });
 
-describe('SW-2 Search with the pane open at 1920: list and pane centred, at most 1280', () => {
+describe('SW-2 Search with the pane open at 1920: the pane at the window edge, the list centred in what it leaves', () => {
   it.each([
     ['no sidebar', '', null, 0],
     ['an expanded sidebar', '?saved', '0', 256],
@@ -494,21 +495,22 @@ describe('SW-2 Search with the pane open at 1920: list and pane centred, at most
     await search(page);
     await openResult(page);
     const pane = (await page.locator('jf-sv3-pane').boundingBox())!;
-    const gutter = (1920 - sidebar - WITH_PANE) / 2;
-    expect(Math.round(pane.width)).toBe(560);
-    expect(Math.abs(pane.x + pane.width - (1920 - gutter)), `pane ends ${gutter} px from the edge`).toBeLessThanOrEqual(1);
+    expect(Math.round(pane.width)).toBe(576);
+    expect(Math.abs(pane.x + pane.width - 1920), 'pane ends at the window edge').toBeLessThanOrEqual(1);
+    const col = column({ left: sidebar, width: pane.x - sidebar });
     const content = await contentBox(page);
-    expect(content.left, 'list starts on the box').toBeGreaterThanOrEqual(sidebar + gutter - 1);
+    expect(content.left, 'list starts on the column').toBeGreaterThanOrEqual(col.left - 1);
     expect(content.right, 'list ends before the pane').toBeLessThanOrEqual(pane.x + 1);
-    expect(pane.x - (sidebar + gutter), 'the main column keeps its 640').toBeGreaterThanOrEqual(640);
+    expect(pane.x - sidebar, 'the main column keeps its 640').toBeGreaterThanOrEqual(640);
   }, 60_000);
 
   it('a wheel in either gutter moves the list', async () => {
     const page = await open(1920, 1080);
     await search(page);
     await openResult(page);
+    const pane = (await page.locator('jf-sv3-pane').boundingBox())!;
     expect(await wheelMoves(page, 100, 600, 700)).toBeGreaterThan(0);
-    expect(await wheelMoves(page, 1800, 600, 700)).toBeGreaterThan(0);
+    expect(await wheelMoves(page, Math.round(pane.x - 40), 600, 700)).toBeGreaterThan(0);
   }, 60_000);
 
   it('live resize: the automatic pane and the gutter follow the window', async () => {
@@ -518,13 +520,13 @@ describe('SW-2 Search with the pane open at 1920: list and pane centred, at most
     await page.setViewportSize({ width: 1100, height: 900 });
     await settle(page, 400);
     let pane = (await page.locator('jf-sv3-pane').boundingBox())!;
-    expect(Math.round(pane.width)).toBe(460);
+    expect(Math.round(pane.width)).toBe(400);
     expect(Math.round(pane.x + pane.width)).toBe(1100);
     await page.setViewportSize({ width: 1920, height: 1080 });
     await settle(page, 400);
     pane = (await page.locator('jf-sv3-pane').boundingBox())!;
-    expect(Math.round(pane.width)).toBe(560);
-    expect(Math.round(pane.x + pane.width)).toBe(1600);
+    expect(Math.round(pane.width)).toBe(576);
+    expect(Math.round(pane.x + pane.width)).toBe(1920);
   }, 60_000);
 });
 
@@ -608,7 +610,7 @@ describe('SW-4 at or below 960 nothing changes; the 980 switch is unchanged', ()
     expect(await page.locator('jf-sv3-window').evaluate(el => el.hasAttribute('pane-overlay'))).toBe(overlay);
   }, 60_000);
 
-  it.each([[1040, 400], [1100, 460]] as const)('at %i px with no sidebar the automatic pane is %i px wide, at the window edge', async (width, px) => {
+  it.each([[1040, 400], [1100, 400]] as const)('at %i px with no sidebar the automatic pane is %i px wide, at the window edge', async (width, px) => {
     const page = await open(width, 800);
     await search(page);
     await openResult(page);
@@ -628,12 +630,12 @@ describe('SW-4 at or below 960 nothing changes; the 980 switch is unchanged', ()
 
 describe('SW-5 the remembered pane width: stored value against effective width, no writes on reflow', () => {
   it.each([
-    ['absent', null, 560],
+    ['absent', null, 576],
     ['360', '360', 360],
     ['450', '450', 450],
-    ['600', '600', 560],
-    ['invalid', 'wide', 560],
-    ['storage unavailable', 'unavailable', 560],
+    ['600', '600', 592],
+    ['invalid', 'wide', 576],
+    ['storage unavailable', 'unavailable', 576],
   ] as const)('stored %s: the pane opens at its effective width and reflow writes nothing', async (_label, stored, px) => {
     const page = await open(1920, 1080, { storage: stored });
     await search(page);
@@ -650,7 +652,7 @@ describe('SW-5 the remembered pane width: stored value against effective width, 
     }
   }, 60_000);
 
-  it('dragging clamps to 360-560 and remembers; reset returns to automatic and forgets', async () => {
+  it('dragging clamps to 392-592 outer and remembers; reset returns to automatic and forgets', async () => {
     const page = await open(1920, 1080);
     await search(page);
     await openResult(page);
@@ -662,11 +664,11 @@ describe('SW-5 the remembered pane width: stored value against effective width, 
     await page.mouse.move(box.x + box.width / 2 + 600, y, { steps: 5 });
     await page.mouse.up();
     await settle(page, 300);
-    expect(Math.round((await page.locator('jf-sv3-pane').boundingBox())!.width)).toBe(360);
-    expect(await page.evaluate(key => localStorage.getItem(key), PANE_KEY)).toBe('360');
+    expect(Math.round((await page.locator('jf-sv3-pane').boundingBox())!.width)).toBe(392);
+    expect(await page.evaluate(key => localStorage.getItem(key), PANE_KEY)).toBe('392');
     await grip.dblclick();
     await settle(page, 300);
-    expect(Math.round((await page.locator('jf-sv3-pane').boundingBox())!.width)).toBe(560);
+    expect(Math.round((await page.locator('jf-sv3-pane').boundingBox())!.width)).toBe(576);
     expect(await page.evaluate(key => localStorage.getItem(key), PANE_KEY)).toBeNull();
   }, 60_000);
 });

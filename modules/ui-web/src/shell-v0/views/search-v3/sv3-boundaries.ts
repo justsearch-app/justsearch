@@ -164,18 +164,40 @@ export function resolveInitialSv3SidebarWidth(
 }
 
 /**
- * The widest the citation pane may be: the details pane's 560px, and — deviation 2 — never more than the
- * box has left once the sidebar's current occupancy and the main column's 640 are taken out.
+ * The pane's 16 px of padding on each side. Every width here is the pane's OUTER width (the track
+ * `--pane-width` sets, the value the remembered width has always stored), so its content is this much
+ * narrower.
+ */
+const SV3_PANE_PADDING_PX = 2 * 16;
+
+/**
+ * The widest the pane may be: 560 px of content plus its padding ("up to 592 px (560 of content plus
+ * 16 padding each side)"), the ceiling of the automatic width and of a drag alike (PJ2': both measure
+ * the same outer box, so a nudge from an automatic width moves one step).
+ */
+export const SV3_PANE_DOCKED_MAX_PX = SV3_PANE_MAX_PX + SV3_PANE_PADDING_PX;
+
+/** The narrowest a drag or nudge takes the pane: 360 px of content plus its padding (PJ2'). */
+const SV3_PANE_DRAG_MIN_PX = SV3_PANE_MIN_PX + SV3_PANE_PADDING_PX;
+
+/**
+ * The widest the citation pane may be: {@link SV3_PANE_DOCKED_MAX_PX}, and — deviation 2 — never more
+ * than the box has left once the sidebar's current occupancy and the main column's 640 are taken out.
  * `sidebarOccupiedWidth` is the rendered width, so a COLLAPSED sidebar hands the pane the 48px rail's
  * worth of room back rather than the width it will have when it expands again.
  */
 export function sv3PaneMaxWidth(hostWidth: number, sidebarOccupiedWidth: number): number {
   return Math.max(
     SV3_PANE_MIN_PX,
-    Math.min(SV3_PANE_MAX_PX, mainSafeRemainder(hostWidth, sidebarOccupiedWidth)),
+    Math.min(SV3_PANE_DOCKED_MAX_PX, mainSafeRemainder(hostWidth, sidebarOccupiedWidth)),
   );
 }
 
+/**
+ * A width the window already holds (a remembered one, re-clamped when the pane opens): floored at the
+ * pane's 360, so a width remembered before PJ2' (stored as the same outer width, 360-560) shows as it
+ * did; storage is never rewritten here.
+ */
 export function clampSv3PaneWidth(
   width: number,
   hostWidth: number,
@@ -184,6 +206,21 @@ export function clampSv3PaneWidth(
   return Math.round(
     Math.max(SV3_PANE_MIN_PX, Math.min(width, sv3PaneMaxWidth(hostWidth, sidebarOccupiedWidth))),
   );
+}
+
+/**
+ * A width the reader drags or nudges to: {@link SV3_PANE_DRAG_MIN_PX}-{@link SV3_PANE_DOCKED_MAX_PX},
+ * cut to the room beside the main column's 640. Where that room is under 392 (a window just above the
+ * 980 switch) the floor stays the pane's 360, so a constrained window drags as it did.
+ */
+export function clampSv3PaneDragWidth(
+  width: number,
+  hostWidth: number,
+  sidebarOccupiedWidth: number,
+): number {
+  const ceiling = sv3PaneMaxWidth(hostWidth, sidebarOccupiedWidth);
+  const floor = ceiling >= SV3_PANE_DRAG_MIN_PX ? SV3_PANE_DRAG_MIN_PX : SV3_PANE_MIN_PX;
+  return Math.round(Math.max(floor, Math.min(width, ceiling)));
 }
 
 /** The pane's own {@link resolveInitialSv3SidebarWidth} — same rule, the pane's numbers. */
@@ -197,41 +234,26 @@ export function resolveInitialSv3PaneWidth(
   return Math.min(preferred, sv3PaneMaxWidth(hostWidth, sidebarOccupiedWidth));
 }
 
-/** The automatic pane's floor on a wide window (the owner's page-width rule: "the pane 400 px"). */
+/** The automatic pane's floor on a wide window ("400 px at the default window"). */
 const SV3_PANE_AUTO_MIN_PX = 400;
 
 /**
- * THE PAGE-WIDTH RULE (owner decision, 15 November): "Search with the side pane open: list and pane
- * together, centred, at most 1280 px, the pane 400 px growing to at most 560". `withPaneCap` is that
- * 1280, read from the frame's `--surface-content-with-pane-max-width`; a cap the frame does not
- * publish (a split stage, a DOM without layout) is `Infinity`, and then nothing here changes the
- * window from what it was before the rule.
- *
- * The sidebar stays outside the cap at the window's left edge; the main column and an open inline
- * pane share what it leaves, at most the cap, centred. This is the gutter on EACH side of that box.
- */
-export function sv3PageGutter(hostWidth: number, sidebarOccupiedWidth: number, withPaneCap: number): number {
-  if (!Number.isFinite(hostWidth) || !Number.isFinite(withPaneCap)) return 0;
-  return Math.max(0, Math.floor((Math.floor(hostWidth) - sidebarOccupiedWidth - withPaneCap) / 2));
-}
-
-/**
- * The pane's width when the reader has not chosen one: the room the main column's 640 leaves in the
- * CAPPED box, 400-560, and never past the existing ceiling ({@link sv3PaneMaxWidth}), so a window
- * between 980 and 1040 px keeps the narrower pane it had (the constrained-window fallback). With no
- * published cap it is the window's automatic width from before the rule.
+ * The pane's width when the reader has not chosen one. With the frame's page-width rule (the picture
+ * author's decision of 17 November: "The pane docks to the window's right edge. Pane width: 400 px at
+ * the default window, then 30 % of the window width, up to 592 px"), `share` is that 30 %, read from
+ * the frame's `--surface-pane-share`: max(400, share of the window), at most 592, and never past the
+ * room the main column's 640 leaves beside the sidebar, so a window between 980 and 1040 px keeps the
+ * narrower pane it had. A share the frame does not publish (`null`: a split stage, a DOM without
+ * layout) leaves the automatic width from before the rule.
  */
 export function sv3AutomaticPaneWidth(
   hostWidth: number,
   sidebarOccupiedWidth: number,
-  withPaneCap: number,
+  share: number | null,
 ): number {
-  if (!Number.isFinite(withPaneCap)) {
-    return resolveInitialSv3PaneWidth(null, hostWidth, sidebarOccupiedWidth);
-  }
-  const box = Math.min(Math.floor(hostWidth) - sidebarOccupiedWidth, withPaneCap);
-  const preferred = Math.max(SV3_PANE_AUTO_MIN_PX, Math.min(SV3_PANE_MAX_PX, box - SV3_MAIN_MIN_PX));
-  return Math.min(preferred, sv3PaneMaxWidth(hostWidth, sidebarOccupiedWidth));
+  if (share === null) return resolveInitialSv3PaneWidth(null, hostWidth, sidebarOccupiedWidth);
+  const preferred = Math.min(SV3_PANE_DOCKED_MAX_PX, Math.max(SV3_PANE_AUTO_MIN_PX, Math.round(Math.floor(hostWidth) * share)));
+  return Math.max(SV3_PANE_MIN_PX, Math.min(preferred, mainSafeRemainder(hostWidth, sidebarOccupiedWidth)));
 }
 
 const SIDEBAR_WIDTH_KEY = 'justsearch.searchV3.sidebar.width.v1';

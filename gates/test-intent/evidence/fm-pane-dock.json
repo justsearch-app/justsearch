@@ -1,0 +1,300 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-17T08:04:27.975Z",
+  "revision": "a99f23ef9e09bca19c399515190cb5e9c4599969",
+  "tree": "ae2bc23716d50126ba8a4ee5cbcb2fcdc90e9607",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-3889-1794902525339.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 405
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-3889-1794902525744.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 71686
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a7ab3cc5667b42036aa78f1055e27c229d5b1566eb4ae39842a6405c58732200",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1024 px with a 0 px sidebar the automatic pane is 384 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1100 px with a 0 px sidebar the automatic pane is 400 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1280 px with a 0 px sidebar the automatic pane is 400 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1333 px with a 0 px sidebar the automatic pane is 400 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1400 px with a 0 px sidebar the automatic pane is 420 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1600 px with a 0 px sidebar the automatic pane is 480 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1920 px with a 0 px sidebar the automatic pane is 576 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1920 px with a 48 px sidebar the automatic pane is 576 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1920 px with a 256 px sidebar the automatic pane is 576 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1973 px with a 0 px sidebar the automatic pane is 592 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 2560 px with a 0 px sidebar the automatic pane is 592 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 3840 px with a 256 px sidebar the automatic pane is 592 px",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 592 is 560 of content and 16 px of padding on each side",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 the main column keeps its 640 beside the automatic pane",
+          "status": "passed"
+        },
+        {
+          "name": "PJ4 what the docked pane leaves alone at or below 1040 px it is the constrained-window width it had (no change at the default window)",
+          "status": "passed"
+        },
+        {
+          "name": "PJ4 what the docked pane leaves alone with no published share (split stage, no layout) it is the automatic width from before the rule",
+          "status": "passed"
+        },
+        {
+          "name": "PJ4 what the docked pane leaves alone a remembered width reads as stored, from 360 up to the outer 592 (PJ2′)",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box a drag or nudge clamps to 392-592 outer (360-560 of content plus 16 px padding each side)",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box at 1920 px with a 256 px sidebar a nudge from the automatic width moves exactly one step",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box at 1920 px with a 0 px sidebar a nudge from the automatic width moves exactly one step",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box at 2400 px with a 0 px sidebar a nudge from the automatic width moves exactly one step",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box at 3840 px with a 256 px sidebar a nudge from the automatic width moves exactly one step",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box at 1600 px with a 0 px sidebar a nudge from the automatic width moves exactly one step",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box the room beside the main column’s 640 still binds, and a constrained window drags as before",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts",
+      "file": "modules/ui-web/src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:ff009f284ef6ef406cb6622531605cf73be3ed65e9b24af7b02f8d1b8450e731",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "PJ1 the pane docks to the window’s right edge; its surface and lines span its width at 1920 with no sidebar (none/0 px) in dark",
+          "status": "passed"
+        },
+        {
+          "name": "PJ1 the pane docks to the window’s right edge; its surface and lines span its width at 1920 with no sidebar (none/0 px) in light",
+          "status": "passed"
+        },
+        {
+          "name": "PJ1 the pane docks to the window’s right edge; its surface and lines span its width at 1920 with an expanded sidebar (expanded/256 px) in dark",
+          "status": "passed"
+        },
+        {
+          "name": "PJ1 the pane docks to the window’s right edge; its surface and lines span its width at 1920 with an expanded sidebar (expanded/256 px) in light",
+          "status": "passed"
+        },
+        {
+          "name": "PJ1 the pane docks to the window’s right edge; its surface and lines span its width at 1920 with a collapsed sidebar (collapsed/48 px) in dark",
+          "status": "passed"
+        },
+        {
+          "name": "PJ1 the pane docks to the window’s right edge; its surface and lines span its width at 1920 with a collapsed sidebar (collapsed/48 px) in light",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 at 1100 px wide the automatic pane is 400 px, at the window edge",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 at 1400 px wide the automatic pane is 420 px, at the window edge",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 at 1600 px wide the automatic pane is 480 px, at the window edge",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 at 1920 px wide the automatic pane is 576 px, at the window edge",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 at 2400 px wide the automatic pane is 592 px, at the window edge",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 at 2400 px the pane is 592 outer and its content box is 592 less its padding and border, inset by the padding",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 live resize follows the window and writes nothing",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 a remembered width still wins over the automatic one, at the window edge",
+          "status": "passed"
+        },
+        {
+          "name": "PJ3 no list+pane cap: the list keeps its 960 and is centred in what the pane leaves with no sidebar (none/0 px) at 1920",
+          "status": "passed"
+        },
+        {
+          "name": "PJ3 no list+pane cap: the list keeps its 960 and is centred in what the pane leaves with an expanded sidebar (expanded/256 px) at 1920",
+          "status": "passed"
+        },
+        {
+          "name": "PJ3 no list+pane cap: the list keeps its 960 and is centred in what the pane leaves with a collapsed sidebar (collapsed/48 px) at 1920",
+          "status": "passed"
+        },
+        {
+          "name": "PJ3 no list+pane cap: the list keeps its 960 and is centred in what the pane leaves with no sidebar (none/0 px) at 2400",
+          "status": "passed"
+        },
+        {
+          "name": "PJ3 no list+pane cap: the list keeps its 960 and is centred in what the pane leaves the frame publishes no list+pane width any more",
+          "status": "passed"
+        },
+        {
+          "name": "PJ3 no list+pane cap: the list keeps its 960 and is centred in what the pane leaves a wheel in either gutter beside the list moves the list",
+          "status": "passed"
+        },
+        {
+          "name": "PJ4 at the default window and in a split nothing changes at 1024×700 the pane, grip, main column and list keep their pixel geometry",
+          "status": "passed"
+        },
+        {
+          "name": "PJ4 at the default window and in a split nothing changes in a stacked split at 1920 the pane keeps the width it had (540) at its split’s edge",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box (392-592) at 1920 px a nudge from the automatic 576 px moves one step, no jump, and Home returns to automatic",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box (392-592) at 2400 px a nudge from the automatic 592 px moves one step, no jump, and Home returns to automatic",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box (392-592) a drag clamps at 392 and 592 outer, and a remembered 592 reopens at 592",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box (392-592) a width remembered before (360) shows the pane and its text column as on the base",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box (392-592) a width remembered before (450) shows the pane and its text column as on the base",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box (392-592) a width remembered before (560) shows the pane and its text column as on the base",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "10ecbfb1ae",
+    "revision": "10ecbfb1ae813b9923dee98d5b4bc64a717305de",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-3889-1794902599702.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 428,
+        "output": "JSON report written to /home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-3889-1794902599702.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-3889-1794902600130.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 67582,
+        "output": "JSON report written to /home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-3889-1794902600130.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts",
+        "classification": "assertion",
+        "detail": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1400 px with a 0 px sidebar the automatic pane is 420 px:  AssertionError: expected 400 to be 420 // Object.is equality\n    at /home/elias/.cache/am/ntlhrh63/tmp/test-intent-before-PtJsfY/modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts:40:40\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-pj/modules/ui-web/node_mod | PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1600 p"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts",
+        "classification": "assertion",
+        "detail": "PJ1 the pane docks to the window’s right edge; its surface and lines span its width at 1920 with no sidebar (none/0 px) in dark:  AssertionError: the pane ends at the window edge: expected 1600 to be 1920 // Object.is equality\n    at /home/elias/.cache/am/ntlhrh63/tmp/test-intent-before-PtJsfY/modules/ui-web/src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts:279:76\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm | PJ1 the pane docks to the window’s right edge; its surface and line"
+      }
+    ]
+  },
+  "digest": "sha256:5269b2046cdf04f6268ccef6aba8b78cd4928ad819e05471f28a983d4d6ca7d9"
+}

@@ -233,8 +233,8 @@ export type TokenName =
   | '--surface-active'
   | '--surface-content-gutter'
   | '--surface-content-max-width'
-  | '--surface-content-with-pane-max-width'
   | '--surface-hover'
+  | '--surface-pane-share'
   | '--surface-primary'
   | '--surface-secondary'
   | '--surface-subtle'
@@ -495,8 +495,8 @@ export const TOKEN_NAMES: readonly TokenName[] = [
   '--surface-active',
   '--surface-content-gutter',
   '--surface-content-max-width',
-  '--surface-content-with-pane-max-width',
   '--surface-hover',
+  '--surface-pane-share',
   '--surface-primary',
   '--surface-secondary',
   '--surface-subtle',
