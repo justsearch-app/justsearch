@@ -86,14 +86,14 @@ passes on the candidate (run-evidence with --before 012aae15e5).
       "change": "modified",
       "kind": "test-code",
       "class": "New",
-      "behaviour": "With successful core.apply-settings ledger rows the panel shows no \"Apply Settings\" text; a failed one is an Earlier row saying Failed. An operation.completed notice for core.apply-settings is no Earlier row on success and \"Apply Settings failed\" on failure. The close button has no text and draws the shared x icon (paths M18 6 6 18 and m6 6 12 12).",
+      "behaviour": "For each of core.reconfigure and core.apply-settings: successful ledger rows labelled \"Apply Settings\" show no such text and a failed one is an Earlier row saying Failed; an operation.completed notice is no Earlier row on success and a \"... failed\" row on failure. A successful row with the same label but another operation (core.rebuild-index) still shows. The close button has no text and draws the shared x icon (paths M18 6 6 18 and m6 6 12 12).",
       "sources": [
         {
           "kind": "delegated-choice",
           "delegationQuote": "just ask the other agent to make the decisions",
           "delegationLocation": "task t-20261113-fmimpl agreement, the owner's reply delegating the open items of the picture author's packaged-app review (relayed verbatim in the fm-ph builder brief)",
           "delegationScope": "the open items of the picture author's review of the packaged app: fm-02, fm-10, fm-11, fm-15",
-          "choice": "PH3 (review fm-15: \"'Apply Settings / Completed' once per theme change is an operation name in the panel. The close mark is a small text cross, unlike the other close icons.\") The status panel's default view lists no successful settings save (the Engine's settings operation core.apply-settings), from the action ledger or an operation.completed notice; a failed save keeps its row. The close button draws the app's shared close icon.",
+          "choice": "PH3 (review fm-15: \"'Apply Settings / Completed' once per theme change is an operation name in the panel. The close mark is a small text cross, unlike the other close icons.\") The status panel's default view lists no successful settings save (the Engine's settings operations: core.reconfigure from the Settings page, core.apply-settings from settings.apply-public; matched by operation, not by label), from the action ledger or an operation.completed notice; a failed save keeps its row. The close button draws the app's shared close icon.",
           "label": "agent choice"
         },
         {
@@ -101,7 +101,7 @@ passes on the candidate (run-evidence with --before 012aae15e5).
           "delegationQuote": "You are supposed to be the implementation session",
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
-          "choice": "PH3 (review fm-15: \"'Apply Settings / Completed' once per theme change is an operation name in the panel. The close mark is a small text cross, unlike the other close icons.\") The status panel's default view lists no successful settings save (the Engine's settings operation core.apply-settings), from the action ledger or an operation.completed notice; a failed save keeps its row. The close button draws the app's shared close icon.",
+          "choice": "PH3 (review fm-15: \"'Apply Settings / Completed' once per theme change is an operation name in the panel. The close mark is a small text cross, unlike the other close icons.\") The status panel's default view lists no successful settings save (the Engine's settings operations: core.reconfigure from the Settings page, core.apply-settings from settings.apply-public; matched by operation, not by label), from the action ledger or an operation.completed notice; a failed save keeps its row. The close button draws the app's shared close icon.",
           "label": "agent choice"
         }
       ],
