@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-17T18:13:46.114Z",
-  "revision": "8c74b0e0a07229287105b500accc9bb892765730",
-  "tree": "4af5c09ba38d689a4bc58ff22b5d767a5f28379e",
+  "createdAt": "2026-11-17T19:37:11.254Z",
+  "revision": "cb9ea82af9c95c4b8dfd8bcfd11e0884e0f88ba4",
+  "tree": "88e260305411b0e8882db3b8fd0b67139f450578",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/documentPane/DocumentPane.match.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/od16sup6/tmp/test-intent-vitest-24277-1794939150614.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/documentPane/DocumentPane.match.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/gfoet6d2/tmp/test-intent-vitest-24734-1794944134564.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 9721
+      "durationMs": 11446
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/od16sup6/tmp/test-intent-vitest-24277-1794939160337.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/gfoet6d2/tmp/test-intent-vitest-24734-1794944146011.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 26673
+      "durationMs": 35995
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#a passage beyond the first window: the window around it is asked for, the passage tinted, found words marked, scrolled to",
       "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:fca0fc4ff0c38e9d81d6bc5bc199a72eead00f106f17b79ed15163e1da2653b8",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -50,7 +50,7 @@
       "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#a passage inside the first window but below the fold: the beginning is asked for, the passage tinted and scrolled to",
       "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:fca0fc4ff0c38e9d81d6bc5bc199a72eead00f106f17b79ed15163e1da2653b8",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -65,7 +65,7 @@
       "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#says \"around the match\", not the cited passage and not the beginning",
       "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:fca0fc4ff0c38e9d81d6bc5bc199a72eead00f106f17b79ed15163e1da2653b8",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -80,7 +80,7 @@
       "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#the file changed since it was read: the window around the passage is tried, then the beginning",
       "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:fca0fc4ff0c38e9d81d6bc5bc199a72eead00f106f17b79ed15163e1da2653b8",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -95,7 +95,7 @@
       "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#the file is now shorter than the passage's position",
       "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:fca0fc4ff0c38e9d81d6bc5bc199a72eead00f106f17b79ed15163e1da2653b8",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -110,7 +110,7 @@
       "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#the preview refuses the window around the passage: the beginning, no failure shown",
       "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:fca0fc4ff0c38e9d81d6bc5bc199a72eead00f106f17b79ed15163e1da2653b8",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -125,7 +125,7 @@
       "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#ends on the second document's passage",
       "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:fca0fc4ff0c38e9d81d6bc5bc199a72eead00f106f17b79ed15163e1da2653b8",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -140,7 +140,7 @@
       "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#stay hidden, and the passage after a marker is found and tinted",
       "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:fca0fc4ff0c38e9d81d6bc5bc199a72eead00f106f17b79ed15163e1da2653b8",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -155,7 +155,7 @@
       "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#the text at the position differs (inside the first window)",
       "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:fca0fc4ff0c38e9d81d6bc5bc199a72eead00f106f17b79ed15163e1da2653b8",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -170,7 +170,7 @@
       "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#the passage is gone (beyond the first window)",
       "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:fca0fc4ff0c38e9d81d6bc5bc199a72eead00f106f17b79ed15163e1da2653b8",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -185,7 +185,7 @@
       "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#the file is now shorter than the position",
       "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:fca0fc4ff0c38e9d81d6bc5bc199a72eead00f106f17b79ed15163e1da2653b8",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -200,7 +200,7 @@
       "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#a match without a usable position",
       "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:fca0fc4ff0c38e9d81d6bc5bc199a72eead00f106f17b79ed15163e1da2653b8",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -212,10 +212,100 @@
       ]
     },
     {
+      "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#the paragraph was replaced, its first line kept (beyond the first window): the beginning, nothing tinted",
+      "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N3 a search passage is confirmed only by its whole text at its span the paragraph was replaced, its first line kept (beyond the first window): the beginning, nothing tinted",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#plain text, three lines deep in the file",
+      "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N4 an unchanged passage is confirmed (keep) plain text, three lines deep in the file",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#Markdown with headings, a list and a table before the passage",
+      "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N4 an unchanged passage is confirmed (keep) Markdown with headings, a list and a table before the passage",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#CRLF line ends, deep in the file",
+      "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N4 an unchanged passage is confirmed (keep) CRLF line ends, deep in the file",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#non-ASCII text (umlauts, emoji, CJK) before and inside the passage",
+      "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N4 an unchanged passage is confirmed (keep) non-ASCII text (umlauts, emoji, CJK) before and inside the passage",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#a passage replaced by none on the open file: the beginning, nothing tinted, today's note",
+      "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:a335c32f97f328ab7c13497d4958542a982f6aec2f3d830b0d9b9e5c2cc49b12",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N1 the open file given another passage, or none a passage replaced by none on the open file: the beginning, nothing tinted, today's note",
+          "status": "passed"
+        }
+      ]
+    },
+    {
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#asks the reader for the part around the passage and tints it",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f69ba87e9b7d664e62d08b311355369012bbe24f736e1eaae6f93b741c04b7e9",
+      "contentDigest": "sha256:06be0bd13672f91959dcc2746b86433195311d0e77f96ebde5e0d955b28d2df0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -230,7 +320,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#moving to another result while the pane is open shows that result's passage",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f69ba87e9b7d664e62d08b311355369012bbe24f736e1eaae6f93b741c04b7e9",
+      "contentDigest": "sha256:06be0bd13672f91959dcc2746b86433195311d0e77f96ebde5e0d955b28d2df0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -242,25 +332,10 @@
       ]
     },
     {
-      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#a newer search answer while the pane is open does not move it, and choosing the same result again does not jump",
-      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts",
-      "runner": "vitest",
-      "contentDigest": "sha256:f69ba87e9b7d664e62d08b311355369012bbe24f736e1eaae6f93b741c04b7e9",
-      "executed": true,
-      "skipped": false,
-      "outcome": "passed",
-      "cases": [
-        {
-          "name": "M6 races a newer search answer while the pane is open does not move it, and choosing the same result again does not jump",
-          "status": "passed"
-        }
-      ]
-    },
-    {
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#choosing a second result while the first one's window is loading ends on the second one's passage",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f69ba87e9b7d664e62d08b311355369012bbe24f736e1eaae6f93b741c04b7e9",
+      "contentDigest": "sha256:06be0bd13672f91959dcc2746b86433195311d0e77f96ebde5e0d955b28d2df0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -275,7 +350,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#deep-long.txt: chunk at 249,619, region 345-765: the window around 249,964, the passage tinted, the match note",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f69ba87e9b7d664e62d08b311355369012bbe24f736e1eaae6f93b741c04b7e9",
+      "contentDigest": "sha256:06be0bd13672f91959dcc2746b86433195311d0e77f96ebde5e0d955b28d2df0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -290,7 +365,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#a first chunk starting at 3 (leading whitespace stripped) is placed at 3 + the region's start",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f69ba87e9b7d664e62d08b311355369012bbe24f736e1eaae6f93b741c04b7e9",
+      "contentDigest": "sha256:06be0bd13672f91959dcc2746b86433195311d0e77f96ebde5e0d955b28d2df0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -305,7 +380,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#a file of identical lines, the passage in a chunk at line 2,400: that place, not the same text near the top",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f69ba87e9b7d664e62d08b311355369012bbe24f736e1eaae6f93b741c04b7e9",
+      "contentDigest": "sha256:06be0bd13672f91959dcc2746b86433195311d0e77f96ebde5e0d955b28d2df0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -320,7 +395,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#a passage past the first window: the window around it, tinted at its place",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f69ba87e9b7d664e62d08b311355369012bbe24f736e1eaae6f93b741c04b7e9",
+      "contentDigest": "sha256:06be0bd13672f91959dcc2746b86433195311d0e77f96ebde5e0d955b28d2df0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -335,7 +410,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#a passage in the first lines: the beginning, the word visible and tinted",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:f69ba87e9b7d664e62d08b311355369012bbe24f736e1eaae6f93b741c04b7e9",
+      "contentDigest": "sha256:06be0bd13672f91959dcc2746b86433195311d0e77f96ebde5e0d955b28d2df0",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -347,10 +422,70 @@
       ]
     },
     {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#N2 a newer answer for the same search arriving without a click moves nothing (keep)",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06be0bd13672f91959dcc2746b86433195311d0e77f96ebde5e0d955b28d2df0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "M6 races N2 a newer answer for the same search arriving without a click moves nothing (keep)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#N2 opening the result whose passage the pane shows, after the reader scrolled away: no request, no scroll, no change (keep)",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06be0bd13672f91959dcc2746b86433195311d0e77f96ebde5e0d955b28d2df0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "M6 races N2 opening the result whose passage the pane shows, after the reader scrolled away: no request, no scroll, no change (keep)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#two-words.txt open at \"frostlatch\"; a search for \"mossbeacon\" returns it with another passage; opening it shows that passage",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06be0bd13672f91959dcc2746b86433195311d0e77f96ebde5e0d955b28d2df0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N1 the open file, found again with another passage, opens at that passage two-words.txt open at \"frostlatch\"; a search for \"mossbeacon\" returns it with another passage; opening it shows that passage",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#a newer answer for the same search gives the open file another passage; opening it then shows that passage",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06be0bd13672f91959dcc2746b86433195311d0e77f96ebde5e0d955b28d2df0",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N1 the open file, found again with another passage, opens at that passage a newer answer for the same search gives the open file another passage; opening it then shows that passage",
+          "status": "passed"
+        }
+      ]
+    },
+    {
       "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a long file: the window around the passage, the passage visible without scrolling, its found word marked (dark)",
       "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:18c5cb03d852518d00c01c21b521474f3db619206c195142e483eb819d8a5022",
+      "contentDigest": "sha256:94f17b531cc984e0878da01876949c47a64c30b39d183e9f5eee854bb70b160d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -365,7 +500,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a long file: the window around the passage, the passage visible without scrolling, its found word marked (light)",
       "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:18c5cb03d852518d00c01c21b521474f3db619206c195142e483eb819d8a5022",
+      "contentDigest": "sha256:94f17b531cc984e0878da01876949c47a64c30b39d183e9f5eee854bb70b160d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -380,7 +515,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a file that fits in one window, opened by keyboard: the passage below the fold is visible without scrolling (dark)",
       "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:18c5cb03d852518d00c01c21b521474f3db619206c195142e483eb819d8a5022",
+      "contentDigest": "sha256:94f17b531cc984e0878da01876949c47a64c30b39d183e9f5eee854bb70b160d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -395,7 +530,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a file that fits in one window, opened by keyboard: the passage below the fold is visible without scrolling (light)",
       "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:18c5cb03d852518d00c01c21b521474f3db619206c195142e483eb819d8a5022",
+      "contentDigest": "sha256:94f17b531cc984e0878da01876949c47a64c30b39d183e9f5eee854bb70b160d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -410,7 +545,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#moving to another result while the pane is open shows that result's passage (dark)",
       "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:18c5cb03d852518d00c01c21b521474f3db619206c195142e483eb819d8a5022",
+      "contentDigest": "sha256:94f17b531cc984e0878da01876949c47a64c30b39d183e9f5eee854bb70b160d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -425,7 +560,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a preview that answers late still lands on the passage (light)",
       "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:18c5cb03d852518d00c01c21b521474f3db619206c195142e483eb819d8a5022",
+      "contentDigest": "sha256:94f17b531cc984e0878da01876949c47a64c30b39d183e9f5eee854bb70b160d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -440,7 +575,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#at 600 px wide with 200 % text the passage is visible without scrolling (dark)",
       "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:18c5cb03d852518d00c01c21b521474f3db619206c195142e483eb819d8a5022",
+      "contentDigest": "sha256:94f17b531cc984e0878da01876949c47a64c30b39d183e9f5eee854bb70b160d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -455,7 +590,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#leaving Search and coming back shows the passage again (light)",
       "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:18c5cb03d852518d00c01c21b521474f3db619206c195142e483eb819d8a5022",
+      "contentDigest": "sha256:94f17b531cc984e0878da01876949c47a64c30b39d183e9f5eee854bb70b160d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -470,7 +605,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#deep-long.txt, chunk at 249,619, region at 345: the window around 249,964, the passage tinted there and visible (dark)",
       "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:18c5cb03d852518d00c01c21b521474f3db619206c195142e483eb819d8a5022",
+      "contentDigest": "sha256:94f17b531cc984e0878da01876949c47a64c30b39d183e9f5eee854bb70b160d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -485,13 +620,73 @@
       "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a file of identical lines: the five lines at the chunk's place are tinted and visible, none near the top (light)",
       "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:18c5cb03d852518d00c01c21b521474f3db619206c195142e483eb819d8a5022",
+      "contentDigest": "sha256:94f17b531cc984e0878da01876949c47a64c30b39d183e9f5eee854bb70b160d",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
           "name": "chunk hits far into a file land on their own place (R1, R3) a file of identical lines: the five lines at the chunk's place are tinted and visible, none near the top (light)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a deep passage of six lines: its first line in the upper quarter, the whole passage inside the pane (dark)",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:94f17b531cc984e0878da01876949c47a64c30b39d183e9f5eee854bb70b160d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N5 the passage lands in the upper quarter of the pane (dark, 1024x700) a deep passage of six lines: its first line in the upper quarter, the whole passage inside the pane (dark)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a deep passage of six lines: its first line in the upper quarter, the whole passage inside the pane (light)",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:94f17b531cc984e0878da01876949c47a64c30b39d183e9f5eee854bb70b160d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N5 the passage lands in the upper quarter of the pane (light, 1024x700) a deep passage of six lines: its first line in the upper quarter, the whole passage inside the pane (light)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a passage that ends the file, too little text below it: the whole passage inside the pane (dark)",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:94f17b531cc984e0878da01876949c47a64c30b39d183e9f5eee854bb70b160d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N5 the passage lands in the upper quarter of the pane (dark, 1024x700) a passage that ends the file, too little text below it: the whole passage inside the pane (dark)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a passage that ends the file, too little text below it: the whole passage inside the pane (light)",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:94f17b531cc984e0878da01876949c47a64c30b39d183e9f5eee854bb70b160d",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "N5 the passage lands in the upper quarter of the pane (light, 1024x700) a passage that ends the file, too little text below it: the whole passage inside the pane (light)",
           "status": "passed"
         }
       ]
@@ -504,35 +699,35 @@
     "patches": [],
     "runs": [
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/documentPane/DocumentPane.match.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/od16sup6/tmp/test-intent-vitest-24277-1794939190454.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/documentPane/DocumentPane.match.test.ts\" \"src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/gfoet6d2/tmp/test-intent-vitest-24734-1794944183598.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 9046,
-        "output": "JSON report written to /home/elias/.cache/am/od16sup6/tmp/test-intent-vitest-24277-1794939190454.json\n\n"
+        "durationMs": 11428,
+        "output": "JSON report written to /home/elias/.cache/am/gfoet6d2/tmp/test-intent-vitest-24734-1794944183598.json\n\n"
       },
       {
-        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/od16sup6/tmp/test-intent-vitest-24277-1794939199500.json\"",
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/gfoet6d2/tmp/test-intent-vitest-24734-1794944195027.json\"",
         "cwd": "<before-worktree>",
         "exitCode": 1,
-        "durationMs": 26316,
-        "output": "JSON report written to /home/elias/.cache/am/od16sup6/tmp/test-intent-vitest-24277-1794939199500.json\n\n"
+        "durationMs": 35899,
+        "output": "JSON report written to /home/elias/.cache/am/gfoet6d2/tmp/test-intent-vitest-24734-1794944195027.json\n\n"
       }
     ],
     "checks": [
       {
         "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#a passage beyond the first window: the window around it is asked for, the passage tinted, found words marked, scrolled to",
         "classification": "assertion",
-        "detail": "M1 the pane opens at the result's passage a passage beyond the first window: the window around it is asked for, the passage tinted, found words marked, scrolled to:  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:92:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@v"
+        "detail": "M1 the pane opens at the result's passage a passage beyond the first window: the window around it is asked for, the passage tinted, found words marked, scrolled to:  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:92:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@v"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#a passage inside the first window but below the fold: the beginning is asked for, the passage tinted and scrolled to",
         "classification": "assertion",
-        "detail": "M1 the pane opens at the result's passage a passage inside the first window but below the fold: the beginning is asked for, the passage tinted and scrolled to:  AssertionError: expected [] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:108:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_"
+        "detail": "M1 the pane opens at the result's passage a passage inside the first window but below the fold: the beginning is asked for, the passage tinted and scrolled to:  AssertionError: expected [] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:108:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#says \"around the match\", not the cited passage and not the beginning",
         "classification": "assertion",
-        "detail": "M2 the note for a window around a match says \"around the match\", not the cited passage and not the beginning:  AssertionError: expected 'Showing the beginning of a longer doc…' to be 'Showing the part of this document aro…' // Object.is equality\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:118:22\n    at file"
+        "detail": "M2 the note for a window around a match says \"around the match\", not the cited passage and not the beginning:  AssertionError: expected 'Showing the beginning of a longer doc…' to be 'Showing the part of this document aro…' // Object.is equality\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:118:22\n    at file"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#the file changed since it was read: the window around the passage is tried, then the beginning",
@@ -542,97 +737,142 @@
       {
         "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#the file is now shorter than the passage's position",
         "classification": "assertion",
-        "detail": "M3 a passage that cannot be confirmed opens the pane as today the file is now shorter than the passage's position:  AssertionError: expected [ false ] to deeply equal [ true, false ]\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:154:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui"
+        "detail": "M3 a passage that cannot be confirmed opens the pane as today the file is now shorter than the passage's position:  AssertionError: expected [ false ] to deeply equal [ true, false ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:154:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#the preview refuses the window around the passage: the beginning, no failure shown",
         "classification": "assertion",
-        "detail": "M3 a passage that cannot be confirmed opens the pane as today the preview refuses the window around the passage: the beginning, no failure shown:  AssertionError: expected [ false ] to deeply equal [ true, false ]\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:162:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui"
+        "detail": "M3 a passage that cannot be confirmed opens the pane as today the preview refuses the window around the passage: the beginning, no failure shown:  AssertionError: expected [ false ] to deeply equal [ true, false ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:162:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#ends on the second document's passage",
         "classification": "assertion",
-        "detail": "M6 a second document while the first one's window is loading ends on the second document's passage:  AssertionError: expected [ [ '/docs/first.txt', false ], …(1) ] to deeply equal [ [ '/docs/first.txt', true ], …(1) ]\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:234:52\n    at file:///home/elias/de"
+        "detail": "M6 a second document while the first one's window is loading ends on the second document's passage:  AssertionError: expected [ [ '/docs/first.txt', false ], …(1) ] to deeply equal [ [ '/docs/first.txt', true ], …(1) ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:234:52\n    at file:///home/elias/de"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#stay hidden, and the passage after a marker is found and tinted",
         "classification": "assertion",
-        "detail": "M7 a scan's page markers stay hidden, and the passage after a marker is found and tinted:  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:246:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@"
+        "detail": "M7 a scan's page markers stay hidden, and the passage after a marker is found and tinted:  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:246:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#the text at the position differs (inside the first window)",
         "classification": "assertion",
-        "detail": "R4 an unconfirmed match brings back no older line-based tint the text at the position differs (inside the first window):  AssertionError: expected [ 'line 0020 plain words..', …(8) ] to deeply equal []\n    at asToday (/home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:264:24)\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-be"
+        "detail": "R4 an unconfirmed match brings back no older line-based tint the text at the position differs (inside the first window):  AssertionError: expected [ 'line 0020 plain words..', …(8) ] to deeply equal []\n    at asToday (/home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:264:24)\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-be"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#the passage is gone (beyond the first window)",
         "classification": "assertion",
-        "detail": "R4 an unconfirmed match brings back no older line-based tint the passage is gone (beyond the first window):  AssertionError: expected [ false ] to deeply equal [ true, false ]\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:283:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui"
+        "detail": "R4 an unconfirmed match brings back no older line-based tint the passage is gone (beyond the first window):  AssertionError: expected [ false ] to deeply equal [ true, false ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:283:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#the file is now shorter than the position",
         "classification": "assertion",
-        "detail": "R4 an unconfirmed match brings back no older line-based tint the file is now shorter than the position:  AssertionError: expected [ false ] to deeply equal [ true, false ]\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:290:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui"
+        "detail": "R4 an unconfirmed match brings back no older line-based tint the file is now shorter than the position:  AssertionError: expected [ false ] to deeply equal [ true, false ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:290:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui"
       },
       {
         "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#a match without a usable position",
         "classification": "assertion",
-        "detail": "R4 an unconfirmed match brings back no older line-based tint a match without a usable position:  AssertionError: expected [ 'line 0020 plain words..', …(8) ] to deeply equal []\n    at asToday (/home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:264:24)\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-be"
+        "detail": "R4 an unconfirmed match brings back no older line-based tint a match without a usable position:  AssertionError: expected [ 'line 0020 plain words..', …(8) ] to deeply equal []\n    at asToday (/home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:264:24)\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-be"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#the paragraph was replaced, its first line kept (beyond the first window): the beginning, nothing tinted",
+        "classification": "assertion",
+        "detail": "N3 a search passage is confirmed only by its whole text at its span the paragraph was replaced, its first line kept (beyond the first window): the beginning, nothing tinted:  AssertionError: expected [ false ] to deeply equal [ true, false ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:340:42\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#plain text, three lines deep in the file",
+        "classification": "assertion",
+        "detail": "N4 an unchanged passage is confirmed (keep) plain text, three lines deep in the file:  AssertionError: expected [] to deeply equal [ …(3) ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:384:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#Markdown with headings, a list and a table before the passage",
+        "classification": "assertion",
+        "detail": "N4 an unchanged passage is confirmed (keep) Markdown with headings, a list and a table before the passage:  AssertionError: expected '' to contain 'The harbour gate opens at dawn for th…'\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:394:70\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#CRLF line ends, deep in the file",
+        "classification": "assertion",
+        "detail": "N4 an unchanged passage is confirmed (keep) CRLF line ends, deep in the file:  AssertionError: expected [] to deeply equal [ …(3) ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:404:61\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modu"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#non-ASCII text (umlauts, emoji, CJK) before and inside the passage",
+        "classification": "assertion",
+        "detail": "N4 an unchanged passage is confirmed (keep) non-ASCII text (umlauts, emoji, CJK) before and inside the passage:  AssertionError: expected [] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:413:24\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts#a passage replaced by none on the open file: the beginning, nothing tinted, today's note",
+        "classification": "assertion",
+        "detail": "N1 the open file given another passage, or none a passage replaced by none on the open file: the beginning, nothing tinted, today's note:  AssertionError: expected 'Showing the beginning of a longer doc…' to be 'Showing the part of this document aro…' // Object.is equality\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.match.test.ts:423:22\n    at file"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#asks the reader for the part around the passage and tints it",
         "classification": "assertion",
-        "detail": "M1 a result opens in the pane at its first returned passage asks the reader for the part around the passage and tints it:  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:202:33\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@vi"
+        "detail": "M1 a result opens in the pane at its first returned passage asks the reader for the part around the passage and tints it:  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:208:33\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@vi"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#moving to another result while the pane is open shows that result's passage",
         "classification": "assertion",
-        "detail": "M1 a result opens in the pane at its first returned passage moving to another result while the pane is open shows that result's passage:  AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:212:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_"
-      },
-      {
-        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#a newer search answer while the pane is open does not move it, and choosing the same result again does not jump",
-        "classification": "assertion",
-        "detail": "M6 races a newer search answer while the pane is open does not move it, and choosing the same result again does not jump:  AssertionError: expected [] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:264:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_mo"
+        "detail": "M1 a result opens in the pane at its first returned passage moving to another result while the pane is open shows that result's passage:  AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:218:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#choosing a second result while the first one's window is loading ends on the second one's passage",
         "classification": "assertion",
-        "detail": "M6 races choosing a second result while the first one's window is loading ends on the second one's passage:  AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:284:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_"
+        "detail": "M6 races choosing a second result while the first one's window is loading ends on the second one's passage:  AssertionError: expected [ …(2) ] to deeply equal [ …(2) ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:309:55\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#deep-long.txt: chunk at 249,619, region 345-765: the window around 249,964, the passage tinted, the match note",
         "classification": "assertion",
-        "detail": "R1 a chunk hit opens at the chunk's start plus the region's place deep-long.txt: chunk at 249,619, region 345-765: the window around 249,964, the passage tinted, the match note:  AssertionError: expected 0 to be greater than 244964\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:333:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_module"
+        "detail": "R1 a chunk hit opens at the chunk's start plus the region's place deep-long.txt: chunk at 249,619, region 345-765: the window around 249,964, the passage tinted, the match note:  AssertionError: expected 0 to be greater than 244964\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:358:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_module"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#a first chunk starting at 3 (leading whitespace stripped) is placed at 3 + the region's start",
         "classification": "assertion",
-        "detail": "R2 a chunk hit without a usable chunk start has no position a first chunk starting at 3 (leading whitespace stripped) is placed at 3 + the region's start:  AssertionError: expected null to deeply equal { at: 8800, …(1) }\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:369:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web"
+        "detail": "R2 a chunk hit without a usable chunk start has no position a first chunk starting at 3 (leading whitespace stripped) is placed at 3 + the region's start:  AssertionError: expected null to deeply equal { at: 8800, …(1) }\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:394:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#a file of identical lines, the passage in a chunk at line 2,400: that place, not the same text near the top",
         "classification": "assertion",
-        "detail": "R3 repeated text: the pane lands on the passage's own position a file of identical lines, the passage in a chunk at line 2,400: that place, not the same text near the top:  AssertionError: expected 0 to be greater than 50545\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:380:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules"
+        "detail": "R3 repeated text: the pane lands on the passage's own position a file of identical lines, the passage in a chunk at line 2,400: that place, not the same text near the top:  AssertionError: expected 0 to be greater than 50545\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:405:30\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#a passage past the first window: the window around it, tinted at its place",
         "classification": "assertion",
-        "detail": "R5 whole-file hits are placed at the region's own span (keep) a passage past the first window: the window around it, tinted at its place:  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:394:63\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@vi"
+        "detail": "R5 whole-file hits are placed at the region's own span (keep) a passage past the first window: the window around it, tinted at its place:  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:419:63\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@vi"
       },
       {
         "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#a passage in the first lines: the beginning, the word visible and tinted",
         "classification": "assertion",
-        "detail": "R5 whole-file hits are placed at the region's own span (keep) a passage in the first lines: the beginning, the word visible and tinted:  AssertionError: expected null to deeply equal { at: 44, …(1) }\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:403:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/n"
+        "detail": "R5 whole-file hits are placed at the region's own span (keep) a passage in the first lines: the beginning, the word visible and tinted:  AssertionError: expected null to deeply equal { at: 44, …(1) }\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:428:38\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/n"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#N2 a newer answer for the same search arriving without a click moves nothing (keep)",
+        "classification": "assertion",
+        "detail": "M6 races N2 a newer answer for the same search arriving without a click moves nothing (keep):  AssertionError: expected [] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:270:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_mo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#N2 opening the result whose passage the pane shows, after the reader scrolled away: no request, no scroll, no change (keep)",
+        "classification": "assertion",
+        "detail": "M6 races N2 opening the result whose passage the pane shows, after the reader scrolled away: no request, no scroll, no change (keep):  AssertionError: expected [] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:299:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_mo"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#two-words.txt open at \"frostlatch\"; a search for \"mossbeacon\" returns it with another passage; opening it shows that passage",
+        "classification": "assertion",
+        "detail": "N1 the open file, found again with another passage, opens at that passage two-words.txt open at \"frostlatch\"; a search for \"mossbeacon\" returns it with another passage; opening it shows that passage:  AssertionError: expected [] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:440:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_m"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts#a newer answer for the same search gives the open file another passage; opening it then shows that passage",
+        "classification": "assertion",
+        "detail": "N1 the open file, found again with another passage, opens at that passage a newer answer for the same search gives the open file another passage; opening it then shows that passage:  AssertionError: expected [] to deeply equal [ Array(1) ]\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.resultMatch.test.ts:464:26\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_mo"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a long file: the window around the passage, the passage visible without scrolling, its found word marked (dark)",
         "classification": "assertion",
-        "detail": "a result opened in the side pane shows its passage (dark, 1024x700) a long file: the window around the passage, the passage visible without scrolling, its found word marked (dark):  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts:229:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@vite"
+        "detail": "a result opened in the side pane shows its passage (dark, 1024x700) a long file: the window around the passage, the passage visible without scrolling, its found word marked (dark):  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts:238:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@vite"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a long file: the window around the passage, the passage visible without scrolling, its found word marked (light)",
         "classification": "assertion",
-        "detail": "a result opened in the side pane shows its passage (light, 1024x700) a long file: the window around the passage, the passage visible without scrolling, its found word marked (light):  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts:229:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@vite"
+        "detail": "a result opened in the side pane shows its passage (light, 1024x700) a long file: the window around the passage, the passage visible without scrolling, its found word marked (light):  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts:238:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@vite"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a file that fits in one window, opened by keyboard: the passage below the fold is visible without scrolling (dark)",
@@ -667,14 +907,34 @@
       {
         "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#deep-long.txt, chunk at 249,619, region at 345: the window around 249,964, the passage tinted there and visible (dark)",
         "classification": "assertion",
-        "detail": "chunk hits far into a file land on their own place (R1, R3) deep-long.txt, chunk at 249,619, region at 345: the window around 249,964, the passage tinted there and visible (dark):  AssertionError: expected 0 to be greater than 244964\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts:303:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/"
+        "detail": "chunk hits far into a file land on their own place (R1, R3) deep-long.txt, chunk at 249,619, region at 345: the window around 249,964, the passage tinted there and visible (dark):  AssertionError: expected 0 to be greater than 244964\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts:312:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/"
       },
       {
         "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a file of identical lines: the five lines at the chunk's place are tinted and visible, none near the top (light)",
         "classification": "assertion",
-        "detail": "chunk hits far into a file land on their own place (R1, R3) a file of identical lines: the five lines at the chunk's place are tinted and visible, none near the top (light):  AssertionError: expected 0 to be greater than 50545\n    at /home/elias/.cache/am/od16sup6/tmp/test-intent-before-0ehxHa/modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts:319:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@"
+        "detail": "chunk hits far into a file land on their own place (R1, R3) a file of identical lines: the five lines at the chunk's place are tinted and visible, none near the top (light):  AssertionError: expected 0 to be greater than 50545\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts:328:34\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a deep passage of six lines: its first line in the upper quarter, the whole passage inside the pane (dark)",
+        "classification": "assertion",
+        "detail": "N5 the passage lands in the upper quarter of the pane (dark, 1024x700) a deep passage of six lines: its first line in the upper quarter, the whole passage inside the pane (dark):  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts:360:47\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@vite"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a deep passage of six lines: its first line in the upper quarter, the whole passage inside the pane (light)",
+        "classification": "assertion",
+        "detail": "N5 the passage lands in the upper quarter of the pane (light, 1024x700) a deep passage of six lines: its first line in the upper quarter, the whole passage inside the pane (light):  AssertionError: expected 0 to be greater than 0\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts:360:47\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_modules/@vite"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a passage that ends the file, too little text below it: the whole passage inside the pane (dark)",
+        "classification": "assertion",
+        "detail": "N5 the passage lands in the upper quarter of the pane (dark, 1024x700) a passage that ends the file, too little text below it: the whole passage inside the pane (dark):  AssertionError: expected +0 to be 4 // Object.is equality\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts:375:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_mod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts#a passage that ends the file, too little text below it: the whole passage inside the pane (light)",
+        "classification": "assertion",
+        "detail": "N5 the passage lands in the upper quarter of the pane (light, 1024x700) a passage that ends the file, too little text below it: the whole passage inside the pane (light):  AssertionError: expected +0 to be 4 // Object.is equality\n    at /home/elias/.cache/am/gfoet6d2/tmp/test-intent-before-mThrQQ/modules/ui-web/src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts:375:25\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_mod"
       }
     ]
   },
-  "digest": "sha256:5032b5928762449c5a9e1b0a3b1c7a9667498ca894ec5f49dfd243001438f8c5"
+  "digest": "sha256:a7aa077203a039f9a154a1ce066a3602629c2bd64c00ecd05706c646ba038e78"
 }
