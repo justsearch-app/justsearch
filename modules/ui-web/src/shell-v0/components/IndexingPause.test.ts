@@ -507,7 +507,7 @@ describe('WP3.7 verifier layout and focus repairs', () => {
     expect(control.shadowRoot!.textContent).not.toContain('Resuming');
   });
 
-  it('F5 keeps a mature folder semantic-install caveat and pending glyph through Pause', async () => {
+  it('F5 keeps a mature folder semantic-install caveat and its Up to date check through Pause', async () => {
     function observe(state: string): void {
       const s = snapshot(state, 0);
       s.worker!.enrichment = { backfillMode: 'idle', embeddingEnabled: false, spladeEnabled: false,
@@ -527,12 +527,13 @@ describe('WP3.7 verifier layout and focus repairs', () => {
     card().querySelector<HTMLButtonElement>('.folder-toggle')!.click(); await settle(library);
     expect(card().querySelector('.card-meta')?.textContent).toBe('Up to date');
     expect(meaning()).toMatch(/Search by meaning\s*Needs AI · word search is available/);
-    expect(card().querySelector('.status-icon.pending')).not.toBeNull();
+    // PG3: a row that says "Up to date" carries the check, also while meaning work waits for AI.
+    expect(card().querySelector('.status-icon.indexed')).not.toBeNull();
     observe('PAUSED'); await settle(library);
     expect(card().querySelector('.card-meta')?.textContent).toBe('Up to date');
     expect(meaning()).toMatch(/Search by meaning\s*Needs AI · word search is available/);
     expect(card().textContent).not.toMatch(/semantic search/i);
-    expect(card().querySelector('.status-icon.pending')).not.toBeNull();
-    expect(card().querySelector('.status-icon.indexed')).toBeNull();
+    expect(card().querySelector('.status-icon.indexed')).not.toBeNull();
+    expect(card().querySelector('.status-icon.pending')).toBeNull();
   });
 });

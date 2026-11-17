@@ -97,10 +97,12 @@ export class SurfaceTabs extends JfElement {
       min-height: 0;
       height: 100%;
     }
-    /* The tab row's line spans the window; the tabs and actions sit on the page's centred column. */
+    /* The tab row's line spans the window; the tabs and actions sit on the page's centred column. A host
+       whose page has its own inline edge sets --surface-tabs-edge: the first tab's label and the last
+       action's outer edge then keep to it. */
     .tab-bar { display: flex; flex-wrap: wrap; align-items: center; border-bottom: 1px solid var(--border-subtle);
       padding-inline: var(--surface-content-gutter); }
-    .tab-actions { margin-inline-start: auto; padding: .25rem 1rem; min-width: 0; max-width: 100%; }
+    .tab-actions { margin-inline-start: auto; padding: .25rem 1rem; padding-inline-end: var(--surface-tabs-edge, 1rem); min-width: 0; max-width: 100%; }
     /* The panel passes the host's height down to the member, so a member's own scroller (its
        surface body) holds its content; the panel itself never scrolls. */
     #surface-tabs-panel { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
@@ -109,6 +111,8 @@ export class SurfaceTabs extends JfElement {
       display: flex;
       gap: 0.25rem;
       padding: 0 1.5rem;
+      /* The tab's own .5rem inline padding is inside the edge: its label starts on it. */
+      padding-inline-start: calc(var(--surface-tabs-edge, 2rem) - 0.5rem);
 
     }
     .tabs button {

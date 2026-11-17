@@ -330,13 +330,13 @@ const column = (box: { left: number; width: number }, cap = COLUMN) => {
 };
 
 /** Content sits on the column: inside it, and starting at its start (it is centred, not left-aligned at the window edge). */
-async function expectOnColumn(page: Page, label: string, align: 'start' | 'centre'): Promise<void> {
+async function expectOnColumn(page: Page, label: string, align: 'start' | 'centre', startWithin = 64): Promise<void> {
   const stage = await stageBox(page);
   const col = column(stage);
   const content = await contentBox(page);
   expect(content.left, `${label}: content left ${content.left} within column from ${col.left}`).toBeGreaterThanOrEqual(col.left - 1);
   expect(content.right, `${label}: content right ${content.right} within column to ${col.right}`).toBeLessThanOrEqual(col.right + 1);
-  if (align === 'start') expect(content.left - col.left, `${label}: content starts at the column's start`).toBeLessThanOrEqual(64);
+  if (align === 'start') expect(content.left - col.left, `${label}: content starts at the column's start`).toBeLessThanOrEqual(startWithin);
   // Centred to within a scrollbar's width: the list's scroller draws its bar on one side.
   else expect(Math.abs((content.left - col.left) - (col.right - content.right)), `${label}: content centred`).toBeLessThanOrEqual(16);
 }
@@ -575,7 +575,8 @@ describe('SW-4 at or below 960 nothing changes; the 980 switch is unchanged', ()
   /** Inline paddings the areas had before the rule, for a window at or below the column. */
   const PADDINGS = [
     [LIBRARY, '.folders-scroll', { 960: 40, 800: 20 }],
-    [BROWSE, '.body', { 960: 40, 800: 40 }],
+    // PG1: Browse keeps to Library's page edge, the tab row's, which is 20 px at 800 px and below.
+    [BROWSE, '.body', { 960: 40, 800: 20 }],
     [HEALTH, '.body', { 960: 24, 800: 24 }],
     [LOGS, '.body', { 960: 16, 800: 16 }],
     [LIBRARY, '.tab-bar', { 960: 0, 800: 0 }],
@@ -710,7 +711,8 @@ describe('SW-8 themes, text size and the split stage', () => {
     await row(page).first().waitFor({ timeout: 15_000 });
     await expectOnColumn(page, 'Search 200%', 'centre');
     await area(page, LIBRARY);
-    await expectOnColumn(page, 'Library 200%', 'start');
+    // PG1: everything in Library, its tab label included, starts on the page's own 2.5rem inset: 80 px at 200% text.
+    await expectOnColumn(page, 'Library 200%', 'start', 80);
   }, 60_000);
 
   it.each(['horizontal', 'vertical'] as const)('a %s split at 1920 is unchanged', async axis => {

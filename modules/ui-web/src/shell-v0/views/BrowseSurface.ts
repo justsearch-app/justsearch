@@ -88,12 +88,13 @@ export class BrowseSurface extends JfElement {
     this.folderErrors = {}; this.partial = {}; this.activeRowId = '';
   }
   static styles = [surfaceLayoutStyles, buttonBaseStyles, css`
-    /* The page column: each region spans the window, its content sits on the centred column. */
-    .header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .75rem calc(var(--surface-content-gutter) + 1.5rem); }
-    .search-bar { padding: 0 calc(var(--surface-content-gutter) + 1.5rem) .625rem; }
+    /* The page column: each region spans the window, its content sits on the centred column, on the
+       Library page's inline edge (the host's --library-page-edge) like the tab row above it. */
+    .header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .75rem calc(var(--surface-content-gutter) + var(--library-page-edge, 2.5rem)); }
+    .search-bar { padding: 0 calc(var(--surface-content-gutter) + var(--library-page-edge, 2.5rem)) .625rem; }
     .filter-input { box-sizing: border-box; width: 100%; padding: .4rem .625rem; background: var(--surface-1);
       border: 1px solid var(--border-subtle); border-radius: 8px; color: var(--text-primary); font: inherit; font-size: var(--font-size-sm); }
-    .body { padding: .875rem calc(var(--surface-content-gutter) + 2.5rem); }
+    .body { padding: .875rem calc(var(--surface-content-gutter) + var(--library-page-edge, 2.5rem)); }
     .row, .column-heads { display: grid; grid-template-columns: minmax(0, 1fr) 5.625rem 8.125rem 4.75rem;
       align-items: center; box-sizing: border-box; min-height: 2.125rem; padding: 0 .5rem; gap: .25rem;
       border-bottom: 1px solid var(--border-subtle); font-size: var(--font-size-sm); color: var(--text-primary); }
