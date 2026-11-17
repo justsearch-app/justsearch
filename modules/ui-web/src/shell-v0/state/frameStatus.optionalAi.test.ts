@@ -36,14 +36,14 @@ describe('FA3 optional AI and the status pill', () => {
     for (const engine of ['not_installed', 'connecting'] as const) {
       const model = derive(ai(engine));
       expect(model.progress.phase).toBe('blocked');
-      expect(model.pill.label, engine).toBe(engine === 'not_installed' ? 'Keyword search ready' : 'Checking search status · last seen just now · checking');
+      expect(model.pill.label, engine).toBe(engine === 'not_installed' ? 'Word search ready' : 'Checking search status · last seen just now · checking');
       expect(model.sections.needs, engine).toEqual([]);
     }
   });
 
   it('after first use, keyword search reads as ready, never "Up to date" over missing semantic coverage', () => {
     const model = derive(ai('not_installed'), { visible: false, known: true, currentStep: 3 });
-    expect(model.pill).toEqual({ kind: 'calm', label: 'Keyword search ready', stale: false });
+    expect(model.pill).toEqual({ kind: 'calm', label: 'Word search ready', stale: false });
   });
 
   it('an AI install the person started shows its progress, not "Needs you", while it runs', () => {

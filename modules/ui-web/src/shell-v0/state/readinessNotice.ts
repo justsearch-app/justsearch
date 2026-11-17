@@ -815,7 +815,7 @@ export function classifyConsequence(codes: readonly string[]): ConsequenceClass 
  * `consequence-classification` gate enforces exactly that (no re-authored claim literal).
  */
 export const KEYWORD_FALLBACK_CAVEAT =
-  'Showing keyword-ranked results — ranking by meaning is degraded';
+  'Showing word search results — ranking by meaning is degraded';
 
 /** A fail-closed schema refusal has no serving index, including no keyword leg. */
 export const SEARCH_UNAVAILABLE_CAVEAT =
@@ -827,7 +827,7 @@ export const MODEL_UNAVAILABLE_CAVEAT =
 
 /** Failed or missing enrichment leaves some documents without semantic matches. */
 export const ENRICHMENT_INCOMPLETE_CAVEAT =
-  "Results may miss some documents' semantic matches; word search covers them";
+  "Results may miss some documents' matches by meaning; word search covers them";
 
 /** 805 §G.2 — the passage-leg-only caveat: document-level semantic ranking still serves. */
 export const PASSAGE_REDUCED_CAVEAT =

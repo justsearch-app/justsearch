@@ -57,14 +57,14 @@ describe('FA3a a fresh install whose only gap is AI nobody asked for', () => {
 
   it.each(['pending', 'empty'] as const)('after first use the pill says keyword search is ready (semantic queue %s), never "Checking"', queue => {
     const model = derive(observe(NOT_INSTALLED, { queue }));
-    expect(model.pill).toEqual({ kind: 'calm', label: 'Keyword search ready', stale: false });
+    expect(model.pill).toEqual({ kind: 'calm', label: 'Word search ready', stale: false });
     expect(model.sections.needs).toEqual([]);
     expect(model.sections.problems).toEqual([]);
   });
 
   it('after a reload "Checking" lasts only until the AI install status is observed', () => {
     expect(derive(observe(null)).pill.label).toContain('Checking search status');
-    expect(derive(observe(NOT_INSTALLED)).pill.label).toBe('Keyword search ready');
+    expect(derive(observe(NOT_INSTALLED)).pill.label).toBe('Word search ready');
   });
 
   it('chat switched on without AI models: not calm, and not "Checking" — the person asked for AI', () => {
@@ -114,7 +114,7 @@ describe('FA3b the status pill\'s screen-reader announcements', () => {
 
   // FC10a — what is spoken is what the pill shows: a calm pill's words, never a search warning.
   it('announce no search warning when the only gap is AI nobody asked for', async () => {
-    expect(await announced(observe(NOT_INSTALLED))).toBe('Keyword search ready');
+    expect(await announced(observe(NOT_INSTALLED))).toBe('Word search ready');
   });
 
   it('still announce it when the person asked for AI and it cannot run', async () => {

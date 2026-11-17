@@ -183,7 +183,7 @@ describe('projectAvailability (tempdoc 596)', () => {
       }));
       expect(a.kind).toBe('degraded');
       expect(a.kind === 'degraded' && a.caveat).toBe(
-        "Results may miss some documents' semantic matches; word search covers them",
+        "Results may miss some documents' matches by meaning; word search covers them",
       );
       expect(a.kind === 'degraded' && a.remedy).toEqual({
         kind: 'navigate', target: 'core.health-surface', label: 'Open Health',

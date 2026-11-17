@@ -691,7 +691,7 @@ export function selectIndexingProgress(
       PAUSE_REASON_WORDING.get(reason) ?? 'Reading is on hold; reason unavailable.').join(' '),
       work.blockedPending > 0 && (!work.embeddingBlocked || work.applicable.embedding)
         ? work.embeddingBlocked && status.worker?.enrichment?.embeddingAvailable === false
-          ? 'Embedding cannot run right now. Word search remains available.'
+          ? 'Search by meaning cannot be prepared right now. Word search remains available.'
           : 'Some enrichment cannot run right now. Word search remains available.' : '',
       (pause.reasons ?? [pause.reason]).includes('user_paused') && pause.untilEpochMs != null
         ? `Until ${formatDeadline(new Date(pause.untilEpochMs))}.` : '',
@@ -824,7 +824,7 @@ function indexingActivity(
       confirmed: true, enrichmentDeferred: true };
   }
   if (phase === 'blocked' && status.worker?.enrichment?.embeddingEnabled !== false) {
-    return { summary: 'Search by meaning unavailable', detail: ['Embedding cannot run right now. Word search remains available.', ...details].join(' '),
+    return { summary: 'Search by meaning unavailable', detail: ['Search by meaning cannot be prepared right now. Word search remains available.', ...details].join(' '),
       confirmed: true, enrichmentDeferred: true };
   }
   const summary = phase === 'indexing'

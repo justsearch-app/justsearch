@@ -481,7 +481,7 @@ describe('classifyConsequence (805 §G.2)', () => {
   it('the exported caveats carry the claim wording so no second module re-authors it', () => {
     // The gate (scripts/ci/check-consequence-classification.mjs) enforces the containment; this pins
     // that the caveats say what their class licenses.
-    expect(KEYWORD_FALLBACK_CAVEAT).toContain('keyword-ranked results');
+    expect(KEYWORD_FALLBACK_CAVEAT).toContain('word search results');
     expect(PASSAGE_REDUCED_CAVEAT).not.toMatch(/keyword|word (results|search)/);
     expect(PASSAGE_REDUCED_CAVEAT).toContain('still ranked by meaning');
     expect(OPTIONAL_CAPABILITY_CAVEAT).not.toMatch(/keyword|word (results|search)/);
@@ -743,7 +743,7 @@ it.each([
   expect(notice?.causes).toEqual([wording]);
   expect(notice?.headline).toBe('Enrichment incomplete.');
   expect(classifyConsequence([code])).toBe('enrichment-incomplete');
-  expect(notice?.body).toBe("Results may miss some documents' semantic matches; word search covers them");
+  expect(notice?.body).toBe("Results may miss some documents' matches by meaning; word search covers them");
   expect(notice?.body).not.toContain('fully');
   expect(warrantsSearchDegradationBanner(degraded('warn', [code]))).toBe(true);
 });

@@ -83,8 +83,8 @@ describe('readiness notices say reading, search by meaning and word search', () 
   });
 
   it('words the shared caveats in the first-minutes names', () => {
-    expect(KEYWORD_FALLBACK_CAVEAT).toBe('Showing keyword-ranked results — ranking by meaning is degraded');
-    expect(ENRICHMENT_INCOMPLETE_CAVEAT).toBe("Results may miss some documents' semantic matches; word search covers them");
+    expect(KEYWORD_FALLBACK_CAVEAT).toBe('Showing word search results — ranking by meaning is degraded');
+    expect(ENRICHMENT_INCOMPLETE_CAVEAT).toBe("Results may miss some documents' matches by meaning; word search covers them");
     expect(PASSAGE_REDUCED_CAVEAT).toBe('Passage-level precision is reduced — results are still ranked by meaning');
   });
 
@@ -108,7 +108,7 @@ describe('progress and coverage say reading and search by meaning', () => {
     const progress = selectIndexingProgress(status, true, 0, []);
     expect(progress.phase).toBe('blocked');
     expect(progress.activity.summary).toBe('Search by meaning unavailable');
-    expect(progress.activity.detail).toContain('Embedding cannot run right now. Word search remains available.');
+    expect(progress.activity.detail).toContain('Search by meaning cannot be prepared right now. Word search remains available.');
   });
 
   it('words the coverage caveats and labels', () => {

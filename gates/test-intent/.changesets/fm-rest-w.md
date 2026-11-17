@@ -198,6 +198,39 @@ are named in governance/search-window-scenarios.v1.json).
           "reason": "The table (DragOverlay, EngineLoss, FolderAddFlow, HelpSurface: use the label the named control has today). Each changed expectation now holds the reworded sentence the production function produces (old phrase replaced by R1-R3 or the table); every input, precondition and observation is unchanged."
         }
       ]
+    },
+    {
+      "items": [
+        "modules/ui-web/src/shell-v0/state/folderStatus.test.ts",
+        "modules/ui-web/src/shell-v0/state/frameStatus.optionalAi.test.ts",
+        "modules/ui-web/src/shell-v0/state/indexingProgress.pause.test.ts",
+        "modules/ui-web/src/shell-v0/components/StatusPill.calmDot.test.ts",
+        "modules/ui-web/src/shell-v0/views/LibrarySurface.render.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.degradation.test.ts",
+        "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.retirement.test.ts"
+      ],
+      "change": "modified",
+      "kind": "test-code",
+      "class": "Obsolete",
+      "sources": [
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "takeover the remaining work and proceed until you think its done",
+          "delegationLocation": "task t-20261113-fmimpl request",
+          "delegationScope": "finish the first-minutes design's remaining work after comparing the finished packaged app with the pictures",
+          "choice": "One name per thing in the display text a user reads or hears: the app reads files; the features are search by meaning and word search. R1 indexing -> reading, indexed -> read, indexing hours -> reading hours, documents counted by that activity -> files (1 file, 2 files). R2 semantic search -> search by meaning (Search by meaning at a sentence start), semantic ranking -> ranking by meaning, ranked semantically -> ranked by meaning, semantic and keyword retrieval -> search by meaning and word search; meaning-based results stays. R3 keyword search -> word search, keyword results -> word results, keyword-only -> word search only. R4 index as a noun, rebuild, Reindex required., embedding model, Collection and every word R1-R3 do not name stay. Table: e.g. Outside indexing hours. -> Outside reading hours.; No documents indexed yet -> No files read yet; Indexing embeddings… -> Preparing search by meaning…; Building semantic search -> Preparing search by meaning; Background indexing -> Background reading; Index failed · -> Couldn't read ·; Index gave up · -> Gave up reading ·; Indexed · -> Read ·; Index state unknown -> Reading outcome unknown; Indexed N documents -> Read N files; Drop folder to index -> Drop folder to add it to your library; Searching and indexing are on hold. -> Searching and reading are on hold.; Why is indexing slow? -> Why is reading my files slow?; Help names controls by their current labels.",
+          "label": "agent choice"
+        }
+      ],
+      "behaviour": "The folder caveats, the calm status word, the blocked-embedding detail, the Search degradation notice and the retired-search note say word search and search by meaning; when each appears, and that Library never shows a coverage caveat for a quiet folder, is unchanged.",
+      "conflictSearch": "Decision records under docs/decisions/ (54) searched for semantic search, keyword search, keyword results, keyword-only, indexing hours, documents indexed, search by meaning, word search, and user-facing wording, copy or vocabulary: none governs the names the UI gives reading or the search modes (0048 and 0050 use 'indexing' for Engine pacing and GPU scheduling, not display text). The consequence-classification register (governance/consequence-classification.v1.json) keeps its claim phrases and gains 'word results', so the keyword-fallback claim stays contained. No conflict.",
+      "assertionChanges": [
+        {
+          "oldAssertion": "'keyword search ready · semantic search still catching up', 'keyword search ready · semantic search waiting for AI install', toContain('keyword search ready'), pill label 'Keyword search ready', 'Embedding cannot run right now. Keyword search remains available.', 'Semantic search paused; keyword search available.', toContain('Keyword search remains available'), causes ['Semantic search models are reloading'], toContain('semantic search did not answer in time'), not.toContain('semantic search still catching up' / 'semantic search waiting for AI install').",
+          "newAssertion": "'word search ready · search by meaning still catching up', 'word search ready · search by meaning waiting for AI install', toContain('word search ready'), pill label 'Word search ready', 'Search by meaning cannot be prepared right now. Word search remains available.', 'Search by meaning paused; word search available.', toContain('Word search remains available'), causes ['Search by meaning models are reloading'], toContain('search by meaning did not answer in time'), not.toContain('search by meaning still catching up' / 'search by meaning waiting for AI install').",
+          "reason": "R2 and R3, and the orchestrator's additions on the combined candidate (the pill 'Word search ready', 'Search by meaning cannot be prepared right now.', 'Showing word search results', 'matches by meaning'): each changed expectation holds the reworded sentence the production function produces; every input, precondition and observation is unchanged. The negative assertions in LibrarySurface.render.test.ts now exclude the sentence production can produce today, so they keep guarding the same claim."
+        }
+      ]
     }
   ]
 }

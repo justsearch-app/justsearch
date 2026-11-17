@@ -60,7 +60,7 @@ async function pillWith(state: AiState | null): Promise<{ shown: string; spoken:
   } finally { pill.remove(); }
 }
 
-const NEEDS_YOU = /semantic search waiting for AI install|needs? you/i;
+const NEEDS_YOU = /(semantic search|search by meaning) waiting for AI install|needs? you/i;
 
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 503 })));
@@ -71,7 +71,7 @@ afterEach(() => { __resetAiStateForTest(); vi.unstubAllGlobals(); });
 describe('FC10 a fresh install where nobody asked for AI says nothing of AI it did not ask for', () => {
   it.each(['pending', 'empty'] as const)('the pill says keyword search is ready (semantic queue %s), and nothing spoken says Needs you or waiting for AI', async (queue) => {
     const { shown, spoken } = await pillWith(observe(NOT_INSTALLED, { queue }));
-    expect(shown).toBe('Keyword search ready');
+    expect(shown).toBe('Word search ready');
     for (const text of spoken) expect(text, `spoken: ${text}`).not.toMatch(NEEDS_YOU);
   });
 

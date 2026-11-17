@@ -84,7 +84,7 @@ it.each(['done', 'error'])('S2 Ask fallback wording survives a live %s terminal'
   frames = [['rag.meta', fallback], ...(terminal === 'done' ? [['chunk', { text: 'The keyword answer.' }] as [string, unknown]] : []), [terminal, terminal === 'done' ? {} : { error: 'No matching documents found in the index', errorCode: 'NO_CONTENT' }]];
   const view = await mount(); await view.askDomain.runAsk('What do the documents say?', null); await settle(view);
   const root = main(view).shadowRoot!;
-  expect(root.textContent).toContain('semantic search did not answer in time');
+  expect(root.textContent).toContain('search by meaning did not answer in time');
   expect(root.textContent).toContain('search models still loading');
   if (terminal === 'done') expect((root.querySelector('jf-markdown-block') as HTMLElement & { text: string })?.text).toBe('The keyword answer.');
   else expect(root.querySelector('[data-testid="sv3-no-evidence"]')?.textContent).toContain('Nothing in your files matched');
@@ -110,7 +110,7 @@ it.each(['complete', 'early stop', 'partial stop', 'model', 'document fallback',
   if (outcome === 'early stop' || outcome === 'no evidence') expect(root.querySelector('jf-markdown-block')).toBeNull();
   else expect((root.querySelector('jf-markdown-block') as HTMLElement & { text: string })?.text).toBe(answer);
   if (outcome === 'document fallback') expect(root.textContent).toContain('document too small for chunking');
-  else if (outcome !== 'model') { expect(root.textContent).toContain('semantic search did not answer in time'); expect(root.textContent).toContain('search models still loading'); }
+  else if (outcome !== 'model') { expect(root.textContent).toContain('search by meaning did not answer in time'); expect(root.textContent).toContain('search models still loading'); }
 });
 it('S2 reloaded bulk-reindex refusal remains expanded, self-contained and occurs once', async () => {
   records = [row('q', 'USER_MESSAGE', 'Rebuild', 'core.agent-run'), row('a', 'TOOL_ACTIVITY', '', 'core.agent-run', { callId: 'call', toolName: 'core_bulk_reindex', status: 'completed', success: false, output })];

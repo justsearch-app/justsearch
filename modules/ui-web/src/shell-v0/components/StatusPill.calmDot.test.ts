@@ -27,7 +27,7 @@ async function mount() {
   const pill = new StatusPill(); document.body.append(pill); await pill.updateComplete;
   return pill;
 }
-it.each(['Up to date', 'Keyword search ready', 'Getting started · 1 of 3', 'Getting started · 2 of 3', 'Getting started · 3 of 3'])('calm %s is only a dot, preserving its name and title', async label => {
+it.each(['Up to date', 'Word search ready', 'Getting started · 1 of 3', 'Getting started · 2 of 3', 'Getting started · 3 of 3'])('calm %s is only a dot, preserving its name and title', async label => {
   const pill = await mount();
   pill.status.model = { ...pill.status.model, pill: { kind: 'calm', label, stale: false } };
   pill.requestUpdate(); await pill.updateComplete;

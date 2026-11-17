@@ -408,21 +408,21 @@ export function folderStatus(row: IndexedRootView, ctx: FolderStatusContext): Fo
       row.parentDocsSettledNer, row.chunkDocsTotal, row.chunkDocsSettled].some(value =>
       typeof value === 'number' && value < 0)) return {
       state: 'unknown', glyph: 'unverified',
-      metaText: `${collection} · ${fileCountText} · Enrichment status unconfirmed. Keyword search remains available.`,
+      metaText: `${collection} · ${fileCountText} · Enrichment status unconfirmed. Word search remains available.`,
       inFlight, failed,
     };
     const missingArtifact = stages?.embedding && Object.entries(row.missingArtifactStages ?? {}).some(
       ([id, missing]) => missing && (id === 'embedding' || id === 'chunkVectors'));
     if (missingArtifact) return {
       state: 'keyword-only', glyph: 'unverified',
-      metaText: `${collection} · ${fileCountText} · Some enrichment is incomplete. Keyword search remains available.`,
+      metaText: `${collection} · ${fileCountText} · Some enrichment is incomplete. Word search remains available.`,
       inFlight, failed,
     };
     const enrichmentFailed = stages && Object.entries(row.failedStages ?? {}).some(([id, failed]) =>
       failed && (id === 'chunkVectors' ? stages.embedding : stages[id as keyof EnrichmentApplicability]));
     if (enrichmentFailed) return {
       state: 'keyword-only', glyph: 'unverified',
-      metaText: `${collection} · ${fileCountText} · Some enrichment failed. Keyword search remains available.`,
+      metaText: `${collection} · ${fileCountText} · Some enrichment failed. Word search remains available.`,
       inFlight, failed,
     };
     const coverage = rootCoverage(row, ctx.enrichmentStages);

@@ -158,7 +158,7 @@ describe('LibrarySurface — applicability before the first poll (813 F1)', () =
         enrichmentPending: el.enrichmentPending,
       });
       expect(fs.metaText).not.toContain('fully searchable');
-      expect(fs.metaText).not.toContain('semantic search still catching up');
+      expect(fs.metaText).not.toContain('search by meaning still catching up');
       expect(fs.metaText).not.toContain('%');
     } finally {
       el.remove();
@@ -341,7 +341,7 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
       // A settled folder claims no reading in progress; its open row has no read time (scans, not writes, set it).
       expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toContain('Search by meaning');
       expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).not.toMatch(/Reading now|Read\s*just now/);
-      expect(text).not.toContain('semantic search still catching up');
+      expect(text).not.toContain('search by meaning still catching up');
     } finally {
       el.remove();
     }
@@ -403,7 +403,7 @@ describe('LibrarySurface — the folder row consults enrichment coverage (809 fi
       // A settled folder claims no reading in progress; its open row has no read time (scans, not writes, set it).
       expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).toContain('Search by meaning');
       expect(el.shadowRoot?.querySelector('.folder-details')?.textContent).not.toMatch(/Reading now|Read\s*just now/);
-      expect(text).not.toContain('semantic search waiting for AI install');
+      expect(text).not.toContain('search by meaning waiting for AI install');
     } finally {
       el.remove();
     }

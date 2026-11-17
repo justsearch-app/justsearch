@@ -801,7 +801,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   else if (!stale && searchServesFully && progress.phase === 'ready') pill = { kind: 'calm', label: 'Up to date', stale: false };
   // Not "Up to date": that is a coverage claim, and semantic coverage is what is missing.
   else if (!stale && unrequestedAi && (searchServesFully || awaitsUnrequestedAi(ai!.verdict, engine) || installDismissed && gapOnlyAiProvides(ai!.verdict))
-    && (progress.phase === 'ready' || waitsForOptionalAi)) pill = { kind: 'calm', label: 'Keyword search ready', stale: false };
+    && (progress.phase === 'ready' || waitsForOptionalAi)) pill = { kind: 'calm', label: 'Word search ready', stale: false };
   else pill = { kind: 'unknown', label: CHECKING, stale: true };
   if (pill.stale) {
     const age = ai?.connection.lastSuccessMs == null ? null : Math.max(0, Math.floor((now - ai.connection.lastSuccessMs) / 60_000));
