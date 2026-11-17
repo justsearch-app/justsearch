@@ -134,6 +134,7 @@ it('A4: Remove AI models opens Advanced settings at the Downloaded files control
   const el = await show('fm-13');
   expect(el.shadowRoot!.querySelector('.brain-advanced')).toBeNull();
   const link = [...el.shadowRoot!.querySelectorAll<HTMLElement>('.brain-links > button')].find(b => words(b) === 'Remove AI models');
+  expect(link, 'Remove AI models').toBeDefined();
   link!.click(); await settle(el);
   expect(el.shadowRoot!.querySelector('.brain-advanced')).not.toBeNull();
   const advanced = [...el.shadowRoot!.querySelectorAll('.brain-links > button')].find(b => words(b) === 'Advanced settings');
