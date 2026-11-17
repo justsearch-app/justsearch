@@ -20,7 +20,7 @@ export interface BrainFeature {
   installed: boolean;
   /** What works now when it differs from the choice, or why the step cannot work; null when the switch says it. */
   note: string | null;
-  /** The download size, labelled as one, or null. */
+  /** The step's size, the amount alone ("1.2 GB"), or null. */
   size: string | null;
   switchable: boolean;
   /** The switch's state in words; "Not known" replaces the switch. */

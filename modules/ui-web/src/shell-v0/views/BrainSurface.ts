@@ -84,6 +84,7 @@ import {
   reportPageStoppedRun,
   subscribeStoppedRun,
   type DoneEvidence,
+  STOPPED_DOWNLOAD_SENTENCE,
 } from '../state/installFlow.js';
 import '../components/Control.js';
 // Tempdoc 613 — coherence: the compat callout words its cause from the ONE canonical reindex
@@ -1234,22 +1235,22 @@ export class BrainSurface extends JfElement {
     .brain-status-detail { margin-top: 0.5rem; }
     .install-row { margin-top: 1rem; gap: 0.875rem; }
     /* Slice 7b — fm-12 / fm-12b: one bar, one line of amounts, one row per part, the actions together. */
-    .install-flow { margin-top: 1.5rem; }
-    .install-flow .flow-bar { height: 0.375rem; border-radius: 4px; }
+    .install-flow { margin-top: 1.125rem; max-width: 51.25rem; }
+    .install-flow .flow-bar { height: 0.5rem; border-radius: 4px; }
     .install-flow .flow-bar .progress-bar { border-radius: 4px; }
     .install-flow.stopped .progress-bar { background: var(--text-tertiary, var(--text-secondary)); }
-    .flow-line { margin-top: 0.75rem; font-size: var(--font-size-secondary); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+    .flow-line { margin-top: 0.5rem; font-size: var(--font-size-secondary); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
     .flow-paused { margin: 0.5rem 0 0; font-size: var(--font-size-sm); color: var(--text-primary); }
-    .flow-parts { list-style: none; margin: 1rem 0 0; padding: 0; border-top: 1px solid var(--border-subtle); }
-    .flow-part { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 0.6fr); gap: 0.75rem; align-items: center;
-      padding: 0.75rem 0; border-bottom: 1px solid var(--border-subtle); font-size: var(--font-size-sm); }
+    .flow-parts { list-style: none; margin: 1.125rem 0 0; padding: 0; border-top: 1px solid var(--border-subtle); }
+    .flow-part { display: grid; grid-template-columns: minmax(0, 1fr) 190px 110px; gap: 1rem; align-items: center;
+      box-sizing: border-box; min-height: 42px; padding: 0; border-bottom: 1px solid var(--border-subtle); font-size: var(--font-size-sm); }
     .consent-pkg small { display: block; font-size: var(--font-size-secondary); color: var(--text-secondary); }
-    .flow-part-state { display: inline-flex; align-items: center; gap: 0.375rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+    .flow-part-state { display: inline-flex; align-items: center; gap: 0.375rem; font-size: var(--font-size-secondary); color: var(--text-secondary); font-variant-numeric: tabular-nums; }
     .flow-part.done .flow-part-state jf-icon, .flow-part.done .flow-part-state svg { color: var(--text-success); }
-    .flow-part-bar { height: 0.25rem; border-radius: 4px; }
+    .flow-part-bar { height: 3px; border-radius: 4px; }
     .flow-part-bar .progress-bar { border-radius: 4px; }
     .install-flow.stopped .flow-part-bar .progress-bar { background: var(--text-secondary); }
-    .flow-actions { margin-top: 1rem; gap: 0.875rem; }
+    .flow-actions { margin-top: 1rem; gap: 0.375rem; }
     .flow-detail { margin-top: 1rem; font-size: var(--font-size-secondary); color: var(--text-secondary); }
     .flow-detail summary { cursor: pointer; }
     .flow-detail p { margin: 0.5rem 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -1272,7 +1273,7 @@ export class BrainSurface extends JfElement {
     .step-switch:focus-within .switch-reason { position: static; width: auto; height: auto; clip-path: none; font-size: var(--font-size-secondary); color: var(--text-secondary); flex-basis: 100%; }
     /* The steps: five columns, the picture branch above "Read the text". A step and the line into it
        are teal only while the step works now; a step that cannot work here is dashed. */
-    .brain-path { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: 0.75rem; row-gap: 2.5rem; padding: 0.625rem 0 0.5rem; margin-top: 1.25rem; }
+    .brain-path { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: 0.75rem; row-gap: 3.625rem; padding: 0.625rem 0 0.5rem; margin-top: 1.25rem; }
     .brain-path > .path-step { grid-row: 2; }
     .path-step { position: relative; min-width: 0; display: flex; align-items: center; flex-direction: column; text-align: center; }
     .brain-path > .path-step::before { content: ''; position: absolute; height: 2px; background: var(--border-subtle); width: calc(100% + 0.75rem); top: calc(1.375rem - 1px); left: calc(-50% - 0.75rem); z-index: 0; }
@@ -1292,7 +1293,7 @@ export class BrainSurface extends JfElement {
     .picture-branch .step-text { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 1.25rem; margin: 0 0 0 0.875rem; }
     .picture-branch .step-words { display: flex; flex-direction: column; align-items: flex-start; }
     .picture-branch .step-switch { margin-top: 0; }
-    .picture-branch::after { content: ''; position: absolute; left: calc((100% - 1.5rem) / 6 - 1px); top: 2.75rem; bottom: -2.5rem; border-left: 2px dashed var(--border-subtle); }
+    .picture-branch::after { content: ''; position: absolute; left: calc((100% - 1.5rem) / 6 - 1px); top: 2.75rem; bottom: -3.625rem; border-left: 2px dashed var(--border-subtle); }
     .step-words { display: flex; flex-direction: column; align-items: center; min-width: 0; max-width: 100%; }
     .graphics-card { display: flex; flex-wrap: wrap; align-items: center; column-gap: 2.5rem; row-gap: 0.5rem; margin-top: 0.375rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle); font-size: var(--font-size-sm); }
     .graphics-name { font-weight: 500; white-space: nowrap; }
@@ -1768,6 +1769,17 @@ export class BrainSurface extends JfElement {
     this.expanded = { ...this.expanded, [key]: !this.expanded[key] };
   }
 
+  /**
+   * fm-13 — "Remove AI models" opens Advanced settings at the existing Downloaded files controls and moves
+   * focus there; it removes nothing itself.
+   */
+  private async openModelRemoval(): Promise<void> {
+    if (!this.expanded.advanced) this.expanded = { ...this.expanded, advanced: true };
+    await this.updateComplete;
+    (this.shadowRoot?.querySelector<HTMLElement>('[data-testid="downloaded-files"]')
+      ?? this.shadowRoot?.querySelector<HTMLElement>('section[aria-label="Downloaded files"]'))?.focus();
+  }
+
   /** One observation gate for the page: retained or incomplete observations are not live facts. */
   private aiKnown(): boolean {
     return this._unifiedAiState?.snapshotLive === true
@@ -1958,9 +1970,9 @@ export class BrainSurface extends JfElement {
 
   /**
    * Whether answers work on this computer now (AM1), from the answer runtime alone: the answer model is
-   * installed, answers are not switched off, and the runtime is ready, starting, or unloaded but
-   * started again by a question (processor operation counts). An unloaded model the runtime will not
-   * load again (`operating.chat.reloadAllowed === false`) refuses questions, so it does not count.
+   * installed, answers are not switched off, and the runtime is ready, starting, or unloaded but started
+   * again by a question (processor operation counts). An unloaded model the runtime will not load again
+   * (`operating.chat.reloadAllowed === false`) refuses questions, so it does not count.
    * `null` when the observation is not live, so the caller keeps what it last showed. Search / Ask
    * keeps its own readiness.
    */
@@ -2110,7 +2122,7 @@ export class BrainSurface extends JfElement {
       const bytes = unavailable ? null : id === 'chat' ? this.answerSize(component) : component?.totalBytes ?? null;
       features[id] = {
         id, label, selected, installed: present, active, availability: unavailable ? 'unavailable' : component ? 'available' : 'unknown',
-        note, size: bytes != null && bytes > 0 && !(!installed && !running && this.packagePresent(packageId)) ? `${formatBytes(bytes)} download` : null,
+        note, size: bytes != null && bytes > 0 && !(!installed && !running && this.packagePresent(packageId)) ? formatBytes(bytes) : null,
         switchable: !unavailable && (acquisitionControl || runtimeControl), switchWord, blockedReason,
         unreachable: unavailable ? this.unavailableWords(component) : null,
       };
@@ -3438,7 +3450,7 @@ export class BrainSurface extends JfElement {
       if (!known) return ['Checking AI status…', (this.systemStatus ?? this._unifiedAiState?.status)?.inference?.procedure === 'VDU_BATCH'
         ? 'Pictures were being read when last observed; current answer availability is unconfirmed.'
         : 'Waiting for live install and AI observations.'];
-      if (stopped) return ['The download stopped', 'Completed parts stay on this computer, and search by exact words keeps working.'];
+      if (stopped) return ['The download stopped', STOPPED_DOWNLOAD_SENTENCE];
       // G3'' — a run's heading is plain "Installing AI" (fm-12): its share stands once, in the top-bar status.
       if (aiState === 'installing' || failed || aiState === 'paused') return [sc.label, sc.sub];
       // G6' — a missing file is owed a repair only with a final file on disk; unobserved, nothing is said.
@@ -3518,6 +3530,7 @@ export class BrainSurface extends JfElement {
             label=${features.chat.selected ? 'Stop answers' : 'Start answers'}
             .availability=${features.chat.blockedReason ? unavailableBecause(features.chat.blockedReason) : AVAILABLE}
             .onActivate=${() => void this.changeFeature(features.chat)}>${icon({ name: features.chat.selected ? 'square' : 'play', size: 14 })} ${features.chat.selected ? 'Stop answers' : 'Start answers'}</jf-button>` : nothing}
+          ${installed && !this.answersShown ? html`<button type="button" data-testid="brain-remove-models" @click=${() => void this.openModelRemoval()}>${icon({ name: 'trash-2', size: 16 })} Remove AI models</button>` : nothing}
           ${this.answersShown || this.devTools ? html`<a href="#justsearch://surface/core.health-surface" @click=${() => requestMemberTab('core.health-surface', 'ai-engine')}>${icon({ name: 'history', size: 16 })} Engine history in Health</a>` : nothing}
           ${this.devTools || choiceUnknown ? html`<jf-button variant="ghost" label="Refresh status" .onActivate=${() => void this.refreshAll()}>${icon({ name: 'refresh-cw', size: 14 })}${choiceUnknown && !this.devTools ? ' Refresh status' : ''}</jf-button>` : nothing}
         </div>`}
@@ -3965,7 +3978,7 @@ export class BrainSurface extends JfElement {
       ${paused ? html`<p class="flow-paused">Paused. The file being downloaded may still finish.</p>` : nothing}
       ${rows.length > 0 ? html`<ul class="flow-parts" aria-label="Parts">${rows.map(row => html`<li class="flow-part ${row.done ? 'done' : ''}" data-part=${row.id}>
         <span class="flow-part-name">${row.name}</span>
-        <span class="flow-part-state">${row.done ? icon({ name: 'check-circle-2', size: 14 }) : nothing}${row.words}</span>
+        <span class="flow-part-state">${row.done ? icon({ name: 'check-circle-2', size: 15 }) : nothing}${row.words}</span>
         ${row.percent !== null ? html`<div class="progress flow-part-bar" aria-hidden="true"><div class="progress-bar" .style=${`width: ${row.percent}%`}></div></div>` : html`<span></span>`}
       </li>`)}</ul>` : nothing}
       <div class="row flow-actions">
@@ -4284,7 +4297,7 @@ export class BrainSurface extends JfElement {
         ${this.renderSlider('maxTokens', 'Longest answer', 'Upper limit for one answer', 16384)}
       </section>
       ${this.renderRuntimeSection()}
-      <section aria-label="Downloaded files"><h3 class="advanced-heading">Downloaded files</h3>
+      <section aria-label="Downloaded files" tabindex="-1"><h3 class="advanced-heading">Downloaded files</h3>
         <p class="advanced-note">Files on this computer, measured on disk. Remove files deletes a switched-off part's downloaded files; Download again asks first.</p>
         ${this.renderDownloadedFiles()}
         ${/* Not in the pictures (AM5): the legacy panels are developer tools, live. */ ''}

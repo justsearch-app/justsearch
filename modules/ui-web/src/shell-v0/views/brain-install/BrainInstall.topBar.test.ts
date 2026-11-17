@@ -121,7 +121,7 @@ describe('fm-12b the top bar follows the stopped view', () => {
     const panel = pill.shadowRoot!.querySelector('jf-status-panel')!;
     await (panel as HTMLElement & { updateComplete: Promise<boolean> }).updateComplete;
     expect(words(panel.shadowRoot)).toContain('Download stopped');
-    expect(words(panel.shadowRoot)).toContain('Completed parts stay on this computer, and search by exact words keeps working.');
+    expect(words(panel.shadowRoot)).toContain('What is already here is kept, and search by exact words keeps working.');
     expect(words(panel.shadowRoot)).not.toMatch(/AI install failed|Install again to continue/);
   });
 

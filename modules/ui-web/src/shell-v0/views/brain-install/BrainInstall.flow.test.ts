@@ -374,7 +374,7 @@ describe('S7b-4 a stopped download (fm-12b)', () => {
     show('failedPartsMissing');
     const el = await mount();
     expect(headline(el)).toBe('The download stopped');
-    expect(words(panel(el))).toContain('Completed parts stay on this computer, and search by exact words keeps working.');
+    expect(words(panel(el))).toContain('What is already here is kept, and search by exact words keeps working.');
     expect(words(panel(el))).toContain('759 of 927 KB');
     expect(partRows(el)).toEqual([
       ['Understand meaning', 'Done'],
@@ -396,7 +396,7 @@ describe('S7b-4 a stopped download (fm-12b)', () => {
     status.packages.find(p => p.packageId === 'splade')!.bytesDownloaded = 57_344;
     show('failedPartsMissing'); store.current = engineState('failedPartsMissing', status as never);
     const el = await mount();
-    expect(partRows(el)[1]).toEqual(['Related words', 'Stopped (had 56 of 177 KB)']);
+    expect(partRows(el)[1]).toEqual(['Related words', 'Stopped at 56 of 177 KB']);
   });
 
   it('a failed first install with nothing placed shows the stopped view, every part Stopped', async () => {
@@ -439,7 +439,7 @@ describe('S7b-6 Cancel install', () => {
     expect(headline(el)).not.toMatch(/failed/i);
     const meaning = el.shadowRoot!.querySelector('.path-step[data-feature="meaning"]');
     expect(words(meaning)).toContain('Downloaded');
-    expect(words(meaning)).not.toMatch(/KB download|Not downloaded/);
+    expect(words(meaning)).not.toMatch(/\d KB|Not downloaded/);
     publish('failedPartsMissing'); await settle(el);
     expect(headline(el)).not.toBe('The download stopped');
   });

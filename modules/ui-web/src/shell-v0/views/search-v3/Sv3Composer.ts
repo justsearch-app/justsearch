@@ -1167,8 +1167,10 @@ export class Sv3Composer extends JfElement {
         :host([state='hero']) .band:has(.recents) { padding-block-start: var(--space-6); }
       }
       .search-field:has(textarea:focus-visible)::after { border-color: var(--foreground); }
-      .mode-switch { display: flex; padding: 2px; border-radius: var(--radius-sm); background: var(--muted); }
-      .mode-switch button { color: color-mix(in srgb, var(--muted-foreground) 90%, var(--foreground)); }
+      /* fm-16 — Search / Ask: 8 px corners, 12 px words, each option 24 px high inside 2 px. */
+      .mode-switch { display: flex; padding: 2px; border-radius: var(--radius); background: var(--muted); }
+      .mode-switch button { color: color-mix(in srgb, var(--muted-foreground) 90%, var(--foreground)); height: 24px; min-height: 24px;
+        padding-inline: calc(9px - 1px); border-radius: var(--radius); font-size: var(--font-size-sv3-xs); }
       .mode-switch button[aria-pressed='true'] { background: var(--surface-2); color: var(--foreground); }
       .search-field { display: flex; align-items: center; gap: var(--space-3); min-block-size: 46px; box-sizing: border-box; padding: var(--space-2) 14px; }
       .search-field .field { flex: 1; min-width: 0; padding: 0; display: flex; align-items: center; gap: var(--space-3); }
@@ -1677,6 +1679,7 @@ export class Sv3Composer extends JfElement {
                 @click=${() => { this.filtersOpen = !this.filtersOpen; this.effortMenuOpen = false; this.tierMenuOpen = false; }}>${localizeResourceKey('search.filters')}</button>`;
     // A search field whose control row would hold nothing has none: no empty block in the field, so Clear
     // sits at its end and the field is the same however its text was emptied (it keeps Clear's room, see .clear-room).
+    // With Search / Ask at its end (fm-16) an empty field keeps no room for Clear.
     const footerEmpty = this.tier === 'search' && tierControl === nothing && filtersTrigger === nothing;
     // Like the degradation banner, this is a reachable description of the refusal. The shell's
     // always-mounted status deck announces observed health/indexing changes once for all surfaces.
@@ -1696,7 +1699,7 @@ export class Sv3Composer extends JfElement {
           data-focus-forward
           @pointerdown=${this.onGlassPointerDown}
         >
-          <div class="field ${this.tier === 'search' && this.draft === '' ? 'clear-room' : ''}">
+          <div class="field ${footerEmpty && this.draft === '' ? 'clear-room' : ''}">
             ${this.tier === 'search' ? html`<span class="search-icon" data-testid="sv3-search-icon">${icon({ name: 'search', size: 18 })}</span>` : nothing}
             <div class="editor">
               <textarea

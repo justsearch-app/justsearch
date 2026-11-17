@@ -138,8 +138,9 @@ describe('repairs R2 and R4: sizes measure the running model; Advanced speaks re
         onnxFeatures: [{ id: 'embed', status: 'active', modelActive: true }] } } as unknown as AiState;
     const el = await mount();
     expect(step(el, 'chat'), 'Answer questions step').not.toBeNull();
-    expect(words(el.shadowRoot!)).not.toContain('6.3 GB download');
-    expect(words(step(el, 'chat'))).toContain('3.2 GB download');
+    // A3: sizes are the amount alone; the standard package's 6.3 GB stays in the licence dialog only.
+    expect([...el.shadowRoot!.querySelectorAll('.step-meta')].map(words).join(' | ')).not.toContain('6.3 GB');
+    expect(words(step(el, 'chat'))).toContain('3.2 GB');
     expect(words(step(el, 'chat'))).not.toMatch(/not working|not applied/i);
   });
   // R4 — Advanced settings › Answers names the pause setting in the read words the page already uses
