@@ -193,3 +193,14 @@ passes on the candidate (run-evidence with --before 02435b349e).
   "note": "Test intent accepted. Each new check fails on 012aae15e5 by assertion for the reason under test and passes on f992b6b045; 10 of 11 mutations killed. Surviving mutation: filtering successful settings saves by label text 'Apply Settings' instead of operationId (the fixture couples both), so PH3's 'not by the label text' is not pinned; suggested strengthening, not blocking."
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "c416e2f8-91cd-4e63-9e93-2ba5c45bbea6",
+  "verdict": "accept",
+  "digest": "sha256:a2c0125c6af918d3fa0c07fc7c2830bea17ada4d0906901445cf2c265c039f63",
+  "note": "Test intent accepted on d5007ab48f. All 11 new checks fail on 02435b349e by assertion for the reason under test (focus on Terms, dialog top 16<44, count line present at 0, badge fill/border, Apply Settings rows/completed advisories, text cross, graphics card shown) and pass on the candidate; preservation (same-label other operation, Escape/Cancel focus return, installed graphics card, counts 1 and 2) passes before and after. 20 of 21 mutations killed, including label-text filtering and dropping either operation id. Survivor: graphics card shown when install state is unknown (known, not pinned). Entry text slip: PH4 behaviour says '3.00 GB of 12.00 GB' while the check asserts '3 GB of 12 GB' (shared wording); the check is right."
+}
+```
