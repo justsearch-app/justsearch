@@ -12,6 +12,7 @@ import { keepUnsettled, MAY_BE_LOST, readUnsettled, SaveQueue, type SendOutcome 
 import { refreshStatusNow } from '../state/aiStateStore.js';
 import type { IndexingProgress } from '../state/indexingProgress.js';
 import { z } from 'zod';
+import { disclosureMark, disclosureStyles } from './disclosure.js';
 
 const NOTHING_WAITING = 'Nothing is waiting to be read.';
 
@@ -657,17 +658,29 @@ export class IndexingRulesEditor extends JfElement {
     </section>`;
   }
 
-  static styles = css`
+  static styles = [disclosureStyles, css`
     :host { display: block; min-width: 0; }
     h3 { margin: 0 0 .75rem; font-size: var(--font-size-xs); font-weight: 500; color: var(--text-secondary); }
     fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
-    label { display: inline-flex; align-items: center; gap: .45rem; font-size: var(--font-size-sm); }
+    label { display: inline-flex; align-items: center; gap: 10px; font-size: var(--font-size-sm); }
     .conflict-actions { display: flex; flex-wrap: wrap; gap: .5rem 1rem; }
-    .rule-choice { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .8rem; }
+    /* fm-07: "and" between the two times is 13 px body like the words around it. */
+    .rule-choice { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .8rem; font-size: var(--font-size-sm); }
     .indexing-days { display: flex; flex-wrap: wrap; gap: .5rem .9rem; margin: .5rem 0 1rem; }
     .indexing-days label { font-size: var(--font-size-xs); }
     .indexing-days[hidden] { display: none; }
     input { font: inherit; color: var(--text-primary); accent-color: var(--text-secondary); max-width: 100%; }
+    /* fm-07: the app draws its radios and checkboxes — a 16 px ring or box in the secondary text colour
+       (at least 3:1 on the page in dark and light), teal only when on. Forced colours keep the system's. */
+    input[type=radio], input[type=checkbox] { appearance: none; -webkit-appearance: none; box-sizing: border-box; flex: none;
+      width: 16px; height: 16px; margin: 0; display: inline-grid; place-content: center; cursor: pointer;
+      border: 1.5px solid var(--text-secondary); border-radius: 50%; background: transparent; }
+    input[type=checkbox] { border-radius: 4px; }
+    input[type=radio]:checked { border: 5px solid var(--accent); }
+    input[type=checkbox]:checked { border-color: var(--accent); background: var(--accent); }
+    input[type=checkbox]:checked::after { content: ''; box-sizing: border-box; width: 5px; height: 9px; margin-top: -2px;
+      border: solid var(--accent-on-tint); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+    input[type=radio]:disabled, input[type=checkbox]:disabled { cursor: default; opacity: .5; }
     input[type=time] { background: transparent; border: 0; border-bottom: 1px dotted var(--border-subtle); padding: .1rem; color-scheme: inherit; }
     button { font: inherit; font-size: var(--font-size-sm); font-weight: 500; background: transparent; border: 0; color: var(--text-primary); padding: .4rem 0; cursor: pointer; }
     button[aria-disabled=true] { opacity: .65; cursor: default; }
@@ -683,8 +696,11 @@ export class IndexingRulesEditor extends JfElement {
     @media (forced-colors: active) {
       button, input { color: CanvasText; background: Canvas; border-color: CanvasText; }
       button:focus-visible, input:focus-visible, summary:focus-visible { outline-color: Highlight; }
+      input[type=radio], input[type=radio]:checked, input[type=checkbox], input[type=checkbox]:checked {
+        appearance: auto; -webkit-appearance: auto; border: revert; background: revert; }
+      input[type=checkbox]:checked::after { content: none; }
     }
-  `;
+  `];
 
   override render() {
     return html`<section aria-labelledby="when-to-index">
@@ -714,7 +730,7 @@ export class IndexingRulesEditor extends JfElement {
             aria-describedby="indexing-battery-help"
             @change=${(e: Event) => this.changeAndSave({ pauseOnBattery: (e.target as HTMLInputElement).checked })}>Pause while on battery</label>
         </fieldset>
-        <details><summary>About reading times</summary>
+        <details><summary class="disclosure">${disclosureMark()}About reading times</summary>
           <p id="indexing-local-time">Hours follow this computer's local time. An end time before the start continues into the next day. Turning hours off keeps your days and times.</p>
           <p id="indexing-battery-help">Applies only while this computer is known to run on battery. If the power source is unknown, this rule does not hold reading. Your preference is kept.</p>
         </details>

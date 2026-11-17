@@ -208,7 +208,9 @@ describe('Library retained-base exclusions', () => {
     document.body.appendChild(library); await library.updateComplete;
     expect(library.shadowRoot?.querySelector('section[aria-label="Exclude patterns"] [role="alert"]')?.textContent)
       .toContain("Couldn't load your skip rules");
-    expect(library.shadowRoot?.querySelector<HTMLInputElement>('.skip-rule input')?.disabled).toBe(true);
+    // fm-07 PD4: no rule field shows before the list is known; Add a rule is not available.
+    expect(library.shadowRoot?.querySelector<HTMLInputElement>('.skip-rule input')).toBeNull();
+    expect(library.shadowRoot?.querySelector<HTMLElement & { disabled: boolean }>('.add-rule')?.disabled).toBe(true);
     expect(send.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
     expect(invoke).not.toHaveBeenCalled();
     library.remove(); await vi.advanceTimersByTimeAsync(0);
