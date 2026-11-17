@@ -14,13 +14,17 @@ import path from 'node:path';
 const SEARCH = 'core.search-v3-surface';
 
 // "inspection" finds the picture's three files (mail, a Word file and a PDF); "harbor" finds only text
-// files, as the packaged app's "text 36" did. A kind filter in the request narrows the files.
+// files, as the packaged app's "text 36" did; "ledger" finds mail beside other files the Engine also
+// calls "binary". The files carry the Engine's own kinds (mail is "binary", message/rfc822), and a
+// kind or file-type filter in the request narrows them, with counts for both, as the Engine does.
 const HARNESS = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <link rel="stylesheet" href="/src/styles/tokens.css"></head><body><script type="module">
 const json = (body) => new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
 const files = {
-  inspection: [['message.eml', 'email', 'message/rfc822'], ['schedule.docx', 'office', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'], ['scanned-delivery.pdf', 'pdf', 'application/pdf']],
+  inspection: [['message.eml', 'binary', 'message/rfc822'], ['schedule.docx', 'office', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'], ['scanned-delivery.pdf', 'pdf', 'application/pdf']],
   harbor: [['note-1.txt', 'text', 'text/plain'], ['note-2.txt', 'text', 'text/plain'], ['note-3.txt', 'text', 'text/plain']],
+  ledger: [['ledger.sqlite', 'binary', 'application/x-sqlite3'], ['reply.eml', 'binary', 'message/rfc822'],
+    ['ledger.bin', 'binary', 'application/octet-stream'], ['ledger.pdf', 'pdf', 'application/pdf']],
 };
 const hit = ([name, kind, mime], i) => ({ id: 'doc-' + name, score: 1 - i / 10, fields: { title: name, filename: name, path: '/home/reader/Documents/' + name,
   content_preview: 'The silver pelican inspection near the harbor.', collection: 'docs', mime, mime_base: mime, file_kind: kind, language: 'en',
@@ -31,12 +35,14 @@ window.fetch = async (input, init) => {
   if (url.includes('/api/knowledge/search')) {
     const body = JSON.parse(String(init?.body ?? '{}'));
     window.searches.push(body);
-    const all = files[String(body.query ?? '').includes('harbor') ? 'harbor' : 'inspection'];
-    const kinds = body.filters?.fileKind ?? [];
-    const found = kinds.length ? all.filter(f => kinds.includes(f[1])) : all;
-    const counts = {}; for (const f of found) counts[f[1]] = (counts[f[1]] ?? 0) + 1;
+    const query = String(body.query ?? '');
+    const all = files[Object.keys(files).find(name => query.includes(name)) ?? 'inspection'];
+    const kinds = body.filters?.fileKind ?? [], types = body.filters?.mimeBase ?? [];
+    const found = all.filter(f => (!kinds.length || kinds.includes(f[1])) && (!types.length || types.includes(f[2])));
+    const counts = { file_kind: {}, mime_base: {} };
+    for (const f of found) { counts.file_kind[f[1]] = (counts.file_kind[f[1]] ?? 0) + 1; counts.mime_base[f[2]] = (counts.mime_base[f[2]] ?? 0) + 1; }
     return json({ totalHits: found.length, matchCount: found.length, tookMs: 4, results: found.map(hit), nextCursor: null,
-      facets: { file_kind: counts }, facetsTruncated: false });
+      facets: counts, facetsTruncated: false });
   }
   if (url.includes('/api/preview')) return json({ content: 'The silver pelican inspection.', totalChars: 30 });
   return json({ entries: [], conversations: [] });
@@ -194,6 +200,36 @@ describe('PF1 kind filters use the words a person would, with the count', () => 
   }, 120_000);
 });
 
+describe('PF1\' Mail is what the rows show as mail, though the Engine calls it "binary"', () => {
+  const sent = (page: Page) => page.evaluate(() =>
+    (window as unknown as { searches: Array<{ filters?: { fileKind?: string[]; mimeBase?: string[] } }> }).searches.at(-1)?.filters ?? {});
+  const rowNames = async (page: Page) => (await page.locator('[data-testid="search-result-row"]').allTextContents())
+    .map(text => text.match(/[\w-]+\.(eml|pdf|bin|sqlite|docx)/)?.[0]);
+
+  it('a .eml file (message/rfc822, kind "binary") is Mail; other binary files stay Other files', async () => {
+    const page = await open('dark');
+    await search(page, 'ledger');
+    expect(await words(page)).toEqual(['All', 'Other files 2', 'Documents 1', 'Mail 1', 'Any time', 'More filters']);
+  }, 120_000);
+
+  it('choosing Mail selects exactly the mail rows; choosing Other files leaves them out of its count; All lets go', async () => {
+    const page = await open('dark');
+    await search(page, 'ledger');
+    const before = await searches(page);
+    await filterRow(page).filter({ hasText: 'Mail' }).click();
+    await expect.poll(() => searches(page), { timeout: 15_000 }).toBe(before + 1);
+    expect(await sent(page), 'by the mail file type, not the catch-all kind').toEqual({ mimeBase: ['message/rfc822'] });
+    await expect.poll(() => rowNames(page), { timeout: 15_000 }).toEqual(['reply.eml']);
+    await settle(page, 300);
+    expect(await words(page), 'a chosen Mail stays on the row').toEqual(['All', 'Mail 1', 'Any time', 'More filters']);
+    expect(await filterRow(page).filter({ hasText: 'Mail' }).getAttribute('aria-pressed')).toBe('true');
+    expect(await page.locator('jf-results-card [data-testid="more-filters"]').getAttribute('aria-label'), 'not a More filters choice').toBeNull();
+    await filterRow(page).filter({ hasText: 'All' }).click();
+    await expect.poll(() => page.locator('[data-testid="search-result-row"]').count(), { timeout: 15_000 }).toBe(4);
+    expect(await sent(page)).toEqual({});
+  }, 120_000);
+});
+
 describe('PF2 one kind among the results shows no kind filters', () => {
   it.each(['dark', 'light'] as const)('only Any time and More filters (%s)', async palette => {
     const page = await open(palette);
@@ -320,6 +356,56 @@ describe('PF4 the search field has a Clear × while it holds text', () => {
     expect(await shown(other)).toEqual(byKeyboard);
     expect(await focusedIsField(other), 'the caret stays in the field').toBe(true);
     expect(await clear(other).count()).toBe(0);
+  }, 180_000);
+
+  it('by pointer five times in a row across new searches: each first click clears, and the × never moves', async () => {
+    const page = await open('dark');
+    const rounds: unknown[] = [];
+    const expected: unknown[] = [];
+    for (const query of ['inspection', 'ledger', 'harbor', 'inspection ledger', 'harbor inspection']) {
+      await search(page, query);
+      const box = (await clear(page).boundingBox())!;
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      await page.mouse.down();
+      await settle(page, 50);
+      const pressed = await clear(page).boundingBox();
+      const caretWhilePressed = await focusedIsField(page);
+      await page.mouse.up();
+      await settle(page);
+      rounds.push({ query, box, pressed, caretWhilePressed, value: await field(page).inputValue(),
+        caret: await focusedIsField(page), clear: await clear(page).count() });
+      expected.push({ query, box: (rounds[0] as { box: unknown }).box, pressed: (rounds[0] as { box: unknown }).box,
+        caretWhilePressed: true, value: '', caret: true, clear: 0 });
+    }
+    expect(rounds, 'each round: the × where it was in round one, unmoved while pressed, cleared by the first click, caret kept').toEqual(expected);
+    const shell = (await page.locator('[data-testid="sv3-composer-shell"]').boundingBox())!;
+    const first = (rounds[0] as { box: { x: number; width: number } }).box;
+    expect(shell.x + shell.width - (first.x + first.width), 'at the field\'s end').toBeLessThanOrEqual(16);
+  }, 180_000);
+
+  it('the field is the same after Clear as after Ctrl+A, Backspace: no empty block left in it', async () => {
+    const page = await open('dark');
+    const fieldState = () => page.evaluate(() => {
+      const win = document.querySelector('jf-shell')!.shadowRoot!.querySelector('jf-stage')!.shadowRoot!.querySelector('jf-sv3-window')!;
+      const root = win.shadowRoot!.querySelector('jf-sv3-composer')!.shadowRoot!;
+      const glass = root.querySelector('[data-testid="sv3-composer-shell"]')!;
+      const box = (el: Element) => { const r = el.getBoundingClientRect(); return [r.x, r.y, r.width, r.height]; };
+      const shape = (el: Element): unknown => ({ tag: el.tagName.toLowerCase(), cls: el.className, kids: [...el.children].map(shape) });
+      return { glass: box(glass), textarea: box(root.querySelector('textarea')!), parts: shape(glass),
+        blocks: [...glass.querySelectorAll('*')].filter(el => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0)
+          .map(el => [el.tagName.toLowerCase(), el.className, ...box(el)]) };
+    });
+    await search(page, 'inspection');
+    await field(page).focus();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.press('Backspace');
+    await settle(page, 400);
+    const byKeyboard = await fieldState();
+    await search(page, 'inspection');
+    await clear(page).click();
+    await settle(page, 400);
+    expect(await fieldState()).toEqual(byKeyboard);
+    expect(JSON.stringify(byKeyboard.parts), 'no empty control row in the field').not.toContain('footer');
   }, 180_000);
 
   it('reachable by keyboard: Tab from the field, then Enter', async () => {

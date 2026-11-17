@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-16T22:48:11.784Z",
-  "revision": "075b738f0a3994558a4f4b4de1fc6ad6fe7ff087",
-  "tree": "9f3b83118205ca14260f2b5cef9079cdf871fc23",
+  "createdAt": "2026-11-17T02:31:32.808Z",
+  "revision": "5a2ac8226ef4cb4dbc4cb081c3db6caea7686f3d",
+  "tree": "e5c58c0708b1dd04f2ba294c8b7170302d0299d9",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/kindFilters.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.filterRow.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ciybs_d7/tmp/test-intent-vitest-30550-1794869257831.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/components/searchResults/kindFilters.test.ts\" \"src/shell-v0/components/searchResults/ResultsCard.filterRow.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/5dbr1cwh/tmp/test-intent-vitest-50905-1794882652171.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 2959
+      "durationMs": 1091
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.filterRow-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/ciybs_d7/tmp/test-intent-vitest-30550-1794869260792.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.filterRow-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/5dbr1cwh/tmp/test-intent-vitest-50905-1794882653264.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 30990
+      "durationMs": 39544
     }
   ],
   "checks": [
@@ -35,13 +35,21 @@
       "id": "modules/ui-web/src/shell-v0/components/searchResults/kindFilters.test.ts",
       "file": "modules/ui-web/src/shell-v0/components/searchResults/kindFilters.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:bd870af39fd811560a31175fb3d7265ad432ec20e29b29be824927ffbc40df75",
+      "contentDigest": "sha256:b91efb1a9e3f1801a14032e3b2bf8303dd366d25105e0ff06c3ece006c1d007f",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
       "cases": [
         {
           "name": "PF1 every engine kind reads as a word a person would use, never its raw name",
+          "status": "passed"
+        },
+        {
+          "name": "PF1' mail the Engine files as \"binary\" (message/rfc822) is Mail, as its row shows it; other binary files stay Other files",
+          "status": "passed"
+        },
+        {
+          "name": "PF1' choosing Mail selects the mail media types, not the catch-all kind; a chosen Mail stays and lets go again",
           "status": "passed"
         },
         {
@@ -66,7 +74,7 @@
       "id": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.filterRow.test.ts",
       "file": "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.filterRow.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:eb15f1201b4baed5b47f39c78601f9732605d185119d73262f0eb6094cbe7c4e",
+      "contentDigest": "sha256:b4ff464a6b22fd4f4292950ce1164ff1dcd3326ed104af5b53e8c3cb46d46a11",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -81,6 +89,14 @@
         },
         {
           "name": "PF1 a press on a filter that stands for several kinds chooses them all at once",
+          "status": "passed"
+        },
+        {
+          "name": "PF1' Mail is the mail the Engine calls \"binary\"; other binary files are Other files, never Mail",
+          "status": "passed"
+        },
+        {
+          "name": "PF1' with Mail chosen, All lets go of it and of any kind, in one press",
           "status": "passed"
         },
         {
@@ -101,7 +117,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.filterRow-lockdown.test.ts",
       "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.filterRow-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:4d38d68580f653717629bb92e2ec7fc95faa0f57aa777e57c431acf792bfa89f",
+      "contentDigest": "sha256:eefcc783d285972708e51c1f2d22e80faf31426a61c9ac309d4d1fd06e0a135c",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -116,6 +132,14 @@
         },
         {
           "name": "PF1 kind filters use the words a person would, with the count choosing Documents narrows to both of its kinds in one search",
+          "status": "passed"
+        },
+        {
+          "name": "PF1' Mail is what the rows show as mail, though the Engine calls it \"binary\" a .eml file (message/rfc822, kind \"binary\") is Mail; other binary files stay Other files",
+          "status": "passed"
+        },
+        {
+          "name": "PF1' Mail is what the rows show as mail, though the Engine calls it \"binary\" choosing Mail selects exactly the mail rows; choosing Other files leaves them out of its count; All lets go",
           "status": "passed"
         },
         {
@@ -151,6 +175,14 @@
           "status": "passed"
         },
         {
+          "name": "PF4 the search field has a Clear × while it holds text by pointer five times in a row across new searches: each first click clears, and the × never moves",
+          "status": "passed"
+        },
+        {
+          "name": "PF4 the search field has a Clear × while it holds text the field is the same after Clear as after Ctrl+A, Backspace: no empty block left in it",
+          "status": "passed"
+        },
+        {
           "name": "PF4 the search field has a Clear × while it holds text reachable by keyboard: Tab from the field, then Enter",
           "status": "passed"
         },
@@ -162,5 +194,5 @@
     }
   ],
   "failBefore": null,
-  "digest": "sha256:6f78d6924b5640b0a1519f3108530554d0e06eccb7a6f8c1e400c5595d987c4c"
+  "digest": "sha256:b27b0be3a872d8fe5dfec78be215e064789d71b9ffac4906033d9c1fdb564b65"
 }

@@ -47,7 +47,7 @@ import '../../views/search-v3/Sv3Filters.js';
 import { matchCountLabel } from './matchCountLabel.js';
 import { isAdvancedMode, subscribeUiMode } from '../../state/uiModeState.js';
 import { renderFacetChips, facetChipStyles } from './facetChips.js';
-import { kindFilters, kindFilterToggle } from './kindFilters.js';
+import { isKindChoice, kindChoices, kindFilters, kindFilterToggle } from './kindFilters.js';
 import {
   renderWhyDisclosure,
   whyThisResultStyles,
@@ -319,6 +319,15 @@ export class ResultsCard extends JfElement {
 
   private emitCard<T>(name: string, detail: T): void {
     this.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
+  }
+
+  /** A filter's flips as one `card-facet-toggle` (one search): `{field, value}` on one field, a list across fields. */
+  private emitFacetToggles(toggles: ReadonlyArray<{ field: string; value: string | null }>): void {
+    const fields = new Set(toggles.map(toggle => toggle.field));
+    if (fields.size !== 1) { this.emitCard('card-facet-toggle', toggles); return; }
+    const values = toggles.map(toggle => toggle.value);
+    const value = values.length === 1 || values.includes(null) ? values[0]! : values as string[];
+    this.emitCard('card-facet-toggle', { field: toggles[0]!.field, value });
   }
 
   /**
@@ -826,18 +835,19 @@ export class ResultsCard extends JfElement {
     const preset = to === undefined && [7, 30, 365].find(days => { const day = new Date(start); day.setDate(day.getDate() - days); return from === day.getTime(); });
     const label = from === undefined && to === undefined ? 'Any time' : preset === 7 ? 'Past week' : preset === 30 ? 'Past month' : preset === 365 ? 'Past year' : 'Custom dates';
     const pending = this.snapshot?.countsPending === true;
-    const selected = this.facetSelections.file_kind ?? [];
-    const kinds = kindFilters(pending ? undefined : (this.snapshot?.facets as SearchFacetCounts | null | undefined)?.file_kind, pending ? this.lastFacets?.file_kind : undefined, selected);
+    const kinds = kindFilters(pending ? undefined : this.snapshot?.facets as SearchFacetCounts | null | undefined,
+      pending ? this.lastFacets : undefined, this.facetSelections);
+    const anyKind = kindChoices(this.facetSelections);
     const more = [getFilters().pathPrefix, getFilters().sizeFromBytes ?? getFilters().sizeToBytes].filter(v => v !== undefined).length
-      + ['mime_base', 'language', 'meta_author'].reduce((n, field) => n + (this.facetSelections[field]?.length ?? 0), 0);
+      + ['mime_base', 'language', 'meta_author'].reduce((n, field) =>
+        n + (this.facetSelections[field] ?? []).filter(value => !isKindChoice(field, value)).length, 0);
     return html`<div class="result-filters" role="group" aria-label="Result filters">
-      ${kinds.length === 0 ? nothing : html`<button type="button" class="text-filter" data-testid="type-all" aria-pressed=${String(selected.length === 0)}
-        @click=${() => this.emitCard('card-facet-toggle', { field: 'file_kind', value: null })}>All</button>
+      ${kinds.length === 0 ? nothing : html`<button type="button" class="text-filter" data-testid="type-all" aria-pressed=${String(anyKind.length === 0)}
+        @click=${() => this.emitFacetToggles([{ field: 'file_kind', value: null }, ...anyKind.filter(choice => choice.field !== 'file_kind')])}>All</button>
       <span class="kind-filters" data-facet-field="file_kind">${kinds.map(kind => html`<button type="button" class="text-filter"
         data-testid="kind-filter" aria-pressed=${String(kind.chosen)}
         aria-label=${`${kind.label}${kind.count !== undefined ? `, ${kind.count} ${kind.count === 1 ? 'file' : 'files'}` : ''}`}
-        @click=${() => { const values = kindFilterToggle(kind, selected);
-          this.emitCard('card-facet-toggle', { field: 'file_kind', value: values.length === 1 ? values[0] : values }); }}
+        @click=${() => this.emitFacetToggles(kindFilterToggle(kind, this.facetSelections))}
         >${kind.label}${kind.count !== undefined ? html` <span class="facet-count">${kind.count}</span>` : nothing}</button>`)}</span>`}
       <button type="button" class="text-filter date-filter ${label === 'Any time' ? '' : 'on'}" data-testid="date-filter"
         aria-label=${`Modified date: ${label}`} aria-haspopup="menu" aria-expanded=${String(this.dateMenuOpen)}

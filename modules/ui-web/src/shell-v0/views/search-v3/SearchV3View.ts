@@ -86,6 +86,7 @@ import {
 } from './Sv3Composer.js';
 import {
   Sv3SearchController,
+  type FacetToggleDetail,
   sv3ResendScopeNote,
   sv3ScopeLabel,
 } from './sv3-search.js';
@@ -2360,7 +2361,7 @@ export class SearchV3View extends JfElement {
   }
 
   private onCardFacetToggle(event: Event): void {
-    this.search.onCardFacetToggle((event as CustomEvent<{ field: string; value: string | readonly string[] | null }>).detail);
+    this.search.onCardFacetToggle((event as CustomEvent<FacetToggleDetail | readonly FacetToggleDetail[]>).detail);
   }
 
   private onCardSelection(event: Event): void {

@@ -1175,12 +1175,11 @@ export class Sv3Composer extends JfElement {
       .search-field .editor { flex: 1; min-width: 0; }
       .search-clear { display: grid; place-items: center; flex: none; min-inline-size: 24px; min-block-size: 24px; padding: 0; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--muted-foreground); cursor: pointer; }
       .search-clear:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+      /* Without Clear the field keeps its room (as padding, not an element), so the text box is the same width
+         empty and typed, however the text was emptied, and stays centred in an empty Search. */
+      .search-field .field.clear-room, :host([results]) .search-field .field.clear-room { padding-inline-end: calc(24px + var(--space-3)); }
       .search-field textarea { min-height: 0; height: auto; min-block-size: 1.5em; padding: 0; line-height: 1.5; white-space: pre; overflow: auto; resize: none; }
       .search-field .footer { margin: 0; padding: 0; flex: none; }
-      .search-field .footer:has(.controls:empty) { display: none; }
-      /* With Clear shown, an empty control row takes no room, so Clear sits at the field's end (the rule above never
-         matches: the template leaves whitespace in '.controls'; the empty field keeps its geometry). */
-      .search-field:has(.search-clear) .footer:not(:has(.controls > *)) { display: none; }
       .search-field .actions:empty { display: none; }
       .recents { --ring: var(--foreground); border: 0; background: transparent; margin-block-start: calc(var(--space-5) + 2px); padding: 0; }
       .recent-heading { padding-inline: var(--space-1); color: var(--muted-foreground); }
@@ -1672,6 +1671,13 @@ export class Sv3Composer extends JfElement {
     // The ONE banner slot, shared. The affordance-scoped reason yields whenever the degradation
     // banner already words its code, so the same fact never stands in the slot twice.
     const reason = sv3ComposerReason(this.degradation, activeReason);
+    const tierControl = this.tierControl();
+    const filtersTrigger = this.results || this.tier === 'search' && this.state === 'hero' && !getShowDeveloperTools() && !this.filtersOpen && !this.filterNote && !this.filterError ? nothing : html`<button type="button" class="composer-control" data-testid="sv3-filters-trigger"
+                aria-expanded=${String(this.filtersOpen)} aria-controls="sv3-filters"
+                @click=${() => { this.filtersOpen = !this.filtersOpen; this.effortMenuOpen = false; this.tierMenuOpen = false; }}>${localizeResourceKey('search.filters')}</button>`;
+    // A search field whose control row would hold nothing has none: no empty block in the field, so Clear
+    // sits at its end and the field is the same however its text was emptied (it keeps Clear's room, see .clear-room).
+    const footerEmpty = this.tier === 'search' && tierControl === nothing && filtersTrigger === nothing;
     // Like the degradation banner, this is a reachable description of the refusal. The shell's
     // always-mounted status deck announces observed health/indexing changes once for all surfaces.
     return html`
@@ -1690,7 +1696,7 @@ export class Sv3Composer extends JfElement {
           data-focus-forward
           @pointerdown=${this.onGlassPointerDown}
         >
-          <div class="field">
+          <div class="field ${this.tier === 'search' && this.draft === '' ? 'clear-room' : ''}">
             ${this.tier === 'search' ? html`<span class="search-icon" data-testid="sv3-search-icon">${icon({ name: 'search', size: 18 })}</span>` : nothing}
             <div class="editor">
               <textarea
@@ -1719,7 +1725,7 @@ export class Sv3Composer extends JfElement {
             </div>
             ${this.tier === 'search' && this.draft !== ''
               ? html`<button type="button" class="search-clear" data-testid="sv3-search-clear" aria-label="Clear search"
-                  title="Clear" @click=${this.clearSearch}>${icon({ name: 'x', size: 14 })}</button>`
+                  title="Clear" @mousedown=${(event: MouseEvent) => event.preventDefault()} @click=${this.clearSearch}>${icon({ name: 'x', size: 14 })}</button>`
               : nothing}
           </div>
           ${this.tier === 'search' && this.searchError
@@ -1743,12 +1749,10 @@ export class Sv3Composer extends JfElement {
               ? 'Extracts from your typed text and this conversation.' : `Extracts from ${this.scopeLabel} and this conversation.`}</p>
             ${this.structuredError === '' ? nothing : html`<p role="alert">${this.structuredError}</p>`}
           </div>` : nothing}
-          <div class="footer">
+          ${footerEmpty ? nothing : html`<div class="footer">
             <div class="controls" @focusout=${this.onControlsFocusOut}>
-              ${this.tierControl()}${this.tier === 'search' ? nothing : this.effortControl()}
-              ${this.results || this.tier === 'search' && this.state === 'hero' && !getShowDeveloperTools() && !this.filtersOpen && !this.filterNote && !this.filterError ? nothing : html`<button type="button" class="composer-control" data-testid="sv3-filters-trigger"
-                aria-expanded=${String(this.filtersOpen)} aria-controls="sv3-filters"
-                @click=${() => { this.filtersOpen = !this.filtersOpen; this.effortMenuOpen = false; this.tierMenuOpen = false; }}>${localizeResourceKey('search.filters')}</button>`}
+              ${tierControl}${this.tier === 'search' ? nothing : this.effortControl()}
+              ${filtersTrigger}
               ${this.tier === 'search' ? nothing : this.modelLabelFact()}
             </div>
             <div class="actions">
@@ -1758,7 +1762,7 @@ export class Sv3Composer extends JfElement {
                 this.refusalDescribedBy(reason),
               )}`}
             </div>
-          </div>
+          </div>`}
         </div>
       ${this.state === 'hero' && this.tier === 'search' ? this.corpusLine() : nothing}
       ${this.filterNote && !this.filtersOpen ? html`<p class="notice" data-testid="sv3-filter-note">${this.filterNote}</p>` : nothing}
