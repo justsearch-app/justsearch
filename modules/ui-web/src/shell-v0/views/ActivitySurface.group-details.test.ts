@@ -193,23 +193,23 @@ describe('A9 / A10 — a burst\'s members are listed in its details by the label
   it('a burst of a known and an unknown state lists both: the unknown state named, never as indexed', async () => {
     const el = await mount([index(1, 'DONE'), index(2, 'PAUSED')]);
     const burst = await selectBurst(el);
-    expect(text(burst)).toContain('Indexed 1 · 1 with unknown state · docs');
+    expect(text(burst)).toContain('Read 1 · 1 with unknown state · docs');
     const listed = members(el);
     expect(listed).toHaveLength(2);
-    expect(listed.some((m) => m.includes('Index state unknown (PAUSED) · docs'))).toBe(true);
-    expect(listed.some((m) => m.includes('Indexed · docs'))).toBe(true);
+    expect(listed.some((m) => m.includes('Reading outcome unknown (PAUSED) · docs'))).toBe(true);
+    expect(listed.some((m) => m.includes('Read · docs'))).toBe(true);
   });
 
   it('a member whose file resolved reads as its name; one that did not keeps the short-hash label', async () => {
     const el = await mount([index(1, 'DONE'), index(2, 'FAILED'), index(3, 'DONE')],
       async (_resource, hash) => (hash === 'hash1' ? 'C:/corpus/docs/report.pdf' : null));
     const burst = await selectBurst(el);
-    expect(text(burst)).toContain('Indexed 2 · 1 failed · docs');
+    expect(text(burst)).toContain('Read 2 · 1 failed · docs');
     const listed = members(el);
     expect(listed).toHaveLength(3);
-    expect(listed.filter((m) => m.includes('Indexed · docs/report.pdf'))).toHaveLength(1);
-    expect(listed.filter((m) => m.includes('Index failed · docs (hash2)'))).toHaveLength(1);
-    expect(listed.filter((m) => m.includes('Indexed · docs (hash3)'))).toHaveLength(1);
+    expect(listed.filter((m) => m.includes('Read · docs/report.pdf'))).toHaveLength(1);
+    expect(listed.filter((m) => m.includes("Couldn't read · docs (hash2)"))).toHaveLength(1);
+    expect(listed.filter((m) => m.includes('Read · docs (hash3)'))).toHaveLength(1);
   });
 });
 
@@ -241,14 +241,14 @@ describe('Activity details name sources in words', () => {
   it('an indexing record names Background indexing as its source', async () => {
     const el = await mount([index(1, 'DONE', { transport: 'WORKER_INDEXER' })]);
     await selectRecord(el);
-    expect(fact(el, 'activity-details-source')).toBe('Background indexing');
+    expect(fact(el, 'activity-details-source')).toBe('Background reading');
   });
 
   it('an indexing burst names Background indexing as its shared source', async () => {
     const el = await mount([index(1, 'DONE', { transport: 'WORKER_INDEXER' }),
       index(2, 'DONE', { transport: 'WORKER_INDEXER' })]);
     await selectBurst(el);
-    expect(fact(el, 'activity-details-source')).toBe('Background indexing');
+    expect(fact(el, 'activity-details-source')).toBe('Background reading');
   });
 
   it('an unknown transport reads Another source and its raw code appears nowhere in the pane', async () => {
@@ -277,7 +277,7 @@ describe('Activity details name sources in words', () => {
       ['RULE_ENGINE', 'A rule'],
       ['SYSTEM_INTERNAL', 'The engine'],
       ['HTTP_API', 'The local API'],
-      ['WORKER_INDEXER', 'Background indexing'],
+      ['WORKER_INDEXER', 'Background reading'],
     ] as const;
     for (const [transport, words] of transports) {
       const el = await mount([index(1, 'DONE', { transport })]);

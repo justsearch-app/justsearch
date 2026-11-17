@@ -33,7 +33,7 @@ describe('DragOverlay (slice 459)', () => {
     el.active = true;
     el.dragKind = 'folder';
     await el.updateComplete;
-    expect(el.shadowRoot?.querySelector('h3')?.textContent).toBe('Drop folder to index');
+    expect(el.shadowRoot?.querySelector('h3')?.textContent).toBe('Drop folder to add it to your library');
   });
 
   it('drag-kind=file shows "Drop files here"', async () => {
@@ -49,6 +49,6 @@ describe('DragOverlay (slice 459)', () => {
     el.active = true;
     el.dragKind = 'unknown';
     await el.updateComplete;
-    expect(el.shadowRoot?.querySelector('h3')?.textContent).toBe('Drop to add to index');
+    expect(el.shadowRoot?.querySelector('h3')?.textContent).toBe('Drop to add to your library');
   });
 });

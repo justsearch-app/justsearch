@@ -163,7 +163,7 @@ describe('SC2 supervisor loss after the app has loaded keeps the app', () => {
     const words = deepText(treatment(shell));
     expect(words).toContain(title);
     expect(words).toContain(reason);
-    expect(words).toContain('Searching and indexing are on hold. Your files and your index are safe.');
+    expect(words).toContain('Searching and reading are on hold. Your files and your index are safe.');
     expect(button(shell, /^Restart the engine$/)).not.toBeNull();
     expect(button(shell, /^Open Health$/), 'Health stays reachable').not.toBeNull();
     expect(button(shell, /^Copy report$/)).not.toBeNull();

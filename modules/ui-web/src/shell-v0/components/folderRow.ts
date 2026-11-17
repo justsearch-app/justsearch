@@ -64,22 +64,25 @@ export const folderRowStyles = css`
   .chevron { display: inline-flex; }
   .folder-toggle[aria-expanded='true'] .chevron { transform: rotate(90deg); }
   .card-info { min-width: 0; }
-  .folder-name { font-weight: 500; }
+  /* fm-07 — the folder's name 15 px, its path 12 px; the state, the count and the facts 13 px. */
   .card-path { font-size: var(--font-size-sm); }
+  .folder-name { font-weight: 500; font-size: var(--font-size-md); }
   .folder-name, .folder-path { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .folder-path { font-size: var(--font-size-xs); color: var(--text-secondary); margin-top: .2rem; }
+  .folder-path { font-size: var(--font-size-secondary); color: var(--text-secondary); margin-top: .2rem; }
   .folder-state { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem;
-    font-size: var(--font-size-xs); max-width: 24rem; color: var(--text-secondary); overflow-wrap: anywhere; }
-  .files-found { color: var(--text-secondary); font-size: var(--font-size-xs); text-align: end; }
+    font-size: var(--font-size-sm); max-width: 24rem; color: var(--text-secondary); overflow-wrap: anywhere; }
+  .files-found { color: var(--text-secondary); font-size: var(--font-size-sm); text-align: end; }
   .folder-details { margin: .8rem 0 .35rem 3.8rem; display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: .4rem 1rem; }
   .folder-details[hidden] { display: none; }
-  .folder-details dl { margin: 0; font-size: var(--font-size-xs); }
+  .folder-details dl { margin: 0; font-size: var(--font-size-sm); }
   .folder-details dl > div { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .5rem; }
   .folder-details dt { color: var(--text-secondary); }
   .folder-details dd { margin: 0; overflow-wrap: anywhere; }
   .row-actions { display: flex; flex-direction: column; align-items: start; }
   .row-actions jf-button::part(control) { font-size: var(--font-size-sm); }
+  /* fm-07 — removing is the danger text action: words and icon in the danger colour, no fill. */
+  .row-actions .remove-action::part(control) { color: var(--text-danger); }
   .status-icon { display: inline-flex; }
   .status-icon.indexed { color: var(--text-success); }
   .status-icon.error { color: var(--text-danger); }

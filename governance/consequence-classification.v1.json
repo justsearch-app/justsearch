@@ -14,7 +14,7 @@
     ]
   },
   "scanRoot": "modules/ui-web/src",
-  "claimPhrases": ["keyword results", "keyword-ranked results"],
+  "claimPhrases": ["keyword results", "keyword-ranked results", "word results", "word search results"],
   "allow": {
     "files": [
       "modules/ui-web/src/shell-v0/aggregate-substrate/strategies/searchTraceExplain.ts"

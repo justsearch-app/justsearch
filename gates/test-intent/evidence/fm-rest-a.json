@@ -1,0 +1,640 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-17T14:18:02.476Z",
+  "revision": "2f379a013909da393324f106847caa667218aab3",
+  "tree": "5c5ff7b5c495f88490d5506ce530e4f89a84cfc7",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.readingEntry.test.ts\" \"src/shell-v0/components/StatusPanel.readingEntry.test.ts\" \"src/shell-v0/components/IndexingControls.pauseIcon.test.ts\" \"src/shell-v0/views/library-first-minutes/reread-receipt.test.ts\" \"src/shell-v0/state/frameStatus.pausedEntry.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-vitest-1976618-1794925029376.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2407
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts\" \"src/shell-v0/views/library-first-minutes/fm-rest-a-selects-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-vitest-1976618-1794925031784.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 21015
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts#while the Documents folder is read: Running holds the reading entry only, and it offers no \"Open AI Brain\"",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:61e9cfb3107c53804bbedf6066fd250b2d2f72ace45c83fdc8ffb3e33ddae770",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1 one entry for reading in Running while the Documents folder is read: Running holds the reading entry only, and it offers no \"Open AI Brain\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts#a folder still being scanned and one whose meaning work runs are no entries of their own either",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:61e9cfb3107c53804bbedf6066fd250b2d2f72ace45c83fdc8ffb3e33ddae770",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1 one entry for reading in Running a folder still being scanned and one whose meaning work runs are no entries of their own either",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts#a missing folder and a folder that could not be read completely keep their entry and Show in Library",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:61e9cfb3107c53804bbedf6066fd250b2d2f72ace45c83fdc8ffb3e33ddae770",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S5 what needs the person keeps its own entry while reading runs a missing folder and a folder that could not be read completely keep their entry and Show in Library",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts#two successful saves add nothing under Earlier",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:61e9cfb3107c53804bbedf6066fd250b2d2f72ace45c83fdc8ffb3e33ddae770",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S6 a saved reading rule is no Earlier entry two successful saves add nothing under Earlier",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts#the save's completion notice is left out too, and kept when it failed",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:61e9cfb3107c53804bbedf6066fd250b2d2f72ace45c83fdc8ffb3e33ddae770",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S6 a saved reading rule is no Earlier entry the save's completion notice is left out too, and kept when it failed",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.readingEntry.test.ts#Running holds the reading entry only: its title, one line of numbers, the bar and \"Pause reading\"",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.readingEntry.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f662d6b008d636a904b4b6b5ecfc3155cff23b06f0825afe9a53b553b566b082",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1 / S3 one reading entry with one action Running holds the reading entry only: its title, one line of numbers, the bar and \"Pause reading\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/StatusPanel.readingEntry.test.ts#no native select and no \"Pause duration\" anywhere in the panel",
+      "file": "modules/ui-web/src/shell-v0/components/StatusPanel.readingEntry.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:f662d6b008d636a904b4b6b5ecfc3155cff23b06f0825afe9a53b553b566b082",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1 / S3 one reading entry with one action no native select and no \"Pause duration\" anywhere in the panel",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/IndexingControls.pauseIcon.test.ts#S7: \"Pause reading\" carries the pause icon, not the clock",
+      "file": "modules/ui-web/src/shell-v0/components/IndexingControls.pauseIcon.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:1e660048805c70d542859382dc0d53a6be5702299898d247ac7c0b48c8f48749",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S7: \"Pause reading\" carries the pause icon, not the clock",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#a folder being read says \"Needs AI\" and nothing about word search",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06c3c62826616787ef1fe82d751823ee820c1a122f3e09a5553cb6fead46ebec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L4 the meaning line while a folder is read a folder being read says \"Needs AI\" and nothing about word search",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#a folder being scanned says \"Needs AI\" and nothing about word search",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06c3c62826616787ef1fe82d751823ee820c1a122f3e09a5553cb6fead46ebec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L4 the meaning line while a folder is read a folder being scanned says \"Needs AI\" and nothing about word search",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts#name 15 px, path 12 px, state, count and facts 13 px",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:97075234da65d1027ae810cf75d34246b9da3fc1b6ea3b5e7966ea3a03f19905",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L5 the folder row's sizes as drawn in fm-07 name 15 px, path 12 px, state, count and facts 13 px",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts#dark: words and icon in the danger colour, no fill, at least 4.5:1",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:97075234da65d1027ae810cf75d34246b9da3fc1b6ea3b5e7966ea3a03f19905",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L6 \"Remove from library\" in the danger colour dark: words and icon in the danger colour, no fill, at least 4.5:1",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts#light: words and icon in the danger colour, no fill, at least 4.5:1",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:97075234da65d1027ae810cf75d34246b9da3fc1b6ea3b5e7966ea3a03f19905",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L6 \"Remove from library\" in the danger colour light: words and icon in the danger colour, no fill, at least 4.5:1",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts#dark: \"Pause reading\" is drawn as Installing AI's \"Pause\"; no select in the panel",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:97075234da65d1027ae810cf75d34246b9da3fc1b6ea3b5e7966ea3a03f19905",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1 / S3 the status panel while files are read dark: \"Pause reading\" is drawn as Installing AI's \"Pause\"; no select in the panel",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts#light: \"Pause reading\" is drawn as Installing AI's \"Pause\"; no select in the panel",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:97075234da65d1027ae810cf75d34246b9da3fc1b6ea3b5e7966ea3a03f19905",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1 / S3 the status panel while files are read light: \"Pause reading\" is drawn as Installing AI's \"Pause\"; no select in the panel",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts#dark: the duration select Settings still draws uses the theme's colours itself, readable",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:97075234da65d1027ae810cf75d34246b9da3fc1b6ea3b5e7966ea3a03f19905",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1 / S3 the status panel while files are read dark: the duration select Settings still draws uses the theme's colours itself, readable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts#light: the duration select Settings still draws uses the theme's colours itself, readable",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:97075234da65d1027ae810cf75d34246b9da3fc1b6ea3b5e7966ea3a03f19905",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1 / S3 the status panel while files are read light: the duration select Settings still draws uses the theme's colours itself, readable",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#accepted -> running without visible reading -> reading visible -> a gap between folders -> complete",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06c3c62826616787ef1fe82d751823ee820c1a122f3e09a5553cb6fead46ebec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L1' one constant line from the confirmation until the outcome completes accepted -> running without visible reading -> reading visible -> a gap between folders -> complete",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#reading visible from the first moment: the same one line, not a second \"Reading\"",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06c3c62826616787ef1fe82d751823ee820c1a122f3e09a5553cb6fead46ebec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L1' one constant line from the confirmation until the outcome completes reading visible from the first moment: the same one line, not a second \"Reading\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#a lost status while the outcome runs still shows only the line; the headline says what is known",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06c3c62826616787ef1fe82d751823ee820c1a122f3e09a5553cb6fead46ebec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L1' one constant line from the confirmation until the outcome completes a lost status while the outcome runs still shows only the line; the headline says what is known",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#\"Everything has been read again.\" alone, kept while in Library, gone after leaving and returning",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06c3c62826616787ef1fe82d751823ee820c1a122f3e09a5553cb6fead46ebec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L2' the completed outcome \"Everything has been read again.\" alone, kept while in Library, gone after leaving and returning",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#completed while reading still runs: the same sentence, without a second \"Reading\" line",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06c3c62826616787ef1fe82d751823ee820c1a122f3e09a5553cb6fead46ebec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L2' the completed outcome completed while reading still runs: the same sentence, without a second \"Reading\" line",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#a later read that fails replaces the line with the uncertain sentence",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06c3c62826616787ef1fe82d751823ee820c1a122f3e09a5553cb6fead46ebec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L3 outcomes that are not in progress keep their messages a later read that fails replaces the line with the uncertain sentence",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.pausedEntry.test.ts#paused by the person: the hold entry only; no folder entry that merely waits, no \"Recent file activity\"",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.pausedEntry.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dcf149e11f07a8f43d9089f66df8d68e4f71e98b2fde87232583daa369be0723",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S9 paused or held, the hold entry speaks for reading paused by the person: the hold entry only; no folder entry that merely waits, no \"Recent file activity\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/state/frameStatus.pausedEntry.test.ts#held by the reading hours: the same",
+      "file": "modules/ui-web/src/shell-v0/state/frameStatus.pausedEntry.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:dcf149e11f07a8f43d9089f66df8d68e4f71e98b2fde87232583daa369be0723",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S9 paused or held, the hold entry speaks for reading held by the reading hours: the same",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-selects-lockdown.test.ts#dark: closed and open, every select uses --surface-1 / --text-primary and its own chevron",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-selects-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4035ad24616e75bca6c643a97384884a0054c268b7f028c09465df8fad98e082",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S10 every native select is drawn in the theme's colours dark: closed and open, every select uses --surface-1 / --text-primary and its own chevron",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-selects-lockdown.test.ts#light: closed and open, every select uses --surface-1 / --text-primary and its own chevron",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-selects-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4035ad24616e75bca6c643a97384884a0054c268b7f028c09465df8fad98e082",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S10 every native select is drawn in the theme's colours light: closed and open, every select uses --surface-1 / --text-primary and its own chevron",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-selects-lockdown.test.ts#20 px, the ladder's heading step (--font-size-lg)",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-selects-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:4035ad24616e75bca6c643a97384884a0054c268b7f028c09465df8fad98e082",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "G2 the heading of System › Activity is on the size ladder 20 px, the ladder's heading step (--font-size-lg)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#\"Check reading outcome\" reads the outcome again and says what it now is",
+      "file": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:06c3c62826616787ef1fe82d751823ee820c1a122f3e09a5553cb6fead46ebec",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "L3 outcomes that are not in progress keep their messages \"Check reading outcome\" reads the outcome again and says what it now is",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b63294eff8",
+    "revision": "b63294eff82721866fe2a66b3b8e5d90ccfc0277",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/state/frameStatus.readingEntry.test.ts\" \"src/shell-v0/components/StatusPanel.readingEntry.test.ts\" \"src/shell-v0/components/IndexingControls.pauseIcon.test.ts\" \"src/shell-v0/views/library-first-minutes/reread-receipt.test.ts\" \"src/shell-v0/state/frameStatus.pausedEntry.test.ts\" --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-vitest-1976618-1794925059032.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2110,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-vitest-1976618-1794925059032.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts\" \"src/shell-v0/views/library-first-minutes/fm-rest-a-selects-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-vitest-1976618-1794925061143.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 21078,
+        "output": "JSON report written to /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-vitest-1976618-1794925061143.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts#while the Documents folder is read: Running holds the reading entry only, and it offers no \"Open AI Brain\"",
+        "classification": "assertion",
+        "detail": "S1 one entry for reading in Running while the Documents folder is read: Running holds the reading entry only, and it offers no \"Open AI Brain\":  AssertionError: expected [ 'indexing', 'folder-work:docs' ] to deeply equal [ 'indexing' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts:46:41\n    at file:///home/elias/dev/justsear"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts#a folder still being scanned and one whose meaning work runs are no entries of their own either",
+        "classification": "assertion",
+        "detail": "S1 one entry for reading in Running a folder still being scanned and one whose meaning work runs are no entries of their own either:  AssertionError: expected [ Array(3) ] to deeply equal [ 'indexing' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts:54:41\n    at file:///home/elias/dev/justsearch/.claude/worktrees/f"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts#a missing folder and a folder that could not be read completely keep their entry and Show in Library",
+        "classification": "assertion",
+        "detail": "S5 what needs the person keeps its own entry while reading runs a missing folder and a folder that could not be read completely keep their entry and Show in Library:  AssertionError: expected [ 'indexing', 'folder-work:docs' ] to deeply equal [ 'indexing' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts:74:41\n    at file:///home/elias/dev/justsear"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts#two successful saves add nothing under Earlier",
+        "classification": "assertion",
+        "detail": "S6 a saved reading rule is no Earlier entry two successful saves add nothing under Earlier:  AssertionError: expected [ Array(2) ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts:112:108\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest/mod"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts#the save's completion notice is left out too, and kept when it failed",
+        "classification": "assertion",
+        "detail": "S6 a saved reading rule is no Earlier entry the save's completion notice is left out too, and kept when it failed:  AssertionError: expected [ 'advisory:n-SUCCESS' ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/state/frameStatus.readingEntry.test.ts:130:58\n    at file:///home/elias/dev/justsearch/.claude/worktrees/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.readingEntry.test.ts#Running holds the reading entry only: its title, one line of numbers, the bar and \"Pause reading\"",
+        "classification": "assertion",
+        "detail": "S1 / S3 one reading entry with one action Running holds the reading entry only: its title, one line of numbers, the bar and \"Pause reading\":  AssertionError: expected [ 'indexing', 'folder-work:docs' ] to deeply equal [ 'indexing' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/components/StatusPanel.readingEntry.test.ts:78:83\n    at file:///home/elias/dev/jus"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/StatusPanel.readingEntry.test.ts#no native select and no \"Pause duration\" anywhere in the panel",
+        "classification": "assertion",
+        "detail": "S1 / S3 one reading entry with one action no native select and no \"Pause duration\" anywhere in the panel:  AssertionError: expected <select …(1)>…(3)</select> to be null\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/components/StatusPanel.readingEntry.test.ts:88:62\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/IndexingControls.pauseIcon.test.ts#S7: \"Pause reading\" carries the pause icon, not the clock",
+        "classification": "assertion",
+        "detail": "S7: \"Pause reading\" carries the pause icon, not the clock:  AssertionError: expected 'clock' to be 'pause' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/components/IndexingControls.pauseIcon.test.ts:32:21\n    at processTicksAndRejections (node:internal/proce"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#a folder being read says \"Needs AI\" and nothing about word search",
+        "classification": "assertion",
+        "detail": "L4 the meaning line while a folder is read a folder being read says \"Needs AI\" and nothing about word search:  AssertionError: expected 'Needs AI · word search availability n…' to be 'Needs AI' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts:219:31\n    at file"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#a folder being scanned says \"Needs AI\" and nothing about word search",
+        "classification": "assertion",
+        "detail": "L4 the meaning line while a folder is read a folder being scanned says \"Needs AI\" and nothing about word search:  AssertionError: expected 'Needs AI · word search availability n…' to be 'Needs AI' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts:223:31\n    at file"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts#name 15 px, path 12 px, state, count and facts 13 px",
+        "classification": "assertion",
+        "detail": "L5 the folder row's sizes as drawn in fm-07 name 15 px, path 12 px, state, count and facts 13 px:  AssertionError: expected { name: '13px', path: '11px', …(2) } to deeply equal { name: '15px', path: '12px', …(2) }\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts:223:"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts#dark: words and icon in the danger colour, no fill, at least 4.5:1",
+        "classification": "assertion",
+        "detail": "L6 \"Remove from library\" in the danger colour dark: words and icon in the danger colour, no fill, at least 4.5:1:  AssertionError: words: expected 'rgba(255, 255, 255, 0.95)' to be 'rgb(239, 130, 120)' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts:233:35"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts#light: words and icon in the danger colour, no fill, at least 4.5:1",
+        "classification": "assertion",
+        "detail": "L6 \"Remove from library\" in the danger colour light: words and icon in the danger colour, no fill, at least 4.5:1:  AssertionError: words: expected 'rgba(15, 23, 42, 0.95)' to be 'rgb(139, 50, 50)' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts:233:35\n    at f"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts#dark: \"Pause reading\" is drawn as Installing AI's \"Pause\"; no select in the panel",
+        "classification": "assertion",
+        "detail": "S1 / S3 the status panel while files are read dark: \"Pause reading\" is drawn as Installing AI's \"Pause\"; no select in the panel:  AssertionError: expected { size: '11px', weight: '500', …(3) } to deeply equal { size: '13px', weight: '500', …(3) }\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts:28"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts#light: \"Pause reading\" is drawn as Installing AI's \"Pause\"; no select in the panel",
+        "classification": "assertion",
+        "detail": "S1 / S3 the status panel while files are read light: \"Pause reading\" is drawn as Installing AI's \"Pause\"; no select in the panel:  AssertionError: expected { size: '11px', weight: '500', …(3) } to deeply equal { size: '13px', weight: '500', …(3) }\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts:28"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts#dark: the duration select Settings still draws uses the theme's colours itself, readable",
+        "classification": "assertion",
+        "detail": "S1 / S3 the status panel while files are read dark: the duration select Settings still draws uses the theme's colours itself, readable:  AssertionError: expected 'auto' to be 'none' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts:301:30\n    at runNextTicks (node:internal/process/ta"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts#light: the duration select Settings still draws uses the theme's colours itself, readable",
+        "classification": "assertion",
+        "detail": "S1 / S3 the status panel while files are read light: the duration select Settings still draws uses the theme's colours itself, readable:  AssertionError: expected 'auto' to be 'none' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-lockdown.test.ts:301:30\n    at file:///home/elias/dev/justsearch/.cla"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#accepted -> running without visible reading -> reading visible -> a gap between folders -> complete",
+        "classification": "assertion",
+        "detail": "L1' one constant line from the confirmation until the outcome completes accepted -> running without visible reading -> reading visible -> a gap between folders -> complete:  AssertionError: expected [ Array(1) ] to deeply equal [ 'Reading everything again.' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts:87:22\n    at processTicksAndRejection"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#reading visible from the first moment: the same one line, not a second \"Reading\"",
+        "classification": "assertion",
+        "detail": "L1' one constant line from the confirmation until the outcome completes reading visible from the first moment: the same one line, not a second \"Reading\":  AssertionError: expected [ Array(1) ] to deeply equal [ 'Reading everything again.' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts:132:22\n    at file:///home/elias/dev/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#a lost status while the outcome runs still shows only the line; the headline says what is known",
+        "classification": "assertion",
+        "detail": "L1' one constant line from the confirmation until the outcome completes a lost status while the outcome runs still shows only the line; the headline says what is known:  AssertionError: expected [ Array(1) ] to deeply equal [ 'Reading everything again.' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts:143:22\n    at file:///home/elias/dev/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#\"Everything has been read again.\" alone, kept while in Library, gone after leaving and returning",
+        "classification": "assertion",
+        "detail": "L2' the completed outcome \"Everything has been read again.\" alone, kept while in Library, gone after leaving and returning:  AssertionError: expected [ Array(1) ] to deeply equal [ 'Everything has been read again.' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts:153:22\n    at file:///home/elia"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#completed while reading still runs: the same sentence, without a second \"Reading\" line",
+        "classification": "assertion",
+        "detail": "L2' the completed outcome completed while reading still runs: the same sentence, without a second \"Reading\" line:  AssertionError: expected [ Array(1) ] to deeply equal [ 'Everything has been read again.' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts:163:22\n    at file:///home/elia"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#a later read that fails replaces the line with the uncertain sentence",
+        "classification": "assertion",
+        "detail": "L3 outcomes that are not in progress keep their messages a later read that fails replaces the line with the uncertain sentence:  AssertionError: expected [ Array(1) ] to deeply equal [ 'Reading everything again.' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts:203:22\n    at file:///home/elias/dev/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.pausedEntry.test.ts#paused by the person: the hold entry only; no folder entry that merely waits, no \"Recent file activity\"",
+        "classification": "assertion",
+        "detail": "S9 paused or held, the hold entry speaks for reading paused by the person: the hold entry only; no folder entry that merely waits, no \"Recent file activity\":  AssertionError: expected [ …(2) ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/state/frameStatus.pausedEntry.test.ts:46:36\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest/modules/ui"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/state/frameStatus.pausedEntry.test.ts#held by the reading hours: the same",
+        "classification": "assertion",
+        "detail": "S9 paused or held, the hold entry speaks for reading held by the reading hours: the same:  AssertionError: expected [ …(2) ] to deeply equal []\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/state/frameStatus.pausedEntry.test.ts:53:36\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest/modules/ui"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-selects-lockdown.test.ts#dark: closed and open, every select uses --surface-1 / --text-primary and its own chevron",
+        "classification": "assertion",
+        "detail": "S10 every native select is drawn in the theme's colours dark: closed and open, every select uses --surface-1 / --text-primary and its own chevron:  AssertionError: IndexingControls · Pause duration: expected 'auto' to be 'none' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-selects-lockdown.test.ts:196:37"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-selects-lockdown.test.ts#light: closed and open, every select uses --surface-1 / --text-primary and its own chevron",
+        "classification": "assertion",
+        "detail": "S10 every native select is drawn in the theme's colours light: closed and open, every select uses --surface-1 / --text-primary and its own chevron:  AssertionError: IndexingControls · Pause duration: expected 'auto' to be 'none' // Object.is equality\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-selects-lockdown.test.ts:196:37"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-selects-lockdown.test.ts#20 px, the ladder's heading step (--font-size-lg)",
+        "classification": "assertion",
+        "detail": "G2 the heading of System › Activity is on the size ladder 20 px, the ladder's heading step (--font-size-lg):  AssertionError: expected { words: 'Activity', size: '22.5px' } to deeply equal { words: 'Activity', size: '20px' }\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/fm-rest-a-selects-lockdown.test"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts#\"Check reading outcome\" reads the outcome again and says what it now is",
+        "classification": "assertion",
+        "detail": "L3 outcomes that are not in progress keep their messages \"Check reading outcome\" reads the outcome again and says what it now is:  AssertionError: expected [ Array(1) ] to deeply equal [ 'Everything has been read again.' ]\n    at /home/elias/dev/justsearch/.claude/worktrees/fm-rest/tmp/run/tmp/test-intent-before-52cNSy/modules/ui-web/src/shell-v0/views/library-first-minutes/reread-receipt.test.ts:195:22\n    at file:///home/elia"
+      }
+    ]
+  },
+  "digest": "sha256:224844ba7087a6430639831550c6fe19d6d8f259acf6537f0b26a3a8525404dd"
+}

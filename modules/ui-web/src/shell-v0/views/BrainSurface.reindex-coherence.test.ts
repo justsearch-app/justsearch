@@ -58,7 +58,7 @@ describe('BrainSurface compat callout — tempdoc 613 reindex coherence', () => 
   it('leads with Brain\'s read words for the reindex cause', () => {
     const text = calloutText(EMB_BLOCKED_LEGACY, ['index.embedding_legacy']);
     expect(text).toContain('Read everything again to restore full search.');
-    expect(text).not.toContain("Semantic search isn't available on this index yet — rebuild it to enable meaning-based results.");
+    expect(text).not.toContain("Search by meaning isn't available on this index yet — rebuild it to enable meaning-based results.");
   });
 
   it('drops the old hardcoded fork wording', () => {
@@ -112,7 +112,7 @@ describe('BrainSurface compat callout — schema arm speaks the REAL compat voca
   it('BLOCKED_LEGACY renders too, worded from its own code (index.blocked_legacy) in read words (Slice 7a X7)', () => {
     const text = calloutText(schemaOnly('BLOCKED_LEGACY'), ['index.blocked_legacy']);
     expect(text).toContain('Read everything again to restore full search.');
-    expect(text).not.toContain('The index was built before semantic search was available — rebuild it to enable meaning-based results.');
+    expect(text).not.toContain('The index was built before search by meaning was available — rebuild it to enable meaning-based results.');
     expect(rebuildRemedy(schemaOnly('BLOCKED_LEGACY'), ['index.blocked_legacy'])).not.toBeNull();
   });
 

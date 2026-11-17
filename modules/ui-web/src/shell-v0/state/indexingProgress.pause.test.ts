@@ -79,7 +79,7 @@ describe('WP3.7 status-owned pause projection', () => {
     const progress = select(snapshot);
     expect(progress.phase).toBe('paused');
     expect(progress.activity.detail).toContain('Paused by you');
-    expect(progress.activity.detail).toContain('Embedding cannot run right now');
+    expect(progress.activity.detail).toContain('Search by meaning cannot be prepared right now');
     expect(progress.enrichingEtaSeconds).toBeNull();
   });
 

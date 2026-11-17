@@ -125,13 +125,13 @@ describe('visibleIndexQueueCount', () => {
 describe('enrichingLabel (813 §4 — the narrowed F-2 suppression)', () => {
   it('backfill genuinely active ⇒ an "Enriching — N%" line, NOT the idle close', () => {
     expect(enrichingLabel(progress({ phase: 'enriching', enrichingPercent: 64 }))).toBe(
-      'Enriching — 64% · semantic search catching up',
+      'Enriching — 64% · search by meaning catching up',
     );
   });
 
   it('enriching without a faithful denominator ⇒ the phase, no fabricated number', () => {
     const label = enrichingLabel(progress({ phase: 'enriching', enrichingPercent: null }));
-    expect(label).toBe('Enriching — semantic search catching up');
+    expect(label).toBe('Enriching — search by meaning catching up');
     expect(label).not.toMatch(/\d/);
   });
 

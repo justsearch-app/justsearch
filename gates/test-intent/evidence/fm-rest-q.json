@@ -1,0 +1,360 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-17T12:07:25.158Z",
+  "revision": "b63294eff82721866fe2a66b3b8e5d90ccfc0277",
+  "tree": "073795f28d57ffea8e30f817d1a6ee15863a9a63",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" \"src/shell-v0/components/documentPane/DocumentPane.scanMarker.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/45zb86k3/tmp/test-intent-vitest-61602-1794917177290.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 9181
+    },
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/45zb86k3/tmp/test-intent-vitest-61602-1794917186471.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 24368
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#shows nothing for a cleared query, even when the earlier request answers late",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:199689018561e521b2c60fc002fdbbad0a923329f49cdb1f3e98a5b50b60f0c3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "S1.9 — an older query’s results are never shown as the current ones shows nothing for a cleared query, even when the earlier request answers late",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#after a search, the Clear button shows the idle screen and closes the pane",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:199689018561e521b2c60fc002fdbbad0a923329f49cdb1f3e98a5b50b60f0c3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fm-rest Q1-Q5 — emptying the search field returns Search to its idle screen after a search, the Clear button shows the idle screen and closes the pane",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#after a search, deleting the text shows the idle screen and closes the pane",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:199689018561e521b2c60fc002fdbbad0a923329f49cdb1f3e98a5b50b60f0c3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fm-rest Q1-Q5 — emptying the search field returns Search to its idle screen after a search, deleting the text shows the idle screen and closes the pane",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#a response to the earlier search that lands after the field was emptied brings nothing back",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:199689018561e521b2c60fc002fdbbad0a923329f49cdb1f3e98a5b50b60f0c3",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "fm-rest Q1-Q5 — emptying the search field returns Search to its idle screen a response to the earlier search that lands after the field was emptied brings nothing back",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.scanMarker.test.ts#PDF source lines: the marker lines are gone, every other line keeps its number",
+      "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.scanMarker.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3dd678670561ad4d668f6410bbd8ac5a02a48059bbd658e569ecdaf5a716d22c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Q6 the reading view leaves out lines that are only a scan page marker PDF source lines: the marker lines are gone, every other line keeps its number",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.scanMarker.test.ts#rendered Markdown: no marker text, the blocks keep their source lines, found words stay marked",
+      "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.scanMarker.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3dd678670561ad4d668f6410bbd8ac5a02a48059bbd658e569ecdaf5a716d22c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Q6 the reading view leaves out lines that are only a scan page marker rendered Markdown: no marker text, the blocks keep their source lines, found words stay marked",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.scanMarker.test.ts#a line with more than the marker stays as it is",
+      "file": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.scanMarker.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:3dd678670561ad4d668f6410bbd8ac5a02a48059bbd658e569ecdaf5a716d22c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Q6 the reading view leaves out lines that are only a scan page marker a line with more than the marker stays as it is",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#after a search with the pane open, emptying it by Clear shows the idle screen (dark)",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e7034c8fb890810a085e54756e85bdc67ad7cb476d9d6e97bc8a304a17560e51",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Q1 an emptied search field is the idle screen after a search with the pane open, emptying it by Clear shows the idle screen (dark)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#after a search with the pane open, emptying it by keyboard shows the idle screen (dark)",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e7034c8fb890810a085e54756e85bdc67ad7cb476d9d6e97bc8a304a17560e51",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Q1 an emptied search field is the idle screen after a search with the pane open, emptying it by keyboard shows the idle screen (dark)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#after a search with the pane open, emptying it by Clear shows the idle screen (light)",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e7034c8fb890810a085e54756e85bdc67ad7cb476d9d6e97bc8a304a17560e51",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Q1 an emptied search field is the idle screen after a search with the pane open, emptying it by Clear shows the idle screen (light)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#after a search with the pane open, emptying it by keyboard shows the idle screen (light)",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e7034c8fb890810a085e54756e85bdc67ad7cb476d9d6e97bc8a304a17560e51",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Q1 an emptied search field is the idle screen after a search with the pane open, emptying it by keyboard shows the idle screen (light)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#at 600 px wide with 200 % text the idle screen is the same, its parts on screen",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e7034c8fb890810a085e54756e85bdc67ad7cb476d9d6e97bc8a304a17560e51",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Q1 an emptied search field is the idle screen at 600 px wide with 200 % text the idle screen is the same, its parts on screen",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#the field is emptied while the search is out; its answer lands on the idle screen",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e7034c8fb890810a085e54756e85bdc67ad7cb476d9d6e97bc8a304a17560e51",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Q2 a late answer to the earlier search does not bring results back the field is emptied while the search is out; its answer lands on the idle screen",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#no \"--- OCR page N ---\" line; the text and found words stay (dark)",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e7034c8fb890810a085e54756e85bdc67ad7cb476d9d6e97bc8a304a17560e51",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Q6 the pane on a scanned file shows its text without page markers no \"--- OCR page N ---\" line; the text and found words stay (dark)",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#no \"--- OCR page N ---\" line; the text and found words stay (light)",
+      "file": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:e7034c8fb890810a085e54756e85bdc67ad7cb476d9d6e97bc8a304a17560e51",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "Q6 the pane on a scanned file shows its text without page markers no \"--- OCR page N ---\" line; the text and found words stay (light)",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "b63294eff8",
+    "revision": "b63294eff82721866fe2a66b3b8e5d90ccfc0277",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" \"src/shell-v0/components/documentPane/DocumentPane.scanMarker.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/45zb86k3/tmp/test-intent-vitest-61602-1794917212638.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 8179,
+        "output": "JSON report written to /home/elias/.cache/am/45zb86k3/tmp/test-intent-vitest-61602-1794917212638.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/45zb86k3/tmp/test-intent-vitest-61602-1794917220818.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 24063,
+        "output": "JSON report written to /home/elias/.cache/am/45zb86k3/tmp/test-intent-vitest-61602-1794917220818.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#shows nothing for a cleared query, even when the earlier request answers late",
+        "classification": "assertion",
+        "detail": "S1.9 — an older query’s results are never shown as the current ones shows nothing for a cleared query, even when the earlier request answers late:  AssertionError: expected [ 'alpha.md' ] to deeply equal []\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1034:33\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-rest-q/modules/ui-web/node_"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#after a search, the Clear button shows the idle screen and closes the pane",
+        "classification": "assertion",
+        "detail": "fm-rest Q1-Q5 — emptying the search field returns Search to its idle screen after a search, the Clear button shows the idle screen and closes the pane:  AssertionError: expected { state: 'docked', …(5) } to deeply equal { state: 'hero', headline: true, …(4) }\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1839:34\n    at file:///home/elias/dev/justsearch/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#after a search, deleting the text shows the idle screen and closes the pane",
+        "classification": "assertion",
+        "detail": "fm-rest Q1-Q5 — emptying the search field returns Search to its idle screen after a search, deleting the text shows the idle screen and closes the pane:  AssertionError: expected { state: 'docked', …(5) } to deeply equal { state: 'hero', headline: true, …(4) }\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1839:34\n    at file:///home/elias/dev/justsearch/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#a response to the earlier search that lands after the field was emptied brings nothing back",
+        "classification": "assertion",
+        "detail": "fm-rest Q1-Q5 — emptying the search field returns Search to its idle screen a response to the earlier search that lands after the field was emptied brings nothing back:  AssertionError: expected { state: 'docked', …(5) } to deeply equal { state: 'hero', headline: true, …(4) }\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts:1854:34\n    at file:///home/elias/dev/justsearch/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.scanMarker.test.ts#PDF source lines: the marker lines are gone, every other line keeps its number",
+        "classification": "assertion",
+        "detail": "Q6 the reading view leaves out lines that are only a scan page marker PDF source lines: the marker lines are gone, every other line keeps its number:  AssertionError: expected [ [ '0', 'scanned-delivery' ], …(6) ] to deeply equal [ [ '0', 'scanned-delivery' ], …(4) ]\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.scanMarker.test.ts:68:23\n    at file:///home/elias"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.scanMarker.test.ts#rendered Markdown: no marker text, the blocks keep their source lines, found words stay marked",
+        "classification": "assertion",
+        "detail": "Q6 the reading view leaves out lines that are only a scan page marker rendered Markdown: no marker text, the blocks keep their source lines, found words stay marked:  AssertionError: expected '\\n        \\n      \\n        \\n       …' not to match /^\\s*--- OCR page \\d+ ---\\s*$/m\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.scanMarker.test.ts:88:32\n    at file:///home/elias/dev/j"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.scanMarker.test.ts#a line with more than the marker stays as it is",
+        "classification": "assertion",
+        "detail": "Q6 the reading view leaves out lines that are only a scan page marker a line with more than the marker stays as it is:  AssertionError: expected [ [ '0', 'Intro' ], …(3) ] to deeply equal [ [ '0', 'Intro' ], …(2) ]\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.scanMarker.test.ts:103:23\n    at file:///home/elias/dev/justsearch/.clau"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#after a search with the pane open, emptying it by Clear shows the idle screen (dark)",
+        "classification": "assertion",
+        "detail": "Q1 an emptied search field is the idle screen after a search with the pane open, emptying it by Clear shows the idle screen (dark):  AssertionError: expected { headline: [], value: '', …(7) } to deeply equal { headline: [ true ], value: '', …(7) }\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts:202:33\n    at file:///home/elias/dev/ju"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#after a search with the pane open, emptying it by keyboard shows the idle screen (dark)",
+        "classification": "assertion",
+        "detail": "Q1 an emptied search field is the idle screen after a search with the pane open, emptying it by keyboard shows the idle screen (dark):  AssertionError: expected { headline: [], value: '', …(7) } to deeply equal { headline: [ true ], value: '', …(7) }\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts:202:33\n    at file:///home/elias/dev/ju"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#after a search with the pane open, emptying it by Clear shows the idle screen (light)",
+        "classification": "assertion",
+        "detail": "Q1 an emptied search field is the idle screen after a search with the pane open, emptying it by Clear shows the idle screen (light):  AssertionError: expected { headline: [], value: '', …(7) } to deeply equal { headline: [ true ], value: '', …(7) }\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts:202:33\n    at file:///home/elias/dev/ju"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#after a search with the pane open, emptying it by keyboard shows the idle screen (light)",
+        "classification": "assertion",
+        "detail": "Q1 an emptied search field is the idle screen after a search with the pane open, emptying it by keyboard shows the idle screen (light):  AssertionError: expected { headline: [], value: '', …(7) } to deeply equal { headline: [ true ], value: '', …(7) }\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts:202:33\n    at file:///home/elias/dev/ju"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#at 600 px wide with 200 % text the idle screen is the same, its parts on screen",
+        "classification": "assertion",
+        "detail": "Q1 an emptied search field is the idle screen at 600 px wide with 200 % text the idle screen is the same, its parts on screen:  AssertionError: expected { headline: [], value: '', …(7) } to deeply equal { headline: [ true ], value: '', …(7) }\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts:212:31\n    at file:///home/elias/dev/ju"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#the field is emptied while the search is out; its answer lands on the idle screen",
+        "classification": "assertion",
+        "detail": "Q2 a late answer to the earlier search does not bring results back the field is emptied while the search is out; its answer lands on the idle screen:  AssertionError: expected { headline: [], value: '', …(7) } to deeply equal { headline: [ true ], value: '', …(7) }\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts:232:31\n    at file:///home/elias/dev/ju"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#no \"--- OCR page N ---\" line; the text and found words stay (dark)",
+        "classification": "assertion",
+        "detail": "Q6 the pane on a scanned file shows its text without page markers no \"--- OCR page N ---\" line; the text and found words stay (dark):  AssertionError: expected [ [ '0', 'scanned-delivery' ], …(6) ] to deeply equal [ [ '0', 'scanned-delivery' ], …(4) ]\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts:257:19\n    at file:///home/elias/dev/"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts#no \"--- OCR page N ---\" line; the text and found words stay (light)",
+        "classification": "assertion",
+        "detail": "Q6 the pane on a scanned file shows its text without page markers no \"--- OCR page N ---\" line; the text and found words stay (light):  AssertionError: expected [ [ '0', 'scanned-delivery' ], …(6) ] to deeply equal [ [ '0', 'scanned-delivery' ], …(4) ]\n    at /home/elias/.cache/am/45zb86k3/tmp/test-intent-before-mNA8eW/modules/ui-web/src/shell-v0/chrome/FirstMinutes.clearedField-lockdown.test.ts:257:19\n    at file:///home/elias/dev/"
+      }
+    ]
+  },
+  "digest": "sha256:893eaa9398964b0e716633b7835629df0f1910c940011fc45e5798f33915b462"
+}

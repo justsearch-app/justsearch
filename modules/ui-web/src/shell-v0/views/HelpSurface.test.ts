@@ -190,7 +190,7 @@ describe('HelpSurface — keyboard shortcuts (tempdoc 586 P-3)', () => {
     expect(text).not.toContain('Restart worker');
     expect(text).not.toContain('Library (Detailed)');
     expect(text).toContain('Recover component');
-    expect(text).toContain('Rebuild search index');
+    expect(text).toContain('Rebuild all search data');
   });
 
   it('FAQ no longer teaches the retired `??` prefix', async () => {

@@ -222,7 +222,7 @@ export class SystemSelfView extends JfElement {
         ? activity.summary
         : progress.phase === 'unknown'
         ? 'Reading'
-        : `Indexing — ${progress.jobsRunning} running · ${progress.jobsQueued} queued`;
+        : `Reading — ${progress.jobsRunning} running · ${progress.jobsQueued} queued`;
     const enriching = explainActivity ? null : enrichingLabel(progress);
     const indexQueueCount = visibleIndexQueueCount(progress);
     const indexQueueBusy = !explainActivity && indexQueueCount !== null && tasks.length === 0;
@@ -291,7 +291,7 @@ export class SystemSelfView extends JfElement {
           : nothing}
         ${indexQueueBusy
           ? html`
-              <div class="section-label">Indexing</div>
+              <div class="section-label">Reading</div>
               <div class="row" data-testid="self-view-index-queue">
                 <span class="label">Processing ${indexQueueCount.toLocaleString()} items</span>
                 <span class="badge badge-running">running</span>

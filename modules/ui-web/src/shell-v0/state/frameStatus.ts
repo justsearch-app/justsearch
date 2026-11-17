@@ -333,11 +333,14 @@ const ADD_FOLDER = 'core.add-watched-root';
  * settings.apply-public is projected as core.apply-settings (OperationHistoryProjection).
  */
 const SETTINGS_SAVES = ['core.reconfigure', 'core.apply-settings'] as const;
+/** Library's reading rules and reading hours, saved as they change (fm-07). */
+const READING_RULES_SAVE = 'core.set-indexing-rules';
 /**
- * Successes the default panel leaves out: a folder's add receipt (its folder row says it) and a
- * settings save (PH3, fm-15: the setting itself shows the change). Their failures stay rows.
+ * Successes the default panel leaves out: a folder's add receipt (its folder row says it), a settings
+ * save (PH3, fm-15: the setting itself shows the change) and a save of reading rules or hours (Library
+ * shows the rules). Matched by operation id, never by label. Their failures stay rows.
  */
-const QUIET_SUCCESSES: ReadonlySet<string> = new Set([ADD_FOLDER, ...SETTINGS_SAVES]);
+const QUIET_SUCCESSES: ReadonlySet<string> = new Set([ADD_FOLDER, ...SETTINGS_SAVES, READING_RULES_SAVE]);
 /** "just now", "12 min", "3 h" (fm-15's age beside an Earlier row). */
 function ageWords(ms: number): string {
   const minutes = Math.floor(Math.max(0, ms) / 60_000);
@@ -525,6 +528,10 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   const provisional = stability?.kind === 'provisional';
   const rebuilding = stability?.kind === 'provisional' && ['rebuilding', 'generation-switch'].includes(stability.cause);
   const listed = new Set<string>();
+  // fm-15 — a folder's ordinary work on a live observation, which the one reading entry speaks for.
+  const ordinaryWork = new Set<string>();
+  // S9 — a folder that merely waits (paused reading, or a retry), which a hold entry speaks for.
+  const waitingWork = new Set<string>();
   for (const root of input.roots ?? []) {
     // R4 — a folder is named by its folder name, with the full path as detail; the collection
     // ("default") is not a folder name. Until the path is resolved the row says what it is.
@@ -557,6 +564,8 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     // ST5/B1 — the same folder conditions the Library headline counts (one source, folderStatus.ts).
     for (const item of folderAttention(root, state, name)) add({ id: item.kind === 'missing' ? `folder:${root.pathHash}` : item.kind === 'files' ? `files:${root.pathHash}` : `folder-${item.key}`, section: 'problems',
       title: item.title, detail: [item.detail, path].filter(Boolean).join(' · '), stale: !input.rootsLive || (item.kind === 'files' && state.failedIsLastKnown === true), actions });
+    if (input.rootsLive && ['scanning', 'indexing', 'enriching'].includes(state.state)) ordinaryWork.add(`folder-work:${root.pathHash}`);
+    if (input.rootsLive && state.state === 'waiting') waitingWork.add(`folder-work:${root.pathHash}`);
     if (['scanning', 'indexing', 'enriching', 'waiting'].includes(state.state)) add({
       id: `folder-work:${root.pathHash}`, section: 'running', title: `${name}: ${state.metaText.replace(`${root.collection ?? 'default'} · `, '')}`, ...(path ? { detail: path } : {}),
       stale: !input.rootsLive, percent: state.state === 'enriching' ? rootCoverage(root, progress.stages)?.percent ?? null : null, actions });
@@ -632,32 +641,49 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   if (progress.pause) add({ id: 'indexing-hold', section: 'needs', indexing: true,
     title: progress.activity.summary, detail: progress.activity.detail ?? progress.pause.reason,
     stale: !progress.activity.confirmed });
-  else if (progress.phase !== 'ready' && progress.phase !== 'unknown' && !waitsForOptionalAi && !(semanticWaitsForAi && aiInstallNeedsYou)) add({ id: 'indexing',
-    section: progress.phase === 'error' ? 'problems' : progress.phase === 'blocked' ? 'needs' : 'running', indexing: true,
-    title: progress.activity.summary,
-    detail: progress.activity.confirmed ? [progress.phase === 'indexing' ? indexingCountsLine(progress)
+  else if (progress.phase !== 'ready' && progress.phase !== 'unknown' && !waitsForOptionalAi && !(semanticWaitsForAi && aiInstallNeedsYou)) {
+    const section = progress.phase === 'error' ? 'problems' : progress.phase === 'blocked' ? 'needs' : 'running';
+    const detail = progress.activity.confirmed ? [progress.phase === 'indexing' ? indexingCountsLine(progress)
       : progress.phase === 'enriching' ? progress.activity.enrichmentDeferred
         ? `${progress.enrichingPercent == null ? '' : `${progress.enrichingPercent}% · `}${progress.enrichingPending} enrichment steps waiting`
-        : enrichingCountsLine(progress) : '', progress.activity.detail].filter(Boolean).join(' · ') : progress.activity.detail ?? undefined,
-    progressLabel: (progress.phase === 'indexing' ? indexingCountsLabel(progress) : enrichingCountsLabel(progress)) ?? undefined,
-    indeterminate: progress.activity.confirmed && progress.phase === 'indexing' && progress.indexingPercent == null,
-    details: [
-      ...(progress.jobsQueued > 0 ? [{ id: 'queued', section: 'running' as const,
-        title: `${formatCount(progress.jobsQueued)} files queued`, stale: !progress.activity.confirmed }] : []),
-      ...((ai?.status?.worker?.failure?.failedJobs ?? 0) > 0 ? [{ id: 'failed-files', section: 'problems' as const,
-        title: `${formatCount(ai!.status!.worker!.failure!.failedJobs!)} failed`, stale: !progress.activity.confirmed }] : []),
-      ...progress.enrichingStages.map(stage => ({ id: `stage:${stage.id}`, section: 'running' as const,
-        stale: !progress.activity.confirmed,
-        title: ({ embedding: 'Semantic vectors', splade: 'Keyword expansion', ner: 'Entity recognition', chunkVectors: 'Passage vectors', chunkSplade: 'Keyword expansion' })[stage.id],
-        detail: `${stage.total - stage.pending} / ${stage.total}${stage.failed ? ` · ${stage.failed} failed` : ''}${stage.missing ? ` · ${stage.missing} missing` : ''}${stage.pending === 0 && !stage.failed && !stage.missing ? ' ✓' : ''}` })),
-      ...(progress.vduPending > 0 ? [{ id: 'extraction', section: 'running' as const, stale: !progress.activity.confirmed, title: `Content extraction — ${progress.vduPending} remaining` }] : []),
-      ...fileRows,
-    ],
-    stale: !progress.activity.confirmed,
-    actions: [go('Open AI Brain', 'core.brain-surface')],
-    percent: !progress.activity.confirmed || progress.activity.enrichmentDeferred ? null : progress.phase === 'indexing' ? progress.indexingPercent
-      : progress.phase === 'enriching' ? progress.enrichingPercent : null });
-  if (fileRows.length && !Object.values(sections).flat().some(row => row.id === 'indexing')) add({ id: FILE_ACTIVITY_ID,
+        : enrichingCountsLine(progress) : '', progress.activity.detail].filter(Boolean).join(' · ') : progress.activity.detail ?? undefined;
+    // fm-15 — the reading entry in Running has one action, Pause reading (its controls); AI Brain's way
+    // in stays where the entry's own words say AI is needed or missing, and with developer tools.
+    const offersBrain = developer || section !== 'running' || /\bAI\b/.test(`${progress.activity.summary} ${detail ?? ''}`);
+    add({ id: 'indexing', section, indexing: true,
+      title: progress.activity.summary,
+      detail,
+      progressLabel: (progress.phase === 'indexing' ? indexingCountsLabel(progress) : enrichingCountsLabel(progress)) ?? undefined,
+      indeterminate: progress.activity.confirmed && progress.phase === 'indexing' && progress.indexingPercent == null,
+      details: [
+        ...(progress.jobsQueued > 0 ? [{ id: 'queued', section: 'running' as const,
+          title: `${formatCount(progress.jobsQueued)} files queued`, stale: !progress.activity.confirmed }] : []),
+        ...((ai?.status?.worker?.failure?.failedJobs ?? 0) > 0 ? [{ id: 'failed-files', section: 'problems' as const,
+          title: `${formatCount(ai!.status!.worker!.failure!.failedJobs!)} failed`, stale: !progress.activity.confirmed }] : []),
+        ...progress.enrichingStages.map(stage => ({ id: `stage:${stage.id}`, section: 'running' as const,
+          stale: !progress.activity.confirmed,
+          title: ({ embedding: 'Semantic vectors', splade: 'Keyword expansion', ner: 'Entity recognition', chunkVectors: 'Passage vectors', chunkSplade: 'Keyword expansion' })[stage.id],
+          detail: `${stage.total - stage.pending} / ${stage.total}${stage.failed ? ` · ${stage.failed} failed` : ''}${stage.missing ? ` · ${stage.missing} missing` : ''}${stage.pending === 0 && !stage.failed && !stage.missing ? ' ✓' : ''}` })),
+        ...(progress.vduPending > 0 ? [{ id: 'extraction', section: 'running' as const, stale: !progress.activity.confirmed, title: `Content extraction — ${progress.vduPending} remaining` }] : []),
+        ...fileRows,
+      ],
+      stale: !progress.activity.confirmed,
+      actions: offersBrain ? [go('Open AI Brain', 'core.brain-surface')] : [],
+      percent: !progress.activity.confirmed || progress.activity.enrichmentDeferred ? null : progress.phase === 'indexing' ? progress.indexingPercent
+        : progress.phase === 'enriching' ? progress.enrichingPercent : null });
+  }
+  // fm-15 — one entry for reading: while it runs, a folder's ordinary scanning, reading or enriching is
+  // not an entry of its own (developer tools show them). A folder that needs the person, waits, or whose
+  // observation is uncertain keeps its entry.
+  if (!developer && sections.running.some(row => row.id === 'indexing')) {
+    sections.running = sections.running.filter(row => !ordinaryWork.has(row.id));
+  }
+  // S9 — paused or held, the hold entry speaks for reading as the reading entry does while it runs: no
+  // entry per folder that merely waits or does ordinary work, and no "Recent file activity" (developer
+  // tools show them). A folder that needs the person keeps its entry; file failures keep theirs.
+  const held = !developer && sections.needs.some(row => row.id === 'indexing-hold');
+  if (held) sections.running = sections.running.filter(row => !ordinaryWork.has(row.id) && !waitingWork.has(row.id));
+  if (fileRows.length && !held && !Object.values(sections).flat().some(row => row.id === 'indexing')) add({ id: FILE_ACTIVITY_ID,
     section: 'running', title: 'Recent file activity', stale: true, details: fileRows,
     actions: [go('Open AI Brain', 'core.brain-surface')] });
   const limited = ai?.verdict.reasons.some(code => isSearchUnavailableCause(code) || isReindexCause(code)) ?? false;
@@ -783,7 +809,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   else if (!stale && searchServesFully && progress.phase === 'ready') pill = { kind: 'calm', label: 'Up to date', stale: false };
   // Not "Up to date": that is a coverage claim, and semantic coverage is what is missing.
   else if (!stale && unrequestedAi && (searchServesFully || awaitsUnrequestedAi(ai!.verdict, engine) || installDismissed && gapOnlyAiProvides(ai!.verdict))
-    && (progress.phase === 'ready' || waitsForOptionalAi)) pill = { kind: 'calm', label: 'Keyword search ready', stale: false };
+    && (progress.phase === 'ready' || waitsForOptionalAi)) pill = { kind: 'calm', label: 'Word search ready', stale: false };
   else pill = { kind: 'unknown', label: CHECKING, stale: true };
   if (pill.stale) {
     const age = ai?.connection.lastSuccessMs == null ? null : Math.max(0, Math.floor((now - ai.connection.lastSuccessMs) / 60_000));

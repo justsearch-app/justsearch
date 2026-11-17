@@ -109,7 +109,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   },
   {
     code: 'encoders.health.embedding_not_ready',
-    wording: 'The semantic embedding index is not ready',
+    wording: 'Search by meaning is not ready',
     remedy: { kind: 'operation', operationId: 'core.trigger-offline-processing' },
   },
   {
@@ -124,12 +124,12 @@ const CAUSE_ROWS: ReadonlyArray<{
   },
   {
     code: 'chunk_embedding.not_ready',
-    wording: 'Passage embeddings are not ready',
+    wording: 'Passage-level search by meaning is not ready',
     remedy: { kind: 'operation', operationId: 'core.trigger-offline-processing' },
   },
   {
     code: 'chunk_embedding.in_progress',
-    wording: 'Passage embeddings are still being computed',
+    wording: 'Passage-level search by meaning is still being prepared',
     // In-progress: nothing to trigger — watching it in Health is the action.
     severity: 'info',
   },
@@ -141,7 +141,7 @@ const CAUSE_ROWS: ReadonlyArray<{
     // Spec D §6.3 — a GPU encoder run has been stuck long enough that searches skip their semantic
     // legs (each search reports cause `stuck`); the standing state, shown after breakerStandingMs.
     code: 'encoders.health.semantic_stuck',
-    wording: 'The semantic search encoder is stalled',
+    wording: 'Search by meaning is stalled',
   },
   {
     // Searches the GPU turned away (no seat in time, or its breaker open) had their query encoded on
@@ -195,7 +195,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   // state this replaces.
   {
     code: 'inference.gpu_yielded_to_indexing',
-    wording: 'The GPU is indexing your files — chat resumes when it finishes',
+    wording: 'The GPU is reading your files — chat resumes when it finishes',
     severity: 'info',
   },
   // Tempdoc 837 S4 — a correctness fix, not an enrichment: the engine is UP (a background procedure
@@ -283,7 +283,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   },
   {
     code: 'ocr.disabled',
-    wording: 'OCR is disabled, so scanned text cannot be indexed yet',
+    wording: 'OCR is disabled, so scanned text cannot be read yet',
     severity: 'warn',
   },
   {
@@ -331,12 +331,12 @@ const CAUSE_ROWS: ReadonlyArray<{
   },
   {
     code: 'indexing.pausing_schedule',
-    wording: 'Pausing — finishing current files. Outside indexing hours.',
+    wording: 'Pausing — finishing current files. Outside reading hours.',
     severity: 'info',
   },
   {
     code: 'indexing.paused_schedule',
-    wording: 'Outside indexing hours.',
+    wording: 'Outside reading hours.',
     severity: 'info',
   },
   {
@@ -351,13 +351,13 @@ const CAUSE_ROWS: ReadonlyArray<{
   },
   {
     code: 'indexing.pausing_settings_recovery_check_exclusions',
-    wording: 'Pausing — finishing current files. Settings recovery — saved settings were damaged and replaced by defaults. Indexing stays held until the reset is confirmed in Settings. Check exclusions.',
+    wording: 'Pausing — finishing current files. Settings recovery — saved settings were damaged and replaced by defaults. Reading stays held until the reset is confirmed in Settings. Check exclusions.',
     severity: 'info',
   },
-  { code: 'index.throughput_stalled', wording: 'Indexing throughput has stalled' },
+  { code: 'index.throughput_stalled', wording: 'Reading has stalled' },
   {
     code: 'index.throughput_degraded',
-    wording: 'Indexing throughput is degraded',
+    wording: 'Reading is slower than usual',
     severity: 'info',
   },
   {
@@ -410,7 +410,7 @@ const CAUSE_ROWS: ReadonlyArray<{
     severity: 'info',
   },
   { code: 'engine.escalated_restart', wording: 'JustSearch is restarting after a serious failure', severity: 'error' },
-  { code: 'encoders.reloading', wording: 'Semantic search models are reloading', severity: 'info' },
+  { code: 'encoders.reloading', wording: 'Search by meaning models are reloading', severity: 'info' },
   { code: 'index.model_not_installed', wording: 'A model selected by the index is missing or has changed', severity: 'warn' },
   { code: 'migration.awaiting_gap_acceptance', wording: 'An index migration is waiting for an operator to review data gaps', severity: 'warn' },
   // Tempdoc 600 PART X — the GPU-saturation readiness code (aiFeatures composite). When retrieval is
@@ -448,7 +448,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   // with the banner. The remedy is to add a folder, which lives on the Library surface.
   {
     code: 'no_documents',
-    wording: 'No documents indexed yet',
+    wording: 'No files read yet',
     remedy: { kind: 'navigate', target: 'core.library-surface', label: 'Add documents' },
     severity: 'info',
   },
@@ -488,14 +488,14 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'index.blocked_legacy',
     wording:
-      'The index was built before semantic search was available — rebuild it to enable meaning-based results.',
+      'The index was built before search by meaning was available — rebuild it to enable meaning-based results.',
     remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
     severity: 'warn',
   },
   {
     code: 'index.embedding_legacy',
     wording:
-      "Semantic search isn't available on this index yet — rebuild it to enable meaning-based results.",
+      "Search by meaning isn't available on this index yet — rebuild it to enable meaning-based results.",
     remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
     severity: 'warn',
   },
@@ -535,7 +535,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'index.rebuild_brake_exhausted',
     wording:
-      'The index could not be rebuilt after repeated attempts — search still works on what is already indexed, but new files are not being added. Rebuild the index to try again.',
+      'The index could not be rebuilt after repeated attempts — search still works on what is already read, but new files are not being added. Rebuild the index to try again.',
     remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
     severity: 'warn',
   },
@@ -545,7 +545,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'index.rebuild_brake_unreadable',
     wording:
-      'The index needs rebuilding, but its rebuild record could not be read, so it is not being rebuilt automatically — search still works on what is already indexed, but new files are not being added. Rebuild the index to continue.',
+      'The index needs rebuilding, but its rebuild record could not be read, so it is not being rebuilt automatically — search still works on what is already read, but new files are not being added. Rebuild the index to continue.',
     remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
     severity: 'warn',
   },
@@ -562,12 +562,12 @@ const CAUSE_ROWS: ReadonlyArray<{
   {
     code: 'index.embedding_rebuilding',
     wording:
-      'Semantic search is being rebuilt — keyword results are complete, semantic ranking resumes when it finishes.',
+      'Search by meaning is being rebuilt — word results are complete, ranking by meaning resumes when it finishes.',
     severity: 'warn',
   },
   {
     code: 'index.embedding_mismatch',
-    wording: 'The embedding model changed — rebuild the index to restore semantic search.',
+    wording: 'The embedding model changed — rebuild the index to restore search by meaning.',
     remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
     severity: 'warn',
   },
@@ -581,7 +581,7 @@ const CAUSE_ROWS: ReadonlyArray<{
   // vocabulary entry the produce-side (StatusLifecycleHandler.denseUnavailableReason) requires.
   {
     code: 'index.dense_unavailable',
-    wording: 'Semantic search is unavailable right now — showing keyword results.',
+    wording: 'Search by meaning is unavailable right now — showing word results.',
     severity: 'warn',
   },
 ];
@@ -815,7 +815,7 @@ export function classifyConsequence(codes: readonly string[]): ConsequenceClass 
  * `consequence-classification` gate enforces exactly that (no re-authored claim literal).
  */
 export const KEYWORD_FALLBACK_CAVEAT =
-  'Showing keyword-ranked results — semantic ranking is degraded';
+  'Showing word search results — ranking by meaning is degraded';
 
 /** A fail-closed schema refusal has no serving index, including no keyword leg. */
 export const SEARCH_UNAVAILABLE_CAVEAT =
@@ -827,11 +827,11 @@ export const MODEL_UNAVAILABLE_CAVEAT =
 
 /** Failed or missing enrichment leaves some documents without semantic matches. */
 export const ENRICHMENT_INCOMPLETE_CAVEAT =
-  "Results may miss some documents' semantic matches; keyword search covers them";
+  "Results may miss some documents' matches by meaning; word search covers them";
 
 /** 805 §G.2 — the passage-leg-only caveat: document-level semantic ranking still serves. */
 export const PASSAGE_REDUCED_CAVEAT =
-  'Passage-level precision is reduced — results are still ranked semantically';
+  'Passage-level precision is reduced — results are still ranked by meaning';
 
 /**
  * 805 §G.2 — the calm caveat: nothing about retrieval itself is reduced.
@@ -953,8 +953,8 @@ export function readinessNotice(
     : verdict.reasons.includes('index.embedding_rebuilding') ? 'index.embedding_rebuilding' : null;
   if (isMigrationPresentation && verdict.kind === 'transitioning' && semanticPauseReason !== null) {
     return {
-      headline: 'Semantic search paused; keyword search available.',
-      body: 'Keyword search remains available while the index is rebuilt; semantic ranking resumes afterward.',
+      headline: 'Search by meaning paused; word search available.',
+      body: 'Word search remains available while the index is rebuilt; ranking by meaning resumes afterward.',
       causes: wordCauses([semanticPauseReason], activity),
       remedy: OPEN_HEALTH,
     };
@@ -973,7 +973,7 @@ export function readinessNotice(
   if (reindexCauses.length > 0) {
     return {
       headline: 'Reindex required.',
-      body: 'Semantic search is degraded until the index is rebuilt — results may be keyword-only.',
+      body: 'Search by meaning is degraded until the index is rebuilt — results may be word search only.',
       causes: wordCauses(reindexCauses, activity),
       remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
     };
@@ -986,7 +986,7 @@ export function readinessNotice(
     if (codes.includes(INDEX_SCHEMA_MISMATCH)) {
       return {
         headline: 'Index format is out of date.',
-        body: 'Search is fully working — both semantic and keyword retrieval are active. Rebuilding will pick up newer index features.',
+        body: 'Search is fully working — both search by meaning and word search are active. Rebuilding will pick up newer index features.',
         causes: wordCauses(codes.filter((c) => c !== INDEX_SCHEMA_MISMATCH), activity),
         remedy: { kind: 'operation', operationId: 'core.rebuild-index' },
       };
@@ -1039,8 +1039,8 @@ export function readinessNotice(
   if (consequence === 'passage-reduced') {
     const passageCauses = codes.filter(isPassageReduced);
     return {
-      headline: 'Semantic search partially degraded.',
-      body: 'Passage-level precision is reduced while passage embeddings are missing — results are still ranked semantically.',
+      headline: 'Search by meaning partially degraded.',
+      body: 'Passage-level precision is reduced while passage data for search by meaning is missing — results are still ranked by meaning.',
       causes: wordCauses(passageCauses, activity),
       remedy: pickRemedy(passageCauses),
     };
@@ -1049,7 +1049,7 @@ export function readinessNotice(
     const aiCauses = codes.filter((c) => AI_MODEL_UNAVAILABLE_CODES.has(c));
     return {
       headline: 'AI features unavailable.',
-      body: 'Search is fully working — both semantic and keyword retrieval are active. Chat and answer features are unavailable until the AI model is online.',
+      body: 'Search is fully working — both search by meaning and word search are active. Chat and answer features are unavailable until the AI model is online.',
       causes: wordCauses(aiCauses, activity),
       remedy: pickRemedy(aiCauses),
     };
@@ -1064,8 +1064,8 @@ export function readinessNotice(
   );
   const listed = impairingCauses.length > 0 ? impairingCauses : codes;
   return {
-    headline: 'Semantic search degraded.',
-    body: 'Showing keyword results; relevance ranking may be reduced.',
+    headline: 'Search by meaning degraded.',
+    body: 'Showing word results; relevance ranking may be reduced.',
     causes: wordCauses(listed, activity),
     remedy: pickRemedy(listed),
   };

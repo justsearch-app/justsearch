@@ -51,10 +51,10 @@ const ctx = (
 const ALL_STAGES = { embedding: true, splade: true, ner: true };
 
 /** The shared caveat wording, authored once in `enrichmentCoverage.ts` (809 finding 2). */
-const CAVEAT = 'keyword search ready · semantic search still catching up';
+const CAVEAT = 'word search ready · search by meaning still catching up';
 
 /** Its round-15 F1b twin: the semantic stage cannot run at all. */
-const BLOCKED_CAVEAT = 'keyword search ready · semantic search waiting for AI install';
+const BLOCKED_CAVEAT = 'word search ready · search by meaning waiting for AI install';
 
 /**
  * The applicability the round captured: no embedding service ⟹ every stage inapplicable. Note that
@@ -501,9 +501,9 @@ describe('folderStatus — index-wide enrichment fallback (809 finding 1)', () =
     const fs = folderStatus(row(), ctx({ relativeTime: '2 minutes ago', enrichmentPending: true }));
     // It still reports the true half (the folder IS indexed and keyword-searchable) …
     expect(fs.metaText).toContain('read 2 minutes ago');
-    expect(fs.metaText).toContain('keyword search ready');
+    expect(fs.metaText).toContain('word search ready');
     // … and does not claim the half that is not true yet.
-    expect(fs.metaText).toContain('semantic search still catching up');
+    expect(fs.metaText).toContain('search by meaning still catching up');
     expect(fs.metaText).toBe(`default · 10 files · read 2 minutes ago · ${CAVEAT}`);
   });
 
@@ -566,9 +566,9 @@ describe('terminal enrichment failure', () => {
 
 it('uses producer unavailability for an unfinished folder while completed folders stay complete', () => {
   const context = ctx({ enrichmentStages: ALL_STAGES, enrichmentBlocked: true,
-    enrichmentBlockedDetail: 'Embedding cannot run right now. Keyword search remains available.' });
+    enrichmentBlockedDetail: 'Search by meaning cannot be prepared right now. Word search remains available.' });
   const unfinished = folderStatus(row({ parentDocsTotalEmbedding: 2, parentDocsSettledEmbedding: 1 }), context);
-  expect(unfinished.metaText).toContain('Embedding cannot run right now');
+  expect(unfinished.metaText).toContain('Search by meaning cannot be prepared right now');
   expect(unfinished.metaText).not.toContain('still catching up');
   const completed = folderStatus(row({ parentDocsTotalEmbedding: 1, parentDocsSettledEmbedding: 1 }), context);
   expect(completed.metaText).toContain('fully searchable');

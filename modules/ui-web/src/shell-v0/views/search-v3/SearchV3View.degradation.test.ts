@@ -82,7 +82,7 @@ describe('the window says when capability is reduced, and says nothing when it i
       reasons: ['rebuilding', 'source:embedding_model_change', 'index.embedding_rebuilding'],
     };
     const projection = projectSv3Degradation(snapshotFor(paused));
-    expect(projection?.headline).toBe('Semantic search paused; keyword search available.');
+    expect(projection?.headline).toBe('Search by meaning paused; word search available.');
     expect(projection?.causes.map((cause) => cause.code)).toEqual(['index.embedding_rebuilding']);
     expect(projection?.remedy).toEqual({ target: 'core.health-surface', label: 'Open Health' });
   });
@@ -94,13 +94,13 @@ describe('the window says when capability is reduced, and says nothing when it i
     };
     const notice = readinessNotice(reloading)!;
     const projection = projectSv3Degradation(snapshotFor(reloading));
-    expect(notice.headline).toBe('Semantic search paused; keyword search available.');
-    expect(notice.body).toContain('Keyword search remains available');
-    expect(notice.causes).toEqual(['Semantic search models are reloading']);
+    expect(notice.headline).toBe('Search by meaning paused; word search available.');
+    expect(notice.body).toContain('Word search remains available');
+    expect(notice.causes).toEqual(['Search by meaning models are reloading']);
     expect(projection).toEqual({
       headline: notice.headline,
       body: notice.body,
-      causes: [{ code: 'encoders.reloading', wording: 'Semantic search models are reloading' }],
+      causes: [{ code: 'encoders.reloading', wording: 'Search by meaning models are reloading' }],
       remedy: { target: 'core.health-surface', label: 'Open Health' },
       severity: 'info',
     });

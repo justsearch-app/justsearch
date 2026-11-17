@@ -488,7 +488,7 @@ export function verdictBody(v: SystemHealthVerdict): string {
         return 'The current index remains available until cutover while the freshly-built index is activated.';
       }
       if (v.reasons.includes('index.embedding_rebuilding') || v.reasons.includes('encoders.reloading')) {
-        return 'Semantic search is paused while the index is rebuilt; keyword search remains available.';
+        return 'Search by meaning is paused while the index is rebuilt; word search remains available.';
       }
       switch (v.reasons[0]) {
         case 'channel-stale':

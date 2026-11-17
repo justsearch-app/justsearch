@@ -15,6 +15,7 @@ import { SETTINGS_CONTROL_LABELS } from './settingsControlLabels.js';
 import { html, css, nothing, type TemplateResult } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
 import { surfaceScrollLayoutStyles } from '../primitives/surfaceLayout.js';
+import { selectStyles } from '../primitives/selectStyles.js';
 import { icon } from '../components/Icon.js';
 import { readAutoLockMinutes, writeAutoLockMinutes } from '../utils/autoLock.js';
 import { subscribeAiState, refreshStatusNow, type StatusSnapshot } from '../state/aiStateStore.js';
@@ -581,6 +582,7 @@ export class SecuritySurface extends JfElement {
   static styles = [
     surfaceScrollLayoutStyles,
     atRestCardStyles,
+    selectStyles,
     css`
       .protection-form-row { display: flex; gap: 0.5rem; margin-top: 0.5rem; align-items: center; flex-wrap: wrap; }
       .protection-form-input { padding: 0.4rem 0.6rem; background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--surface-3); border-radius: 0.25rem; }

@@ -735,7 +735,7 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     async def setup_search_semantic_paused(page):
         await _view_setup("search")(page)
-        headline = page.get_by_text("Semantic search paused; keyword search available.", exact=True)
+        headline = page.get_by_text("Search by meaning paused; word search available.", exact=True)
         await headline.wait_for(state="visible", timeout=10_000)
         if await headline.count() != 1:
             raise AssertionError("semantic-search limitation must be explained exactly once")
@@ -1817,9 +1817,10 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
                 await field.fill(query)
                 async with page.expect_response("**/api/knowledge/search", timeout=15_000):
                     await field.press("Enter")
-            await field.fill("")
             if state == "hero":
-                await field.press("Escape")
+                # Emptying the field is the idle screen (as Escape makes it); a docked step keeps
+                # the last query, so the window stays docked with its results.
+                await field.fill("")
                 await page.locator("jf-sv3-composer[state='hero']").wait_for(state="visible")
             await field.blur()
             await field.focus()
@@ -1834,11 +1835,8 @@ def _build_steps(ui_url: str, cooldown_ms: int, timeout_ms: int) -> list[Step]:
 
     def setup_sv3_filters(state, narrow, viewport=None):
         async def setup(page):
+            # A docked step keeps the displayed query in the field, so filter commits rerun it.
             await setup_sv3_recents(state, narrow, viewport)(page)
-            if state != "hero":
-                # Recents setup empties the draft. Keep the displayed query while editing result
-                # filters so commits can rerun it; an empty draft deliberately leaves them stale.
-                await page.locator(S.CSS_SV3_COMPOSER_TEXTAREA).first.fill("latest")
             # The fresh search document seeds profile preferences during setup.
             await _enable_developer_tools(page)
             trigger = page.locator('[data-testid="more-filters"]:visible, [data-testid="sv3-filters-trigger"]:visible').first

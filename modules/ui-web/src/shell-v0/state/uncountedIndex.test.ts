@@ -104,7 +104,7 @@ describe('count observation provenance', () => {
       } } as unknown as StatusSnapshot,
     });
     expect(getAiState().capabilities.rag).toBe(true);
-    expect(projectAvailability('documents', getAiState())).not.toMatchObject({ kind: 'unavailable', reason: 'No documents indexed yet' });
+    expect(projectAvailability('documents', getAiState())).not.toMatchObject({ kind: 'unavailable', reason: 'No files read yet' });
   });
 
 });

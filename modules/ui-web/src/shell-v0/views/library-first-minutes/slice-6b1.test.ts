@@ -168,7 +168,7 @@ it('6b1-2: confirmation uses consent and recorded outcome', async () => {
   button(ask, 'Read again').click(); await settle(el);
   expect(invoke).toHaveBeenCalledTimes(1);
   expect(invoke).toHaveBeenCalledWith('core.reindex', { args: { force: true } }, { requestConsent: expect.any(Function) });
-  expect(el.shadowRoot!.textContent).toContain('Read again completed');
+  expect(el.shadowRoot!.textContent).toContain('Everything has been read again.');
 });
 it('6b1-4: after no-AI completion Up to date occurs once on the page', async () => {
   vi.spyOn(getOperationClient(''), 'invokeWithConsent').mockResolvedValue({ success: true, message: 'Reading accepted',
@@ -185,7 +185,7 @@ it('6b1-4: after no-AI completion Up to date occurs once on the page', async () 
     button(must(el.shadowRoot, '[role="region"][aria-label="Read every watched folder again?"]'), 'Read again').click();
   }
   await settle(el);
-  expect(el.shadowRoot!.textContent).toContain('Read again completed');
+  expect(el.shadowRoot!.textContent).toContain('Everything has been read again.');
   expect(el.shadowRoot!.textContent!.match(/Up to date/g)).toHaveLength(1);
 });
 it.each([[1, '1 document from other apps'], [0, '0 documents from other apps'], [12, '12 documents from other apps']] as const)(

@@ -325,7 +325,7 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
     const bursts = host.shadowRoot!.querySelectorAll('[data-testid="ledger-burst"]');
     expect(bursts.length).toBe(1);
     expect(bursts[0]!.querySelector('[data-testid="ledger-new-dot"]')?.getAttribute('role')).toBe('img');
-    expect(bursts[0]!.textContent).toContain('Indexed 5 · default');
+    expect(bursts[0]!.textContent).toContain('Read 5 · default');
     // tempdoc 558 Deepening 3 — the burst is also a projection of records that occurred at a time:
     // it carries the most-recent occurredAt of the collapsed group (rows are newest-first).
     const burstTime = bursts[0]!.querySelector('[data-testid="ledger-time"]');
@@ -634,7 +634,7 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
       const rollups = host.shadowRoot!.querySelectorAll('[data-testid="ledger-scan-rollup"]');
       expect(rollups.length).toBe(1);
       expect(rollups[0]!.querySelector('[data-testid="ledger-new-dot"]')?.getAttribute('role')).toBe('img');
-      expect(rollups[0]!.textContent).toContain('Indexed 11 documents');
+      expect(rollups[0]!.textContent).toContain('Read 11 files');
       expect(rollups[0]!.textContent).toContain('scifact');
       expect(rollups[0]!.textContent).toContain('6m 12s'); // 372s at human altitude
       expect(rollups[0]!.textContent).toContain('1 failed');
@@ -698,13 +698,13 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
       // In flight: the placeholder IS the record — a scan that never finishes still left a trace.
       let rollups = host.shadowRoot!.querySelectorAll('[data-testid="ledger-scan-rollup"]');
       expect(rollups.length).toBe(1);
-      expect(rollups[0]!.textContent).toContain('Indexing');
+      expect(rollups[0]!.textContent).toContain('Reading');
 
       src.emitFrame(snapshotFrame([started, ...scanWithDocs(2)]));
       await host.updateComplete;
       rollups = host.shadowRoot!.querySelectorAll('[data-testid="ledger-scan-rollup"]');
       expect(rollups.length).toBe(1);
-      expect(rollups[0]!.textContent).toContain('Indexed 1 documents');
+      expect(rollups[0]!.textContent).toContain('Read 1 file');
     });
 
     it('keyless index rows (pre-812 / single-file ingest) keep the adjacency collapse fallback', async () => {
@@ -728,7 +728,7 @@ describe('<jf-action-ledger> (tempdoc 550 C1 / thesis II — live read-view)', (
 
       const bursts = host.shadowRoot!.querySelectorAll('[data-testid="ledger-burst"]');
       expect(bursts.length).toBe(1);
-      expect(bursts[0]!.textContent).toContain('Indexed 4 · default');
+      expect(bursts[0]!.textContent).toContain('Read 4 · default');
       expect(host.shadowRoot!.querySelectorAll('[data-testid="ledger-scan-rollup"]').length).toBe(0);
     });
   });

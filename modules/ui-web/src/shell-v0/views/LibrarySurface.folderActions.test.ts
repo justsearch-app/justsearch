@@ -326,11 +326,16 @@ it('distinguishes accepted reindex from the recorded completion and failure', as
   await reindex();
   expect(getOperationClient(el.apiBase).invokeWithConsent).toHaveBeenCalledWith('core.reindex', { args: { force: true } }, expect.anything());
   await pump(el);
-  expect(el.shadowRoot!.textContent).toContain('Read again accepted');
-  expect(el.shadowRoot!.textContent).not.toContain('Read again completed');
+  expect(el.shadowRoot!.textContent).toContain('Reading everything again.');
+  expect(el.shadowRoot!.textContent).not.toContain('Everything has been read again.');
   setOutcome({ state: 'complete', historySince: 0 });
-  button(el, 'Check reading outcome').onActivate(); await pump(el);
-  expect(el.shadowRoot!.textContent).toContain('Read again completed');
+  // The status ticks 5 s later: Library reads the outcome again (a running request offers no check action).
+  const later = Date.now() + 5_000;
+  vi.spyOn(Date, 'now').mockReturnValue(later);
+  __feedForTest({ status: { worker: { core: { indexState: 'IDLE', indexedDocuments: 0, indexHealthy: true }, migration: { migrationState: 'IDLE' } }, readiness: { composites: { retrieval: { state: 'READY', reasonCodes: [] } } } } as unknown as StatusSnapshot });
+  await pump(el);
+  vi.mocked(Date.now).mockRestore();
+  expect(el.shadowRoot!.textContent).toContain('Everything has been read again.');
   setOutcome({ state: 'failed', historySince: 0 });
   await reindex();
   await pump(el);

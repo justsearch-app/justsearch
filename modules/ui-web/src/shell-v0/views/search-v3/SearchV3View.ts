@@ -286,6 +286,7 @@ import { publishForgetCompletion, type IndexedForgetCompletion } from '../../../
 import { confirmForget } from '../../components/searchResults/forgetConsent.js';
 import type { CardForgetDetail, ResultsCard } from '../../components/searchResults/ResultsCard.js';
 import { projectSv3Degradation, type Sv3Degradation } from './sv3-degradation.js';
+import { openControlMenuInPath, previewOpenInPath, renamingRowInPath } from './sv3-keystroke-origin.js';
 import {
   PANE_LABEL,
   SV3_DRAFT_KEY,
@@ -317,40 +318,6 @@ const SIDEBAR_GRIP_LABEL =
 
 const isComposerState = (value: string | null): value is Sv3ComposerState =>
   value === 'hero' || value === 'docked';
-
-/**
- * Is the keystroke coming out of a session row that is BEING RENAMED? The row is asked, not the
- * DOM shape: `renaming` is the row's own public state, so the test cannot drift from the markup the
- * edit happens to use. Open shadow roots put the real origin in the composed path, so a capture-phase listener on the host can see
- * an editor three shadow roots down.
- */
-const renamingRowInPath = (event: KeyboardEvent): boolean =>
-  event.composedPath().some((node) => {
-    const el = node as Element & { renaming?: unknown };
-    return el.localName === 'jf-sv3-session-row' && el.renaming === true;
-  });
-
-/**
- * Is the keystroke coming out of a composer whose control MENU is open (tempdoc 822 Phase F10)? The
- * same question as the rename above, asked of the same kind of state, and answered the same way:
- * the element is asked for its own public flag rather than the DOM being pattern-matched.
- */
-const openControlMenuInPath = (event: KeyboardEvent): boolean =>
-  event.composedPath().some((node) => {
-    const el = node as Element & { effortMenuOpen?: unknown; tierMenuOpen?: unknown };
-    if (el.localName !== 'jf-sv3-composer') return false;
-    // EITHER control menu (852 S4 added the second). The ladder's rung is "a menu is open in the
-    // control row", not "the effort menu is open" — a mode menu that Escape closed by falling
-    // through to the window would take the composer back to hero with it.
-    return el.effortMenuOpen === true || el.tierMenuOpen === true;
-  });
-
-/** Is the keystroke coming out of a result list whose Space preview is open? It closes itself first. */
-const previewOpenInPath = (event: KeyboardEvent): boolean =>
-  event.composedPath().some((node) => {
-    const el = node as Element & { previewOpen?: unknown };
-    return el.localName === 'jf-sv3-results' && el.previewOpen === true;
-  });
 
 export class SearchV3View extends JfElement {
   static styles = [
@@ -2123,13 +2090,19 @@ export class SearchV3View extends JfElement {
 
   /** Explicit dismissal closes both the visible reader and the shared inspector projection. */
   private dismissPane(): void {
+    const giveBack = this.closeDetailsPane();
+    void this.updateComplete.then(giveBack);
+  }
+
+  /** The dismissal without moving focus; returns what would give focus back to the pane's opener. */
+  private closeDetailsPane(): () => void {
     this.details.remember(false);
     const giveBack = this.details.takeFocusReturn();
     this.clearPane();
     // A document another window holds stays open there (C4).
     const { owner } = getInspectorState();
     if (owner === null || owner === SV3_SURFACE_KEY) setInspectorOpen(false);
-    void this.updateComplete.then(giveBack);
+    return giveBack;
   }
 
   /** Close from outside the window (Escape with the keyboard on the page). False when none is open. */
@@ -2333,6 +2306,13 @@ export class SearchV3View extends JfElement {
     if (this.draftDomain.retiredHandoffText !== null && detail.text !== this.draftDomain.retiredHandoffText) {
       this.draftDomain.clearRetiredHandoff();
       this.draftDomain.saveRecovery();
+    }
+    // An emptied search field is the idle screen, as Escape makes it: the list, its filters and its
+    // pane leave with the text. Only the layout moves; no draft, review or conversation is touched,
+    // and a late answer to the old query cannot dock it again (results show only when docked).
+    if (this.tier === 'search' && this.search.showing && detail.text === '' && this.composerState === 'docked') {
+      if (this.paneTab !== null) this.closeDetailsPane();
+      void this.setComposerState('hero');
     }
     if (this.draftDomain.draftReview) { this.draftDomain.saveRecovery(); return; }
     if (this.draftDomain.humanTask !== null || this.tier === 'search') this.draftDomain.saveRecovery();

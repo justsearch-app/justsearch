@@ -2,6 +2,7 @@
 import { SignalWatcher } from '@lit-labs/signals';
 import { css, html, nothing, type PropertyValues } from 'lit';
 import { JfElement } from '../primitives/JfElement.js';
+import { selectStyles } from '../primitives/selectStyles.js';
 import { selectIndexingProgress, type IndexingProgress } from '../state/indexingProgress.js';
 import { getOperationClient, type OperationInvocationSuccess } from '../operations/OperationClient.js';
 import { requestSurfaceNavigation, requestIndexingRuleNavigation } from '../controllers/navigateRequest.js';
@@ -15,6 +16,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
     compact: { type: Boolean, reflect: true },
     toolbar: { type: Boolean, reflect: true }, menuOpen: { state: true },
     allowPause: { type: Boolean, attribute: 'allow-pause' },
+    entry: { type: Boolean, reflect: true },
     duration: { state: true }, pending: { state: true }, message: { state: true },
     saveWithSettings: { attribute: false },
   };
@@ -24,6 +26,11 @@ class IndexingControls extends SignalWatcher(JfElement) {
   declare toolbar: boolean;
   declare menuOpen: boolean;
   declare allowPause: boolean;
+  /**
+   * An entry's action in the status panel (fm-15): text actions like the panel's own, and Pause reading
+   * pauses until resumed, as Library's "Until I resume" does; the durations stay in Library's menu.
+   */
+  declare entry: boolean;
   declare duration: number;
   declare pending: boolean;
   declare message: string;
@@ -55,6 +62,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
     this.progress = selectIndexingProgress(null, false, 0, []);
     this.apiBase = '';
     this.allowPause = false;
+    this.entry = false;
     this.compact = false;
     this.toolbar = false;
     this.menuOpen = false;
@@ -63,7 +71,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
     this.message = '';
   }
 
-  static styles = css`
+  static styles = [selectStyles, css`
     :host { display: inline-block; max-width: 100%; min-width: 0; }
     .actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
     label { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; font-size: var(--font-size-xs); }
@@ -77,7 +85,8 @@ class IndexingControls extends SignalWatcher(JfElement) {
     button:focus-visible, select:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
     p { margin: 0; font-size: var(--font-size-xs); overflow-wrap: anywhere; }
     p:not(:empty) { margin-top: .25rem; }
-    :host([compact]) button, :host([compact]) select { border: 0; background: transparent; }
+    :host([compact]) button { border: 0; background: transparent; }
+    :host([compact]) select { border: 0; }
     .pause-menu { position: relative; }
     .pause-menu > button { display: inline-flex; align-items: center; gap: .4rem; }
     /* "Pause reading" in a tab row is a text action: body size, like the actions beside it. */
@@ -88,11 +97,17 @@ class IndexingControls extends SignalWatcher(JfElement) {
     .pause-options button { display: block; width: 100%; text-align: start; }
     .pause-options button:hover { background: var(--surface-2); }
     :host([compact]) select { font-size: var(--font-size-xs); }
+    /* fm-15 — in a status panel entry the controls are its text actions, as the entry's own. */
+    :host([entry]) { display: block; margin-top: var(--jf-space-2); }
+    :host([entry]) .actions { gap: var(--jf-space-3); }
+    :host([entry]) button { font-size: var(--font-size-sm); border: 0; background: transparent; padding: var(--jf-space-1); min-height: 0; border-radius: 0; }
+    :host([entry]) button:hover { text-decoration: underline; }
+    :host([entry]) button:focus-visible { outline-width: var(--frame-focus-width); outline-offset: var(--jf-space-1); }
     @media (forced-colors: active) {
       button, select { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
       button:focus-visible, select:focus-visible { outline-color: Highlight; }
     }
-  `;
+  `];
 
   protected override willUpdate(changed: PropertyValues): void {
     if (this.toolbar) {
@@ -185,7 +200,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
       @click=${() => {
         if (unavailable) return;
         if (resume) void this.invoke(); else this.menuOpen = !this.menuOpen;
-      }}>${icon({ name: resume ? 'play' : 'clock', size: 14 })}${resume ? 'Resume reading' : 'Pause reading'}
+      }}>${icon({ name: resume ? 'play' : 'pause', size: 14 })}${resume ? 'Resume reading' : 'Pause reading'}
       ${!resume ? icon({ name: 'chevron-down', size: 12 }) : nothing}</button>
       ${!resume && this.menuOpen ? html`<div id="pause-options" class="pause-options">
         ${[[0, 'Until I resume'], [900000, '15 minutes'], [3600000, '1 hour']].map(([duration, label]) => html`
@@ -201,7 +216,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
         this.focused = event.relatedTarget instanceof Node && !!this.shadowRoot?.contains(event.relatedTarget);
         this.requestUpdate();
       }}>
-      ${this.action === 'pause' ? html`<label><span class=${this.compact ? 'visually-hidden' : ''}>Pause duration</span>
+      ${this.action === 'pause' && !this.entry ? html`<label><span class=${this.compact ? 'visually-hidden' : ''}>Pause duration</span>
         <select aria-label="Pause duration"
           .value=${String(this.duration)} @change=${(e: Event) => { this.duration = Number((e.target as HTMLSelectElement).value); }}>
           <option value="0">Until I resume</option>

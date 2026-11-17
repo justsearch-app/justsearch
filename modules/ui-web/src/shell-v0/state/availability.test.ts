@@ -125,7 +125,7 @@ describe('projectAvailability (tempdoc 596)', () => {
     const a = projectAvailability('documents', aiState({ chat: true, docs: 0 }));
     expect(a.kind).toBe('unavailable');
     expect(isUnavailable(a) && a.transient).toBeFalsy();
-    expect(isUnavailable(a) && /document/i.test(a.reason)).toBe(true);
+    expect(isUnavailable(a) && /file/i.test(a.reason)).toBe(true);
     // §16.5 remedy-driven onboarding: the dead-end carries the "Add documents" → Library navigate remedy.
     expect(isUnavailable(a) && a.remedy).toEqual({
       kind: 'navigate',
@@ -183,7 +183,7 @@ describe('projectAvailability (tempdoc 596)', () => {
       }));
       expect(a.kind).toBe('degraded');
       expect(a.kind === 'degraded' && a.caveat).toBe(
-        "Results may miss some documents' semantic matches; keyword search covers them",
+        "Results may miss some documents' matches by meaning; word search covers them",
       );
       expect(a.kind === 'degraded' && a.remedy).toEqual({
         kind: 'navigate', target: 'core.health-surface', label: 'Open Health',
@@ -214,7 +214,7 @@ describe('projectAvailability (tempdoc 596)', () => {
     );
     expect(a.kind).toBe('degraded');
     expect(a.kind === 'degraded' && a.caveat).toBe(PASSAGE_REDUCED_CAVEAT);
-    expect(a.kind === 'degraded' && a.caveat.toLowerCase()).not.toContain('keyword');
+    expect(a.kind === 'degraded' && a.caveat.toLowerCase()).not.toMatch(/keyword|word (results|search)/);
   });
 
   it('D1-15: a missing selected query model does not assert keyword-only retrieval', () => {
@@ -223,7 +223,7 @@ describe('projectAvailability (tempdoc 596)', () => {
       aiState({ chat: true, docs: 5, degradedSeverity: 'warn', reasons: ['index.model_not_installed'] }),
     );
     expect(a.kind === 'degraded' && a.caveat).toBe(MODEL_UNAVAILABLE_CAVEAT);
-    expect(a.kind === 'degraded' && a.caveat).not.toContain('keyword');
+    expect(a.kind === 'degraded' && a.caveat).not.toMatch(/keyword|word (results|search)/);
   });
 
   it('D1-15: a fatal schema open refusal does not claim keyword search still serves', () => {
@@ -232,7 +232,7 @@ describe('projectAvailability (tempdoc 596)', () => {
       aiState({ chat: true, docs: 5, degradedSeverity: 'warn', reasons: ['index.schema_open_refused'] }),
     );
     expect(a.kind === 'degraded' && a.caveat).toBe(SEARCH_UNAVAILABLE_CAVEAT);
-    expect(a.kind === 'degraded' && a.caveat).not.toContain('keyword');
+    expect(a.kind === 'degraded' && a.caveat).not.toMatch(/keyword|word (results|search)/);
   });
 
   it('805 §G.2: an AI-model cause → the calm caveat (retrieval is untouched)', () => {

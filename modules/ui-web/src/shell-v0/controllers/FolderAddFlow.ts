@@ -140,7 +140,7 @@ export class FolderAddFlow {
       if (!result.success) throw new Error(result.message || 'Add refused');
       recordFirstUseFolderAdded(path, watchedBefore);
       state.pendingPath = ''; state.pendingCollection = ''; state.pendingPreview = null; state.showManualInput = false;
-      state.actionMessage = this.firstLaunch ? null : 'Folder added. Indexing activity is shown below.';
+      state.actionMessage = this.firstLaunch ? null : 'Folder added. Reading progress is shown below.';
       await this.host.added();
       state.addBusy = false; this.host.changed();
       if (current()) await this.host.focus('button');

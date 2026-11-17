@@ -25,6 +25,7 @@ import { ifDefined } from 'lit/directives/if-defined.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { keyed } from 'lit/directives/keyed.js';
 import { JfElement } from '../primitives/JfElement.js';
+import { selectStyles } from '../primitives/selectStyles.js';
 import { FocusKeeper } from '../primitives/focusKeeper.js';
 import { authorizedFetch } from '../api/authorizedFetch.js';
 // Tempdoc 511 §511-followup-B: reset-settings now routes through
@@ -443,6 +444,7 @@ export class SettingsSurface extends JfElement {
   }
 
   static styles = [
+    selectStyles,
     css`
     /* Tempdoc 855 §9.1 — Settings is a chrome-hosted MODAL content component: display:contents
        pass-through (layout-purity) so the hosting <jf-settings-window> frame controls sizing. */
@@ -858,10 +860,8 @@ export class SettingsSurface extends JfElement {
     }
     select {
       padding: 0.375rem 0.5rem;
-      background: var(--surface-tertiary);
       border: 1px solid var(--border-subtle);
       border-radius: 0.25rem;
-      color: var(--text-primary);
       font-size: var(--font-size-sm);
     }
     p.help {
@@ -3252,7 +3252,7 @@ export class SettingsSurface extends JfElement {
     const progress = selectIndexingProgress(s?.status, s?.indexingStatusLive ?? false,
       s?.episodeMaxPendingJobs ?? 0, s?.enrichSettleSamples ?? []);
     return html`<section class="section" data-testid="settings-indexing">
-      <h3>Indexing</h3>
+      <h3>Reading files</h3>
       <p>${progress.activity.summary}${progress.activity.detail ? ` — ${progress.activity.detail}` : ''}</p>
       ${progress.pause?.reason !== 'settings_recovery' ? html`<p>Pause reading while keeping your files searchable. Resume clears your manual pause; reading hours and battery rules still apply.</p>` : nothing}
       <jf-indexing-controls allow-pause .progress=${progress} api-base=${this.apiBase}></jf-indexing-controls>

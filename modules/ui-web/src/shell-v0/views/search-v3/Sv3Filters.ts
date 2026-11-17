@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { css, html, nothing, type PropertyValues, type TemplateResult } from 'lit';
 import { JfElement } from '../../primitives/JfElement.js';
+import { selectStyles } from '../../primitives/selectStyles.js';
 import { localizeResourceKey as message, onCatalogUpdated } from '../../../i18n/resourceCatalog.js';
 import { getFilters, setFilters, subscribeFilters, type SearchFilterSpec, type SizeUnit } from '../../state/searchFiltersState.js';
 import { dateBound, localDay, restrictionLabels, SIZE_UNITS, sizeBound, withoutRestriction, type RestrictionKind } from './sv3-filter-input.js';
@@ -20,7 +21,7 @@ export class Sv3Filters extends JfElement {
   private toUnit: SizeUnit = 'KB';
   private unsubscribers: Array<() => void> = [];
 
-  static styles = css`
+  static styles = [selectStyles, css`
     :host { display: block; min-block-size: 0; min-inline-size: 0; color: var(--foreground); font-size: var(--font-size-sv3-sm); }
     :host([open]), :host([active]) { overflow-y: auto; overscroll-behavior: contain; }
     button, input, select { font: inherit; color: inherit; }
@@ -37,13 +38,13 @@ export class Sv3Filters extends JfElement {
     label { display: block; min-inline-size: 0; }
     input { box-sizing: border-box; inline-size: 100%; min-inline-size: 0; background: var(--background); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-1); }
     .size-input { display: flex; gap: var(--space-1); }
-    select { background: var(--background); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+    select { border: 1px solid var(--border); border-radius: var(--radius-sm); }
     .error, .hint, .notes { font-size: var(--font-size-sv3-xs); overflow-wrap: anywhere; }
     .error { color: var(--text-danger); }
     .notes { margin-block-start: var(--space-1); }
     .error:empty { display: none; }
     @media (forced-colors: active) { .panel, input, select, button { background: Canvas; color: CanvasText; border-color: CanvasText; } .error { color: CanvasText; } }
-  `;
+  `];
 
   constructor() {
     super(); this.active = false; this.open = false; this.note = ''; this.serverError = ''; this.spec = {};

@@ -194,7 +194,7 @@ describe('SC1 engine loss after the app has loaded', () => {
     expect(section, 'the treatment shows').not.toBeNull();
     const words = deepText(section);
     expect(words).toContain('JustSearch can’t reach its engine');
-    expect(words).toContain('Searching and indexing are on hold. Your files and your index are safe. JustSearch tries again every few seconds.');
+    expect(words).toContain('Searching and reading are on hold. Your files and your index are safe. JustSearch tries again every few seconds.');
     expect(button(shell, 'Try again'), 'the browser offers Try again').not.toBeNull();
     expect(button(shell, 'Open Health')).not.toBeNull();
     expect(button(shell, 'Copy report')).not.toBeNull();

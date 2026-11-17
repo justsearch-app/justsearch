@@ -11,12 +11,13 @@
 import { html, css, type PropertyValues, type TemplateResult } from 'lit';
 import type { JsonSchema, UISchemaElement } from '@jsonforms/core';
 import { JsonFormsRendererBase } from '../JsonFormsRendererBase.js';
+import { selectStyles } from '../../primitives/selectStyles.js';
 import type { RendererTester } from '../rendererTypes.js';
 import { RANK_SPECIALIZED_CONTROL } from '../rendererTypes.js';
 import { registerRenderer } from '../dispatch.js';
 
 export class EnumControl extends JsonFormsRendererBase {
-  static styles = css`
+  static styles = [selectStyles, css`
     :host {
       display: block;
       margin-block-end: var(--justsearch-shell-form-control-spacing, 0.75rem);
@@ -34,8 +35,6 @@ export class EnumControl extends JsonFormsRendererBase {
       border: 1px solid var(--justsearch-shell-form-input-border, #ccc);
       border-radius: var(--justsearch-shell-form-input-radius, 4px);
       font: inherit;
-      color: inherit;
-      background: var(--justsearch-shell-form-input-bg, transparent);
     }
     select:disabled {
       opacity: 0.5;
@@ -46,7 +45,7 @@ export class EnumControl extends JsonFormsRendererBase {
       font-size: var(--font-size-xs);
       margin-block-start: 0.25rem;
     }
-  `;
+  `];
 
   override render(): TemplateResult {
     if (!this.visible) {

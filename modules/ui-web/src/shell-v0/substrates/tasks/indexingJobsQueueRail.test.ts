@@ -9,6 +9,7 @@ import { projectJobsToTasks, startIndexingJobsBridge, __setResolveHashForTest, _
 import { __resetEnvelopeStreamPoolForTest } from '../../streaming/EnvelopeStreamPool.js';
 import { MultiplexedStream } from '../../streaming/MultiplexedStream.js';
 import { formatCount } from '../../display/format.js';
+import { setShowDeveloperTools } from '../../state/developerToolsState.js';
 import type { StatusResponse } from '../../../api/generated/index.js';
 
 class Source extends EventTarget {
@@ -34,6 +35,8 @@ const queuedRows = (pill: StatusPill) => panel(pill).shadowRoot!.querySelectorAl
 let stop: (() => void) | undefined;
 let multiplex: MultiplexedStream | undefined;
 beforeEach(() => {
+  // fm-15 (fm-rest-a S1/S4): the reading entry's Details, which this rail is read through, are a developer tool.
+  setShowDeveloperTools(true);
   __resetAiStateForTest(); __resetTasksForTest(); __resetEnvelopeStreamPoolForTest(); __resetResolvedLabelsForTest();
   __setResolveHashForTest(async () => null);
   // The pill reads folders/presence on the status cadence; never let a test reach a real origin.
@@ -43,6 +46,7 @@ afterEach(() => {
   stop?.(); multiplex?.stop(); stop = undefined; multiplex = undefined;
   document.body.replaceChildren(); __resetAiStateForTest(); __resetTasksForTest(); __resetEnvelopeStreamPoolForTest();
   __setResolveHashForTest(null); vi.useRealTimers(); vi.unstubAllGlobals();
+  setShowDeveloperTools(false);
 });
 
 for (const transport of ['standalone', 'multiplexed'] as const) {

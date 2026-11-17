@@ -504,6 +504,8 @@ export class ActivitySurface extends JfElement {
     /* The page column, inside the scroller beside the details pane: the scroller and the header's
        line span what the pane leaves; the feed sits on a centred column within it. */
     .main > .header { padding-inline: calc(var(--surface-content-gutter) + var(--density-header-pad-x)); }
+    /* The page's heading on the size ladder's heading step (the browser's own h2 is 1.5em, off the ladder). */
+    .header h2 { font-size: var(--font-size-lg); }
     .main > .body { padding-inline: calc(var(--surface-content-gutter) + var(--density-inner-pad-x)); }
     jf-action-ledger {
       display: block;
@@ -614,7 +616,7 @@ export class ActivitySurface extends JfElement {
           <h2>Activity</h2>
           <div class="sub">
             What happened, who did it and how it ended — your actions, the
-            assistant's, indexing and the engine's own work, in one list
+            assistant's, file reading and the engine's own work, in one list
             updated live. Choose a record for its details. For raw diagnostic output, see Logs.
           </div>
         </div>

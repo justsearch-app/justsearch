@@ -34,6 +34,7 @@ import { repeat } from 'lit/directives/repeat.js';
 import '@lit-labs/virtualizer';
 import { FlowLayout } from '@lit-labs/virtualizer/layouts/flow.js';
 import { JfElement } from '../primitives/JfElement.js';
+import { selectStyles } from '../primitives/selectStyles.js';
 import {
   ActionLedgerClient,
   indexLabel,
@@ -102,7 +103,7 @@ function isBurst(row: FeedRow | IndexBurstSummary): row is IndexBurstSummary {
 
 /** What a burst summary says: how many were indexed, failed or are of unknown state, and where. */
 function burstLabel(burst: IndexBurstSummary): string {
-  return [`Indexed ${burst.indexed}`, burst.failed ? `${burst.failed} failed` : '',
+  return [`Read ${burst.indexed}`, burst.failed ? `${burst.failed} failed` : '',
     burst.unknown ? `${burst.unknown} with unknown state` : '', burst.collection].filter(Boolean).join(' · ');
 }
 
@@ -222,7 +223,7 @@ const historyIdentity = (row: OperationHistoryRow): string | undefined =>
   row && typeof row.operationId === 'string' && typeof row.endTime === 'string' ? historyLedgerId(row) : undefined;
 
 const QUICK_FILTERS: ReadonlyArray<readonly [QuickFilter, string]> = [
-  ['all', 'All'], ['agents', 'Agents'], ['mine', 'Your actions'], ['indexing', 'Indexing'], ['problems', 'Problems'],
+  ['all', 'All'], ['agents', 'Agents'], ['mine', 'Your actions'], ['indexing', 'Reading'], ['problems', 'Problems'],
 ];
 
 const NOTE_TEXT: Record<FeedNote, string> = {
@@ -330,6 +331,7 @@ export class ActionLedgerView extends JfElement {
   // tempdoc 558 §S1 — the row styles are single-sourced in eventRow.ts (shared with the History tab).
   static styles = [
     eventRowStyles,
+    selectStyles,
     css`
       :host {
         display: block;
@@ -1004,7 +1006,7 @@ export class ActionLedgerView extends JfElement {
         ${this.newDot(isNew)}
         <span class="who" data-originator=${row.entry.originator}>${whoWords(row.entry.originator)}</span>
         <span class="label">${row.entry.label}</span>
-        <span class="members" data-testid="ledger-scan-members">${members ? `${members} document${members === 1 ? '' : 's'} retained` : 'no documents retained'}</span>
+        <span class="members" data-testid="ledger-scan-members">${members ? `${members} file${members === 1 ? '' : 's'} retained` : 'no files retained'}</span>
         ${renderEventWhen(row.entry.occurredAt)}
       </div>`;
   }

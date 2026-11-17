@@ -4,7 +4,7 @@
  * Tempdoc 807 A.3 (round-13 R13-F2) — with the backend dead, no snapshot-derived Brain surface may
  * render a PRESENT-TENSE progress or capability claim.
  *
- * The round photographed, with both java processes killed: an animating "Building semantic search
+ * The round photographed, with both java processes killed: an animating "Preparing search by meaning
  * 2.0% · 5,084 pending", "Search Quality Features 4/4 active", and a populated Runtime card. Each
  * value was a true past measurement rendered as a present fact. These tests assert on the RENDERED
  * TEXT, and each has an anti-regression twin proving a healthy verdict still renders normally.
@@ -127,12 +127,12 @@ describe('BrainSurface — enrichment progress card (807)', () => {
     expect(observed.textContent).toContain('Reading status unconfirmed');
     expect(observed.textContent).toContain('pending when last observed');
     expect(observed.textContent).not.toContain(DISCONNECTED);
-    expect(observed.textContent).not.toContain('Building semantic search');
+    expect(observed.textContent).not.toContain('Preparing search by meaning');
     expect(observed.querySelector('.spin, [class*="spin"]')).toBeNull();
 
     el.systemStatus = fresh;
     const recovered = domOf(el.renderEnrichmentProgress());
-    expect(recovered.textContent).toContain('Building semantic search');
+    expect(recovered.textContent).toContain('Preparing search by meaning');
     expect(recovered.textContent).not.toContain('Reading status unconfirmed');
     expect(recovered.querySelector('.spin, [class*="spin"]')).not.toBeNull();
   });
@@ -144,15 +144,15 @@ describe('BrainSurface — enrichment progress card (807)', () => {
     const stale = domOf(el.renderEnrichmentProgress());
     expect(stale.textContent).toContain('Reading status unconfirmed');
     expect(stale.textContent).not.toContain(DISCONNECTED);
-    expect(stale.textContent).not.toContain('Building semantic search');
+    expect(stale.textContent).not.toContain('Preparing search by meaning');
     expect(stale.querySelector('.spin, [class*="spin"]')).toBeNull();
     state.indexingStatusLive = true;
-    expect(textOf(el.renderEnrichmentProgress())).toContain('Building semantic search');
+    expect(textOf(el.renderEnrichmentProgress())).toContain('Preparing search by meaning');
   });
 
   it('stops presenting as live progress when the snapshot is not live', () => {
     const text = textOf(harness(false).renderEnrichmentProgress());
-    expect(text).not.toContain('Building semantic search');
+    expect(text).not.toContain('Preparing search by meaning');
     expect(text).toContain('last known');
     expect(text).toContain(DISCONNECTED);
     // The figures survive — this bundle changes their tense, not their existence.
@@ -169,7 +169,7 @@ describe('BrainSurface — enrichment progress card (807)', () => {
 
   it('ANTI-REGRESSION: a healthy verdict still renders the live progress card unchanged', () => {
     const text = textOf(harness(true).renderEnrichmentProgress());
-    expect(text).toContain('Building semantic search');
+    expect(text).toContain('Preparing search by meaning');
     expect(text).toContain('2%');
     expect(text).toContain(`${num(5084)} pending`);
     expect(text).not.toContain('last known');
@@ -217,7 +217,7 @@ describe('BrainSurface — enrichment progress SCOPE (round-15 scope mismatch)',
   it('THE defect: the card does not disappear when its old single signal hits 100%', () => {
     const tpl = scoped().renderEnrichmentProgress();
     expect(tpl).not.toBe(nothing);
-    expect(textOf(tpl)).toContain('Building semantic search');
+    expect(textOf(tpl)).toContain('Preparing search by meaning');
   });
 
   it('shows the AGGREGATE percent, the one the other surfaces show — not the embedding stage', () => {
