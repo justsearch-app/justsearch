@@ -39,6 +39,7 @@ const root={querySelectorAll:s=>s==='*'?[]:s.includes('search-result-row')?rows:
 const card={snapshot:{query:'lighthouse',isSearching:false,isRefining:stage==='refining',passStage:stage==='quick'?'quick':'refined'},
  shadowRoot:root,getBoundingClientRect:()=>({width:100,height:100})};
 global.document={querySelectorAll:s=>s==='*'||s==='jf-results-card'?[card]:[]};
+global.getComputedStyle=()=>({visibility:'visible'});
 const fn=new Function('arguments',JSON.parse(process.argv[3]));
 console.log(JSON.stringify(fn(JSON.parse(process.argv[4]))));
 '''
@@ -52,8 +53,11 @@ console.log(JSON.stringify(fn(JSON.parse(process.argv[4]))));
                     return value
             self.fail(description)
         with patch.object(linux, 'search_api', return_value={'results': []}), \
+             patch.object(linux, 'open_result_passage') as passage, \
              patch.object(linux, 'wait_for', poll), patch.object(linux, 'receiving_viewer', return_value={'pid': 123}):
             linux.search_open(run)
+        passage.assert_called_once_with(run, {'element-6066-11e4-a52e-4f735466cecf': 'fixture-row'},
+                                        fixture)
         action = run.wd.call.call_args_list[0].args[1]['actions'][0]['actions'][0]
         self.assertEqual(action['origin']['element-6066-11e4-a52e-4f735466cecf'], 'fixture-row')
         self.assertEqual(observations, ['quick', 'refining', 'settled'])

@@ -20,7 +20,7 @@ from pathlib import PurePosixPath
 
 from runner import (Infrastructure, OwnerValidation, ProductFailure, RunStopped, Unavailable,
                     Target as LinuxTarget, Run as SharedRun,
-                    WebDriver, digest, wait_for)
+                    WebDriver, digest, wait_for, wait_for_navigation)
 
 
 def regular_files(root):
@@ -631,8 +631,7 @@ foreach($d in $disks) {$devices[$d.Name]=[long]$d.DiskWriteBytesPersec;$total+=[
             raise Infrastructure('WebDriver did not use the normal installed app profile; see webdriver-profile.json')
         self.observe_window('automation')
         self.ready()
-        wait_for(lambda: self.wd.execute("return all(document,'button[data-surface-id]').length>0"),
-                 'Packaged UI mounted in own WebDriver session', seconds=60, error=ProductFailure)
+        wait_for_navigation(self.wd, error=ProductFailure)
         self.facts['ui'] = True
 
     def stop_app(self):
@@ -1028,10 +1027,10 @@ return all(document,'jf-walkthrough-card').some(card => card.shadowRoot &&
 
 
 def add_folder(run):
+    from linux import open_library_picker
     run.require('ui')
     run.nav('Library')
-    # v0.3.2 predecessor preparation still uses the capital-F label.
-    run.wd.click('button[aria-label="Add folder"],button[aria-label="Add Folder"]')
+    open_library_picker(run)
     picker = run.native.select_folder(run.require('corpus'))
     run.evidence('J2-picker', picker)
     wait_for(lambda: run.wd.execute("return all(document,'input[aria-label=\"Folder path\"]').some(e=>e.value===arguments[0])", [run.require('corpus')]),
@@ -1089,8 +1088,8 @@ public class QualAssociation {
 """)
 
 def search_open(run):
-    from corpus import OPEN_FILE, QUERY
-    from linux import search_api
+    from corpus import OPEN_FILE
+    from linux import open_result_passage, search_api, settled_result_row, submit_search
     run.require('ui'); run.require('folder')
     result = search_api(run)
     fixture = str(Path(run.require('corpus')) / OPEN_FILE)
@@ -1103,13 +1102,10 @@ def search_open(run):
         raise Infrastructure('OS default text viewer differs from qualification provisioning: ' + repr(association))
     before = ps_json(PROCESSES, array=True)
     run.nav('Search')
-    run.wd.click('button[data-testid="sv3-composer-tier"]')
-    run.wd.click('button[data-tier="search"]')
-    run.wd.keys('textarea[data-testid="sv3-composer-input"]', QUERY + '\ue007')
-    hit = wait_for(lambda: run.wd.execute("""
-return all(document,'[data-testid="search-result-row"]').find(e =>
- (e.getAttribute('data-addressable-id') || '').toLowerCase() === arguments[0].toLowerCase()) || null;
-""", [fixture]), 'Exact fixture row in search DOM', seconds=45, error=ProductFailure)
+    submit_search(run.wd)
+    hit = wait_for(lambda: settled_result_row(run.wd, fixture, ignore_case=True),
+                   'Exact fixture row after search refinement', seconds=45, error=ProductFailure)
+    open_result_passage(run, hit, fixture)
     action = run.wd.execute("return arguments[0].querySelector('button[data-testid=\"row-actions\"]')", [hit])
     if not action:
         raise ProductFailure('Exact fixture row has no Actions button')

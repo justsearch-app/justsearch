@@ -19,11 +19,13 @@ class ActivationEndStateTests(unittest.TestCase):
                       installedFully=platform == 'linux' and active)
         runtime = {'onnxFeatures': [{'id': name, 'modelActive': active}
                                    for name in ('embed', 'citation_scorer')]}
-        run.wd.text.return_value = 'Chat is not supported here.'
+        run.wd.text.return_value = 'Answer questions\nNeeds an NVIDIA graphics card'
         observations = iter([{'typed': True, 'blocked': True, 'operationKeys': []},
                              {'typed': False, 'operationKeys': []}])
 
         def dom(script):
+            if '.step-reason' in script:
+                return 'Needs an NVIDIA graphics card'
             if 'authorization-typed-input' in script:
                 return next(observations, {'typed': False, 'operationKeys': []}) if withdrawn else {
                     'typed': False, 'operationKeys': []}

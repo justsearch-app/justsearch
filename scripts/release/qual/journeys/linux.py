@@ -135,11 +135,22 @@ return all(document,'jf-walkthrough-card').some(card => card.shadowRoot &&
     raise OwnerValidation('Desktop entry opened an owned, mapped installed app window and Engine is ready; validate first-run text in J1-desktop-first-run.png')
 
 
+def open_library_picker(run):
+    # The library stages a selection; Search's identically named control submits it.
+    selector = ('button[aria-label="Add a folder"],button[aria-label="Add folder"],'
+                'button[aria-label="Add Folder"]')
+    button = wait_for(lambda: run.wd.execute("""
+return all(document,'jf-library-surface').flatMap(library =>
+ library.shadowRoot ? all(library.shadowRoot,arguments[0]) : []
+).find(visible) || null;
+""", [selector]), 'Visible Library folder picker button', seconds=30, error=Infrastructure)
+    run.wd.click_element(button)
+
+
 def add_folder(run):
     run.require('ui')
     run.nav('Library')
-    # v0.3.2 predecessor preparation still uses the capital-F label.
-    run.wd.click('button[aria-label="Add folder"],button[aria-label="Add Folder"]')
+    open_library_picker(run)
     try:
         # The actual GtkFileChooserNative is driven outside WebDriver.
         wait_for(lambda: run.native.picker_visible('J2-picker'),
@@ -224,27 +235,70 @@ print(json.dumps(rows))
     return viewer_fixture(rows, run.require('corpus') + '/' + OPEN_FILE)
 
 
+def submit_search(wd):
+    field = 'textarea[data-testid="sv3-composer-input"]'
+    wd.element(field)
+    trigger = 'button[data-testid="sv3-composer-tier"]'
+    option = 'button[data-tier="search"]'
+    direct = f'[data-testid="sv3-composer-tier"] {option}'
+    if wd.find_visible(direct):
+        wd.click(direct)
+    elif wd.find_visible(trigger):
+        wd.click(trigger)
+        wd.click(option)
+    wd.keys(field, QUERY + '\ue007')
+
+
+def settled_result_row(wd, fixture, *, ignore_case=False):
+    return wd.execute("""
+const path = value => arguments[2] ? value.toLowerCase() : value;
+const card = all(document,'jf-results-card').find(e => {
+ const s = e.snapshot;
+ return visible(e) && s?.query === arguments[1] &&
+  !s.isSearching && !s.isRefining && s.passStage === 'refined';
+});
+return card?.shadowRoot ? all(card.shadowRoot,'[data-testid="search-result-row"]').find(e =>
+ visible(e) && path(e.getAttribute('data-addressable-id') || '') === path(arguments[0])) || null : null;
+""", [fixture, QUERY, ignore_case])
+
+
+def open_result_passage(run, hit, fixture):
+    # The predecessor prepares saved state before the result-anchoring redesign.
+    if getattr(run.args, 'phase', None) == 'predecessor':
+        return
+    run.wd.click_element(hit)
+    evidence = wait_for(lambda: run.wd.execute("""
+const path = value => arguments[2] ? value.replaceAll('\\\\', '/').toLowerCase() : value;
+const pane = all(document,'jf-document-pane[data-testid="sv3-pane-document"]').find(e =>
+ visible(e) && typeof e.docPath === 'string' && path(e.docPath) === path(arguments[0]));
+const region = pane?.shadowRoot?.querySelector('.scroll-region');
+if (!visible(region) || !(region.scrollTop > 0)) return null;
+const frame = region.getBoundingClientRect();
+const line = all(pane.shadowRoot,'pre.source [data-line].hl-strong,pre.source [data-line].hl-weak').find(e => {
+ const r = e.getBoundingClientRect();
+ // The whole line, not a fragment: the corpus's match line is short enough never to wrap.
+ return visible(e) && r.top >= frame.top && r.bottom <= frame.bottom &&
+  e.innerText.toLowerCase().includes(arguments[1].toLowerCase());
+});
+return line ? {path:pane.docPath, passage:line.innerText.trim(), scrollTop:region.scrollTop} : null;
+""", [fixture, QUERY, getattr(run, 'platform', None) == 'windows']),
+        'In-app pane displays the exact result’s anchored passage containing ' + QUERY,
+        seconds=45, error=ProductFailure)
+    run.evidence('J2-in-app-passage', evidence)
+    run.native.shot('J2-in-app-passage')
+    run.wd.click(f'button[aria-label="Close {OPEN_FILE}" i]:not([data-testid="details-pane-backdrop"])')
+
+
 def search_open(run):
     run.require('folder')
     run.require('ui')
     result = search_api(run)
     run.nav('Search')
-    # Search input is distinct from the AI composer. The selector is scoped to
-    # native input controls, including open shadow roots, and is probed below.
-    run.wd.click('button[data-testid="sv3-composer-tier"]')
-    run.wd.click('button[data-tier="search"]')
-    selector = 'textarea[data-testid="sv3-composer-input"]'
-    run.wd.keys(selector, QUERY + '\ue007')
+    submit_search(run.wd)
     fixture = run.require('corpus') + '/' + OPEN_FILE
-    hit = wait_for(lambda: run.wd.execute("""
-const card=all(document,'jf-results-card').find(e=>{
- const s=e.snapshot, r=e.getBoundingClientRect();
- return r.width>0 && r.height>0 && s?.query===arguments[1] &&
-  !s.isSearching && !s.isRefining && s.passStage!=='quick';
-});
-return card?.shadowRoot ? all(card.shadowRoot,'[data-testid="search-result-row"]').find(e=>
- e.getAttribute('data-addressable-id')===arguments[0] && e.getBoundingClientRect().height>0) || null : null;
-""", [fixture, QUERY]), 'Exact fixture row after search refinement', seconds=45)
+    hit = wait_for(lambda: settled_result_row(run.wd, fixture),
+                   'Exact fixture row after search refinement', seconds=45)
+    open_result_passage(run, hit, fixture)
     # WebDriver's real secondary mouse click opens the result's context menu.
     hit_key = hit['element-6066-11e4-a52e-4f735466cecf']
     run.wd.call(f'/session/{run.wd.session}/actions', {'actions': [{'type': 'pointer', 'id': 'mouse',
@@ -294,7 +348,9 @@ def install_ai(run):
         run.evidence('J3-resume-runtime', run.api('/api/ai/runtime/status'))
         raise Unavailable('cached setup: activation cannot be re-observed; run J3 on a fresh install')
     run.wd.click('button[aria-label^="Install AI"]')
-    run.wd.click('button[aria-label="Accept and download"]')
+    # The consent renders before the plan and licence details are ready.
+    run.wd.click('button[aria-label="Accept and download"]:not(:disabled):not([aria-disabled="true"])',
+                 error=Infrastructure)
     samples = []
     def settled():
         status = run.api('/api/ai/install/status')
@@ -358,8 +414,13 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
     run.require('folder')
     retrieval = semantic_search(run)
     run.nav('AI Brain')
-    text = run.wd.text()
-    assert (chat.get('unavailableReason') or 'Chat is not supported here.') in text, 'CPU chat unavailable explanation is not shown'
+    if getattr(run.args, 'phase', None) == 'predecessor':
+        text = run.wd.text()
+        assert (chat.get('unavailableReason') or 'Chat is not supported here.') in text, 'CPU chat unavailable explanation is not shown'
+    else:
+        wait_for(lambda: cpu_chat_unavailable(run), 'CPU chat unavailable explanation is not shown',
+                 seconds=30, error=ProductFailure)
+        text = run.wd.text()
     run.native.shot('J3-cpu-search-without-chat')
     # Check required retrieval models after exercising retrieval. SPLADE and
     # CPU reranking are off by default, even with their files downloaded.
@@ -383,6 +444,20 @@ print(json.dumps(dict(m,epochSeconds=time.time(),usedKiB=m['MemTotal']-m['MemAva
             + '; retrieval trace=' + json.dumps(diagnostic['retrievalTrace'])) from exc
     run.facts['ai'] = status
     return {'installed': status, 'runtime': runtime, 'cpuPlan': preview, 'activeRetrieval': retrieval, 'uiText': text}
+
+
+def cpu_chat_unavailable(run):
+    reason = run.wd.execute("""
+const step = all(document,'.path-step[data-feature="chat"]').find(visible);
+if (!step || step.dataset.reach !== 'na' || step.dataset.lit !== 'false') return null;
+const name = step.querySelector('.step-name');
+const reason = step.querySelector('.step-reason');
+return visible(name) && name.innerText.trim() === 'Answer questions' && visible(reason)
+ ? reason.innerText.trim() : null;
+""")
+    return reason in ('Not available on Linux yet', 'Needs an NVIDIA graphics card',
+                      'Needs a newer NVIDIA graphics driver', 'Needs a graphics card with more memory',
+                      'Not available on this computer')
 
 
 def activate_downloaded(run):
@@ -664,18 +739,19 @@ def open_update_offer(run, evidence):
     # recreates Settings at General, so do not reuse its former category.
     started = time.monotonic()
     run.close_settings()
-    banner = wait_for(lambda: update_banner(run),
-                      'Update banner visible', seconds=45, error=Infrastructure)
+    trigger = 'button.trigger[aria-haspopup="dialog"]'
+    if not run.wd.find_visible(trigger + '[aria-expanded="true"]'):
+        run.wd.click(trigger + '[aria-expanded="false"]')
+    banner = wait_for(lambda: update_banner(run, visible=True),
+                      'Update banner visible in the open status panel', seconds=45, error=Infrastructure)
     expected_candidate = run.require('initialVersion')
     assert re.search(r'(?<![\w.+~-])' + re.escape(expected_candidate) + r'(?![\w+~-]|\.\w)', banner), 'Update banner does not name the candidate version'
     run.native.shot(evidence + '-banner')
-    # Frame status S1: the banner retired; the offer is a Needs you row in the status panel,
-    # opened from the title-bar pill. Its action navigates to Settings like the banner's did.
-    run.wd.click('button.trigger[aria-haspopup="dialog"]')
     action = run.wd.execute("return all(document,'article[data-fact=\"app-update\"] button').some(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0})")
     if action:
         run.wd.click('article[data-fact="app-update"] button', 'Review and install')
     else:
+        run.wd.click('button[aria-label="Close status panel"]')
         run.nav('Settings')
     run.wd.click('button[data-settings-category="general"]')
     run.wd.element('button[aria-label="Install update"]:not(:disabled)', seconds=45)
@@ -684,14 +760,20 @@ def open_update_offer(run, evidence):
                           'readinessSignal': 'Banner names candidate; enabled Install update visible in General settings'})
 
 
-def update_banner(run):
-    # The update offer's Needs you row (data-fact="app-update"), rendered by the status panel whether
-    # or not the panel is open; the repair state names itself ("The app update needs repair").
+def update_banner(run, *, visible=False):
+    # Lock recovery watches the mounted row; the screenshot requires rendered text.
     banner = run.wd.execute("""
 const rows=all(document,'article[data-fact="app-update"]');
-return {text:rows.map(e=>e.textContent.replace(/\\s+/g,' ')).join(' ').trim(),
-        repair:rows.some(e=>/needs repair/.test(e.textContent))};
-""")
+const text = rows.map(row => {
+ if (!arguments[0]) return row.textContent;
+ const title = row.querySelector('.title .text');
+ if (!visible(title)) return '';
+ title.scrollIntoView({block:'nearest'});
+ const rect = title.getBoundingClientRect();
+ return rect.top >= 0 && rect.bottom <= document.documentElement.clientHeight ? title.innerText : '';
+}).join(' ').replace(/\\s+/g,' ').trim();
+return {text, repair:rows.some(e=>/needs repair/.test(e.textContent))};
+""", [visible])
     if banner['repair']:
         raise ProductFailure('Updater requires repair: ' + banner['text'])
     return banner['text']
@@ -966,8 +1048,9 @@ def deep_links(run):
             raise ProductFailure('Warm OS deep link left an extra JustSearch process after the 3s forwarding grace period')
         destination = run.wd.execute("""
 const shell=all(document,'jf-shell').find(e=>e.activeId==='core.library-surface');
-const segment=all(document,'button.segment[data-surface-id="core.library-surface"][aria-current="page"]').find(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0});
-return shell && segment ? {route:shell.activeId,segment:segment.textContent.trim()} : null;
+const segment=all(document,'button.segment[data-surface-id="core.library-surface"][aria-current="page"]').find(visible);
+const area=segment || all(document,'button.area-trigger[aria-label="Library, choose area"]').find(visible);
+return shell && area ? {route:shell.activeId,segment:area.textContent.trim()} : null;
 """)
         if not destination:
             return None

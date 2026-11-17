@@ -326,7 +326,7 @@ The candidate's AI registry and URLs are used **unchanged**. `--source` must be
 the source that produced that candidate. For the round-nine development continuation, add `--journeys J1 J3 J9`;
 J3 adds the small corpus through the production API as a prerequisite, without
 a J2 result. Installation still uses fresh private downloads, production
-activation and the acknowledged Start answers control.
+activation and the acknowledged Use Answer questions switch.
 For a development isolation check without AI installation or GPU work, use
 `--journeys J1 J2 --write-budget-bytes 20000000000`; the summary marks this
 subset as development evidence.
@@ -419,7 +419,7 @@ completion is observed through `/api/ai/install/status`. This lane does not driv
 the Install AI consent dialog; the CPU VMs qualify that UI flow. Downloaded models
 are activated through the existing UI activation consent. Preview must select GPU_FULL and include chat and `cuda-runtime-linux`; installed
 readiness must agree and must not install the Windows native runtime. The separate
-**Start answers** control then sets chat intent; the observed runtime must become
+**Use Answer questions** switch then sets chat intent; the observed runtime must become
 healthy with a realized model before a chat request. Embedding
 must report **observed** CUDA execution without GPU fallback. SPLADE is downloaded but runs only when enabled (off by default since #1162), so it is not required.
 The production RAG chat request goes through the shell's own authenticated
@@ -557,7 +557,7 @@ recovery; the saved skip rule and theme are not authored a second time. The empt
 sandbox-home mount placeholders are rebuilt for the new evidence path. Exited
 zombie processes are excluded before environment reads and final live-process
 checks; unreadable known live processes still fail as infrastructure. Remove any retained
-root after the development repair sequence ends. Start answers
+root after the development repair sequence ends. The answers switch
 must be invoked and its chat intent acknowledged before chat startup failures
 can be classified as product failures.
 
@@ -611,13 +611,19 @@ qualification. Explicit `--journeys` subsets likewise never qualify a release.
   with `J1-desktop-first-run.png`. A subsequent harness-launched WebDriver session
   checks its own mounted DOM and prepares later journeys; it does not certify
   the preceding desktop window's visible text.
-- J2: the real chooser, Ctrl+L and a generated corpus path on the Wayland VM;
-  production API folder addition on hosted; index and search observations;
-  **Open file** followed by the exact fixture path in the receiving Mousepad
+- J2: **Add a folder** in Library opens the real chooser on the Wayland VM.
+  Ctrl+L selects the generated corpus path, which must appear exactly in
+  **Folder path** before pressing **Add**. Hosted Linux adds the folder through
+  the production API. After indexing and search, clicking the candidate's exact
+  result must open the in-app reader at a highlighted passage containing the query.
+  The journey records `J2-in-app-passage.json` and `J2-in-app-passage.png`.
+  **Open file** must also deliver the exact fixture path in the receiving Mousepad
   process's `/proc/<pid>/cmdline` or open file descriptor, plus a screenshot.
   The process must belong to this run. Window titles and maximization do not
   determine which file was opened.
-- J3: default production downloads, then **Activate downloaded models** and the
+- J3: **Accept and download** must become enabled before clicking. A readiness
+  timeout is infrastructure. Default production downloads are followed by
+  **Activate downloaded models** and the
   UI's typed authorization when it remains interactable. A duplicate typed prompt
   may disappear while the harness is observing or typing. The harness polls for
   an interactable typed prompt for up to 30 seconds and approves it when present.
@@ -635,7 +641,9 @@ qualification. Explicit `--journeys` subsets likewise never qualify a release.
   fixture with a dense-only execution trace, without keyword fallback or blocked
   vector retrieval. CPU requires a cross-encoder stage explicitly skipped for
   `PIPELINE_NOT_ELIGIBLE`;
-  GPU still requires an executed cross-encoder. Fresh downloads also require the session acquisition capability.
+  GPU still requires an executed cross-encoder. On CPU, the AI Brain Overview
+  must show **Answer questions** as unavailable with a hardware explanation.
+  Fresh downloads also require the session acquisition capability.
   Cached CPU setups report J3 unavailable because activation cannot be re-observed;
   run J3 on a fresh install.
   Activation polls record `/proc/meminfo` samples about every five seconds. The CPU
@@ -659,7 +667,9 @@ qualification. Explicit `--journeys` subsets likewise never qualify a release.
   dpkg lock timeout**, then accepted elevation and automatic candidate relaunch.
   The offer is entered through the banner's **Review and install** action,
   which opens Settings. A direct Settings fallback is allowed only when the
-  visible banner has no action, and the chosen entry is recorded. Recovery
+  visible status row has no action, and the chosen entry is recorded. Open the
+  status panel and verify the exact candidate version is visible before taking
+  the offer screenshot. Recovery
   can recreate Settings at Appearance; the runner closes that window, follows
   the banner again, and waits for an enabled Install update control before
   claiming a re-offer. Cancellation requires this run's pkexec apt-get install
@@ -923,8 +933,10 @@ bindings are cached before sealing (`uia-client.json`). Picker input uses UIA
 Value and Invoke patterns, with exact returned-value checks. The picker control
 inventory is retained for diagnosis.
 
-Windows J2 uses EdgeDriver's native element-click endpoint for the plain result
-Actions button; nested shadow controls retain the shared coordinate path.
+Windows J2 clicks the exact result and verifies its passage in the candidate's
+in-app reader. It then uses EdgeDriver's native element-click endpoint for the
+plain result Actions button. Nested shadow controls use the shared viewport
+click path.
 J2 records a trusted left click on the exact fixture's Actions
 button before attributing a missing menu to the product; a missed click is
 infrastructure.
@@ -1078,24 +1090,25 @@ python -m unittest discover -s scripts/release/qual/journeys -p test_windows.py
 ```
 
 
-### Current UI selector audit (H1–H6)
+### Current UI selector audit (H1–H9)
 
-Checked against `origin/main` at `d8f6c9d13f` (the source in this checkout).
-`test_current_ui.py` covers the reported controls and predecessor exception;
-`SkipRuleTests` in `test_redesign.py` also rejects missing, hidden, disabled or
-changed rule inputs after restart. Older round notes above describe historical
-observations.
+Checked against `ab9271581f`. The regression fixtures in
+`test_current_ui.py` cite the corresponding source lines and run with the
+journey unit suite. Older round notes describe their historical observations.
 
-| Journey controls | Current UI source under `modules/ui-web/src/shell-v0/` | Audit result |
+| Journey controls | UI source under `modules/ui-web/src/shell-v0/` | Harness behavior |
 | --- | --- | --- |
-| J1 shell and first launch | `chrome/Shell.ts`, `components/WalkthroughCard.ts`, `components/GettingStarted.ts` | The empty legacy walkthrough host is still mounted. Dismiss only when its actual button is visible; the current Getting started card needs no dismissal. Legacy Get started remains optional for predecessors. |
-| Navigation and Settings close | `chrome/TopBar.ts`, `chrome/SettingsWindow.ts` | `button[data-surface-id]`, `jf-shell.activeId` and Close Settings remain valid; update the runner's obsolete rail comment only. |
-| J2 system picker | `views/LibrarySurface.ts`, `controllers/FolderAddFlow.ts` | Add folder is lowercase; retain Add Folder for v0.3.2. Folder path and Add are unchanged. |
-| J2 search and open | `views/search-v3/Sv3Composer.ts`, `components/searchResults/ResultsCard.ts`, `commands/searchResultActions.ts` | Use the mode trigger's stable `sv3-composer-tier` test ID regardless of current mode. Search tier, composer input, results-card snapshot, result-row identity, row Actions and Open file remain valid. |
-| J3 install, consent, activation, GPU chat | `views/BrainSurface.ts`, `components/AuthorizationHost.ts`, `components/OperationOutcomeDetail.ts` | Match Install AI by label prefix; Start answers replaces Start AI. Accept and download, Activate downloaded models, typed authorization, Approve and operationKey remain valid. |
-| J4 authored state | `views/LibrarySurface.ts`, `components/SurfaceTabs.ts`, `components/IndexingRulesEditor.ts`, `views/settingsRegister.ts`, `components/SettingsNav.ts`, `renderers/controls/OptionButtonGroupRenderer.ts` | Folders tab, Add a rule, last skip-rule input left with Tab (saves), and the in-place ask's Keep them; reading hours `#indexing-hours` (Only between) then the other `indexing-hours` radio (Any time); Appearance and Dark are unchanged. Retire bookmark UI and savedViews checks. J5 predecessor state is Dark plus downloaded models. |
-| J5 update offer and install | `components/StatusPill.ts`, `components/StatusPanel.ts`, `state/frameStatus.ts`, `views/SettingsSurface.ts`, `views/settingsControlLabels.ts` | Status trigger, app-update row, Review and install, General and Install update remain valid. |
-| J7 warm link and shortcut | `chrome/TopBar.ts`, `views/SettingsSurface.ts`, `views/search-v3/Sv3Composer.ts` | Replace the removed Library heading with its visible current top-bar segment; keep shell activeId. General, settings-search-shortcut and the focused composer input remain valid. |
+| J1 shell and first launch | `chrome/Shell.ts`, `components/WalkthroughCard.ts`, `components/GettingStarted.ts` | The legacy walkthrough host can be empty. Click Get started and Dismiss only when the respective button is available. Leave first-run wording with the owner screenshot. |
+| H1–H2 shared navigation | `chrome/TopBar.ts`, `chrome/SettingsWindow.ts` | Open Settings from Menu, with a direct-button path for predecessors that render it. Startup requires a visible Search button or narrow area trigger. At narrow widths select a `data-area-id` row from the area menu. Before navigation, close restored Settings. |
+| H3 J2 system picker | `views/LibrarySurface.ts`, `controllers/FolderAddFlow.ts` | Scope Add a folder to Library, with older labels for predecessors. The native chooser returns the exact Folder path for Add to confirm. Search first-use submits the native selection directly. Hosted Linux and GPU keep their API folder-add steps. |
+| H4–H5 J2 search and open | `views/search-v3/Sv3Composer.ts`, `views/search-v3/sv3-search.ts`, `views/search-v3/Sv3Pane.ts`, `components/documentPane/DocumentPane.ts`, `components/searchResults/ResultsCard.ts` | Select Search from a direct button or mode menu if rendered. Submit with Enter in the composer textarea. On candidate Linux and Windows, click the exact row, verify the matching document path and highlighted query passage, and close the in-app pane before the external Open file check. Predecessor and GPU lanes keep their existing search evidence. |
+| H6–H8 J3 install, consent, activation and GPU chat | `views/BrainSurface.ts`, `components/AuthorizationHost.ts`, `components/OperationOutcomeDetail.ts` | Match Install AI by label prefix and wait for enabled Accept and download. Keep the typed activation, operation and retrieval evidence. Verify the candidate CPU Overview's unavailable Answer questions step. On GPU, start answers with the Overview switch and wait for persisted intent and the ready runtime. |
+| J4 authored state | `views/LibrarySurface.ts`, `components/IndexingRulesEditor.ts`, `components/SettingsNav.ts` | Folders, Add a rule, Tab-to-save and Keep them still apply. Keep the reading-hours, Dark and restart assertions. Predecessor J4 authors Dark only. |
+| H9 J5 update offer and install | `components/StatusPill.ts`, `components/StatusPanel.ts`, `state/frameStatus.ts`, `views/SettingsSurface.ts` | Open the status panel before checking the exact visible version and taking the offer screenshot. Use Review and install or dismiss the panel and open Settings. Require General's enabled Install update control. |
+| J7 warm link and shortcut | `chrome/TopBar.ts`, `views/SettingsSurface.ts`, `views/search-v3/Sv3Composer.ts` | Require the shell's Library route and the visible current segment or narrow Library area trigger. Keep the General shortcut status and focused composer checks. |
 
-The two additional H6 fixes are the empty walkthrough host and selected-mode
-assumption. No other selector mismatches were found. No product files changed.
+The production-build Chromium fixture is
+`modules/ui-web/e2e/type-ladder-chromium.mjs`. It drives the real composer and
+result pane against fixture responses. It requires Vite, Playwright Chromium,
+and a loopback listener. Native picker delivery, packaged WebDriver behavior,
+external viewers, and GPU activation are covered by the release lanes.

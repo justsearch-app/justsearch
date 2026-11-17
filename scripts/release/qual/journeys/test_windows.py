@@ -507,11 +507,13 @@ class WindowsOperationalTests(unittest.TestCase):
         path=lambda p:tools if str(p)=='C:/Qual/tools.json' else Path(p)
         with patch.object(windows,'Path',side_effect=path),patch.object(linux,'search_api',return_value={'results':[OPEN_FILE.lower()]}), \
              patch.object(windows,'default_viewer',return_value={'executable':image}), \
-             patch.object(windows,'ps_json',side_effect=[[],[receiver]]),patch.object(windows,'wait_for',once):
+             patch.object(windows,'ps_json',side_effect=[[],[receiver]]),patch.object(windows,'wait_for',once), \
+             patch.object(linux, 'open_result_passage') as passage:
             windows.search_open(run)
-        run.wd.element.assert_not_called()
+        passage.assert_called_once_with(run, exact, fixture)
+        run.wd.element.assert_called_once_with('textarea[data-testid="sv3-composer-input"]')
         self.assertIn('data-addressable-id',run.wd.execute.call_args_list[0].args[0])
-        self.assertEqual(run.wd.execute.call_args_list[0].args[1],[fixture])
+        self.assertEqual(run.wd.execute.call_args_list[0].args[1],[fixture,linux.QUERY,True])
         self.assertIn('row-actions',run.wd.execute.call_args_list[1].args[0])
         self.assertEqual(run.wd.execute.call_args_list[1].args[1],[exact])
         run.wd.click_element.assert_not_called()
@@ -539,7 +541,8 @@ class WindowsOperationalTests(unittest.TestCase):
                 path=lambda p:tools if str(p)=='C:/Qual/tools.json' else Path(p)
                 with patch.object(windows,'Path',side_effect=path),patch.object(linux,'search_api',return_value={}), \
                      patch.object(windows,'default_viewer',return_value={'executable':image}), \
-                     patch.object(windows,'ps_json',return_value=[]),patch.object(windows,'wait_for',once):
+                     patch.object(windows,'ps_json',return_value=[]),patch.object(windows,'wait_for',once), \
+                     patch.object(linux, 'open_result_passage'):
                     expected=ProductFailure if observation==delivered else Infrastructure
                     message='missing menu' if observation==delivered else 'click.*not delivered'
                     with self.assertRaisesRegex(expected,message):

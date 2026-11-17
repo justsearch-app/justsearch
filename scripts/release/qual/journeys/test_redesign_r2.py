@@ -178,7 +178,7 @@ class ClassificationTests(unittest.TestCase):
 
     def test_packaged_rail_never_mounts_is_product(self):
         run = Mock(binary=BINARY, work='/tmp/isolated', facts={})
-        wd = Mock(); wd.execute.return_value = False
+        wd = Mock(); wd.find_visible.return_value = None
         with patch.object(runner,'WebDriver',return_value=wd), patch.object(runner,'wait_for',immediate), \
              self.assertRaises(AssertionError):
             runner.Run.start_ui(run)
@@ -227,19 +227,19 @@ class ClassificationTests(unittest.TestCase):
                 run=runner.Run(NS(evidence=temp+'/run',vm=None),DEFINITION)
                 run.facts['ui']=True;run.wd=Mock()
                 run.wd.execute.side_effect=[True,False]
-                run.wd.element.return_value={'element-6066-11e4-a52e-4f735466cecf':'rail'}
+                run.wd.find_visible.return_value={'element-6066-11e4-a52e-4f735466cecf':'rail'}
                 with patch.object(runner,'wait_for',immediate):run.nav(surface)
                 calls=run.wd.mock_calls
                 self.assertIn(unittest.mock.call.click('button[aria-label="Close Settings"]'),calls)
                 self.assertLess(next(i for i,c in enumerate(calls) if c[0]=='click'),
-                                next(i for i,c in enumerate(calls) if c[0]=='element'))
+                                next(i for i,c in enumerate(calls) if c[0]=='find_visible'))
 
     def test_restored_settings_stuck_is_product(self):
         with tempfile.TemporaryDirectory() as temp:
             run=runner.Run(NS(evidence=temp+'/run',vm=None),DEFINITION)
             run.facts['ui']=True;run.wd=Mock();run.wd.execute.return_value=True
             with patch.object(runner,'wait_for',immediate),self.assertRaises(runner.ProductFailure):run.nav('Search')
-            run.wd.element.assert_not_called()
+            run.wd.find_visible.assert_not_called()
 
 
 class ProcessTests(unittest.TestCase):

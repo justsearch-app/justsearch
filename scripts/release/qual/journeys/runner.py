@@ -509,6 +509,11 @@ function all(root, selector) {
  for (const node of root.querySelectorAll('*')) if (node.shadowRoot) found.push(...all(node.shadowRoot, selector));
  return found;
 }
+function visible(e) {
+ if (!e) return false;
+ const r = e.getBoundingClientRect();
+ return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility === 'visible';
+}
 """
 
 
@@ -535,13 +540,16 @@ class WebDriver:
             raise Unavailable('No attached WebDriver session')
         return self.call(f'/session/{self.session}/execute/sync', {'script': DEEP_QUERY + script, 'args': args or []})
 
+    def find_visible(self, selector, text=None):
+        return self.execute("""
+return all(document,arguments[0]).find(e =>
+ visible(e) && (!arguments[1] || (e.innerText || e.textContent || '').trim()===arguments[1])
+) || null;
+""", [selector, text])
+
     def element(self, selector, text=None, seconds=30, *, error=Infrastructure):
-        return wait_for(lambda: self.execute("""
-return all(document,arguments[0]).find(e => {
- const r=e.getBoundingClientRect();
- return r.width>0 && r.height>0 && (!arguments[1] || (e.innerText || e.textContent || '').trim()===arguments[1]);
-}) || null;
-""", [selector, text]), f'Visible {selector} {text or ""}', seconds, error=error)
+        return wait_for(lambda: self.find_visible(selector, text),
+                        f'Visible {selector} {text or ""}', seconds, error=error)
 
     def click(self, selector, text=None, *, error=Infrastructure):
         element = self.element(selector, text, error=error)
@@ -572,6 +580,11 @@ return all(document,arguments[0]).find(e => {
                 self.call(f'/session/{self.session}', method='DELETE')
             finally:
                 self.session = None
+
+
+def wait_for_navigation(wd, *, error=AssertionError):
+    wait_for(lambda: wd.find_visible('button[data-surface-id="core.search-v3-surface"],button.area-trigger'),
+             'Packaged UI area navigation visible', seconds=60, error=error)
 
 
 class Native:
@@ -974,8 +987,7 @@ except (TimeoutError,PermissionError) as exc:
         self.wd.start(self.binary)
         self.observe_window('automation')
         self.ready()
-        wait_for(lambda: self.wd.execute("return all(document,'button[data-surface-id]').length > 0"),
-                 'Packaged UI rail mounted', seconds=60)
+        wait_for_navigation(self.wd)
         self.facts['ui'] = True
 
     def stop_app(self):
@@ -1056,12 +1068,31 @@ except (TimeoutError,PermissionError) as exc:
         self.close_settings()
         ids = {'Library': 'core.library-surface', 'Search': 'core.search-v3-surface',
                'AI Brain': 'core.brain-surface', 'Settings': 'core.settings-surface'}
-        # Top-bar buttons are ordinary native buttons in one shadow root. Use
-        # WebDriver's element click so moved/recreated windows resolve their own
-        # hit point; the viewport adapter remains for nested component controls.
-        element = self.wd.element('button[data-surface-id=' + json.dumps(ids[surface]) + ']')
+        selector = 'button[data-surface-id=' + json.dumps(ids[surface]) + ']'
+        if surface == 'Settings':
+            menu_item = selector + '[role="menuitem"]'
+            selector += ':not([role="menuitem"])'
+            trigger = 'button[aria-label="Menu"]'
+        else:
+            menu_item = 'button[data-area-id=' + json.dumps(ids[surface]) + ']'
+            trigger = 'button.area-trigger'
+
+        def control():
+            for candidate in (selector, menu_item, trigger + ':not([aria-expanded="true"])'):
+                if element := self.wd.find_visible(candidate):
+                    return candidate, element
+
+        chosen, element = wait_for(control, f'Visible navigation to {surface}', seconds=30,
+                                   error=Infrastructure)
+        if chosen == menu_item:
+            self.wd.click_element(element)
+            return
+        # Keep the native element click for the plain top-bar buttons. The
+        # viewport adapter handles the nested shadow menu controls.
         key = element['element-6066-11e4-a52e-4f735466cecf']
         self.wd.call(f'/session/{self.wd.session}/element/{key}/click', {})
+        if chosen != selector:
+            self.wd.click(menu_item)
 
     def jvm_crashes(self):
         if self.crash_since_ns is None:

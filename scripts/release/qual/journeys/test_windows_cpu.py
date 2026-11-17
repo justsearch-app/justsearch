@@ -27,8 +27,9 @@ class WindowsCPUReadinessTests(unittest.TestCase):
 
     def run_ai(self, status, *, platform='windows', inactive=None):
         run = Mock(platform=platform, facts={})
-        run.wd.execute.return_value = []
-        run.wd.text.return_value = 'Chat is not supported here.'
+        reason = 'Needs an NVIDIA graphics card' if platform == 'windows' else 'Not available on Linux yet'
+        run.wd.execute.side_effect = lambda script: reason if '.step-reason' in script else []
+        run.wd.text.return_value = f'Answer questions\n{reason}'
         runtime = {'onnxFeatures': [
             {'id': name, 'modelActive': name != inactive}
             for name in ('embed', 'splade', 'reranker', 'citation_scorer')]}
