@@ -89,6 +89,7 @@ class NarrowedTests(unittest.TestCase):
             with self.subTest(offered=offered):
                 run = Mock()
                 run.require.return_value = '0.3.1'
+                run.wd.find_visible.return_value = None
                 with patch.object(linux, 'wait_for', immediate), \
                      patch.object(linux, 'update_banner', return_value=f'JustSearch {offered} is available.'):
                     if offered == '0.3.1':
@@ -97,7 +98,8 @@ class NarrowedTests(unittest.TestCase):
                     else:
                         with self.assertRaisesRegex(AssertionError, 'candidate version'):
                             linux.open_update_offer(run, 'offer')
-                        run.wd.click.assert_not_called()
+                        run.wd.click.assert_called_once_with('button.trigger[aria-haspopup="dialog"][aria-expanded="false"]')
+                        run.native.shot.assert_not_called()
 
     def test_n5_missing_desktop_entry_does_not_depend_on_english(self):
         run = Mock()

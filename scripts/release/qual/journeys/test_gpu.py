@@ -371,7 +371,8 @@ class GpuTests(unittest.TestCase):
             {'inference': {'engineState': 'Healthy', 'chatEnabledSpec': True}},
             {'active': {'modelPath': '/private/models/chat.gguf', 'chatProfile': 'standard'}, 'activation': {'state': 'idle'}}]
         gpu.start_chat(run)
-        run.wd.click.assert_called_once_with('button[aria-label="Start answers"]')
+        run.wd.click.assert_called_once_with(
+            'button[role="switch"][aria-label="Use Answer questions"][aria-checked="false"][aria-disabled="false"]')
         self.assertEqual(run.api.call_args_list[0].args, ('/api/status',))
 
     def test_chat_failure_needs_invoked_and_acknowledged_start_ai(self):

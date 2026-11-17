@@ -734,7 +734,7 @@ def chat_runtime_ready(status, runtime):
 def wait_chat_ready(run, label):
     proof = run.facts.get('chatStart', {})
     if proof.get('invoked') is not True or proof.get('acknowledged') is not True:
-        raise Infrastructure('Start answers action was not invoked and acknowledged; product chat failure cannot be established')
+        raise Infrastructure('Use Answer questions switch was not invoked and acknowledged; product chat failure cannot be established')
     samples = []
     def probe():
         status = run.api('/api/status')
@@ -755,15 +755,16 @@ def start_chat(run):
     # The CPU adapter has no chat action, so it cannot supply this GPU step.
     run.nav('AI Brain')
     run.facts['chatStart'] = {'invoked': False, 'acknowledged': False}
-    run.wd.click('button[aria-label="Start answers"]')
+    control = 'Use Answer questions'
+    run.wd.click(f'button[role="switch"][aria-label="{control}"][aria-checked="false"][aria-disabled="false"]')
     run.facts['chatStart']['invoked'] = True
     def acknowledged():
         status = run.api('/api/status')
         run.facts['chatStart']['acknowledged'] = (status.get('inference') or {}).get('chatEnabledSpec') is True
-        run.evidence('J3-start-ai-action', {'control': 'Start answers', **run.facts['chatStart'],
+        run.evidence('J3-start-ai-action', {'control': control, **run.facts['chatStart'],
                                           'inference': status.get('inference')})
         return run.facts['chatStart']['acknowledged']
-    wait_for(acknowledged, 'Start answers intent acknowledgment', seconds=30, error=Infrastructure)
+    wait_for(acknowledged, 'Use Answer questions intent acknowledgment', seconds=30, error=Infrastructure)
     return wait_chat_ready(run, 'J3')
 
 

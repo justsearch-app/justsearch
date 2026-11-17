@@ -230,14 +230,17 @@ class ClassificationReviewTests(unittest.TestCase):
         run.wd = wd
         wd.keys = Mock(); wd.element = Mock(return_value={'element-6066-11e4-a52e-4f735466cecf':'hit'})
         wd.call = Mock()
+        wd.find_visible = Mock(return_value=None)
         # Other setup clicks succeed; use real click/element for Open file.
         def click(selector, text=None, **kw):
             if text == 'Open file':
                 with patch.object(wd,'element',side_effect=lambda *a,**k: runner.WebDriver.element(wd,*a,**k)), \
+                     patch.object(wd,'find_visible',side_effect=lambda *a,**k: runner.WebDriver.find_visible(wd,*a,**k)), \
                      patch.object(wd,'execute',return_value=None), patch.object(runner,'wait_for',immediate):
                     runner.WebDriver.click(wd,selector,text,**kw)
         wd.click = Mock(side_effect=click)
-        with patch.object(linux,'search_api',return_value={}),patch.object(linux,'wait_for',return_value={'element-6066-11e4-a52e-4f735466cecf':'hit'}):
+        with patch.object(linux, 'open_result_passage'), patch.object(linux,'search_api',return_value={}), \
+             patch.object(linux,'wait_for',return_value={'element-6066-11e4-a52e-4f735466cecf':'hit'}):
             try: linux.search_open(run)
             except Exception as exc:
                 self.assertEqual(runner.classify(exc),'failed-product')

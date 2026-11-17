@@ -96,8 +96,14 @@ class RepairTests(unittest.TestCase):
         for typed, citation_active in ((True, True), (False, True), (False, False)):
             run = Mock()
             run.facts = {}
-            run.wd.text.return_value = 'Chat is not supported here.'
-            run.wd.execute.side_effect = lambda script: {'typed': typed, 'operationKeys': [] if typed else ['accepted-operation']} if 'const typed=' in script else []
+            run.wd.text.return_value = 'Answer questions\nNot available on Linux yet'
+            def dom(script):
+                if '.step-reason' in script:
+                    return 'Not available on Linux yet'
+                if 'const typed=' in script:
+                    return {'typed': typed, 'operationKeys': [] if typed else ['accepted-operation']}
+                return []
+            run.wd.execute.side_effect = dom
             downloaded = {'state': 'completed', 'phase': 'activation_required', 'installedFully': False,
                           'readyCapabilities': ['retrieval-core']}
             active = dict(downloaded, phase='completed', installedFully=True)

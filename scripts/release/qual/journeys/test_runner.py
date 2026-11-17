@@ -335,6 +335,7 @@ class RunnerTests(unittest.TestCase):
         run.require.side_effect = lambda key: '0.3.1' if key == 'initialVersion' else {}
         run.target.run.side_effect = [types.SimpleNamespace(stdout='0.3.0'),
                                       types.SimpleNamespace(stdout='', returncode=0)]
+        run.wd.find_visible.return_value = None
         run.wd.execute.side_effect = [{'text': 'JustSearch 0.3.1 is available. Review and install', 'repair': False}, True]
         with patch.object(linux, 'installed_version', return_value='0.3.0'), \
              patch.object(linux, 'digest', return_value='package-hash'), \
@@ -343,7 +344,7 @@ class RunnerTests(unittest.TestCase):
         run.nav.assert_not_called()
         # Frame status S1: the offer is the status panel's Needs you row, opened from the pill.
         self.assertEqual([c.args for c in run.wd.click.call_args_list[:2]],
-                         [('button.trigger[aria-haspopup="dialog"]',),
+                         [('button.trigger[aria-haspopup="dialog"][aria-expanded="false"]',),
                           ('article[data-fact="app-update"] button', 'Review and install')])
         self.assertTrue(run.facts['updateOffered'])
         run.wd.element.assert_called_with('button[aria-label="Install update"]:not(:disabled)', seconds=45)
@@ -353,11 +354,12 @@ class RunnerTests(unittest.TestCase):
         from unittest.mock import Mock, call
         run = Mock()
         run.require.return_value = '0.3.1'
+        run.wd.find_visible.return_value = None
         run.wd.execute.side_effect = [{'text': 'JustSearch 0.3.1 is available. Review and install', 'repair': False}, True]
         linux.open_update_offer(run, 'recovered')
         run.close_settings.assert_called_once()
         self.assertEqual(run.wd.click.call_args_list, [
-            call('button.trigger[aria-haspopup="dialog"]'),
+            call('button.trigger[aria-haspopup="dialog"][aria-expanded="false"]'),
             call('article[data-fact="app-update"] button', 'Review and install'),
             call('button[data-settings-category="general"]')])
         run.nav.assert_not_called()
@@ -414,7 +416,7 @@ class RunnerTests(unittest.TestCase):
         from unittest.mock import Mock
         run = Mock()
         run.wd.session = 'session'
-        run.wd.element.return_value = {'element-6066-11e4-a52e-4f735466cecf': 'rail-button'}
+        run.wd.find_visible.return_value = {'element-6066-11e4-a52e-4f735466cecf': 'rail-button'}
         self.r.Run.nav(run, 'Settings')
         run.wd.call.assert_called_once_with('/session/session/element/rail-button/click', {})
         run.wd.click.assert_not_called()
