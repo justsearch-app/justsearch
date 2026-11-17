@@ -328,6 +328,16 @@ function activityWords(entry: UnifiedActionEntry): { title: string; detail?: str
 /** S8 H4' — outcomes that stay their own row while the decision that allowed them is not shown. */
 const UNFINISHED_OUTCOMES: ReadonlySet<string> = new Set(['FAILURE', 'FAILED', 'PARTIAL']);
 const ADD_FOLDER = 'core.add-watched-root';
+/**
+ * The Engine's history names for a settings save: the Settings page's Apply records core.reconfigure;
+ * settings.apply-public is projected as core.apply-settings (OperationHistoryProjection).
+ */
+const SETTINGS_SAVES = ['core.reconfigure', 'core.apply-settings'] as const;
+/**
+ * Successes the default panel leaves out: a folder's add receipt (its folder row says it) and a
+ * settings save (PH3, fm-15: the setting itself shows the change). Their failures stay rows.
+ */
+const QUIET_SUCCESSES: ReadonlySet<string> = new Set([ADD_FOLDER, ...SETTINGS_SAVES]);
 /** "just now", "12 min", "3 h" (fm-15's age beside an Earlier row). */
 function ageWords(ms: number): string {
   const minutes = Math.floor(Math.max(0, ms) / 60_000);
@@ -453,7 +463,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   for (const record of input.advisories ?? []) {
     const extras = record.event.classExtras;
     if (!developer && (record.event.classId === 'core.draft-kept' || record.event.classId === 'operation.completed'
-      && extras.operationId === ADD_FOLDER && extras.outcome === 'SUCCESS')) continue;
+      && QUIET_SUCCESSES.has(String(extras.operationId)) && extras.outcome === 'SUCCESS')) continue;
     if (record.event.classId === 'authorization.pending') {
       const id = typeof extras.pendingId === 'string' ? extras.pendingId : '';
       if (waiting.has(id) || ledgerRequests.has(id)) continue;
@@ -477,7 +487,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
     if (entry.isRoutine || entry.operationOutcomeKey || decisions.folded.has(entry.id)) continue;
     // RV8-3 — only successful permission history (issued, used) is left out; withdrawn and expired stay.
     if (!developer && (entry.grant && ['ISSUED', 'CONSUMED'].includes(entry.grant.action.toUpperCase()) || entry.gate?.disposition === 'APPROVED'
-      || entry.kind === 'operation' && entry.operationId === ADD_FOLDER && entry.outcome === 'SUCCESS')) continue;
+      || entry.kind === 'operation' && QUIET_SUCCESSES.has(entry.operationId ?? '') && entry.outcome === 'SUCCESS')) continue;
     const pendingId = entry.gate?.pendingId;
     if (pendingId && (waiting.has(pendingId) || entry.gate?.disposition === 'GATED' && terminal.has(pendingId))) continue;
     // L9 — a same-key copy withdrawn by another request's answer is not a decision: one row per decision.

@@ -100,6 +100,44 @@ describe('S8-1 the picture', () => {
   });
 });
 
+// PH3 (fm-15) — a settings save is the Engine's settings operation (core.reconfigure from the Settings
+// page, core.apply-settings from settings.apply-public), not something that happened to the person: its
+// success is no row; its failure still is. The filter goes by operation, never by the row's words.
+describe('PH3 settings saves and the close mark', () => {
+  const save = (operationId: string, outcome: string, id = 's1'): UnifiedActionEntry => ({ id, source: 'backend', kind: 'operation',
+    occurredAt: '2026-11-16T09:59:00Z', originator: 'user', label: 'Apply Settings', operationId, outcome });
+  for (const operationId of ['core.reconfigure', 'core.apply-settings']) {
+    it(`a successful ${operationId} save is no row; a failed one is`, async () => {
+      await show(pictured(false, { activity: [save(operationId, 'SUCCESS'), save(operationId, 'SUCCESS', 's2')] }));
+      expect(text(panel.shadowRoot!)).not.toMatch(/Apply Settings/);
+      panel.model = pictured(false, { activity: [save(operationId, 'FAILURE')] }); await panel.updateComplete;
+      expect(text(row('Apply Settings'))).toContain('Failed');
+    });
+    it(`a ${operationId} advisory that succeeded is no row; one that failed is`, () => {
+      const advisory = (outcome: string): AdvisoryRecord => ({ ...unread, key: `a-${outcome}`, event: { ...unread.event, id: `a-${outcome}`,
+        classId: 'operation.completed', classExtras: { operationId, outcome } } } as AdvisoryRecord);
+      const titles = (model: FrameStatus) => model.sections.earlier.map(fact => fact.title).join(' | ');
+      expect(titles(pictured(false, { advisories: [advisory('SUCCESS')] }))).not.toMatch(/ completed/);
+      expect(titles(pictured(false, { advisories: [advisory('FAILURE')] }))).toMatch(/ failed/);
+    });
+  }
+  it('another operation labelled like a settings save still shows its success', async () => {
+    await show(pictured(false, { activity: [save('core.rebuild-index', 'SUCCESS')] }));
+    expect(text(panel.shadowRoot!)).toMatch(/Apply Settings/);
+    const other: AdvisoryRecord = { ...unread, key: 'a-other', event: { ...unread.event, id: 'a-other',
+      classId: 'operation.completed', classExtras: { operationId: 'core.rebuild-index', outcome: 'SUCCESS' } } } as AdvisoryRecord;
+    expect(pictured(false, { advisories: [other] }).sections.earlier.map(fact => fact.title).join(' | ')).toMatch(/ completed/);
+  });
+  it('the close button draws the app\'s close icon, not a text cross', async () => {
+    await show(pictured());
+    const close = panel.shadowRoot!.querySelector<HTMLButtonElement>('button[aria-label="Close status panel"]')!;
+    expect(text(close)).toBe('');
+    const icon = close.querySelector('svg');
+    expect(icon, 'close icon').not.toBeNull();
+    expect([...icon!.querySelectorAll('path')].map(p => p.getAttribute('d'))).toEqual(['M18 6 6 18', 'm6 6 12 12']);
+  });
+});
+
 describe('S8-3 / H5\' "Open AI Brain" only away from AI Brain', () => {
   it('shows on Search and Library, not on AI Brain, and follows the area while open', async () => {
     await show(pictured(), { area: 'core.search-v3-surface' });

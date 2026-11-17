@@ -200,6 +200,41 @@ it.each(['calm', 'working', 'first-use', 'unreachable', 'problems', 'limited', '
   expect(await page.locator('jf-status-pill .trigger').count()).toBe(['calm', 'working', 'first-use'].includes(kind) ? 0 : 1);
 });
 
+// PH2 (fm-02) — the working status is words beside the ring: no outline, no pill background; focus still shows.
+it.each(['dark', 'light'])('"Reading files" is words without an outline or fill in %s', async theme => {
+  const page = await open();
+  await page.evaluate(async theme => {
+    await (window as unknown as { appearance: { applyAppearance(value: unknown): Promise<void> } }).appearance
+      .applyAppearance({ theme, highContrast: false });
+  }, theme);
+  await settle(page); await page.evaluate(() => (window as unknown as AppWindow).attachHost());
+  await add(page).click();
+  await page.getByRole('textbox', { name: 'Folder path', exact: true }).fill('/notes');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.evaluate(() => { const w = window as unknown as AppWindow; w.observe(1, 2, 8); w.finishAdd({ success: true }); });
+  await expect.poll(() => page.locator('jf-status-pill .label').textContent()).toBe('Reading files');
+  await settle(page);
+  const look = await page.locator('jf-status-pill .trigger').evaluate(trigger => {
+    const badge = trigger.querySelector('jf-status-badge')!.shadowRoot!.querySelector('.badge')!;
+    const style = getComputedStyle(badge);
+    const clear = (c: string) => c === 'transparent' || /[,/]\s*0\)$/.test(c);
+    return { fill: clear(style.backgroundColor), outline: ['Top', 'Right', 'Bottom', 'Left'].every(side =>
+      clear(style.getPropertyValue(`border-${side.toLowerCase()}-color`)) || style.getPropertyValue(`border-${side.toLowerCase()}-width`) === '0px'),
+      ring: trigger.querySelector('svg.ring') !== null };
+  });
+  expect(look).toEqual({ fill: true, outline: true, ring: true });
+  // Reached by keyboard: Shift+Tab away and Tab back.
+  await page.locator('jf-status-pill .trigger').focus();
+  await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Tab');
+  const focus = await page.locator('jf-status-pill .trigger').evaluate(trigger => {
+    const style = getComputedStyle(trigger);
+    return { visible: trigger.matches(':focus-visible'), style: style.outlineStyle, width: parseFloat(style.outlineWidth) };
+  });
+  expect(focus.visible).toBe(true);
+  expect(focus.style).toBe('solid');
+  expect(focus.width).toBeGreaterThanOrEqual(2);
+});
+
 it.each(['dark', 'light', 'hc-dark', 'hc-light'])('primary button text clears AA in %s', async theme => {
   const page = await open();
   await page.evaluate(async theme => {

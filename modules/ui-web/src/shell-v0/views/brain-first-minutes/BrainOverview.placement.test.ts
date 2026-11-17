@@ -136,3 +136,21 @@ describe('S7a-8 fm-10 without a recovery need', () => {
     expect(el.shadowRoot!.querySelector('.path-step[data-feature="meaning"]'), 'Understand meaning step').not.toBeNull();
   });
 });
+
+// PH4 (fm-10) — before AI is installed AI Brain shows no graphics card memory (System › Health keeps it);
+// once AI is installed the reading shows as before.
+describe('PH4 the graphics card waits for an installed AI', () => {
+  const gpu = { gpu: { totalVramBytes: 12 * 1024 ** 3, usedVramBytes: 3 * 1024 ** 3, available: true, cudaFunctional: true },
+    operating: { gpu: { stale: false, adapter: 'RTX 4070' } } };
+  const card = (el: Brain) => el.shadowRoot!.querySelector('.graphics-card');
+  it('a not-installed page with a current reading shows no graphics card; installed, it does', async () => {
+    store.current = { ...notInstalled(), status: gpu } as unknown as AiState; preview = plan('to-download');
+    const el = await mount();
+    expect(el.shadowRoot!.querySelector('.path-step[data-feature="meaning"]'), 'the page rendered its steps').not.toBeNull();
+    expect(card(el)).toBeNull();
+    el.remove();
+    store.current = { ...ready(), status: { ...(ready().status as object), ...gpu } } as unknown as AiState; preview = plan('installed');
+    const installed = await mount();
+    expect(words(card(installed))).toContain('3 GB of 12 GB in use · RTX 4070');
+  });
+});

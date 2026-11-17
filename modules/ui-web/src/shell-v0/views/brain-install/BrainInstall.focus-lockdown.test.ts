@@ -170,6 +170,33 @@ it('Escape and Cancel close the consent and return focus to Install AI; Accept i
   expect(await page.evaluate(() => window.brainCalls)).toEqual([]);
 }, 60_000);
 
+// PH5 (fm-11) — the consent sits centred in the area below the top bar, its dimming starts under the bar,
+// and it opens on Cancel, never on a Terms link that leaves the app.
+it.each(['dark', 'light'] as const)('the consent is centred below the top bar and opens on Cancel in %s', async theme => {
+  const { page } = await open('restartAfterFailedNothingPlaced', { shipped: true, theme });
+  await expect.poll(() => heading(page).textContent()).toBe("AI isn't installed yet");
+  await page.getByRole('button', { name: /^Install AI/ }).click();
+  const consent = page.getByRole('dialog', { name: 'Download AI models?' });
+  await expect.poll(() => consent.isVisible()).toBe(true);
+  await expect.poll(() => consent.getByRole('button', { name: 'Accept and download' }).isEnabled()).toBe(true);
+  await expect.poll(() => focused(page)).toBe('Cancel');
+  const g = await page.evaluate(() => {
+    const brain = document.querySelector('jf-brain-surface')!;
+    const dialog = brain.shadowRoot!.querySelector('dialog.consent')!;
+    const root = getComputedStyle(document.documentElement);
+    const bar = parseFloat(root.getPropertyValue('--frame-topbar-height')) * parseFloat(root.fontSize);
+    const r = dialog.getBoundingClientRect(), backdrop = getComputedStyle(dialog, '::backdrop');
+    return { bar, top: r.top, bottom: r.bottom, height: innerHeight, backdropTop: parseFloat(backdrop.top), dim: backdrop.backgroundColor,
+      overBar: brain.shadowRoot!.elementFromPoint(innerWidth / 2, bar / 2) === dialog };
+  });
+  expect(g.bar).toBe(44);
+  expect(g.top).toBeGreaterThanOrEqual(g.bar);
+  expect(Math.abs((g.top + g.bottom) / 2 - (g.bar + g.height) / 2)).toBeLessThanOrEqual(1);
+  expect(g.backdropTop).toBe(g.bar);
+  expect(g.dim).not.toMatch(/^(transparent|rgba\(0, 0, 0, 0\))$/);
+  expect(g.overBar).toBe(false);
+}, 60_000);
+
 it('the install view takes the page without losing focus: after Accept, and from a step, focus moves to Pause', async () => {
   const { page, engine: state } = await open('restartAfterFailedNothingPlaced', { shipped: true });
   await expect.poll(() => heading(page).textContent()).toBe("AI isn't installed yet");
