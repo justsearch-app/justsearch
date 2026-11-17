@@ -248,3 +248,13 @@ are named in governance/search-window-scenarios.v1.json).
   "note": "Wording expectations outside the cited source. The source's choice states R1-R3, a table introduced by 'e.g.', and R4 'every word R1-R3 do not name stay'. These pinned sentences follow from none of R1-R3 or the quoted table, and several replace words R4 keeps: 'The semantic embedding index is not ready' -> 'Search by meaning is not ready'; 'Passage embeddings are not ready' -> 'Passage-level search by meaning is not ready'; 'Passage embeddings are still being computed' -> 'Passage-level search by meaning is still being prepared'; 'The semantic search encoder is stalled' -> 'Search by meaning is stalled' (R2 gives 'The search by meaning encoder is stalled'); 'Indexing throughput has stalled/is degraded' -> 'Reading has stalled'/'Reading is slower than usual' (new file); 'passage embeddings are missing' -> 'passage data for search by meaning is missing' (new file); 'Embedding cannot run right now.' -> 'Search by meaning cannot be prepared right now.'; 'Showing keyword-ranked results - semantic ranking' -> 'Showing word search results - ranking by meaning'; \"semantic matches\" -> 'matches by meaning'; 'Folder added. Indexing activity is shown below.' -> 'Reading progress is shown below.' (R1 gives 'Reading activity'). The last four are named only in an assertionChanges reason as 'the orchestrator's additions', not in any source. Files: readinessNotice.test.ts, readinessNoticeQueryOnCpu.test.ts, folderStatus.test.ts, frameStatus.optionalAi.test.ts, indexingProgress.pause.test.ts, availability.test.ts, FirstUse.app-lockdown.test.ts, first-minutes-wording.test.ts. Also folderStatus.test.ts changes an input (the enrichmentBlockedDetail fixture), contrary to 'every input unchanged'. Repair: quote the decided table in full in the source choice (with these sentences), or reword to what R1-R4 give. Everything else checked: diffs change only expected sentences, negatives still guard their claims, all files pass, the new file fails before by assertion and caught a reinserted 'Semantic search degraded.'"
 }
 ```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "a5321ecd-fbbf-4063-8e71-f3790ac0911d",
+  "verdict": "accept",
+  "digest": "sha256:784a66d9440ab9170aea20c0cecfb308229d86b5b828216bc973735063e6f692"
+}
+```
