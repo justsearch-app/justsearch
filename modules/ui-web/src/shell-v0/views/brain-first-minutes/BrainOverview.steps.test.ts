@@ -154,8 +154,8 @@ describe('S7a-1 not installed (fm-10)', () => {
     expect(words(step(el, 'pictures'))).toContain('Simple scans are read already');
     expect(step(el, 'pictures')!.querySelectorAll('[role="switch"]')).toHaveLength(0);
     expect(step(el, 'meaning')!.querySelectorAll('[role="switch"]')).toHaveLength(0);
-    expect(words(step(el, 'meaning'))).toContain('1.2 GB download');
-    expect(words(step(el, 'reranker'))).toContain('341 MB download');
+    expect(words(step(el, 'meaning'))).toContain('1.2 GB');
+    expect(words(step(el, 'reranker'))).toContain('341 MB');
     const included = step(el, 'reranker')!.querySelectorAll<HTMLElement>('[role="switch"]');
     expect(included).toHaveLength(1);
     expect(included[0]!.getAttribute('aria-checked')).toBe('true');
@@ -316,7 +316,7 @@ describe('S7a-3 meaning not working keeps its remedy and claims nothing', () => 
 });
 
 describe('S7a-9 sizes and words', () => {
-  it('labels package sizes as downloads, never as measured disk use, and never leads with a separator', async () => {
+  it('writes package sizes as the amount alone, never as measured disk use, and never leads with a separator', async () => {
     preview = plan(true, 'available');
     presence = { packages: ['embedding', 'reranker', 'chat'].map(id => ({ id, complete: true })) };
     store.current = { ...installedNoCard(), aiEngine: { kind: 'online', stability: { kind: 'settled' }, installFailure: null },
@@ -326,7 +326,7 @@ describe('S7a-9 sizes and words', () => {
     for (const [id, bytes] of [['meaning', '1.2 GB'], ['reranker', '341 MB'], ['chat', '5.7 GB']] as const) {
       const size = [...(step(el, id)?.querySelectorAll('.step-meta') ?? [])].map(words).find(t => t.includes(bytes));
       expect(size, `${id} size`).toBeTruthy();
-      expect(size).toMatch(/download/i);
+      expect(size).toBe(bytes);
       expect(size).not.toMatch(/on disk|registry|footprint/i);
     }
     const metas = [...el.shadowRoot!.querySelectorAll('.path-step .step-meta')].map(words);
@@ -348,7 +348,7 @@ describe('S7a-9 sizes and words', () => {
     const el = await mount();
     expect(words(el.shadowRoot!)).not.toContain('5.7 GB');
     expect(step(el, 'chat'), 'Answer questions step').not.toBeNull();
-    expect(words(step(el, 'meaning'))).toContain('1.2 GB download');
+    expect(words(step(el, 'meaning'))).toContain('1.2 GB');
   });
   it('keeps one kept-files wording at most and no CUDA reason on the default page', async () => {
     preview = plan(true, 'no-card'); settings = { ...settings, rerankerEnabled: false };

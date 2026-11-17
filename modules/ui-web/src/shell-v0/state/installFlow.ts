@@ -13,6 +13,12 @@
 import type { AiInstallStatus } from '../../api/generated/schema-types/ai-install-status.js';
 import { formatBytesOf } from '../display/format.js';
 
+/**
+ * fm-12b — what a stopped download keeps, in AI Brain and in the status panel's entry alike. It names no
+ * cause: the Engine reports only that downloads failed.
+ */
+export const STOPPED_DOWNLOAD_SENTENCE = 'What is already here is kept, and search by exact words keeps working.';
+
 /** Page step names per package; a package the pictures do not name keeps the Engine's label. */
 const PART_NAMES: Record<string, { name: string; note?: string }> = {
   embedding: { name: 'Understand meaning' },
@@ -110,7 +116,7 @@ export interface DoneEvidence {
 export interface PartRow {
   id: string;
   name: string;
-  /** Done / "a of b" / Waiting / Stopped… / a stage's blocked reason. */
+  /** Done / "a of b" / Waiting / "Stopped at a of b" / Stopped / a stage's blocked reason. */
   words: string;
   done: boolean;
   /** 0..100 for a part with bytes under way, else null. */
@@ -160,7 +166,7 @@ export function composePartRows(
         : amount ?? 'Waiting';
     } else {
       words = p.state === 'pending' ? blocked.get(p.stage ?? '') ?? 'Waiting'
-        : got > 0 && amount ? `Stopped (had ${amount})` : 'Stopped';
+        : got > 0 && amount ? `Stopped at ${amount}` : 'Stopped';
     }
     return { id: p.packageId ?? '', name, words, done, percent };
   });

@@ -5,7 +5,7 @@ import { selectIndexingProgress, type IndexingProgress } from './indexingProgres
 import { awaitsUnrequestedAi, gapOnlyAiProvides, isSearchUnavailableCause, isReindexCause, readinessNotice, warrantsSearchDegradationBanner } from './readinessNotice.js';
 import { aiEngineBody, aiEngineHeadline } from './aiVerdict.js';
 import { formatBytesOf, formatCount } from '../display/format.js';
-import { formatTimeLeft, runActivity } from './installFlow.js';
+import { formatTimeLeft, runActivity, STOPPED_DOWNLOAD_SENTENCE } from './installFlow.js';
 import { composeStageRows } from './installComponents.js';
 import { indexingCountsLine, indexingCountsLabel, enrichingCountsLine, enrichingCountsLabel } from './statusProgress.js';
 import { indexingTaskStatus } from './indexingProgress.js';
@@ -694,7 +694,7 @@ export function deriveFrameStatus(input: FrameStatusInput): FrameStatus {
   // fm-12b — a failed run with parts missing is said as AI Brain says it: a stopped download.
   if (ai && engine && aiInstallNeedsYou) add({ id: engine.kind === 'install_failed' ? 'ai-install-failed' : 'ai-install-paused',
     section: 'needs', title: installStopped ? STOPPED_DOWNLOAD : engine.kind === 'install_failed' ? aiEngineHeadline(engine) : 'AI download paused',
-    detail: installStopped ? 'Completed parts stay on this computer, and search by exact words keeps working.' : aiEngineBody(engine),
+    detail: installStopped ? STOPPED_DOWNLOAD_SENTENCE : aiEngineBody(engine),
     ...(engine.kind === 'install_failed' && engine.installFailure ? { details: [{ id: 'ai-install-support', section: 'needs' as const,
       title: `Detail for support: ${engine.installFailure}` }] } : {}),
     stale: !ai.installObservationLive, actions: [go('Open AI Brain', 'core.brain-surface')] });
