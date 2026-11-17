@@ -2123,13 +2123,19 @@ export class SearchV3View extends JfElement {
 
   /** Explicit dismissal closes both the visible reader and the shared inspector projection. */
   private dismissPane(): void {
+    const giveBack = this.closeDetailsPane();
+    void this.updateComplete.then(giveBack);
+  }
+
+  /** The dismissal without moving focus; returns what would give focus back to the pane's opener. */
+  private closeDetailsPane(): () => void {
     this.details.remember(false);
     const giveBack = this.details.takeFocusReturn();
     this.clearPane();
     // A document another window holds stays open there (C4).
     const { owner } = getInspectorState();
     if (owner === null || owner === SV3_SURFACE_KEY) setInspectorOpen(false);
-    void this.updateComplete.then(giveBack);
+    return giveBack;
   }
 
   /** Close from outside the window (Escape with the keyboard on the page). False when none is open. */
@@ -2333,6 +2339,13 @@ export class SearchV3View extends JfElement {
     if (this.draftDomain.retiredHandoffText !== null && detail.text !== this.draftDomain.retiredHandoffText) {
       this.draftDomain.clearRetiredHandoff();
       this.draftDomain.saveRecovery();
+    }
+    // An emptied search field is the idle screen, as Escape makes it: the list, its filters and its
+    // pane leave with the text. Only the layout moves; no draft, review or conversation is touched,
+    // and a late answer to the old query cannot dock it again (results show only when docked).
+    if (this.tier === 'search' && this.search.showing && detail.text === '' && this.composerState === 'docked') {
+      if (this.paneTab !== null) this.closeDetailsPane();
+      void this.setComposerState('hero');
     }
     if (this.draftDomain.draftReview) { this.draftDomain.saveRecovery(); return; }
     if (this.draftDomain.humanTask !== null || this.tier === 'search') this.draftDomain.saveRecovery();

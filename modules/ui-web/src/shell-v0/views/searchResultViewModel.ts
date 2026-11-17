@@ -16,6 +16,7 @@
 
 import { fileKindPresentation, type ResultKind } from '../display/fileKind.js';
 import type { IconName } from '../components/Icon.js';
+import { SCAN_PAGE_MARKERS } from './scanPageMarker.js';
 export type { ResultKind } from '../display/fileKind.js';
 
 export interface SearchResultView {
@@ -106,8 +107,7 @@ const SNIPPET_MAX = 240;
 
 /** Display only. Stored snippets and citation offsets always keep the original text. */
 function cleanSnippet(text: string, path: string): string {
-  // Exact marker emitted by PdfOcrEngine (both OCR paths). Snippets may flatten its newlines.
-  let clean = text.replace(/--- OCR page [1-9]\d* ---/g, ' ');
+  let clean = text.replace(SCAN_PAGE_MARKERS, ' ');
   // The code extensions are IndexingDocumentOps.isCodeExtension's classification.
   // Plain text stays literal too; office/PDF/mail extraction stores Markdown structure.
   if (!/\.(ts|tsx|js|jsx|py|java|kt|go|rs|c|cc|cpp|h|hpp|cs|rb|php|swift|scala|sql|sh|ps1|yml|yaml|json|xml|toml|ini|gradle|properties|txt|log|csv)$/i.test(path)) {

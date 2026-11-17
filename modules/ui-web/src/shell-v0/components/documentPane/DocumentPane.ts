@@ -90,6 +90,7 @@ import { formatBytes } from '../../display/format.js';
 import { getShowDeveloperTools, subscribeShowDeveloperTools } from '../../state/developerToolsState.js';
 import { authorizedFetch } from '../../api/authorizedFetch.js';
 import { copyToClipboard } from '../../utils/clipboardCopy.js';
+import { isScanPageMarkerLine } from '../../views/scanPageMarker.js';
 import { revealLocalPath } from '../../plugin-api/capabilities/platform.js';
 import '../ErrorAlert.js';
 import '../Button.js';
@@ -703,7 +704,10 @@ export class DocumentPane extends JfElement {
 
   private computedBlocks(): MarkdownBlockDescriptor[] {
     if (this.blocksCache?.content !== this.content) {
-      this.blocksCache = { content: this.content, blocks: markdownBlockMap(this.content) };
+      // A scan's page marker is read as a page break: its line is emptied, never removed, so every
+      // block keeps the source lines (and so the highlights) of the raw content.
+      const readable = this.content.split('\n').map((line) => (isScanPageMarkerLine(line) ? '' : line)).join('\n');
+      this.blocksCache = { content: this.content, blocks: markdownBlockMap(readable) };
     }
     return this.blocksCache.blocks;
   }
@@ -1310,8 +1314,12 @@ export class DocumentPane extends JfElement {
 
   private renderSourceMode(): TemplateResult {
     const lines = this.content.split('\n');
+    // The reading view leaves out a scan's page markers; the developer's source view keeps the raw
+    // text. Either way a line keeps its number, which is what highlights and anchors address.
+    const readable = !getShowDeveloperTools();
     return html`
-      <pre class=${getShowDeveloperTools() ? 'source' : 'source readable'}>${lines.map((line, i) => {
+      <pre class=${readable ? 'source readable' : 'source'}>${lines.map((line, i) => {
+        if (readable && isScanPageMarkerLine(line)) return nothing;
         const tier = this.highlightTier(i, i);
         return html`<span
           data-line="${i}"

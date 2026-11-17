@@ -1030,7 +1030,9 @@ describe('S1.9 — an older query’s results are never shown as the current one
     await type(el, '');
     for (const release of backend.held) release();
     await settle(el);
-    expect(await rowTitles(el)).toEqual(['alpha.md']);
+    // fm-rest Q2: the emptied field is the idle screen, and the late answer does not bring the row back.
+    expect(await rowTitles(el)).toEqual([]);
+    expect(el.getAttribute('composer-state')).toBe('hero');
     expect((await fieldOf(el)).value).toBe('');
   });
 
@@ -1791,4 +1793,145 @@ it('XFilters restriction errors on syntax queries retain the Engine restriction 
   expect(q(failed, 'sv3-results-failure-detail')!.textContent).toBe(`${reason} Open Health to check the connection and service status before trying again.`);
   expect(q(await region(el, 'jf-sv3-composer'), 'sv3-search-error')).toBeNull();
   expect(getFilters()).toEqual(original); expect((await fieldOf(el)).value).toBe(query);
+});
+
+/* ── fm-rest Q — an emptied field is the idle screen ─────────────────────────────────────────── */
+
+describe('fm-rest Q1-Q5 — emptying the search field returns Search to its idle screen', () => {
+  const draftKey = __draftStorageKey(SV3_DRAFT_KEY);
+  const attachmentKey = 'justsearch.draft.attachment.v1.search-v3.main';
+  const shownState = async (el: Mounted) => {
+    const composer = await region(el, 'jf-sv3-composer');
+    return {
+      state: el.getAttribute('composer-state'),
+      headline: q(composer, 'sv3-composer-headline') !== null,
+      value: (await fieldOf(el)).value,
+      results: (await results(el)) !== null,
+      rows: (await rowTitles(el)).length,
+      pane: el.shadowRoot?.querySelector('jf-sv3-pane') !== null,
+    };
+  };
+  const idle = { state: 'hero', headline: true, value: '', results: false, rows: 0, pane: false };
+  const storage = (): Record<string, string | null> => Object.fromEntries([
+    ...Object.keys(localStorage).map(key => [`local:${key}`, localStorage.getItem(key)]),
+    ...Object.keys(sessionStorage).map(key => [`session:${key}`, sessionStorage.getItem(key)]),
+  ]);
+  async function clearButton(el: Mounted): Promise<void> {
+    const composer = await region(el, 'jf-sv3-composer');
+    const button = q<HTMLButtonElement>(composer, 'sv3-search-clear');
+    if (!button) throw new Error('no Clear button');
+    button.click();
+    await settle(el);
+  }
+
+  it.each([
+    ['the Clear button', clearButton],
+    ['deleting the text', async (el: Mounted) => { await type(el, ''); await settle(el); }],
+  ] as const)('after a search, %s shows the idle screen and closes the pane', async (_how, empty) => {
+    backend.corpus.alpha = [wireHit('a', 'docs/alpha.md'), wireHit('b', 'docs/beta.md')];
+    aiOnline();
+    const el = await mount();
+    await searchFor(el, 'alpha');
+    await clickRow(el, 'alpha.md');
+    await settle(el);
+    expect(await shownState(el)).toMatchObject({ state: 'docked', rows: 2, pane: true });
+    await empty(el);
+    expect(await shownState(el)).toEqual(idle);
+    expect(el.hasAttribute('search-results')).toBe(false);
+  });
+
+  it('a response to the earlier search that lands after the field was emptied brings nothing back', async () => {
+    backend.corpus.alpha = [wireHit('a', 'docs/alpha.md')];
+    aiOnline();
+    const el = await mount();
+    await searchFor(el, 'alpha');
+    backend.holdSearches = true;
+    await searchFor(el, 'alpha');
+    await type(el, '');
+    await settle(el);
+    for (const release of backend.held.splice(0)) release();
+    await settle(el);
+    expect(await shownState(el)).toEqual(idle);
+  });
+
+  it('typing a new query after emptying and pressing Enter searches as before', async () => {
+    backend.corpus.alpha = [wireHit('a', 'docs/alpha.md')];
+    backend.corpus.gamma = [wireHit('g', 'docs/gamma.md')];
+    aiOnline();
+    const el = await mount();
+    await searchFor(el, 'alpha');
+    await type(el, '');
+    await settle(el);
+    const before = backend.searches.length;
+    await searchFor(el, 'gamma');
+    await vi.waitFor(async () => expect(await rowTitles(el)).toEqual(['gamma.md']));
+    expect(backend.searches.length).toBeGreaterThan(before);
+    expect(backend.searches.at(-1)?.query).toBe('gamma');
+    expect(el.getAttribute('composer-state')).toBe('docked');
+  });
+
+  it('emptying the field changes no conversation, sends nothing and stores only the empty draft', async () => {
+    recordTurn('uc-old', 'who is the landlord?', 'Acme.');
+    backend.corpus.alpha = [wireHit('a', 'docs/alpha.md')];
+    aiOnline();
+    const el = await mount();
+    await settle(el);
+    await searchFor(el, 'alpha');
+    const sessions = el.sessions.sessions.map(session => session.id);
+    const active = el.sessions.activeId;
+    const calls = fetchMock.mock.calls.length;
+    const before = storage();
+    await type(el, '');
+    await settle(el);
+    expect(el.sessions.sessions.map(session => session.id)).toEqual(sessions);
+    expect(el.sessions.activeId).toBe(active);
+    expect(ctrl.send).not.toHaveBeenCalled();
+    expect(dispatches()).toEqual([]);
+    const writes = fetchMock.mock.calls.slice(calls)
+      .filter(call => ['POST', 'PUT', 'PATCH', 'DELETE'].includes(String((call[1] as RequestInit | undefined)?.method)));
+    expect(writes).toEqual([]);
+    const after = storage();
+    const changed = Object.keys({ ...before, ...after }).filter(key => before[key] !== after[key]).sort();
+    expect(changed.every(key => key === `local:${draftKey}` || key === `session:${attachmentKey}`), changed.join(', ')).toBe(true);
+    expect(localStorage.getItem(draftKey) ?? '').toBe('');
+  });
+
+  it('emptying a restored draft under review neither approves nor discards the review', async () => {
+    localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), 'northfield lease');
+    aiOnline();
+    const el = await mount();
+    await settle(el);
+    expect(el.shadowRoot!.querySelector('[data-testid=sv3-draft-review]')).not.toBeNull();
+    await type(el, '');
+    await settle(el);
+    await type(el, 'northfield lease');
+    await settle(el);
+    expect(el.shadowRoot!.querySelector('[data-testid=sv3-draft-review]')).not.toBeNull();
+    await pressEnter(el); await settle(el);
+    expect(backend.searches).toHaveLength(0);
+  });
+
+  it('leaving Search and coming back with a query present still shows its results', async () => {
+    backend.corpus.alpha = [wireHit('a', 'docs/alpha.md')];
+    aiOnline();
+    const el = await mount();
+    await searchFor(el, 'alpha');
+    el.remove();
+    await reenter(el);
+    expect(await shownState(el)).toMatchObject({ state: 'docked', value: 'alpha', rows: 1 });
+  });
+
+  it('a reload with an emptied field opens on the idle screen', async () => {
+    backend.corpus.alpha = [wireHit('a', 'docs/alpha.md')];
+    aiOnline();
+    const first = await mount();
+    await searchFor(first, 'alpha');
+    await type(first, '');
+    await settle(first);
+    first.remove();
+    resetSearchState();
+    const el = await mount();
+    await settle(el);
+    expect(await shownState(el)).toEqual(idle);
+  });
 });
