@@ -133,7 +133,7 @@ the sentence after the confirmation and after completion (second entry).
         {
           "oldAssertion": "LibrarySurface.folderActions.test.ts 'distinguishes accepted reindex from the recorded completion and failure': after the confirmation (outcome running) the page contains 'Read again accepted' and not 'Read again completed'; the case then sets the outcome complete and activates 'Check reading outcome', and expects 'Read again completed'.",
           "newAssertion": "After the confirmation the page contains 'Reading everything again.' and not 'Everything has been read again.'; the case sets the outcome complete and lets the status tick 5 s later (Date.now advanced, one status fed), which reads the outcome again as Library does, and expects 'Everything has been read again.'. The failed path (alert 'Read again did not complete', 'retry') is unchanged.",
-          "reason": "L1' says the accepted/running request in exactly the line 'Reading everything again.' and removes the 'Check reading outcome' action while it is in progress, so the step that pressed it reads the outcome on the status tick instead; L2' gives the completion its sentence."
+          "reason": "L1' says the accepted/running request in exactly the line 'Reading everything again.' and removes the 'Check reading outcome' action while it is in progress, so the step that pressed it reads the outcome on the status tick instead; L2' gives the completion its sentence. Pressing 'Check reading outcome' stays covered where L3 keeps the action: reread-receipt.test.ts '\"Check reading outcome\" reads the outcome again and says what it now is' starts from an outcome that could not be read, presses the action, and expects one more outcome read and 'Everything has been read again.' (added after an acceptor showed that a do-nothing action passed every test)."
         },
         {
           "oldAssertion": "review-repairs.test.ts 'V6: when Read everything again completes, the folders are read again so the rows show the new file counts': the page contains 'Read again completed'.",
@@ -160,5 +160,16 @@ the sentence after the confirmation and after completion (second entry).
   "session": "d5886b95-ce0e-4a81-a866-f77d0505bec4",
   "verdict": "accept",
   "digest": "sha256:2a83b19476982a1788919f8166c86e0eceaa1a33c7120538fc3da37e030e3a21"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "31a786ae-20b4-4de2-bdc4-f8f78c5be4df",
+  "verdict": "reject",
+  "digest": "sha256:094b26228cd50ea7476f16f3bd8248ece232065547a4b65ebaabc59c40356ade",
+  "note": "LibrarySurface.folderActions.test.ts dropped the only check that pressing 'Check reading outcome' reads the outcome again and says the result. L1' removes the action only while the outcome is accepted or running; L3 keeps it for unknown or unreadable outcomes, so the guarded behaviour did not change there. A no-op mutation of the action passes every test of the candidate and fails the base test. Repair: keep the tick read, and add a step (or a case) where the outcome is unknown or unreadable, then reads complete after pressing 'Check reading outcome'."
 }
 ```

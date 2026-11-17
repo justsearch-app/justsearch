@@ -182,6 +182,18 @@ describe('L3 outcomes that are not in progress keep their messages', () => {
     expect(said(el)[0]).toContain('Read again accepted. Its outcome could not be read; check again before retrying.');
     expect(checkAction(el)).not.toBeNull();
   });
+  it('"Check reading outcome" reads the outcome again and says what it now is', async () => {
+    let readable = false;
+    const el = await library({ reading: false, outcome: () => readable ? Response.json({ state: 'complete', historySince: 0 }) : new Response('{}', { status: 503 }) });
+    await reread(el);
+    expect(said(el)[0]).toContain('Its outcome could not be read');
+    const reads = outcomeReads(el);
+    readable = true;
+    (checkAction(el) as unknown as { onActivate: () => void }).onActivate(); await settle(el);
+    expect(outcomeReads(el)).toBe(reads + 1);
+    expect(said(el)).toEqual([DONE]);
+    expect(checkAction(el)).toBeNull();
+  });
   it('a later read that fails replaces the line with the uncertain sentence', async () => {
     let ok = true;
     vi.spyOn(Date, 'now').mockImplementation(() => clock);
