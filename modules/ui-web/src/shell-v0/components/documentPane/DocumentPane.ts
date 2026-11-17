@@ -124,6 +124,20 @@ export interface DocumentCitationAnchor {
   readonly sentenceText: string | null;
 }
 
+/**
+ * The passage a search result's row came from, by the character offsets the search answer gave it,
+ * with the passage's text as the same witness a citation's excerpt is. A HINT, not a claim: when the
+ * pane cannot confirm it at those offsets it opens as if there were none — the beginning of the file
+ * and no notice — because the reader asked to see a file, not to have a citation checked.
+ */
+export interface DocumentMatchAnchor {
+  /** Document-relative, 0-based, INCLUSIVE. */
+  readonly startChar: number;
+  /** Document-relative, 0-based, EXCLUSIVE. */
+  readonly endChar: number;
+  readonly excerpt: string;
+}
+
 /** What the fetched window let the reader confirm about {@link DocumentPane.citation}. */
 interface CitationAnchorState {
   /** The claim-matched sentence's line span, or `null` when there is no match to locate. */
@@ -151,6 +165,8 @@ interface PreviewWindow {
   readonly offset: number;
   /** The endpoint said more of the document follows this slice. */
   readonly truncated: boolean;
+  /** What the slice was placed around: the window note names it. `null` is the document's head. */
+  readonly around: 'citation' | 'match' | null;
 }
 
 /** Mirrors InspectorPane's local `VisualExtractionEvidence` shape (the `/api/preview` response field). */
@@ -210,6 +226,7 @@ const ANCHOR_NOTICE = {
 /** What the pane says about the slice it is showing, from the response's own `truncated` flag. */
 const WINDOW_NOTE = {
   around: 'Showing the part of this document around the cited passage.',
+  aroundMatch: 'Showing the part of this document around the match.',
   head: 'Showing the beginning of a longer document.',
 } as const;
 /** What the pane says when the index has no such document (a 404 from `/api/preview`). */
@@ -246,6 +263,8 @@ export class DocumentPane extends JfElement {
     citation: { attribute: false },
     // Tempdoc 849 §7 — what the citation that opened this pane can honestly be said about.
     citationHeader: { attribute: false },
+    // The passage of the search result that opened this pane; used only when there is no citation.
+    match: { attribute: false },
     // The search the document was opened from, when it was a search result: its found words are marked.
     markQuery: { attribute: false },
     anchorState: { state: true },
@@ -289,6 +308,14 @@ export class DocumentPane extends JfElement {
    */
   declare citationHeader: CitationHeader | null;
   /**
+   * The search result's passage ({@link DocumentMatchAnchor}). Read only when there is no
+   * {@link citation}; when it is set the window opens around it and the passage is tinted with the
+   * chunk tier, and when it cannot be confirmed the pane silently opens at the document's head.
+   */
+  declare match: DocumentMatchAnchor | null;
+  /** The {@link match} was not confirmed at its offsets in this document: it is no longer read. */
+  private matchSetAside = false;
+  /**
    * The query of the search result this pane shows, or '' when it shows anything else (a cited
    * document, another window's selection): the query's found words are marked in the text with the
    * result snippet's own matching ({@link highlightSegments}). '' marks nothing.
@@ -331,6 +358,7 @@ export class DocumentPane extends JfElement {
     this.chunkRange = null;
     this.citation = null;
     this.citationHeader = null;
+    this.match = null;
     this.markQuery = '';
     this.anchorState = null;
     this.previewWindow = null;
@@ -380,6 +408,9 @@ export class DocumentPane extends JfElement {
   protected override onReveal(): void {
     // Resume an invalidated pending read; a completed retained preview keeps its existing behavior.
     if (this.docPath && this.previewWindow === null) void this.loadContent(this.docPath, this.anchor());
+    // A pane put back into the page has lost its scroll; one opened at a search result's passage goes
+    // back to that passage rather than to the top of the window around it.
+    else if (this.anchoredOnMatch() && this.anchorState?.chunk) this.scrollToHighlight();
   }
 
   private base(): string {
@@ -402,8 +433,10 @@ export class DocumentPane extends JfElement {
       // A fresh docPath re-arms the highlight decay even for a line-range that happens to match
       // the previous document's (the passage is a genuinely new landing).
       this.armedHighlightKey = null;
+      this.matchSetAside = false;
       if (path) void this.loadContent(path, this.anchor());
-    } else if (changed.has('citation')) {
+    } else if (changed.has('citation') || changed.has('match')) {
+      if (changed.has('match')) this.matchSetAside = false;
       // Tempdoc 849 §4 — a LATE claim match arrives on an already-open pane as a new anchor over the
       // same span. Re-fetching would be a visible reload for a fact the loaded window already
       // contains, so the window is re-used whenever it covers the anchor and only re-fetched when
@@ -426,7 +459,21 @@ export class DocumentPane extends JfElement {
    * consumers and send them down the anchored path with nothing to anchor on.
    */
   private anchor(): DocumentCitationAnchor | null {
-    return this.citation ?? null;
+    return this.citation ?? this.matchAnchor();
+  }
+
+  /** The search result's passage as an anchor, while it may still be read, and only when it is a span. */
+  private matchAnchor(): DocumentCitationAnchor | null {
+    const match = this.match ?? null;
+    if (match === null || this.matchSetAside) return null;
+    const { startChar, endChar, excerpt } = match;
+    if (!Number.isSafeInteger(startChar) || !Number.isSafeInteger(endChar) || startChar < 0 || endChar <= startChar) return null;
+    return { startChar, endChar, excerpt: typeof excerpt === 'string' ? excerpt : '', sentenceText: null };
+  }
+
+  /** The anchor in use is a search result's passage, not a citation. */
+  private anchoredOnMatch(): boolean {
+    return (this.citation ?? null) === null && this.matchAnchor() !== null;
   }
 
   /**
@@ -565,7 +612,11 @@ export class DocumentPane extends JfElement {
    * anchor this is the document's head, which is what the line-addressed consumers have always got.
    */
   private windowFor(citation: DocumentCitationAnchor | null): { offset: number; maxChars: number } {
-    if (citation === null) return { offset: 0, maxChars: DEFAULT_MAX_CHARS };
+    // A search result's passage inside the head the pane opens with anyway keeps that head: the
+    // window is then the one the pane has always shown, and only the scroll differs.
+    if (citation === null || (this.anchoredOnMatch() && citation.endChar <= DEFAULT_MAX_CHARS)) {
+      return { offset: 0, maxChars: DEFAULT_MAX_CHARS };
+    }
     const offset = Math.max(0, Math.floor(citation.startChar) - CITATION_LEAD_IN_CHARS);
     const span = Math.max(0, Math.ceil(citation.endChar) - offset);
     return { offset, maxChars: Math.min(MAX_WINDOW_CHARS, span + CITATION_TRAIL_CHARS) };
@@ -574,6 +625,8 @@ export class DocumentPane extends JfElement {
   private async loadContent(path: string, citation: DocumentCitationAnchor | null): Promise<void> {
     const token = ++this.loadToken;
     const window = this.windowFor(citation);
+    const around = window.offset === 0 && window.maxChars === DEFAULT_MAX_CHARS ? null
+      : this.anchoredOnMatch() ? 'match' : 'citation';
     this.requestedWindow = window;
     this.loading = true;
     this.error = null;
@@ -592,6 +645,12 @@ export class DocumentPane extends JfElement {
             && 'sourceState' in body && body.sourceState === 'absent';
         } catch { /* An unrecognized response is unknown. */ }
         if (token !== this.loadToken) return;
+        // A window placed around a search result's passage that the endpoint refused (an offset it
+        // will not serve) is the passage not being confirmed: the pane opens at the head instead.
+        if (!absent && around === 'match') {
+          this.setMatchAside(path);
+          return;
+        }
         this.error = absent ? DOCUMENT_GONE : PREVIEW_FAILED;
         return;
       }
@@ -625,7 +684,7 @@ export class DocumentPane extends JfElement {
         }
       }
       this.content = content;
-      this.previewWindow = { offset, truncated: data.truncated === true };
+      this.previewWindow = { offset, truncated: data.truncated === true, around };
       this.provenance = data.textProvenance ?? null;
       this.evidence = data.visualExtractionEvidence ?? null;
       this.deriveAnchorState();
@@ -648,13 +707,29 @@ export class DocumentPane extends JfElement {
    * range at all rather than a range that is then explained away.
    */
   private deriveAnchorState(): void {
-    this.anchorState = this.resolveAnchor();
+    const state = this.resolveAnchor();
+    // A search result's passage that is not where the answer said is not reported: the result's
+    // row was a hint. The pane is left as it opens without one.
+    if (state !== null && state.unconfirmed !== null && this.anchoredOnMatch() && this.docPath) {
+      this.anchorState = null;
+      this.setMatchAside(this.docPath);
+      return;
+    }
+    this.anchorState = state;
     // Armed here, where the range is decided, rather than from a `changed.has('anchorState')` test
     // in `willUpdate`. Both work — probed: Lit records a property changed DURING `willUpdate` in the
     // same `changedProperties`, so the observer would fire in the same cycle — and the claim that
     // arming from `willUpdate` was a defect would have been false. This is the shorter path, not a
     // repair: deriving the range and arming its emphasis are one operation.
     this.syncHighlightDecay();
+  }
+
+  /** Stop reading the search result's passage, and show the document's head if this is not it. */
+  private setMatchAside(path: string): void {
+    this.matchSetAside = true;
+    const win = this.previewWindow;
+    if (win === null || win.around !== null) void this.loadContent(path, null);
+    else this.syncHighlightDecay();
   }
 
   private resolveAnchor(): CitationAnchorState | null {
@@ -1287,7 +1362,7 @@ export class DocumentPane extends JfElement {
     // "around" anything the pane is willing to claim.
     if ((this.anchorState?.unconfirmed ?? null) !== null) return nothing;
     return html`<p class="reader-notice window-note">
-      ${win.offset > 0 ? WINDOW_NOTE.around : WINDOW_NOTE.head}
+      ${win.offset === 0 ? WINDOW_NOTE.head : win.around === 'match' ? WINDOW_NOTE.aroundMatch : WINDOW_NOTE.around}
     </p>`;
   }
 
