@@ -145,7 +145,7 @@
     ]
   },
   "searchResultRendering": {
-    "rationale": "ResultsCard is the shared Search result renderer. Why, facets and highlights derive from their registered authorities; the retired host no longer has a parallel result renderer.",
+    "rationale": "ResultsCard is the shared Search result renderer. Why, facets and highlights derive from their registered authorities; the retired host no longer has a parallel result renderer. The reader (DocumentPane) marks a search result's found words with the same matching.",
     "authoritySites": [
       "modules/ui-web/src/shell-v0/components/searchResults/whyThisResult.ts",
       "modules/ui-web/src/shell-v0/components/searchResults/facetChips.ts",
@@ -156,10 +156,12 @@
       "renderFacetChips",
       "traceChipsFor",
       "tracePartsFor",
-      "highlightTerms"
+      "highlightTerms",
+      "highlightSegments"
     ],
     "consumerSites": [
-      "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.ts"
+      "modules/ui-web/src/shell-v0/components/searchResults/ResultsCard.ts",
+      "modules/ui-web/src/shell-v0/components/documentPane/DocumentPane.ts"
     ]
   },
   "scan": {

@@ -177,6 +177,7 @@ export class ResultsCard extends JfElement {
     filterError: { type: String },
     facetSelections: { attribute: false },
     selectedIds: { attribute: false },
+    openPath: { attribute: false },
     askAvailability: { attribute: false },
     forgetAvailable: { type: Boolean, attribute: false },
     copyText: { attribute: false },
@@ -199,6 +200,11 @@ export class ResultsCard extends JfElement {
   declare filterError: string;
   declare facetSelections: Record<string, string[]>;
   declare selectedIds: ReadonlySet<string>;
+  /**
+   * The file the host's details pane is showing, or null. Its row is the current one: it wears the
+   * selected look and `aria-current`, however it was opened (pointer, Enter, the preview's →).
+   */
+  declare openPath: string | null;
   /** null hides the Ask AI control (hosts that cannot escalate). */
   declare askAvailability: Availability | null;
   /** True only for a host that handles card-forget through the durable operation boundary. */
@@ -246,6 +252,7 @@ export class ResultsCard extends JfElement {
     this.filterError = '';
     this.facetSelections = {};
     this.selectedIds = new Set<string>();
+    this.openPath = null;
     this.askAvailability = null;
     this.forgetAvailable = false;
     this.variant = 'live';
@@ -600,16 +607,17 @@ export class ResultsCard extends JfElement {
     // search); they stay openable via the plain click branch in handleRowClick.
     const isLive = this.variant === 'live';
     const selected = isLive && this.selectedIds.has(hit.id);
+    const open = isLive && this.openPath !== null && hit.path === this.openPath;
     const view = projectResultView(hit as unknown as ResultViewInput);
     const query = this.snapshot?.query ?? '';
     const roots = getFirstUse().roots;
     return html`
       <div
-        class=${selected ? 'row selected' : 'row'}
+        class=${`row${selected ? ' selected' : ''}${open ? ' open' : ''}`}
         role="listitem"
         id=${`search-opt-${hit.id}`}
         data-testid="search-result-row"
-        aria-current=${selected ? 'true' : 'false'}
+        aria-current=${selected || open ? 'true' : 'false'}
         data-selected=${selected ? 'true' : 'false'}
         data-kind=${view.kind}
         data-addressable-kind="search-result"
@@ -987,6 +995,23 @@ export class ResultsCard extends JfElement {
       .row.selected {
         border-left-color: var(--text-secondary);
         background: var(--surface-subtle);
+      }
+      /* The row whose file is in the details pane (first-minutes fm-05): a raised tint with rounded
+         corners. The tint reaches a step past the column on both sides and the padding gives the step
+         back, so the row's text stays exactly where it was. After the hover and chosen fills, so it
+         is the look the row keeps while the pointer is on it. */
+      .row.open {
+        margin-inline: calc(-1 * var(--jf-space-2));
+        padding-inline: var(--jf-space-2);
+        border-radius: 8px;
+        border-bottom-color: transparent;
+        background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+      }
+      @media (forced-colors: active) {
+        .row.open {
+          outline: 2px solid Highlight;
+          outline-offset: -2px;
+        }
       }
       .row .title {
         display: flex;

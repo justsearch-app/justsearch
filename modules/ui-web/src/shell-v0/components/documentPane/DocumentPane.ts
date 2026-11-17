@@ -77,7 +77,14 @@ import { lineSpanOfChars, locateText, locateWitness } from './charAnchor.js';
 import { markdownCodeHighlight, markdownTypography } from '../markdown/markdownStyles.js';
 import { highlightCodeBlocks } from '../markdown/markdownHighlight.js';
 import { markScrollableRegions } from '../markdown/markdownScrollRegions.js';
-import { formatDisplayPath, formatLocationBreadcrumb } from '../searchResults/resultRowPresentation.js';
+import {
+  formatDisplayPath,
+  formatLocationBreadcrumb,
+  highlightSegments,
+  highlightStyles,
+  highlightTerms,
+  splitFolderTail,
+} from '../searchResults/resultRowPresentation.js';
 import { isAdvancedMode, subscribeUiMode } from '../../state/uiModeState.js';
 import { formatBytes } from '../../display/format.js';
 import { getShowDeveloperTools, subscribeShowDeveloperTools } from '../../state/developerToolsState.js';
@@ -238,6 +245,8 @@ export class DocumentPane extends JfElement {
     citation: { attribute: false },
     // Tempdoc 849 §7 — what the citation that opened this pane can honestly be said about.
     citationHeader: { attribute: false },
+    // The search the document was opened from, when it was a search result: its found words are marked.
+    markQuery: { attribute: false },
     anchorState: { state: true },
     previewWindow: { state: true },
     mode: { state: true },
@@ -278,6 +287,14 @@ export class DocumentPane extends JfElement {
    * property existed the pane could not tell the two apart and so said nothing about either.
    */
   declare citationHeader: CitationHeader | null;
+  /**
+   * The query of the search result this pane shows, or '' when it shows anything else (a cited
+   * document, another window's selection): the query's found words are marked in the text with the
+   * result snippet's own matching ({@link highlightSegments}). '' marks nothing.
+   */
+  declare markQuery: string;
+  /** The query whose marks are in the rendered blocks now; they are DOM the reader added. */
+  private markedQuery = '';
   /** Derived from {@link citation} + the fetched window; never written from outside. */
   declare anchorState: CitationAnchorState | null;
   /** Which slice of the document {@link content} is, and whether more of it follows. */
@@ -313,6 +330,7 @@ export class DocumentPane extends JfElement {
     this.chunkRange = null;
     this.citation = null;
     this.citationHeader = null;
+    this.markQuery = '';
     this.anchorState = null;
     this.previewWindow = null;
     this.mode = 'source';
@@ -505,6 +523,39 @@ export class DocumentPane extends JfElement {
     // keyboard user can reach the clipped half of a wide fence or table. Re-applied per render: Lit
     // rebuilds this subtree through `unsafeHTML`, which takes the attributes with it.
     markScrollableRegions(this.renderRoot.querySelector('.blocks'));
+    this.markFoundWords(this.renderRoot.querySelector('.blocks'));
+  }
+
+  /**
+   * The rendered blocks are markup the reader does not template word by word, so their found words
+   * are marked in the DOM after each render: text nodes are split around each found word with the
+   * snippet's own matching. Code blocks are left alone (their highlighter rewrites them). A new query
+   * takes the old marks out first; blocks Lit rebuilt arrive unmarked.
+   */
+  private markFoundWords(blocks: Element | null): void {
+    if (blocks === null) { this.markedQuery = ''; return; }
+    if (this.markedQuery !== this.markQuery) {
+      for (const mark of blocks.querySelectorAll('mark.hl')) mark.replaceWith(...mark.childNodes);
+      blocks.normalize();
+      this.markedQuery = this.markQuery;
+    }
+    if (this.markQuery === '') return;
+    const walker = document.createTreeWalker(blocks, NodeFilter.SHOW_TEXT);
+    const found: Text[] = [];
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      if (node.parentElement?.closest('mark.hl, pre') === null) found.push(node as Text);
+    }
+    for (const node of found) {
+      const segments = highlightSegments(node.data, this.markQuery);
+      if (!segments.some((segment) => segment.mark)) continue;
+      node.replaceWith(...segments.map((segment) => {
+        if (!segment.mark) return document.createTextNode(segment.text);
+        const mark = document.createElement('mark');
+        mark.className = 'hl';
+        mark.textContent = segment.text;
+        return mark;
+      }));
+    }
   }
 
   /**
@@ -792,7 +843,7 @@ export class DocumentPane extends JfElement {
    * `font-family`), and every chrome row — header, toggle, provenance — sets its own `font-size`,
    * so what the ramp actually reaches is the document body it was moved here for.
    */
-  static styles = [markdownTypography, markdownCodeHighlight, css`
+  static styles = [markdownTypography, markdownCodeHighlight, highlightStyles, css`
     :host {
       display: flex;
       flex-direction: column;
@@ -828,6 +879,21 @@ export class DocumentPane extends JfElement {
       overflow-wrap: anywhere;
       color: var(--text-secondary);
     }
+    /* The folder on ONE line, shortened in the middle: the start of the folder gives way first and
+       ends in an ellipsis, the last folder and the facts after it stay whole. The text itself is the
+       whole folder (the full path is the title), so nothing is lost to a screen reader or a copy. */
+    .path.fit {
+      display: flex;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .path.fit > span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .path.fit .folder-head { flex: 0 1 auto; min-width: 0; }
+    .path.fit .folder-tail { flex: 0 0 auto; max-width: 60%; }
+    .path.fit .facts { flex: none; white-space: pre; }
     .toggle-group {
       flex-shrink: 0;
       display: flex;
@@ -1008,12 +1074,18 @@ export class DocumentPane extends JfElement {
       margin-left: -0.4rem;
     }
     pre.source.readable { font-family: inherit; font-size: var(--font-size-sm); }
+    /* A found word of the search this document was opened from: the snippet's wash, with a soft ring. */
+    mark.hl {
+      padding: 1px 2px;
+      box-shadow: 0 0 0 3px var(--highlight-wash-ring);
+    }
     pre.source {
       margin: 0;
       font-family: ui-monospace, 'SF Mono', monospace;
       font-size: var(--font-size-xs);
       line-height: 1.5;
-      color: var(--text-secondary);
+      /* The document IS the content of this pane: it reads in the normal text colour, never muted. */
+      color: var(--text-primary);
       white-space: pre-wrap;
       word-break: break-word;
     }
@@ -1061,18 +1133,21 @@ export class DocumentPane extends JfElement {
     }
   `];
 
-  private documentMetadata(): string {
+  private documentMetadata(): TemplateResult {
     const path = this.docPath ?? '';
     const at = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
     let folder = at < 0 ? '' : path.slice(0, at || 1);
     if (/^[A-Za-z]:$/.test(folder)) folder += path[at];
     const pages = this.evidence?.pageCount;
     const size = this.sizeBytes;
-    return [folder,
+    const facts = [
       typeof pages === 'number' && Number.isInteger(pages) && pages > 0 ? `${pages} ${pages === 1 ? 'page' : 'pages'}` : '',
       typeof size === 'number' && Number.isFinite(size) && size >= 0
         ? formatBytes(size) : '',
     ].filter(Boolean).join(' · ');
+    const { head, tail } = splitFolderTail(folder);
+    return html`<span class="folder-head">${head}</span><span class="folder-tail">${tail}</span><span class="facts"
+      >${facts === '' ? '' : folder === '' ? facts : ` · ${facts}`}</span>`;
   }
 
   private renderToggle(): TemplateResult {
@@ -1241,7 +1316,7 @@ export class DocumentPane extends JfElement {
         return html`<span
           data-line="${i}"
           class=${tier === 'strong' ? 'hl-strong' : tier === 'weak' ? 'hl-weak' : ''}
-          >${line}\n</span
+          >${this.markQuery === '' ? line : highlightTerms(line, this.markQuery)}\n</span
         >`;
       })}</pre>
     `;
@@ -1297,7 +1372,7 @@ export class DocumentPane extends JfElement {
       <div class="header">
         ${/* Search Thread Round-2 R5c — the shared formatDisplayPath authority (filename-preserving
               middle truncation), not CSS end-truncation; the full path stays reachable via title. */ ''}
-        <div class="path" title=${this.docPath}>
+        <div class=${getShowDeveloperTools() ? 'path' : 'path fit'} title=${this.docPath}>
           ${/* Tempdoc 738 (C4) — Simple shows the humanized folder breadcrumb; Detailed the full path
                 (the full path stays reachable via the title tooltip in both). */ ''}
           ${getShowDeveloperTools() ? (isAdvancedMode() ? formatDisplayPath(this.docPath) : formatLocationBreadcrumb(this.docPath))

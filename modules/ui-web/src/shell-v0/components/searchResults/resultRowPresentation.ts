@@ -112,6 +112,35 @@ function highlightQueryTerms(query: string): string[] {
   return [...terms].sort((a, b) => b.length - a.length);
 }
 
+/** A run of text, and whether it is a found word. */
+export interface HighlightSegment {
+  readonly text: string;
+  readonly mark: boolean;
+}
+
+/**
+ * The query's found words in `text`, as runs: word prefixes matching the query's terms are marked.
+ * The ONE matching shared by the result snippet ({@link highlightTerms}) and the reader, which marks
+ * the same words in the document a search result opened. An empty / sub-2-char query marks nothing.
+ */
+export function highlightSegments(text: string, query: string): HighlightSegment[] {
+  const terms = highlightQueryTerms(query);
+  if (terms.length === 0) return text === '' ? [] : [{ text, mark: false }];
+  // Terms contain only Unicode letters/digits. Split words first rather than using ASCII \b.
+  const prefix = new RegExp(`^(${terms.join('|')})`, 'iu');
+  const segments: HighlightSegment[] = [];
+  text.split(/([\p{L}\p{N}]+)/u).forEach((part, index) => {
+    const match = index % 2 === 1 ? prefix.exec(part) : null;
+    if (match === null) {
+      if (part !== '') segments.push({ text: part, mark: false });
+      return;
+    }
+    segments.push({ text: match[0], mark: true });
+    if (part.length > match[0].length) segments.push({ text: part.slice(match[0].length), mark: false });
+  });
+  return segments;
+}
+
 /**
  * Q11: wrap word prefixes matching the query's terms in `<mark>` so the snippet shows
  * WHY a result matched. Lit auto-escapes both the plain segments and the marked
@@ -119,27 +148,45 @@ function highlightQueryTerms(query: string): string[] {
  * no marks (returns the text verbatim).
  */
 export function highlightTerms(text: string, query: string): TemplateResult | string {
-  const terms = highlightQueryTerms(query);
-  if (terms.length === 0) return text;
-  // Terms contain only Unicode letters/digits. Split words first rather than using ASCII \b.
-  const prefix = new RegExp(`^(${terms.join('|')})`, 'iu');
-  return html`${text.split(/([\p{L}\p{N}]+)/u).map((part, index) => {
-    const match = index % 2 === 1 ? prefix.exec(part) : null;
-    return match ? html`<mark class="hl">${match[0]}</mark>${part.slice(match[0].length)}` : part;
-  })}`;
+  if (highlightQueryTerms(query).length === 0) return text;
+  return html`${highlightSegments(text, query).map((segment) =>
+    segment.mark ? html`<mark class="hl">${segment.text}</mark>` : segment.text)}`;
 }
 
 /**
- * The query-term highlight mark style. 577 Phase 7: consumes the highlight ROLE
- * (the contrast-floored `--accent-highlight` / `--accent-on-highlight` pair, AA
- * in every theme) — not a hardcoded tint. Unscoped `mark.hl` so it applies in
- * either surface's snippet container (`.snippet` / `.retrieve-row-snippet`).
+ * The found-word mark (first-minutes fm-04/fm-05): a faint warm wash behind the word, which keeps the
+ * colour of the text around it — the found words are read as text, not as a row of filled blocks. The
+ * wash is the theme's `--highlight-wash`, which the appearance writer derives from each theme's own
+ * ground and ink so the word reads at >= 4.5:1 (`roleForegrounds.deriveHighlightWashDecls`); only a
+ * theme whose own text does not read on its own ground gets a derived `--highlight-ink`.
+ * Unscoped `mark.hl` so it applies in either container that draws it (the result snippet, the reader);
+ * the reader adds its own ring and padding. Forced colours take the system Mark pair.
  */
 export const highlightStyles = css`
   mark.hl {
-    background: var(--accent-highlight);
-    color: var(--accent-on-highlight);
+    background: var(--highlight-wash);
+    color: var(--highlight-ink, var(--text-primary));
     border-radius: 4px;
-    padding: 0 1px;
+    padding: 0 2px;
+  }
+  @media (forced-colors: active) {
+    mark.hl {
+      forced-color-adjust: none;
+      background: Mark;
+      color: MarkText;
+      box-shadow: none;
+    }
   }
 `;
+
+/**
+ * The folder of a path, split for a middle ellipsis: everything up to the last folder, and the last
+ * folder with its separator. The first part may be cut at its end while the last folder stays whole,
+ * so a long folder reads "/home/reader/.ca…/Documents" on one line. Both parts stay in the text, so
+ * the whole folder is still there for a screen reader and for copying.
+ */
+export function splitFolderTail(folder: string): { readonly head: string; readonly tail: string } {
+  const at = Math.max(folder.lastIndexOf('/'), folder.lastIndexOf('\\'));
+  if (at <= 0 || at === folder.length - 1) return { head: '', tail: folder };
+  return { head: folder.slice(0, at), tail: folder.slice(at) };
+}

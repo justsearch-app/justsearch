@@ -124,6 +124,20 @@
      and `link` (this-is-clickable text, e.g. result titles). */
   --accent-highlight: oklch(50% 0.11 var(--h-amber));
   --accent-link: oklch(72% 0.13 var(--h-blue));
+  /* A found word in a result snippet or in the reader: a faint warm wash behind text that keeps its own
+     colour (first-minutes fm-04/fm-05); the ring is the reader's softer halo around the same wash.
+     Two authored washes, one for a dark ground and one for a light ground: which one a theme gets is
+     decided by its ground, not by the light/dark setting (a palette may keep a dark ground in Light),
+     and the appearance writer (roleForegrounds.deriveHighlightWashDecls) re-derives --highlight-wash
+     from the palette's own --surface-0 and --text-primary so the word stays >= 4.5:1. The values here
+     are the fallback before that runs. Forced colours replace both with the system Mark pair at the
+     rule that draws the mark. */
+  --highlight-wash-on-dark: rgb(240 184 96 / 22%);
+  --highlight-wash-ring-on-dark: rgb(240 184 96 / 8%);
+  --highlight-wash-on-light: oklch(86% 0.14 85 / 55%);
+  --highlight-wash-ring-on-light: oklch(86% 0.14 85 / 20%);
+  --highlight-wash: var(--highlight-wash-on-dark);
+  --highlight-wash-ring: var(--highlight-wash-ring-on-dark);
 
   /* Semantic state colors */
   --accent-success: oklch(70% 0.18 var(--h-green));
@@ -563,6 +577,8 @@
   /* 577 Phase 7 — light theme: pale highlight fill with dark ink; deep link blue. */
   --accent-highlight: oklch(88% 0.12 var(--h-amber));
   --accent-on-highlight: oklch(25% 0.06 var(--h-amber));
+  --highlight-wash: var(--highlight-wash-on-light);
+  --highlight-wash-ring: var(--highlight-wash-ring-on-light);
   --accent-link: oklch(45% 0.18 var(--h-blue));
   --accent-on-link: #ffffff;
   --text-highlight: rgb(120, 78, 0);

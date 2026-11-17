@@ -14,7 +14,7 @@ beforeEach(() => { vi.useFakeTimers(); resetSearchState(); });
 afterEach(() => { document.body.replaceChildren(); resetSearchState(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 async function expectQuickResponseVisible(): Promise<void> {
-  const host = { addController: vi.fn(), requestUpdate: vi.fn() } as unknown as
+  const host = { addController: vi.fn(), requestUpdate: vi.fn(), paneDocPath: () => null } as unknown as
     ConstructorParameters<typeof Sv3SearchController>[0];
   const controller = new Sv3SearchController(host);
   controller.hostConnected();

@@ -36,7 +36,7 @@ import { detailsDocumentActions } from '../../components/detailsPane/detailsDocu
 import '../../components/ContextInspectorPane.js';
 import type { InspectorView } from '../../components/ContextInspectorPane.js';
 import '../../components/Button.js';
-import type { CitationHeader } from '../../components/chat/evidenceProjection.js';
+import { filenameOf, type CitationHeader } from '../../components/chat/evidenceProjection.js';
 import { PANE_LABEL } from './fixtures.js';
 import { SV3_PANE_CONTEXT_TAB } from './sv3-details.js';
 
@@ -62,19 +62,23 @@ export class Sv3Pane extends JfElement {
          surface/text/edge tokens the shared frame and reader read are re-pointed at this window's
          palette here, so the frame does not enclose a panel wearing the shipped theme. The
          --accent-tint* family is deliberately NOT re-pointed — those tokens ARE the cited passage's
-         land-strong-then-settle emphasis, whose authority is the reader's own. */
+         land-strong-then-settle emphasis, whose authority is the reader's own.
+         The text colour is NOT re-pointed: the pane's ground is the window's --background, which is
+         the app theme's --surface-0, so its ink is that theme's own --text-primary. The window's
+         --foreground follows only the light/dark setting, and under a palette that keeps its ground
+         in the other mode it was ink of the wrong side on that ground (dark on Nord's dark ground in
+         Light, light on Sepia Focus's cream ground in Dark: about 1.1-1.3:1). */
       :host {
         display: block;
         min-inline-size: 0;
         min-block-size: 0;
         overflow: hidden;
         background: var(--background);
-        color: var(--foreground);
+        color: var(--text-primary);
         font-family: var(--font-sans);
         --surface-1: var(--background);
         --surface-2: var(--muted);
         --surface-hover: var(--accent-surface);
-        --text-primary: var(--foreground);
         --text-secondary: var(--muted-foreground);
         --text-tertiary: var(--secondary-label);
         --border-subtle: var(--border);
@@ -134,6 +138,7 @@ export class Sv3Pane extends JfElement {
     contextView: { attribute: false },
     selectedItem: { attribute: false },
     sourceControl: { attribute: false },
+    resultQuery: { attribute: false },
   };
 
   /**
@@ -160,6 +165,13 @@ export class Sv3Pane extends JfElement {
   declare contextView: InspectorView | null;
   declare selectedItem: unknown;
   declare sourceControl: Sv3PaneSourceControl | null;
+  /**
+   * The query of the search result on show, or null when the pane shows anything else (a cited
+   * document, another window's selection). A result is closed by its file's name, and its found words
+   * are marked in the text; anything else keeps the pane's own words and an unmarked text. '' is a
+   * search result whose file a later search left out of the list: still closed by its name, unmarked.
+   */
+  declare resultQuery: string | null;
 
   constructor() {
     super();
@@ -174,6 +186,7 @@ export class Sv3Pane extends JfElement {
     this.contextView = null;
     this.selectedItem = null;
     this.sourceControl = null;
+    this.resultQuery = null;
   }
 
   /** Put the keyboard in the pane. */
@@ -216,7 +229,8 @@ export class Sv3Pane extends JfElement {
       <jf-details-pane
         ?overlay=${this.overlay}
         region-label=${PANE_LABEL.region}
-        close-label=${PANE_LABEL.dismiss}
+        close-label=${this.resultQuery !== null && this.docPath !== null
+          ? `Close ${filenameOf(this.docPath)}` : PANE_LABEL.dismiss}
         .tabs=${this.tabs}
         .activeTab=${tab}
         @details-close=${this.onClose}
@@ -232,6 +246,7 @@ export class Sv3Pane extends JfElement {
                 .highlightRange=${this.highlightRange}
                 .citation=${this.citation}
                 .citationHeader=${this.citationHeader}
+                .markQuery=${this.resultQuery ?? ''}
                 api-base=${this.apiBase}
               ></jf-document-pane>
             </div>`}

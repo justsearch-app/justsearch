@@ -2691,6 +2691,7 @@ export class SearchV3View extends JfElement {
         .contextView=${this.paneTab === SV3_PANE_CONTEXT_TAB ? this.contextDomain.buildContextInspectorView() : null}
         .selectedItem=${this.details.selection()}
         .sourceControl=${this.details.sourceControl()}
+        .resultQuery=${this.search.paneQuery(this.paneSource, this.paneDocPath)}
         ?overlay=${this.paneOverlay}
         api-base=${this.apiBase}
         @sv3-pane-close=${this.dismissPane}

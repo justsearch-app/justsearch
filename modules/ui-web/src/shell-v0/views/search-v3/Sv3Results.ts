@@ -332,6 +332,7 @@ export class Sv3Results extends JfElement {
         facetsTruncated: false, countsPending: true, isSearching: view.status === 'loading', processingTimeMs: null, error: view.failure }}
       .facetSelections=${view.facetSelections}
       .selectedIds=${view.selectedIds}
+      .openPath=${view.openPath}
       .askAvailability=${null}
       .forgetAvailable=${this.forgetAvailable}
       .filterError=${view.restrictionError ?? ''}
