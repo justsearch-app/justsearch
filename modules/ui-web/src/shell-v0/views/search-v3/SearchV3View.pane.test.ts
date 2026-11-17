@@ -794,8 +794,8 @@ describe('the two boundaries leave the main column its 640', () => {
   it('reopens at a remembered width the current box still allows', async () => {
     localStorage.setItem(sv3BoundaryStorageKeys.paneWidth, '900');
     const el = await mount(1400);
-    // With no conversation column, this fixture reopens at the 560px automatic default.
-    expect(el.paneWidthPx).toBe(560); // No conversation column occupies the empty Search window.
+    // With no conversation column the box allows the pane's outer ceiling, 592 (PJ2\u2032).
+    expect(el.paneWidthPx).toBe(592); // No conversation column occupies the empty Search window.
     expect(el.paneWidthPx).toBeGreaterThanOrEqual(SV3_PANE_MIN_PX);
   });
 });

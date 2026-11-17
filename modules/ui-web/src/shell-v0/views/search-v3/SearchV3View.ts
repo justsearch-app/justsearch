@@ -100,6 +100,7 @@ import {
   type Sv3SessionSelect,
 } from './Sv3Sidebar.js';
 import {
+  clampSv3PaneDragWidth,
   clampSv3PaneWidth,
   clampSv3SidebarWidth,
   forgetSv3PaneWidth,
@@ -1972,7 +1973,7 @@ export class SearchV3View extends JfElement {
     const frame = new FrameLatch();
     this.resizing = true;
     const move = (moved: PointerEvent): void => {
-      width = clampSv3PaneWidth(startWidth - (moved.clientX - startX), available, sidebar);
+      width = clampSv3PaneDragWidth(startWidth - (moved.clientX - startX), available, sidebar);
       frame.request(() => this.applyPaneWidth(width));
     };
     const stop = (): void => {
@@ -2013,7 +2014,7 @@ export class SearchV3View extends JfElement {
     // Right-anchored: LEFT grows the pane, the same direction the pointer drags it.
     const step = event.key === 'ArrowLeft' ? SV3_GRIP_KEY_STEP_PX : -SV3_GRIP_KEY_STEP_PX;
     this.adoptPaneWidth(
-      clampSv3PaneWidth(this.paneWidthPx + step, this.availableWidth(), this.sidebarOccupiedWidth()),
+      clampSv3PaneDragWidth(this.paneWidthPx + step, this.availableWidth(), this.sidebarOccupiedWidth()),
     );
   }
 

@@ -3,8 +3,8 @@
 // W2'/W2'' read it, with the list+pane half replaced by the picture author's decision of 17 November
 // (PJ2/PJ3): the pane docks to the window's right edge, max(400, 30 % of the window) up to 592, and
 // there is no list+pane cap or gutter any more (sv3-boundaries.pane-dock.test.ts holds the new rule).
-// What stays: the sidebar's ceiling measures the whole window; a remembered width is clamped as before
-// (360-560); the 980 switch measures the whole window; below 1040 the constrained-window width.
+// What stays: the sidebar's ceiling measures the whole window; a remembered width is read from 360 as
+// before, up to the pane's outer 592 since PJ2′; the 980 switch measures the whole window; below 1040 the constrained-window width.
 // A namespace import, so a build without the rule fails these by assertion rather than at import.
 import { describe, expect, it } from 'vitest';
 import * as boundaries from './sv3-boundaries.js';
@@ -57,12 +57,12 @@ describe('Search page width — what the rule leaves alone (W2′/W2″)', () =>
     expect(boundaries.sv3PaneIsInline(980)).toBe(true);
   });
 
-  it('a remembered or dragged width is clamped as before, 360-560', () => {
+  it('a remembered width is read as stored, from 360 up to the outer 592 (PJ2\u2032)', () => {
     expect(boundaries.resolveInitialSv3PaneWidth(360, 1920, NO_SIDEBAR)).toBe(360);
     expect(boundaries.resolveInitialSv3PaneWidth(450, 1920, NO_SIDEBAR)).toBe(450);
-    expect(boundaries.resolveInitialSv3PaneWidth(600, 1920, NO_SIDEBAR)).toBe(560);
+    expect(boundaries.resolveInitialSv3PaneWidth(600, 1920, NO_SIDEBAR)).toBe(592);
     expect(boundaries.clampSv3PaneWidth(300, 1920, EXPANDED)).toBe(360);
-    expect(boundaries.clampSv3PaneWidth(900, 1920, EXPANDED)).toBe(560);
+    expect(boundaries.clampSv3PaneWidth(900, 1920, EXPANDED)).toBe(592);
   });
 
   it('the sidebar ceiling still measures the whole window', () => {

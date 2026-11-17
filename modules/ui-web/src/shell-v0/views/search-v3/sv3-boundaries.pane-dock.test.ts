@@ -70,10 +70,45 @@ describe('PJ4 what the docked pane leaves alone', () => {
     }
   });
 
-  it('a remembered or dragged width is still clamped 360-560', () => {
+  it('a remembered width reads as stored, from 360 up to the outer 592 (PJ2\u2032)', () => {
+    expect(boundaries.resolveInitialSv3PaneWidth(360, 2560, NO_SIDEBAR)).toBe(360);
     expect(boundaries.resolveInitialSv3PaneWidth(450, 2560, NO_SIDEBAR)).toBe(450);
-    expect(boundaries.resolveInitialSv3PaneWidth(600, 2560, NO_SIDEBAR)).toBe(560);
+    expect(boundaries.resolveInitialSv3PaneWidth(560, 2560, NO_SIDEBAR)).toBe(560);
+    expect(boundaries.resolveInitialSv3PaneWidth(600, 2560, NO_SIDEBAR)).toBe(592);
     expect(boundaries.clampSv3PaneWidth(300, 2560, EXPANDED)).toBe(360);
-    expect(boundaries.clampSv3PaneWidth(900, 2560, EXPANDED)).toBe(560);
+    expect(boundaries.clampSv3PaneWidth(900, 2560, EXPANDED)).toBe(592);
+  });
+});
+
+type Clamp = (width: number, host: number, sidebar: number) => number;
+const drag: Clamp = (width, host, sidebar) => {
+  const fn = (boundaries as unknown as Record<string, unknown>).clampSv3PaneDragWidth;
+  expect(typeof fn, 'clampSv3PaneDragWidth exists').toBe('function');
+  return (fn as Clamp)(width, host, sidebar);
+};
+
+describe('PJ2\u2032 the automatic width and a drag measure the same outer box', () => {
+  it('a drag or nudge clamps to 392-592 outer (360-560 of content plus 16 px padding each side)', () => {
+    for (const sidebar of [NO_SIDEBAR, COLLAPSED, EXPANDED]) {
+      expect(drag(10, 1920, sidebar), `${sidebar}`).toBe(392);
+      expect(drag(450, 1920, sidebar), `${sidebar}`).toBe(450);
+      expect(drag(5000, 1920, sidebar), `${sidebar}`).toBe(592);
+    }
+  });
+
+  it.each([[1920, EXPANDED], [1920, NO_SIDEBAR], [2400, NO_SIDEBAR], [3840, EXPANDED], [1600, NO_SIDEBAR]] as const)(
+    'at %i px with a %i px sidebar a nudge from the automatic width moves exactly one step', (host, sidebar) => {
+      const px = auto(host, sidebar, SHARE);
+      const step = boundaries.SV3_GRIP_KEY_STEP_PX;
+      expect(drag(px - step, host, sidebar), 'narrower').toBe(px - step);
+      expect(drag(px + step, host, sidebar), 'wider, at most 592').toBe(Math.min(px + step, 592));
+    });
+
+  it('the room beside the main column\u2019s 640 still binds, and a constrained window drags as before', () => {
+    expect(drag(5000, 1300, EXPANDED)).toBe(1300 - EXPANDED - boundaries.SV3_MAIN_MIN_PX);
+    // 1024 - 640 = 384, under 392: the pane's 360 floor stays, as on the base.
+    expect(drag(10, 1024, NO_SIDEBAR)).toBe(360);
+    expect(drag(5000, 1024, NO_SIDEBAR)).toBe(384);
+    expect(drag(5000, 1100, EXPANDED)).toBe(360);
   });
 });

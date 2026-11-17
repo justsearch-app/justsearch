@@ -632,7 +632,7 @@ describe('SW-5 the remembered pane width: stored value against effective width, 
     ['absent', null, 576],
     ['360', '360', 360],
     ['450', '450', 450],
-    ['600', '600', 560],
+    ['600', '600', 592],
     ['invalid', 'wide', 576],
     ['storage unavailable', 'unavailable', 576],
   ] as const)('stored %s: the pane opens at its effective width and reflow writes nothing', async (_label, stored, px) => {
@@ -651,7 +651,7 @@ describe('SW-5 the remembered pane width: stored value against effective width, 
     }
   }, 60_000);
 
-  it('dragging clamps to 360-560 and remembers; reset returns to automatic and forgets', async () => {
+  it('dragging clamps to 392-592 outer and remembers; reset returns to automatic and forgets', async () => {
     const page = await open(1920, 1080);
     await search(page);
     await openResult(page);
@@ -663,8 +663,8 @@ describe('SW-5 the remembered pane width: stored value against effective width, 
     await page.mouse.move(box.x + box.width / 2 + 600, y, { steps: 5 });
     await page.mouse.up();
     await settle(page, 300);
-    expect(Math.round((await page.locator('jf-sv3-pane').boundingBox())!.width)).toBe(360);
-    expect(await page.evaluate(key => localStorage.getItem(key), PANE_KEY)).toBe('360');
+    expect(Math.round((await page.locator('jf-sv3-pane').boundingBox())!.width)).toBe(392);
+    expect(await page.evaluate(key => localStorage.getItem(key), PANE_KEY)).toBe('392');
     await grip.dblclick();
     await settle(page, 300);
     expect(Math.round((await page.locator('jf-sv3-pane').boundingBox())!.width)).toBe(576);

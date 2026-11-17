@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-17T01:24:37.591Z",
-  "revision": "5a2ac8226ef4cb4dbc4cb081c3db6caea7686f3d",
-  "tree": "7f23c17d8d2a6dbcf70184ccd9d5730ef56621a1",
+  "createdAt": "2026-11-17T01:53:54.023Z",
+  "revision": "26ae540014a552fdce4587a9675a10d472e9e400",
+  "tree": "5ea21d3fc5fe4f343cb49bd040fe66a93efabe14",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-50404-1794878621987.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/f1d94f1p/tmp/test-intent-vitest-18720-1794880354247.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 386
+      "durationMs": 904
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-50404-1794878622375.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/f1d94f1p/tmp/test-intent-vitest-18720-1794880355153.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 55214
+      "durationMs": 78867
     }
   ],
   "checks": [
@@ -35,7 +35,7 @@
       "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts",
       "file": "modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:2edd50faf08724b2efe9bb88ae04863f69b217d1e6469b7efdb0b834741eedac",
+      "contentDigest": "sha256:a7ab3cc5667b42036aa78f1055e27c229d5b1566eb4ae39842a6405c58732200",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -105,7 +105,35 @@
           "status": "passed"
         },
         {
-          "name": "PJ4 what the docked pane leaves alone a remembered or dragged width is still clamped 360-560",
+          "name": "PJ4 what the docked pane leaves alone a remembered width reads as stored, from 360 up to the outer 592 (PJ2′)",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box a drag or nudge clamps to 392-592 outer (360-560 of content plus 16 px padding each side)",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box at 1920 px with a 256 px sidebar a nudge from the automatic width moves exactly one step",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box at 1920 px with a 0 px sidebar a nudge from the automatic width moves exactly one step",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box at 2400 px with a 0 px sidebar a nudge from the automatic width moves exactly one step",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box at 3840 px with a 256 px sidebar a nudge from the automatic width moves exactly one step",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box at 1600 px with a 0 px sidebar a nudge from the automatic width moves exactly one step",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box the room beside the main column’s 640 still binds, and a constrained window drags as before",
           "status": "passed"
         }
       ]
@@ -114,7 +142,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:5827c62d0f2c4965c490f895969a0b9d42e18edccb0cb45db52d939aa3d5f3d3",
+      "contentDigest": "sha256:da1cabb0960ff4659fe8421e324aa2214d2414f8538bb630474a52ba15be152e",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -206,10 +234,34 @@
         {
           "name": "PJ4 at the default window and in a split nothing changes in a stacked split at 1920 the pane keeps the width it had (540) at its split’s edge",
           "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box (392-592) at 1920 px a nudge from the automatic 576 px moves one step, no jump, and Home returns to automatic",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box (392-592) at 2400 px a nudge from the automatic 592 px moves one step, no jump, and Home returns to automatic",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box (392-592) a drag clamps at 392 and 592 outer, and a remembered 592 reopens at 592",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box (392-592) a width remembered before (360) shows the pane and its text column as on the base",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box (392-592) a width remembered before (450) shows the pane and its text column as on the base",
+          "status": "passed"
+        },
+        {
+          "name": "PJ2′ the automatic width and a drag measure the same outer box (392-592) a width remembered before (560) shows the pane and its text column as on the base",
+          "status": "passed"
         }
       ]
     }
   ],
   "failBefore": null,
-  "digest": "sha256:3342479b9f8ca5fec88ea306208d296b9db79a74e12e269dd59674ff1c82adf9"
+  "digest": "sha256:7b0d38253b451d502d4fbfda82cede5279054c5e4c40a33e5565466271ed0e9d"
 }

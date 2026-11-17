@@ -434,3 +434,73 @@ describe('PJ4 at the default window and in a split nothing changes', () => {
     expect(Math.round(p.pane.right)).toBe(1920);
   }, 60_000);
 });
+
+/** The width of the document's text column in the pane: its blocks' box, inside the pane's edge and padding. */
+const contentWidth = (page: Page): Promise<number> => page.evaluate(() => {
+  const find = (root: ParentNode, sel: string): Element | null => {
+    const hit = root.querySelector(sel); if (hit) return hit;
+    for (const el of Array.from(root.querySelectorAll('*'))) { const inner = el.shadowRoot && find(el.shadowRoot, sel); if (inner) return inner; }
+    return null;
+  };
+  const doc = find(document, '[data-testid="sv3-pane-document"]')!;
+  return find(doc.shadowRoot ?? doc, '.blocks')!.getBoundingClientRect().width;
+});
+
+const paneWidth = async (page: Page): Promise<number> => Math.round((await paneParts(page)).pane.width);
+const stored = (page: Page): Promise<string | null> => page.evaluate(key => localStorage.getItem(key), PANE_KEY);
+
+/** Press `key` on the pane's grip and let the width settle. */
+async function nudge(page: Page, key: 'ArrowLeft' | 'ArrowRight' | 'Home'): Promise<void> {
+  await page.locator('[data-testid="sv3-pane-grip"]').focus();
+  await page.keyboard.press(key);
+  await settle(page, 300);
+}
+
+describe('PJ2′ the automatic width and a drag measure the same outer box (392-592)', () => {
+  it.each([[1920, 576], [2400, 592]] as const)(
+    'at %i px a nudge from the automatic %i px moves one step, no jump, and Home returns to automatic', async (width, px) => {
+      const page = await openPane(width, 1000);
+      expect(await paneWidth(page), 'automatic').toBe(px);
+      await nudge(page, 'ArrowRight');
+      expect(await paneWidth(page), 'one step narrower').toBe(px - 24);
+      expect(await stored(page)).toBe(String(px - 24));
+      await nudge(page, 'Home');
+      expect(await paneWidth(page), 'automatic again').toBe(px);
+      expect(await stored(page)).toBeNull();
+      await nudge(page, 'ArrowLeft');
+      expect(await paneWidth(page), 'one step wider, at most 592').toBe(Math.min(592, px + 24));
+      expect(await stored(page)).toBe(String(Math.min(592, px + 24)));
+    }, 60_000);
+
+  it('a drag clamps at 392 and 592 outer, and a remembered 592 reopens at 592', async () => {
+    const page = await openPane(1920, 1000);
+    const grip = page.locator('[data-testid="sv3-pane-grip"]');
+    const drag = async (dx: number): Promise<void> => {
+      const box = (await grip.boundingBox())!;
+      const x = box.x + box.width / 2; const y = box.y + box.height / 2;
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      await page.mouse.move(x + dx, y, { steps: 5 });
+      await page.mouse.up();
+      await settle(page, 300);
+    };
+    await drag(600);
+    expect(await paneWidth(page), 'the floor').toBe(392);
+    expect(await stored(page)).toBe('392');
+    await drag(-600);
+    expect(await paneWidth(page), 'the ceiling').toBe(592);
+    expect(await stored(page)).toBe('592');
+    await context?.close();
+    const again = await openPane(1920, 1000, { stored: '592' });
+    expect(await paneWidth(again)).toBe(592);
+  }, 60_000);
+
+  /** Measured on the base (5a2ac8226e) in this harness: pane width and its text column. */
+  it.each([['360', 360, 331], ['450', 450, 421], ['560', 560, 531]] as const)(
+    'a width remembered before (%s) shows the pane and its text column as on the base', async (value, px, content) => {
+      const page = await openPane(1920, 1000, { stored: value });
+      expect(await paneWidth(page)).toBe(px);
+      expect(Math.round(await contentWidth(page))).toBe(content);
+      expect(await stored(page), 'storage is not rewritten on read').toBe(value);
+    }, 60_000);
+});
