@@ -29,7 +29,7 @@ export function kindWord(fileKind: string): string {
   return WORDS[fileKind.toLowerCase()] ?? 'Other files';
 }
 
-export type KindField = 'file_kind' | 'mime_base';
+type KindField = 'file_kind' | 'mime_base';
 type KindCounts = { readonly file_kind?: Readonly<Record<string, number>>; readonly mime_base?: Readonly<Record<string, number>> };
 /** One selection flip, as the card's `card-facet-toggle` carries it. */
 export interface FacetToggle { readonly field: string; readonly value: string }
