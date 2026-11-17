@@ -241,6 +241,9 @@ export const SV3_RESULTS_IDLE: Sv3ResultsView = {
   openPath: null,
 };
 
+/** One `card-facet-toggle`: a value, several values, or (null) every chosen value of one field. */
+export type FacetToggleDetail = { readonly field: string; readonly value: string | readonly string[] | null };
+
 /**
  * The window's search state. A Lit controller so its subscriptions follow the window's connection,
  * and so the window file gains wiring rather than a second copy of this bookkeeping.
@@ -338,12 +341,15 @@ export class Sv3SearchController implements ReactiveController {
     if (this.showing) this.rerun();
   }
 
-  /** The card's facet chips — the default window's handler, on the same store. */
-  onCardFacetToggle(detail: { field: string; value: string | null } | undefined): void {
+  /** The card's facet chips — the default window's handler, on the same store. A kind filter that stands
+   *  for several values flips them in one press (one re-run), on one field or, as a list, across fields. */
+  onCardFacetToggle(detail: FacetToggleDetail | readonly FacetToggleDetail[] | undefined): void {
     if (detail === undefined) return;
     if (this.host.draft().draftReview ? !this.hasPlace : !this.host.draft().draftMayIssue()) return;
-    if (detail.value === null) for (const value of getFacetSelections()[detail.field] ?? []) toggleFacetValue(detail.field, value);
-    else toggleFacetValue(detail.field, detail.value);
+    for (const { field, value } of 'field' in detail ? [detail] : detail) {
+      if (value === null) for (const chosen of getFacetSelections()[field] ?? []) toggleFacetValue(field, chosen);
+      else for (const one of typeof value === 'string' ? [value] : value) toggleFacetValue(field, one);
+    }
     this.rerun();
   }
 
