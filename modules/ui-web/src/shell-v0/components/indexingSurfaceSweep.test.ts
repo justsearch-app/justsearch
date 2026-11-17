@@ -86,6 +86,8 @@ function framePanel(state: AiState, tasks: Task[] = []) {
   const panel = new StatusPanel();
   panel.model = deriveFrameStatus({ ai: state, now: Date.now(), contactLostAt: null, tasks });
   panel.expanded = new Set(['indexing']);
+  // fm-15 (fm-rest-a S1/S4): the reading entry's Details, which these cases read, are a developer tool.
+  panel.developer = true;
   return panel;
 }
 function expectedReason(which: Case): string {

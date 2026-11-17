@@ -15,6 +15,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
     compact: { type: Boolean, reflect: true },
     toolbar: { type: Boolean, reflect: true }, menuOpen: { state: true },
     allowPause: { type: Boolean, attribute: 'allow-pause' },
+    entry: { type: Boolean, reflect: true },
     duration: { state: true }, pending: { state: true }, message: { state: true },
     saveWithSettings: { attribute: false },
   };
@@ -24,6 +25,11 @@ class IndexingControls extends SignalWatcher(JfElement) {
   declare toolbar: boolean;
   declare menuOpen: boolean;
   declare allowPause: boolean;
+  /**
+   * An entry's action in the status panel (fm-15): text actions like the panel's own, and Pause reading
+   * pauses until resumed, as Library's "Until I resume" does; the durations stay in Library's menu.
+   */
+  declare entry: boolean;
   declare duration: number;
   declare pending: boolean;
   declare message: string;
@@ -55,6 +61,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
     this.progress = selectIndexingProgress(null, false, 0, []);
     this.apiBase = '';
     this.allowPause = false;
+    this.entry = false;
     this.compact = false;
     this.toolbar = false;
     this.menuOpen = false;
@@ -88,6 +95,18 @@ class IndexingControls extends SignalWatcher(JfElement) {
     .pause-options button { display: block; width: 100%; text-align: start; }
     .pause-options button:hover { background: var(--surface-2); }
     :host([compact]) select { font-size: var(--font-size-xs); }
+    /* Drawn by the page in the theme's colours, never by the platform's own (light) control: the page's
+       select colour-scheme rule does not reach into this shadow root, also not in the desktop app's WebKit view. */
+    select { appearance: none; padding-inline-end: 1.6rem; }
+    option { background: var(--surface-1); color: var(--text-primary); }
+    .select { position: relative; display: inline-flex; align-items: center; }
+    .select .chevron { position: absolute; inset-inline-end: .45rem; display: inline-flex; pointer-events: none; color: var(--text-secondary); }
+    /* fm-15 — in a status panel entry the controls are its text actions, as the entry's own. */
+    :host([entry]) { display: block; margin-top: var(--jf-space-2); }
+    :host([entry]) .actions { gap: var(--jf-space-3); }
+    :host([entry]) button { font-size: var(--font-size-sm); border: 0; background: transparent; padding: var(--jf-space-1); min-height: 0; border-radius: 0; }
+    :host([entry]) button:hover { text-decoration: underline; }
+    :host([entry]) button:focus-visible { outline-width: var(--frame-focus-width); outline-offset: var(--jf-space-1); }
     @media (forced-colors: active) {
       button, select { color: ButtonText; background: ButtonFace; border-color: ButtonText; }
       button:focus-visible, select:focus-visible { outline-color: Highlight; }
@@ -185,7 +204,7 @@ class IndexingControls extends SignalWatcher(JfElement) {
       @click=${() => {
         if (unavailable) return;
         if (resume) void this.invoke(); else this.menuOpen = !this.menuOpen;
-      }}>${icon({ name: resume ? 'play' : 'clock', size: 14 })}${resume ? 'Resume reading' : 'Pause reading'}
+      }}>${icon({ name: resume ? 'play' : 'pause', size: 14 })}${resume ? 'Resume reading' : 'Pause reading'}
       ${!resume ? icon({ name: 'chevron-down', size: 12 }) : nothing}</button>
       ${!resume && this.menuOpen ? html`<div id="pause-options" class="pause-options">
         ${[[0, 'Until I resume'], [900000, '15 minutes'], [3600000, '1 hour']].map(([duration, label]) => html`
@@ -201,13 +220,13 @@ class IndexingControls extends SignalWatcher(JfElement) {
         this.focused = event.relatedTarget instanceof Node && !!this.shadowRoot?.contains(event.relatedTarget);
         this.requestUpdate();
       }}>
-      ${this.action === 'pause' ? html`<label><span class=${this.compact ? 'visually-hidden' : ''}>Pause duration</span>
-        <select aria-label="Pause duration"
+      ${this.action === 'pause' && !this.entry ? html`<label><span class=${this.compact ? 'visually-hidden' : ''}>Pause duration</span>
+        <span class="select"><select aria-label="Pause duration"
           .value=${String(this.duration)} @change=${(e: Event) => { this.duration = Number((e.target as HTMLSelectElement).value); }}>
           <option value="0">Until I resume</option>
           <option value="900000">15 minutes</option>
           <option value="3600000">1 hour</option>
-        </select></label>` : nothing}
+        </select><span class="chevron" aria-hidden="true">${icon({ name: 'chevron-down', size: 12 })}</span></span></label>` : nothing}
       <button type="button" aria-disabled=${unavailable ? 'true' : 'false'} aria-describedby="control-state"
         @click=${() => void this.invoke()}>${this.action === 'settings' ? 'Open Settings at Reset to defaults' : this.action === 'hours' ? this.compact ? 'Change when to read files' : 'Change hours' : this.action === 'battery' ? this.compact ? 'Change when to read files' : 'Change battery setting' : resume ? 'Resume reading' : 'Pause reading'}</button>
       ${!this.compact && this.action !== 'settings' && this.action !== 'hours' && this.reasons.includes('schedule')
