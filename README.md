@@ -13,11 +13,11 @@
 
 <p align="center">
   <img src="docs/assets/hero-search.png" width="820"
-       alt="JustSearch results for the search semantic understanding, across a folder of local documents">
+       alt="JustSearch results for keyboard shortcuts, with matching words highlighted">
 </p>
 <p align="center">
   <img src="docs/assets/hero-answer.png" width="820"
-       alt="An on-device answer with citations, backed by an excerpt from a local document">
+       alt="JustSearch answers what the global search shortcut preserves, with citations and a passage from the keyboard shortcuts guide">
 </p>
 
 JustSearch is local-first: it indexes your local documents, such as PDF, email, Office and most common document
