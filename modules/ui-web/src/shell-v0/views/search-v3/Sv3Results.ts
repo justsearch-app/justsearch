@@ -358,7 +358,7 @@ export class Sv3Results extends JfElement {
       .way-icon { color: var(--text-secondary); flex: none; }
       .way > div, .way > p { flex: 1; }
       .way .information { font-size: var(--font-size-xs); }
-      .way button { border: 0; border-radius: 4px; background: transparent; color: var(--text-primary); font: inherit; font-size: var(--font-size-xs); font-weight: 500; cursor: pointer; padding: var(--space-1); }
+      .way button { border: 0; border-radius: 4px; background: transparent; color: var(--text-primary); font: inherit; font-size: var(--font-size-sm); font-weight: 500; cursor: pointer; padding: var(--space-1); }
       :host {
         display: block;
         width: 100%;

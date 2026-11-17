@@ -307,37 +307,40 @@ describe('PJ2 the automatic pane: max(400, 30 % of the window), at most 592', ()
       expect(Math.round(p.pane.right)).toBe(width);
     }, 60_000);
 
-  it('at 2400 px the pane\u2019s content stays at most 560 px, 16 px in from each side', async () => {
+  /**
+   * PJ2'': the automatic pane is at most 592 px outer and its content column is that width less the
+   * pane's own padding (14 px each side) and its 1 px start border, unchanged from the pane's styling.
+   * This measures boxes, not where wrapped text ends, so it holds whatever fonts the machine has.
+   */
+  it('at 2400 px the pane is 592 outer and its content box is 592 less its padding and border, inset by the padding', async () => {
+    const OUTER = 592, PADDING = 14, BORDER = 1;
     const page = await openPane(2400, 900);
     const p = await paneParts(page);
-    const text = await page.evaluate(() => {
+    const content = await page.evaluate(() => {
       const find = (root: ParentNode, sel: string): Element | null => {
         const hit = root.querySelector(sel); if (hit) return hit;
         for (const el of Array.from(root.querySelectorAll('*'))) { const inner = el.shadowRoot && find(el.shadowRoot, sel); if (inner) return inner; }
         return null;
       };
       const doc = find(document, '[data-testid="sv3-pane-document"]')!;
-      const out = { left: Infinity, right: -Infinity };
-      const walk = (root: ParentNode) => {
-        for (const child of Array.from((root as Element).childNodes ?? [])) {
-          if (child.nodeType === Node.TEXT_NODE) {
-            if (!child.textContent?.trim()) continue;
-            const range = document.createRange(); range.selectNodeContents(child);
-            for (const r of Array.from(range.getClientRects())) if (r.width > 1 && r.bottom < innerHeight) { out.left = Math.min(out.left, r.left); out.right = Math.max(out.right, r.right); }
-            continue;
-          }
-          if (!(child instanceof Element) || child.localName === 'style') continue;
-          if (child.shadowRoot) walk(child.shadowRoot);
-          walk(child);
-        }
+      const surface = find(find(document, 'jf-sv3-pane')!.shadowRoot!, 'jf-details-pane')!.shadowRoot!.querySelector('.surface')!;
+      const region = find(doc.shadowRoot ?? doc, '.scroll-region')!;
+      const blocks = region.querySelector('.blocks')!.getBoundingClientRect();
+      const r = getComputedStyle(region), f = getComputedStyle(surface);
+      const px = (v: string) => parseFloat(v) || 0;
+      return {
+        left: blocks.left, right: blocks.right, width: blocks.width,
+        padding: px(r.paddingLeft) + px(r.paddingRight) + px(r.borderLeftWidth) + px(r.borderRightWidth),
+        border: px(f.borderLeftWidth) + px(f.borderRightWidth) + px(f.paddingLeft) + px(f.paddingRight),
       };
-      walk(doc.shadowRoot ?? doc);
-      return out;
     });
-    expect(Math.round(p.pane.width)).toBe(592);
-    expect(text.left - p.pane.left, 'content starts 16 px or more in').toBeGreaterThanOrEqual(15);
-    expect(p.pane.right - text.right, 'content ends 16 px or more before the edge').toBeGreaterThanOrEqual(15);
-    expect(text.right - text.left, 'content at most 560').toBeLessThanOrEqual(561);
+    expect(Math.round(p.pane.width), 'the pane is 592 outer').toBe(OUTER);
+    expect(Math.round(p.pane.right), 'at the window edge').toBe(2400);
+    expect(Math.round(content.width), 'content box = outer less computed padding and border')
+      .toBe(Math.round(p.pane.width - content.padding - content.border));
+    expect(Math.round(content.width), 'content box = 592 - 2 * 14 - 1').toBe(OUTER - 2 * PADDING - BORDER);
+    expect(Math.round(content.left - p.pane.left), '14 px in after the 1 px border').toBe(BORDER + PADDING);
+    expect(Math.round(p.pane.right - content.right), '14 px in from the right edge').toBe(PADDING);
   }, 60_000);
 
   it('live resize follows the window and writes nothing', async () => {

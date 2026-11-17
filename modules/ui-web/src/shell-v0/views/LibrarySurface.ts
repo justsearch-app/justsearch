@@ -841,8 +841,11 @@ export class LibrarySurface extends JfElement {
     failedChipStyles,
     folderRowStyles,
     css`
-      /* The page column: the scroller spans the window, its content sits on the centred column. */
-      .folders-scroll { padding: 1.8rem calc(var(--surface-content-gutter) + 2.5rem); min-width: 0; }
+      /* The page column: the scroller spans the window, its content sits on the centred column. The
+         page's inline edge is one length: the tab row's tabs and actions, Folders and Browse keep to it. */
+      :host { --library-page-edge: 2.5rem; }
+      jf-surface-tabs { --surface-tabs-edge: var(--library-page-edge); }
+      .folders-scroll { padding: 1.8rem calc(var(--surface-content-gutter) + var(--library-page-edge)); min-width: 0; }
       .header-left h2 { font-size: var(--font-size-headline); font-variation-settings: "opsz" 32; font-weight: 400; }
       .header { margin-bottom: 1.5rem; }
       .subtitle { overflow-wrap: anywhere; }
@@ -853,11 +856,12 @@ export class LibrarySurface extends JfElement {
       .removal-history summary { cursor: pointer; }
       .window-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
       @media (max-width: 45rem) { .window-actions { gap: .25rem; } }
+      /* A text action is the normal text colour in medium weight. */
       .text-action { align-self: center; padding: .25rem 0; border: 0; background: transparent;
-        color: var(--text-secondary); font: inherit; cursor: pointer; }
-      .text-action:hover { color: var(--text-primary); text-decoration: underline; }
+        color: var(--text-primary); font: inherit; font-weight: 500; cursor: pointer; }
+      .text-action:hover { text-decoration: underline; }
       .text-action[aria-disabled="true"] { cursor: default; opacity: .65; }
-      .text-action[aria-disabled="true"]:hover { color: var(--text-secondary); text-decoration: none; }
+      .text-action[aria-disabled="true"]:hover { text-decoration: none; }
       .text-action:focus-visible { outline: 2px solid var(--focus-ring-color); outline-offset: 2px; }
       .reread-confirmation { flex-basis: 100%; }
       .reread-confirmation:empty { display: none; }
@@ -896,12 +900,15 @@ export class LibrarySurface extends JfElement {
       .bottom-links { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 1.5rem;
         border-top: 1px solid var(--border-subtle); padding-top: .75rem; font-size: var(--font-size-sm); color: var(--text-secondary); }
       .bottom-links details { min-width: 0; flex: 1 1 17rem; }
+      /* Activity is a text action like its sibling: its words start on the page edge. */
+      .bottom-links > jf-button::part(control) { padding: .25rem 0; border: 0; background: transparent; }
+      .bottom-links > jf-button::part(control):hover { text-decoration: underline; }
       .bottom-links summary { cursor: pointer; }
       .bottom-links .excludes-section { margin-top: .5rem; }
       .other-source-card { display: flex; gap: .75rem; align-items: center; padding: .65rem 0; border-bottom: 1px solid var(--border-subtle); }
       .other-source-card .card-info { flex: 1; }
-      @media (max-width: 800px) { .folders-scroll { padding: 1.25rem; } }
-      @media (max-width: 640px) { .folders-scroll { padding: 1rem; } }
+      @media (max-width: 800px) { :host { --library-page-edge: 1.25rem; } .folders-scroll { padding-block: 1.25rem; } }
+      @media (max-width: 640px) { :host { --library-page-edge: 1rem; } .folders-scroll { padding-block: 1rem; } }
       @media (forced-colors: active) { .attention-item, .bottom-links, .excludes-section { border-color: CanvasText; } }
     `,
   ];
@@ -1346,7 +1353,8 @@ export class LibrarySurface extends JfElement {
       expanded: this.expandedFolders.has(pathHash),
       pathHash, displayPath: name.label, fullPath, pathTitle: name.title,
       walkError: this.developer && root.walkError && isWalkErrorCode(root.walkError) ? root.walkError : undefined,
-      status: !confirmed && fs.glyph === 'indexed' ? 'pending' : fs.glyph,
+      // A row that says "Up to date" carries the check, also while meaning work only waits for AI.
+      status: !confirmed && fs.glyph === 'indexed' ? 'pending' : confirmed && statusText === 'Up to date' ? 'indexed' : fs.glyph,
       statusText: this.rootsUnconfirmed ? 'Reading status unconfirmed'
         : !confirmed && statusText === 'Up to date' ? this.indexingActivity.summary
         : statusText,

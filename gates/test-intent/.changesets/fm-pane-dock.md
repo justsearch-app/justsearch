@@ -30,7 +30,15 @@ without PJ2′) the new PJ2′ cases fail by assertion: a nudge wider from the a
 560, a nudge narrower from 592 lands on 560, a drag to the floor lands on 360; in the unit file a
 remembered 600 reads 560 and the drag clamp does not exist yet.
 
-Base: `5a2ac8226e`. The evidence runs each new file whole (one check per file) on the candidate. The
+A further decision, PJ2″ (the orchestrator's, replacing only the 560/16 arithmetic of PJ2: CI's
+fonts wrapped the text past the 561 px the old case allowed, and the real app measured a 592 px pane
+with a 563 px text column): the automatic pane is at most 592 px outer, and its content column is
+that width less the pane's own padding (14 px each side) and its 1 px start border, unchanged from
+today's pane styling; "560 of content plus 16 px padding each side" was a wrong assumption about the
+pane's padding. The 2400 px case now measures the content box (the document's block column) rather
+than where wrapped text ends, so it does not depend on the machine's fonts.
+
+Base: `10ecbfb1ae` (the PR's merge base; earlier runs used `5a2ac8226e`). The evidence runs each new file whole (one check per file) on the candidate. The
 same files were run on a shared clone of the base: `sv3-boundaries.pane-dock.test.ts` fails 17 of 24
 by assertion (the automatic pane is 400 at 1400-3840 px where the rule says 420-592, because the base
 reads the third argument as a 1280-style cap); `Shell.paneDock-lockdown.test.ts` fails 22 of 28 by
@@ -53,7 +61,7 @@ remembered 360, 450 and 560 open at 360, 450 and 560 with a 331, 421 and 531 px 
         "modules/ui-web/src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts"
       ],
       "class": "New",
-      "behaviour": "With Search's pane open inline (980 px of window and up), the pane is the window's last track: its right edge, its surface, the title row with its bottom line and its close button, and the foot actions with their top line all reach the window's right edge (1920 at 1920 with no, an expanded or a collapsed sidebar, in dark and light); the last pixel column is painted by the pane; the grip straddles its start edge. With no remembered width the pane is max(400, 30 % of the window width) and at most 592 (560 of content plus 16 px padding each side), never past the room the main column's 640 leaves beside the sidebar: 384 at 1024, 400 at 1100-1333, 420 at 1400, 480 at 1600, 576 at 1920 with any sidebar, 592 from 1973; at 2400 the document's text lies at least 16 px in from each side and at most 560 wide. Live resize follows the window and writes nothing to the remembered width; a remembered width still wins (450 stays 450 at the edge). PJ2′: the automatic width and a drag measure the same outer box; a drag or nudge clamps to 392-592 outer (360-560 of content plus 16 px padding each side), cut to the room beside the main column's 640 (404 at 1300 with an expanded sidebar), with the pane's 360 floor kept where that room is under 392 (360-384 at 1024 with no sidebar, as before); a nudge from the automatic width moves exactly one 24 px step (576 -> 552 / 592 at 1920, 592 -> 568 / 592 at 2400); Home returns to automatic and forgets; a drag to 392 and to 592 is remembered as '392' and '592', and a remembered 592 reopens at 592. A width remembered before PJ2′ is read as stored, the same outer width: 360, 450 and 560 open at 360, 450 and 560 with a 331, 421 and 531 px text column, as on the base, and storage is not rewritten on read; a remembered 600 reads as 592. There is no list+pane cap: the frame publishes no --surface-content-with-pane-max-width; the main column runs from the sidebar (or the window's left edge) to the pane, and the list keeps its plain-results 960 column centred there (also at 2400); a wheel in either gutter beside the list moves the list. At 1024x700 the pane, grip, main column and list keep the base's pixel geometry; with no published share (a split stage, a DOM without layout) the automatic width is the one from before the rule, and a stacked split at 1920 keeps the 540 px pane.",
+      "behaviour": "With Search's pane open inline (980 px of window and up), the pane is the window's last track: its right edge, its surface, the title row with its bottom line and its close button, and the foot actions with their top line all reach the window's right edge (1920 at 1920 with no, an expanded or a collapsed sidebar, in dark and light); the last pixel column is painted by the pane; the grip straddles its start edge. With no remembered width the pane is max(400, 30 % of the window width) and at most 592 outer, never past the room the main column's 640 leaves beside the sidebar: 384 at 1024, 400 at 1100-1333, 420 at 1400, 480 at 1600, 576 at 1920 with any sidebar, 592 from 1973; at 2400 the pane is 592 outer and its content box (the document's block column) is that width less the pane's computed padding and border, 592 - 2 * 14 - 1 = 563, inset 14 px after the 1 px border on the left and 14 px from the right edge (PJ2″), measured as boxes so it holds whatever the machine's fonts. Live resize follows the window and writes nothing to the remembered width; a remembered width still wins (450 stays 450 at the edge). PJ2′: the automatic width and a drag measure the same outer box; a drag or nudge clamps to 392-592 outer, cut to the room beside the main column's 640 (404 at 1300 with an expanded sidebar), with the pane's 360 floor kept where that room is under 392 (360-384 at 1024 with no sidebar, as before); a nudge from the automatic width moves exactly one 24 px step (576 -> 552 / 592 at 1920, 592 -> 568 / 592 at 2400); Home returns to automatic and forgets; a drag to 392 and to 592 is remembered as '392' and '592', and a remembered 592 reopens at 592. A width remembered before PJ2′ is read as stored, the same outer width: 360, 450 and 560 open at 360, 450 and 560 with a 331, 421 and 531 px text column, as on the base, and storage is not rewritten on read; a remembered 600 reads as 592. There is no list+pane cap: the frame publishes no --surface-content-with-pane-max-width; the main column runs from the sidebar (or the window's left edge) to the pane, and the list keeps its plain-results 960 column centred there (also at 2400); a wheel in either gutter beside the list moves the list. At 1024x700 the pane, grip, main column and list keep the base's pixel geometry; with no published share (a split stage, a DOM without layout) the automatic width is the one from before the rule, and a stacked split at 1920 keeps the 540 px pane.",
       "sources": [
         {
           "kind": "owner-words",
@@ -84,6 +92,14 @@ remembered 360, 450 and 560 open at 360, 450 and 560 with a 331, 421 and 531 px 
           "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
           "delegationScope": "implement the agreed first-minutes design set",
           "choice": "PJ2′: the automatic width and the drag limits measure the same box. The pane's outer width (including its 16 px padding each side) is what both the automatic rule and dragging set: automatic max(400, 30% of the window) up to 592; dragging and arrow-key nudges clamp to 392-592 outer (= 360-560 content), so a nudge from any automatic width moves by one step without a jump. Stored values keep their meaning; a value remembered before this change keeps giving the same visible content width; storage is not rewritten on read.",
+          "label": "agent choice"
+        },
+        {
+          "kind": "delegated-choice",
+          "delegationQuote": "You are supposed to be the implementation session",
+          "delegationLocation": "task t-20261113-fmimpl request, the user's turn of 2026-11-13T15:05Z",
+          "delegationScope": "implement the agreed first-minutes design set",
+          "choice": "PJ2'' (replaces only the 560/16 arithmetic of PJ2): the automatic pane is at most 592 px outer; its content column is that width less the pane's own padding and border, unchanged from today's pane styling (no product change; nothing at 1024x700 changes). The 'at most 560 content + 16 px padding each side' wording was a wrong assumption about the pane's padding.",
           "label": "agent choice"
         }
       ],
@@ -177,5 +193,35 @@ remembered 360, 450 and 560 open at 360, 450 and 560 with a 331, 421 and 531 px 
   "verdict": "accept",
   "digest": "sha256:e330656dd869023fef3a697d573f96cc6d6f511caff35353f61fa5e2f1d8340d",
   "note": "Audit on 354f99d56a: new checks fail on 10ecbfb1ae by assertion and pass on the candidate; rewritten assertions limited to PJ1-PJ5/PJ2'; 4 of 4 mutations caught. Not pinned: split-layout drag limits (PJ4'); 563 vs 560 text column at 592."
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "62003fab-d2d0-4612-9b20-d2a0a6d3bebd",
+  "verdict": "accept",
+  "digest": "sha256:015113f7b010415972c326c6747fb78ef7221a5df7365eb1ec54cb35dc3b7eaf"
+}
+```
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "a37bf9fb-3e0b-4d99-ad8f-8d6514ba3260",
+  "verdict": "accept",
+  "digest": "sha256:e2298542786c06e9f9c6ef500b7fcd2effb3c494954b16f04055141592406a23"
+}
+```
+
+```json
+{
+  "kind": "audit",
+  "role": "verifier",
+  "session": "7efbcdd2-f5fc-4ac2-a5cb-02369ff3fcd8",
+  "verdict": "accept",
+  "digest": "sha256:e2298542786c06e9f9c6ef500b7fcd2effb3c494954b16f04055141592406a23"
 }
 ```

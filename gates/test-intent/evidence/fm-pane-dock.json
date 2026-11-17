@@ -4,9 +4,9 @@
     "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
     "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
   },
-  "createdAt": "2026-11-17T01:53:54.023Z",
-  "revision": "26ae540014a552fdce4587a9675a10d472e9e400",
-  "tree": "5ea21d3fc5fe4f343cb49bd040fe66a93efabe14",
+  "createdAt": "2026-11-17T08:04:27.975Z",
+  "revision": "a99f23ef9e09bca19c399515190cb5e9c4599969",
+  "tree": "ae2bc23716d50126ba8a4ee5cbcb2fcdc90e9607",
   "environment": {
     "platform": "linux",
     "arch": "x64",
@@ -18,16 +18,16 @@
   },
   "runs": [
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/f1d94f1p/tmp/test-intent-vitest-18720-1794880354247.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-3889-1794902525339.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 904
+      "durationMs": 405
     },
     {
-      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/f1d94f1p/tmp/test-intent-vitest-18720-1794880355153.json\"",
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-3889-1794902525744.json\"",
       "cwd": "modules/ui-web",
       "exitCode": 0,
-      "durationMs": 78867
+      "durationMs": 71686
     }
   ],
   "checks": [
@@ -142,7 +142,7 @@
       "id": "modules/ui-web/src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts",
       "file": "modules/ui-web/src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts",
       "runner": "vitest",
-      "contentDigest": "sha256:da1cabb0960ff4659fe8421e324aa2214d2414f8538bb630474a52ba15be152e",
+      "contentDigest": "sha256:ff009f284ef6ef406cb6622531605cf73be3ed65e9b24af7b02f8d1b8450e731",
       "executed": true,
       "skipped": false,
       "outcome": "passed",
@@ -192,7 +192,7 @@
           "status": "passed"
         },
         {
-          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 at 2400 px the pane’s content stays at most 560 px, 16 px in from each side",
+          "name": "PJ2 the automatic pane: max(400, 30 % of the window), at most 592 at 2400 px the pane is 592 outer and its content box is 592 less its padding and border, inset by the padding",
           "status": "passed"
         },
         {
@@ -262,6 +262,39 @@
       ]
     }
   ],
-  "failBefore": null,
-  "digest": "sha256:7b0d38253b451d502d4fbfda82cede5279054c5e4c40a33e5565466271ed0e9d"
+  "failBefore": {
+    "ref": "10ecbfb1ae",
+    "revision": "10ecbfb1ae813b9923dee98d5b4bc64a717305de",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-3889-1794902599702.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 428,
+        "output": "JSON report written to /home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-3889-1794902599702.json\n\n"
+      },
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts\" --config vitest.config.lockdown.ts --reporter=json --outputFile=\"/home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-3889-1794902600130.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 67582,
+        "output": "JSON report written to /home/elias/.cache/am/ntlhrh63/tmp/test-intent-vitest-3889-1794902600130.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts",
+        "classification": "assertion",
+        "detail": "PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1400 px with a 0 px sidebar the automatic pane is 420 px:  AssertionError: expected 400 to be 420 // Object.is equality\n    at /home/elias/.cache/am/ntlhrh63/tmp/test-intent-before-PtJsfY/modules/ui-web/src/shell-v0/views/search-v3/sv3-boundaries.pane-dock.test.ts:40:40\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm-pj/modules/ui-web/node_mod | PJ2 the docked pane: max(400, 30 % of the window), at most 592 at 1600 p"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts",
+        "classification": "assertion",
+        "detail": "PJ1 the pane docks to the window’s right edge; its surface and lines span its width at 1920 with no sidebar (none/0 px) in dark:  AssertionError: the pane ends at the window edge: expected 1600 to be 1920 // Object.is equality\n    at /home/elias/.cache/am/ntlhrh63/tmp/test-intent-before-PtJsfY/modules/ui-web/src/shell-v0/chrome/Shell.paneDock-lockdown.test.ts:279:76\n    at file:///home/elias/dev/justsearch/.claude/worktrees/fm | PJ1 the pane docks to the window’s right edge; its surface and line"
+      }
+    ]
+  },
+  "digest": "sha256:5269b2046cdf04f6268ccef6aba8b78cd4928ad819e05471f28a983d4d6ca7d9"
 }
