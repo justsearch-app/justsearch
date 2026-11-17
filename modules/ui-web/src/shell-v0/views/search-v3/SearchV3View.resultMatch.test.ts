@@ -32,7 +32,8 @@ const DEEP = '/docs/deep-long.txt';
 const REPEAT = '/docs/repeated.txt';
 const WHOLE = '/docs/whole-long.txt';
 const FIRST = '/docs/first-lines.txt';
-const PATHS = [MANUAL, GUIDE, BARE, DEEP, REPEAT, WHOLE, FIRST];
+const TWO = '/docs/two-words.txt';
+const PATHS = [MANUAL, GUIDE, BARE, DEEP, REPEAT, WHOLE, FIRST, TWO];
 
 const filler = (n: number): string => Array.from({ length: n }, (_, i) => `filler line ${String(i).padStart(4, '0')} ....`).join('\n');
 /** Documents whose passage lies far past any opening window (past character 8,000). */
@@ -45,6 +46,10 @@ const WHOLE_PASSAGE = 'Whole: the harbour office keeps the tide tables.';
 const WHOLE_TEXT = `${filler(400)}\n${WHOLE_PASSAGE}\n${filler(50)}`;
 const FIRST_PASSAGE = 'First: the harbour opens early.';
 const FIRST_TEXT = `${filler(2)}\n${FIRST_PASSAGE}\n${filler(400)}`;
+/** The verifier's two-words.txt: one file, a passage for each of two searches, far apart. */
+const FROST_PASSAGE = 'Frost: the frostlatch on the boathouse door sticks in winter.';
+const MOSS_PASSAGE = 'Moss: the mossbeacon on the far jetty blinks green at night.';
+const TWO_TEXT = `${filler(380)}\n${FROST_PASSAGE}\n${filler(420)}\n${MOSS_PASSAGE}\n${filler(100)}`;
 
 /** Lines of one length (24 characters with the break) up to exactly `length` characters, ending in a break. */
 const fillTo = (length: number): string => {
@@ -76,7 +81,7 @@ const REPEAT_REGION = { startChar: 345, endChar: 345 + 5 * 23 - 1 };
 const REPEAT_PASSAGE = REPEAT_TEXT.slice(REPEAT_CHUNK_START + REPEAT_REGION.startChar, REPEAT_CHUNK_START + REPEAT_REGION.endChar);
 
 const DOCS: Record<string, string> = { [MANUAL]: MANUAL_TEXT, [GUIDE]: GUIDE_TEXT, [BARE]: filler(400), [DEEP]: DEEP_TEXT,
-  [REPEAT]: REPEAT_TEXT, [WHOLE]: WHOLE_TEXT, [FIRST]: FIRST_TEXT };
+  [REPEAT]: REPEAT_TEXT, [WHOLE]: WHOLE_TEXT, [FIRST]: FIRST_TEXT, [TWO]: TWO_TEXT };
 
 type Region = { text?: string; approxLine?: number; startChar?: unknown; endChar?: unknown; matchSpans?: unknown[] };
 /** One hit of the answer: a chunk hit's stored chunk fields (strings), and its regions. */
@@ -119,6 +124,7 @@ beforeEach(() => {
       regions: [{ text: REPEAT_PASSAGE, approxLine: 2416, ...REPEAT_REGION, matchSpans: [] }] },
     [WHOLE]: { regions: [regionOf(WHOLE, WHOLE_PASSAGE)] },
     [FIRST]: { regions: [regionOf(FIRST, FIRST_PASSAGE)] },
+    [TWO]: chunkHitOf(TWO, FROST_PASSAGE),
   };
   previews = []; hold = null; held = [];
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
@@ -257,7 +263,7 @@ describe('M5 nothing new is stored', () => {
 });
 
 describe('M6 races', () => {
-  it('a newer search answer while the pane is open does not move it, and choosing the same result again does not jump', async () => {
+  it('N2 a newer answer for the same search arriving without a click moves nothing (keep)', async () => {
     const { view, card } = await mount();
     await openResult(view, card, MANUAL);
     const shown = documentPane(view)!.match;
@@ -268,9 +274,28 @@ describe('M6 races', () => {
     await pump(view);
     expect(getSearchState().results.find(hit => hit.path === MANUAL)?.excerptRegions?.[0]?.text).toBe('filler line 0010 ....');
     expect(documentPane(view)!.match).toBe(shown);
-    await openResult(view, card, MANUAL);
-    expect(documentPane(view)!.match).toBe(shown);
     expect(previews).toHaveLength(1);
+    expect(tinted(view)).toEqual([MANUAL_PASSAGE]);
+  });
+
+  it('N2 opening the result whose passage the pane shows, after the reader scrolled away: no request, no scroll, no change (keep)', async () => {
+    const { view, card } = await mount();
+    await openResult(view, card, MANUAL);
+    const pane = documentPane(view)!;
+    const shown = pane.match;
+    // The same search answers again with the same passage (new objects, the same span and text).
+    submitSearch();
+    await pump(view);
+    expect(pane.match).toBe(shown);
+    const area = pane.shadowRoot!.querySelector<HTMLElement>('.scroll-region')!;
+    area.scrollTop = 37;
+    const scrolls = vi.mocked(Element.prototype.scrollIntoView).mock.calls.length;
+    await openResult(view, card, MANUAL);
+    expect(documentPane(view)).toBe(pane);
+    expect(pane.match).toBe(shown);
+    expect(previews).toHaveLength(1);
+    expect(vi.mocked(Element.prototype.scrollIntoView).mock.calls.length).toBe(scrolls);
+    expect(area.scrollTop).toBe(37);
     expect(tinted(view)).toEqual([MANUAL_PASSAGE]);
   });
 
@@ -402,5 +427,43 @@ describe('R5 whole-file hits are placed at the region\'s own span (keep)', () =>
     expect(firstLine(view)).toBe('filler line 0000 ....');
     expect(tintedPlace(view, FIRST)).toEqual({ at: FIRST_TEXT.indexOf(FIRST_PASSAGE), text: FIRST_PASSAGE });
     expect(noteOf(view)).toBe('Showing the beginning of a longer document.');
+  });
+});
+
+describe('N1 the open file, found again with another passage, opens at that passage', () => {
+  const marked = (view: Mounted): string[] =>
+    [...documentPane(view)!.shadowRoot!.querySelectorAll('pre.source span.hl-weak mark.hl')].map(m => m.textContent ?? '');
+
+  it('two-words.txt open at "frostlatch"; a search for "mossbeacon" returns it with another passage; opening it shows that passage', async () => {
+    const { view, card, field } = await mount();
+    await openResult(view, card, TWO);
+    expect(tinted(view)).toEqual([FROST_PASSAGE]);
+    // The second search's answer for the same file, as the Engine sends it: another chunk and region.
+    answers[TWO] = chunkHitOf(TWO, MOSS_PASSAGE);
+    field.value = 'mossbeacon'; field.dispatchEvent(new Event('input'));
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await pump(view);
+    expect(getSearchState().results.find(hit => hit.path === TWO)?.excerptRegions?.[0]?.text).toBe(MOSS_PASSAGE);
+    await openResult(view, card, TWO);
+    const at = TWO_TEXT.indexOf(MOSS_PASSAGE);
+    const asked = previews.filter(p => p.path === TWO).at(-1)!;
+    expect(asked.offset).toBeGreaterThan(0);
+    expect(asked.offset).toBeLessThanOrEqual(at);
+    expect(asked.offset + asked.max).toBeGreaterThanOrEqual(at + MOSS_PASSAGE.length);
+    expect(tintedPlace(view, TWO)).toEqual({ at, text: MOSS_PASSAGE });
+    expect(marked(view)).toEqual(['mossbeacon']);
+    expect(noteOf(view)).toBe('Showing the part of this document around the match.');
+  });
+
+  it('a newer answer for the same search gives the open file another passage; opening it then shows that passage', async () => {
+    const { view, card } = await mount();
+    await openResult(view, card, TWO);
+    answers[TWO] = chunkHitOf(TWO, MOSS_PASSAGE);
+    submitSearch();
+    await pump(view);
+    expect(tinted(view)).toEqual([FROST_PASSAGE]);
+    await openResult(view, card, TWO);
+    expect(tintedPlace(view, TWO)).toEqual({ at: TWO_TEXT.indexOf(MOSS_PASSAGE), text: MOSS_PASSAGE });
+    expect(noteOf(view)).toBe('Showing the part of this document around the match.');
   });
 });

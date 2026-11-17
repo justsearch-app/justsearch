@@ -304,3 +304,128 @@ describe('R4 an unconfirmed match brings back no older line-based tint', () => {
     expect(tinted(el)).toEqual(Array.from({ length: 9 }, (_, i) => lineAt(20 + i)));
   });
 });
+
+/**
+ * N3/N4 — a search result's passage is the Engine's own cut of the file's text
+ * (`content.substring(winStart, winEnd)`, HighlightingOps.computeExcerptRegions and
+ * EvidenceSpanSelector.toExcerptRegion), so it is confirmed only when the file's text at exactly its
+ * span is the passage's whole text. A prefix that survived an edit, or the passage a few characters
+ * away, is not the passage.
+ */
+const PARAGRAPH = [
+  'The harbour gate opens at dawn for the inspection boats.',
+  'Each boat is logged by name before it may pass the mole.',
+  'The keeper closes the gate again when the last boat is in.',
+].join('\n');
+/** The long document with the paragraph written over lines `n` .. `n + 2`. */
+const withParagraphAt = (n: number, paragraph = PARAGRAPH): string =>
+  LONG.replace([lineAt(n), lineAt(n + 1), lineAt(n + 2)].join('\n'), paragraph);
+
+describe('N3 a search passage is confirmed only by its whole text at its span', () => {
+  const asToday = (el: DocumentPane): void => {
+    expect(shownLines(el)[0]).toBe(lineAt(0));
+    expect(tinted(el)).toEqual([]);
+    expect(el.shadowRoot!.querySelectorAll('pre.source .hl-weak, pre.source .hl-strong')).toHaveLength(0);
+    expect(note(el)).toBe('Showing the beginning of a longer document.');
+    expect(notices(el)).toEqual([]);
+    expect(scrolledTo).toEqual([]);
+  };
+
+  it('the paragraph was replaced, its first line kept (beyond the first window): the beginning, nothing tinted', async () => {
+    const match = span(withParagraphAt(400), PARAGRAPH);
+    const replaced = withParagraphAt(400, [PARAGRAPH.split('\n')[0], 'The page was redone and says something else entirely now.', 'Nothing of the old paragraph is left here at all.'].join('\n'));
+    expect(replaced.slice(match.startChar, match.startChar + 56)).toBe(PARAGRAPH.slice(0, 56));
+    const { calls } = serve(replaced);
+    const el = await open('/docs/m3-vanish.txt', pane => { pane.match = match; pane.markQuery = 'frostlatch'; });
+    expect(calls.map(c => c.offset > 0)).toEqual([true, false]);
+    asToday(el);
+  });
+
+  it('the paragraph was replaced, its first line kept (inside the first window): the beginning, nothing tinted', async () => {
+    const match = span(withParagraphAt(120), PARAGRAPH);
+    const replaced = withParagraphAt(120, [PARAGRAPH.split('\n')[0], 'Rewritten.'].join('\n'));
+    const { calls } = serve(replaced);
+    const el = await open('/docs/m3-vanish.txt', pane => { pane.match = match; });
+    expect(calls.map(c => c.offset)).toEqual([0]);
+    asToday(el);
+  });
+
+  it('the text at the span differs only in its last character', async () => {
+    const doc = withParagraphAt(120);
+    const match = span(doc, PARAGRAPH);
+    const changed = doc.slice(0, match.endChar - 1) + '!' + doc.slice(match.endChar);
+    expect(changed).toHaveLength(doc.length);
+    const { calls } = serve(changed);
+    const el = await open('/docs/m3-vanish.txt', pane => { pane.match = match; });
+    expect(calls.map(c => c.offset)).toEqual([0]);
+    asToday(el);
+  });
+
+  it('the passage is found 10 characters later than its span: not accepted', async () => {
+    const doc = withParagraphAt(120);
+    const match = span(doc, PARAGRAPH);
+    const moved = doc.slice(0, match.startChar) + 'tenchars: ' + doc.slice(match.startChar);
+    expect(moved.indexOf(PARAGRAPH)).toBe(match.startChar + 10);
+    const { calls } = serve(moved);
+    const el = await open('/docs/m3-vanish.txt', pane => { pane.match = match; });
+    expect(calls.map(c => c.offset)).toEqual([0]);
+    asToday(el);
+  });
+});
+
+describe('N4 an unchanged passage is confirmed (keep)', () => {
+  const tintedText = (el: DocumentPane): string =>
+    [...el.shadowRoot!.querySelectorAll('.hl-weak')].map(node => node.textContent ?? '').join('\n');
+
+  it('plain text, three lines deep in the file', async () => {
+    const doc = withParagraphAt(400);
+    serve(doc);
+    const el = await open('/docs/plain.txt', pane => { pane.match = span(doc, PARAGRAPH); pane.markQuery = 'harbour'; });
+    expect(tinted(el)).toEqual(PARAGRAPH.split('\n'));
+    expect(note(el)).toBe('Showing the part of this document around the match.');
+    expect(notices(el)).toEqual([]);
+  });
+
+  it('Markdown with headings, a list and a table before the passage', async () => {
+    const doc = ['# Harbour handbook', '', '## Gates', '', '- the north gate', '- the south gate', '',
+      '| gate | opens |', '| --- | --- |', '| north | dawn |', '', PARAGRAPH, '', '## Boats', '', 'The rest of the handbook.'].join('\n');
+    serve(doc);
+    const el = await open('/docs/handbook.md', pane => { pane.match = span(doc, PARAGRAPH); });
+    for (const line of PARAGRAPH.split('\n')) expect(tintedText(el)).toContain(line);
+    expect(tintedText(el)).not.toContain('north gate');
+    expect(notices(el)).toEqual([]);
+  });
+
+  it('CRLF line ends, deep in the file', async () => {
+    const doc = withParagraphAt(400).split('\n').join('\r\n');
+    const passage = PARAGRAPH.split('\n').join('\r\n');
+    serve(doc);
+    const el = await open('/docs/crlf.txt', pane => { pane.match = span(doc, passage); });
+    expect(tinted(el).map(line => line.replace(/\r$/, ''))).toEqual(PARAGRAPH.split('\n'));
+    expect(note(el)).toBe('Showing the part of this document around the match.');
+  });
+
+  it('non-ASCII text (umlauts, emoji, CJK) before and inside the passage', async () => {
+    const passage = 'Der Hafen öffnet 🚢 um sechs Uhr: 港の門は夜明けに開く。 Grüße an die Fähre 😀.';
+    const doc = Array.from({ length: 500 }, (_, i) => `Zeile ${String(i).padStart(4, '0')} äöü ß 😀 漢字`).join('\n').replace('Zeile 0420 äöü ß 😀 漢字', passage);
+    serve(doc);
+    const el = await open('/docs/umlaut.txt', pane => { pane.match = span(doc, passage); });
+    expect(tinted(el)).toEqual([passage]);
+    expect(notices(el)).toEqual([]);
+  });
+});
+
+describe('N1 the open file given another passage, or none', () => {
+  it('a passage replaced by none on the open file: the beginning, nothing tinted, today\'s note', async () => {
+    const doc = withPassageAt(400);
+    const { calls } = serve(doc);
+    const el = await open('/docs/two-words.txt', pane => { pane.match = span(doc); });
+    expect(note(el)).toBe('Showing the part of this document around the match.');
+    el.match = null;
+    await settle(el);
+    expect(calls.map(c => c.offset > 0)).toEqual([true, false]);
+    expect(shownLines(el)[0]).toBe(lineAt(0));
+    expect(tinted(el)).toEqual([]);
+    expect(note(el)).toBe('Showing the beginning of a longer document.');
+  });
+});

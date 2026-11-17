@@ -437,12 +437,15 @@ export class DocumentPane extends JfElement {
       if (path) void this.loadContent(path, this.anchor());
     } else if (changed.has('citation') || changed.has('match')) {
       if (changed.has('match')) this.matchSetAside = false;
+      const anchor = this.anchor();
       // Tempdoc 849 §4 — a LATE claim match arrives on an already-open pane as a new anchor over the
       // same span. Re-fetching would be a visible reload for a fact the loaded window already
       // contains, so the window is re-used whenever it covers the anchor and only re-fetched when
-      // the anchor moved outside it.
-      if (this.docPath && !this.windowCovers(this.anchor())) {
-        void this.loadContent(this.docPath, this.anchor());
+      // the anchor moved outside it. A search passage taken away from the open file leaves no window
+      // "around the match": the pane goes back to the document's head, as it opens without one.
+      const matchWindowLeft = changed.has('match') && anchor === null && this.previewWindow?.around === 'match';
+      if (this.docPath && (!this.windowCovers(anchor) || matchWindowLeft)) {
+        void this.loadContent(this.docPath, anchor);
       } else {
         this.deriveAnchorState();
       }
@@ -750,7 +753,15 @@ export class DocumentPane extends JfElement {
       const ranToEnd = !win.truncated && end > this.content.length && start >= 0;
       return { highlight: null, chunk: null, unconfirmed: ranToEnd ? 'shrunk' : 'window' };
     }
-    if (!locateWitness(this.content, { start, end }, citation.excerpt)) {
+    // A search result's passage is the Engine's own cut of the document's text at its span
+    // (HighlightingOps.computeExcerptRegions, EvidenceSpanSelector.toExcerptRegion), so it is
+    // confirmed only by that whole text at exactly that span: a prefix that survived an edit, or the
+    // passage a few characters away, is not it. A citation's excerpt is a clamped, normalised
+    // witness and keeps the citation check.
+    const confirmed = this.anchoredOnMatch()
+      ? this.content.slice(start, end) === citation.excerpt
+      : locateWitness(this.content, { start, end }, citation.excerpt);
+    if (!confirmed) {
       return { highlight: null, chunk: null, unconfirmed: 'witness' };
     }
     const chunk = lineSpanOfChars(this.content, { start, end });
@@ -808,8 +819,18 @@ export class DocumentPane extends JfElement {
       // sentence sits anywhere but the head of the passage, so it would scroll past the emphasis it
       // was meant to land on.
       const root = this.shadowRoot;
-      const el = root?.querySelector('.hl-strong') ?? root?.querySelector('.hl-weak');
-      el?.scrollIntoView({ block: 'center' });
+      const el = root?.querySelector<HTMLElement>('.hl-strong') ?? root?.querySelector<HTMLElement>('.hl-weak');
+      if (!el) return;
+      if (!this.anchoredOnMatch()) {
+        el.scrollIntoView({ block: 'center' });
+        return;
+      }
+      // A search result's passage is read from its first line down: that line lands an eighth of the
+      // way into the pane's scroll area (inside its upper quarter), so a passage shorter than the rest
+      // of the area is visible whole. Near the document's end the scroll stops where the text does.
+      const area = root?.querySelector<HTMLElement>('.scroll-region');
+      el.style.scrollMarginTop = `${Math.round((area?.clientHeight ?? 0) / 8)}px`;
+      el.scrollIntoView({ block: 'start' });
     });
   }
 

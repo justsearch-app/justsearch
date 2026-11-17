@@ -44,7 +44,14 @@ const fillTo = (length) => { let out = ''; for (let i = 0; length - out.length >
   return out + '.'.repeat(length - out.length - 1) + '\\n'; };
 const deep = fillTo(${DEEP_AT}) + '${DEEP_PASSAGE}\\n' + fillTo(6000);
 const repeated = Array.from({ length: 3000 }, () => '${SAME}').join('\\n');
-const docs = { '${FOLDER}/long-manual.md': manual, '${FOLDER}/short-notes.txt': notes, '${FOLDER}/deep-long.txt': deep, '${FOLDER}/repeated.txt': repeated };
+// N5: a passage of six lines deep in a long log, and one of four lines that ends another log.
+const landingPassage = Array.from({ length: 6 }, (_, i) => 'Landing ' + i + ': the harbour pilot boards at the outer buoy.').join('\\n');
+const landing = [...Array.from({ length: 600 }, (_, i) => 'Log ' + pad(i) + ' records a quiet watch on deck.'), landingPassage,
+  ...Array.from({ length: 300 }, (_, i) => 'Later ' + pad(i) + ' of the log.')].join('\\n');
+const tailPassage = Array.from({ length: 4 }, (_, i) => 'Tail ' + i + ': the harbour log ends with the last tide.').join('\\n');
+const tail = [...Array.from({ length: 600 }, (_, i) => 'Entry ' + pad(i) + ' notes the wind and the swell.'), tailPassage].join('\\n') + '\\n';
+const docs = { '${FOLDER}/long-manual.md': manual, '${FOLDER}/short-notes.txt': notes, '${FOLDER}/deep-long.txt': deep, '${FOLDER}/repeated.txt': repeated,
+  '${FOLDER}/landing.txt': landing, '${FOLDER}/tail.txt': tail };
 window.docs = docs;
 // A whole-file hit's region is the passage's place in the file; a chunk hit's counts from its chunk's start.
 const region = (text, startChar) => ({ text, startChar, endChar: startChar + text.length, approxLine: 1, matchSpans: [] });
@@ -69,13 +76,15 @@ window.fetch = async (input, init) => {
     const text = docs[doc] ?? '';
     return json({ content: text.slice(offset, offset + max), truncated: offset + max < text.length, offsetChars: offset, totalChars: text.length });
   }
-  if (url.includes('/api/knowledge/search')) return json({ totalHits: 4, matchCount: 4, tookMs: 4, nextCursor: null, facets: {}, facetsTruncated: false,
+  if (url.includes('/api/knowledge/search')) return json({ totalHits: 6, matchCount: 6, tookMs: 4, nextCursor: null, facets: {}, facetsTruncated: false,
     results: [
       hit('${FOLDER}/long-manual.md', '${LONG_PASSAGE}', 0, { at: manualAt - manualChunk, chunk: chunk('${FOLDER}/long-manual.md', manualChunk, manualChunk + 4000) }),
       hit('${FOLDER}/short-notes.txt', '${SHORT_PASSAGE}', 1, { at: notes.indexOf('${SHORT_PASSAGE}') }),
       hit('${FOLDER}/deep-long.txt', '${DEEP_PASSAGE}', 2, { at: 345, chunk: chunk('${FOLDER}/deep-long.txt', ${DEEP_CHUNK_START}, ${DEEP_CHUNK_START} + 1600) }),
       hit('${FOLDER}/repeated.txt', repeated.slice(${REPEAT_CHUNK_START + REPEAT_REGION.start}, ${REPEAT_CHUNK_START + REPEAT_REGION.end}), 3,
         { at: ${REPEAT_REGION.start}, chunk: chunk('${FOLDER}/repeated.txt', ${REPEAT_CHUNK_START}, ${REPEAT_CHUNK_START} + 1200) }),
+      hit('${FOLDER}/landing.txt', landingPassage, 4, { at: landing.indexOf(landingPassage) }),
+      hit('${FOLDER}/tail.txt', tailPassage, 5, { at: tail.indexOf(tailPassage) }),
     ] });
   return json({ entries: [], conversations: [] });
 };
@@ -321,5 +330,51 @@ describe('chunk hits far into a file land on their own place (R1, R3)', () => {
     expect(await tintedPlace(page, `${FOLDER}/repeated.txt`)).toMatchObject({ at, lines: 5 });
     expect(await passage(page)).toMatchObject({ text: SAME, inPane: true, inWindow: true });
     expect(await note(page)).toBe('Showing the part of this document around the match.');
+  });
+});
+
+/**
+ * N5 — where the passage lands: its tinted lines' boxes against the pane's visible box (the scroll
+ * area's box, cut to the window), and how far the scroll area could still move down.
+ */
+async function landing(page: Page): Promise<{ lines: number; top: number; bottom: number; frameTop: number; frameHeight: number; frameBottom: number; scrolled: number; maxScroll: number }> {
+  return page.locator('jf-document-pane').first().evaluate(element => {
+    const root = element.shadowRoot!;
+    const area = root.querySelector<HTMLElement>('.scroll-region')!;
+    const lines = [...root.querySelectorAll('pre.source span.hl-weak')];
+    const frame = area.getBoundingClientRect();
+    const frameTop = Math.max(frame.top, 0);
+    const frameBottom = Math.min(frame.bottom, window.innerHeight);
+    // Nothing tinted reads as no box at all (NaN), so the line count's assertion is what fails.
+    return { lines: lines.length, top: lines[0]?.getBoundingClientRect().top ?? Number.NaN, bottom: lines.at(-1)?.getBoundingClientRect().bottom ?? Number.NaN,
+      frameTop, frameBottom, frameHeight: frameBottom - frameTop, scrolled: area.scrollTop, maxScroll: area.scrollHeight - area.clientHeight };
+  });
+}
+
+describe.each(['dark', 'light'] as const)('N5 the passage lands in the upper quarter of the pane (%s, 1024x700)', palette => {
+  it(`a deep passage of six lines: its first line in the upper quarter, the whole passage inside the pane (${palette})`, async () => {
+    const page = await open(palette);
+    await search(page);
+    await rows(page).nth(4).click();
+    await shown(page);
+    expect((await previews(page))[0]!.offset).toBeGreaterThan(0);
+    const place = await landing(page);
+    expect(place.lines).toBe(6);
+    expect(place.bottom - place.top).toBeLessThan(place.frameHeight * 0.75);
+    expect(place.top).toBeGreaterThanOrEqual(place.frameTop - 0.5);
+    expect(place.top - place.frameTop).toBeLessThanOrEqual(place.frameHeight / 4);
+    expect(place.bottom).toBeLessThanOrEqual(place.frameBottom + 0.5);
+  });
+
+  it(`a passage that ends the file, too little text below it: the whole passage inside the pane (${palette})`, async () => {
+    const page = await open(palette);
+    await search(page);
+    await rows(page).nth(5).click();
+    await shown(page);
+    const place = await landing(page);
+    expect(place.lines).toBe(4);
+    expect(place.top).toBeGreaterThanOrEqual(place.frameTop - 0.5);
+    expect(place.bottom).toBeLessThanOrEqual(place.frameBottom + 0.5);
+    expect(place.scrolled).toBeGreaterThanOrEqual(place.maxScroll - 1);
   });
 });

@@ -82,8 +82,17 @@ describe('sv3NextPaneMatch — opening again', () => {
   const shown = { startChar: 100, endChar: 120, excerpt: 'shown passage' };
   const newer = { startChar: 5, endChar: 25, excerpt: 'newer passage' };
 
-  it('the file on show at a passage keeps that passage', () => {
-    expect(sv3NextPaneMatch({ docPath: '/a.md', match: shown }, '/a.md', newer)).toBe(shown);
+  it('N2 the file on show at the identical passage (same span and text) keeps the passage on show', () => {
+    expect(sv3NextPaneMatch({ docPath: '/a.md', match: shown }, '/a.md', { ...shown })).toBe(shown);
+  });
+
+  it('N1 the file on show at another passage takes the result\'s own', () => {
+    expect(sv3NextPaneMatch({ docPath: '/a.md', match: shown }, '/a.md', newer)).toBe(newer);
+    const sameSpan = { ...shown, excerpt: 'other passage' };
+    expect(sv3NextPaneMatch({ docPath: '/a.md', match: shown }, '/a.md', sameSpan)).toBe(sameSpan);
+    const sameText = { ...shown, endChar: shown.endChar + 1 };
+    expect(sv3NextPaneMatch({ docPath: '/a.md', match: shown }, '/a.md', sameText)).toBe(sameText);
+    expect(sv3NextPaneMatch({ docPath: '/a.md', match: shown }, '/a.md', null)).toBeNull();
   });
 
   it('another file takes its own passage', () => {

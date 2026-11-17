@@ -6,8 +6,9 @@
  * The position is taken from the result list in memory at the moment the result is opened, and
  * nothing of it is stored: the shared selection keeps its shape, and a pane opened from anywhere else
  * (Library, Browse, another window, a restored conversation, a reload) has no passage and opens as it
- * always has. The passage is a HINT: the reader confirms its text at its offsets and, when it cannot,
- * opens at the file's beginning without saying anything (`DocumentPane.match`).
+ * always has. The passage is a HINT: the reader confirms that the file's text at its offsets is the
+ * passage's text and, when it is not, opens at the file's beginning without saying anything
+ * (`DocumentPane.match`).
  */
 import type { DocumentMatchAnchor } from '../../components/documentPane/DocumentPane.js';
 import type { SearchHit } from '../../state/searchState.js';
@@ -50,14 +51,17 @@ export function sv3ResultMatch(hit: Pick<SearchHit, 'excerptRegions' | 'chunk'>)
 }
 
 /**
- * The passage the pane keeps when a result is opened: opening the file the pane already shows at a
- * passage leaves that passage in place, so choosing the same result again — or the same file after a
- * newer answer — does not move what the reader is looking at. Anything else takes the result's own.
+ * The passage the pane takes when a result is opened: always the result's own. Only the passage the
+ * pane already shows for that file — the same span and the same text — is kept as the object it is,
+ * so opening that result again reloads and moves nothing.
  */
 export function sv3NextPaneMatch(
   open: { readonly docPath: string | null; readonly match: DocumentMatchAnchor | null },
   docPath: string,
   match: DocumentMatchAnchor | null,
 ): DocumentMatchAnchor | null {
-  return open.docPath === docPath && open.match !== null ? open.match : match;
+  const shown = open.match;
+  const same = open.docPath === docPath && shown !== null && match !== null
+    && shown.startChar === match.startChar && shown.endChar === match.endChar && shown.excerpt === match.excerpt;
+  return same ? shown : match;
 }
