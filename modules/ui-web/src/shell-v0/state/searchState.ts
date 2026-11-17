@@ -52,6 +52,17 @@ export interface SearchExcerptRegion {
   endChar?: number;
 }
 
+/**
+ * Where the chunk a hit was found through sits in its file, as the answer's `fields` gave it
+ * (`chunk_start_char` inclusive, `chunk_end_char` exclusive, strings, unchecked). Present only on a
+ * hit found through a chunk (`fields.parent_doc_id`): its excerpt regions' positions count from the
+ * chunk's start, not from the file's.
+ */
+export interface SearchHitChunk {
+  startChar?: string;
+  endChar?: string;
+}
+
 export interface SearchHit {
   id: string;
   title: string;
@@ -70,8 +81,11 @@ export interface SearchHit {
   /** Tempdoc 577 Phase 7 — excerpt regions (refined pass, `includeExcerpts`): the
    *  worker-computed best passages; preferred snippet source over content_preview. Each carries
    *  where it sits in the document's text (`startChar` inclusive, `endChar` exclusive) as the answer
-   *  gave it, unchecked: the details pane opens at the first one and confirms it against the text. */
+   *  gave it, unchecked: the details pane opens at the first one and confirms it against the text.
+   *  On a chunk hit ({@link chunk}) the positions count from the chunk's start. */
   excerptRegions?: SearchExcerptRegion[];
+  /** The chunk this hit was found through, when it was ({@link SearchHitChunk}). */
+  chunk?: SearchHitChunk;
   /** Tempdoc 811 (C-1a) — the corpus this hit came from (`fields.collection`). Absent or
    *  `default` for the user's own documents; a named value (e.g. `justsearch-help`) marks the
    *  row so app-internal docs are distinguishable in the result list. */
@@ -714,6 +728,9 @@ async function runSearch(q: string, stage: SearchPassStage, gen: number): Promis
         kind: r.fields?.file_kind,
         mimeBase: r.fields?.mime_base,
         excerptRegions: Array.isArray(r.excerptRegions) ? r.excerptRegions : undefined,
+        // A chunk hit's regions count from its chunk's start (SearchResponseBuilder), so the chunk's
+        // place in the file travels with them; the Engine marks a chunk hit by a non-empty parent_doc_id.
+        ...(r.fields?.parent_doc_id ? { chunk: { startChar: r.fields.chunk_start_char, endChar: r.fields.chunk_end_char } } : {}),
         // Tempdoc 811 (C-1a): the corpus marker's input — the row says which collection it came
         // from when that is not the user's own documents.
         collection: r.fields?.collection,

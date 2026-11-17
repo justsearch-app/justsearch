@@ -251,3 +251,56 @@ describe('M7 a scan\'s page markers', () => {
     expect(el.content.split('\n')[Number(numbered)]).toBe(PASSAGE);
   });
 });
+
+describe('R4 an unconfirmed match brings back no older line-based tint', () => {
+  // The pane's line-addressed tints (`highlightRange`, `chunkRange`) are populated as well: with the
+  // match set aside nothing may be tinted as "the match", and the pane reads as one opened without it.
+  const lineRanges = (pane: DocumentPane): void => {
+    pane.highlightRange = { startLine: 21, endLine: 23 };
+    pane.chunkRange = { startLine: 20, endLine: 28 };
+  };
+  const asToday = (el: DocumentPane): void => {
+    expect(shownLines(el)[0]).toBe(lineAt(0));
+    expect(tinted(el)).toEqual([]);
+    expect(el.shadowRoot!.querySelectorAll('pre.source .hl-weak, pre.source .hl-strong')).toHaveLength(0);
+    expect(note(el)).toBe('Showing the beginning of a longer document.');
+    expect(notices(el)).toEqual([]);
+  };
+
+  it('the text at the position differs (inside the first window)', async () => {
+    const doc = withPassageAt(120);
+    const match = span(doc);
+    const { calls } = serve(LONG);
+    const el = await open('/docs/long-manual.txt', pane => { pane.match = match; lineRanges(pane); });
+    expect(calls.map(c => c.offset)).toEqual([0]);
+    asToday(el);
+  });
+
+  it('the passage is gone (beyond the first window)', async () => {
+    const match = span(withPassageAt(400));
+    const { calls } = serve(LONG);
+    const el = await open('/docs/long-manual.txt', pane => { pane.match = match; lineRanges(pane); });
+    expect(calls.map(c => c.offset > 0)).toEqual([true, false]);
+    asToday(el);
+  });
+
+  it('the file is now shorter than the position', async () => {
+    const { calls } = serve(LONG.slice(0, 6000));
+    const el = await open('/docs/long-manual.txt', pane => { pane.match = { startChar: 9000, endChar: 9056, excerpt: PASSAGE }; lineRanges(pane); });
+    expect(calls.map(c => c.offset > 0)).toEqual([true, false]);
+    asToday(el);
+  });
+
+  it('a match without a usable position', async () => {
+    const { calls } = serve(LONG);
+    const el = await open('/docs/long-manual.txt', pane => { pane.match = { startChar: Number.NaN, endChar: 40, excerpt: PASSAGE }; lineRanges(pane); });
+    expect(calls.map(c => c.offset)).toEqual([0]);
+    asToday(el);
+  });
+
+  it('without a match the line-based tints are read as always (keep)', async () => {
+    serve(LONG);
+    const el = await open('/docs/long-manual.txt', pane => { lineRanges(pane); });
+    expect(tinted(el)).toEqual(Array.from({ length: 9 }, (_, i) => lineAt(20 + i)));
+  });
+});

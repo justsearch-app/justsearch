@@ -765,15 +765,24 @@ export class DocumentPane extends JfElement {
     return { highlight, chunk, unconfirmed: null };
   }
 
+  /**
+   * The tints are the anchor's whenever the pane was opened at an anchor — a citation, or a search
+   * result's passage even when it was set aside or had no usable position. A set-aside passage then
+   * tints nothing: the line-addressed ranges are not "the match" and must not come back as if they were.
+   */
+  private anchoredTints(): boolean {
+    return this.anchor() !== null || (this.match ?? null) !== null;
+  }
+
   /** The line span the strong tier renders from — the anchor's when there is one. */
   private activeHighlightRange(): DocumentLineRange | null {
-    if (this.anchor() !== null) return this.anchorState?.highlight ?? null;
+    if (this.anchoredTints()) return this.anchorState?.highlight ?? null;
     return this.highlightRange;
   }
 
   /** The line span the weak tier renders from — the anchor's when there is one. */
   private activeChunkRange(): DocumentLineRange | null {
-    if (this.anchor() !== null) return this.anchorState?.chunk ?? null;
+    if (this.anchoredTints()) return this.anchorState?.chunk ?? null;
     return this.chunkRange;
   }
 

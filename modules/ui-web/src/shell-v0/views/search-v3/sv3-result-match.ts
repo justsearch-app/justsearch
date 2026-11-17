@@ -12,20 +12,41 @@
 import type { DocumentMatchAnchor } from '../../components/documentPane/DocumentPane.js';
 import type { SearchHit } from '../../state/searchState.js';
 
+/** A position the answer wrote as a string: a whole, non-negative, safe number, or `null`. */
+function wholeChars(value: string | undefined): number | null {
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) return null;
+  const chars = Number(value);
+  return Number.isSafeInteger(chars) ? chars : null;
+}
+
 /**
- * The hit's first returned passage — the one its row shows, the first with any text — or `null` when
- * it has none, or when that passage's offsets are not a span of the document (missing, not whole
+ * The hit's first returned passage — the one its row shows, the first with any text — placed in the
+ * FILE, or `null` when it has none, or when that passage's offsets are not a span (missing, not whole
  * numbers, negative, empty or inverted). A bad first passage is not replaced by a later one: the
  * pane would then open at a place the row does not show.
+ *
+ * A hit found through a chunk has its regions counted from the chunk's start, so the place is the
+ * chunk's start plus the region's span. Without a usable chunk start, or with a region reaching past
+ * the chunk's own length, it has no place: chunk-relative numbers are never read as file positions.
  */
-export function sv3ResultMatch(hit: Pick<SearchHit, 'excerptRegions'>): DocumentMatchAnchor | null {
+export function sv3ResultMatch(hit: Pick<SearchHit, 'excerptRegions' | 'chunk'>): DocumentMatchAnchor | null {
   const regions = Array.isArray(hit.excerptRegions) ? hit.excerptRegions : [];
   const region = regions.find(candidate => typeof candidate?.text === 'string' && candidate.text.trim() !== '');
   if (region === undefined) return null;
   const { startChar, endChar, text } = region;
   if (typeof startChar !== 'number' || typeof endChar !== 'number') return null;
   if (!Number.isSafeInteger(startChar) || !Number.isSafeInteger(endChar) || startChar < 0 || endChar <= startChar) return null;
-  return { startChar, endChar, excerpt: text ?? '' };
+  if (hit.chunk === undefined) return { startChar, endChar, excerpt: text ?? '' };
+  const chunkStart = wholeChars(hit.chunk.startChar);
+  if (chunkStart === null) return null;
+  if (hit.chunk.endChar !== undefined) {
+    const chunkEnd = wholeChars(hit.chunk.endChar);
+    if (chunkEnd === null || chunkEnd < chunkStart || endChar > chunkEnd - chunkStart) return null;
+  }
+  const fileStart = chunkStart + startChar;
+  const fileEnd = chunkStart + endChar;
+  if (!Number.isSafeInteger(fileEnd)) return null;
+  return { startChar: fileStart, endChar: fileEnd, excerpt: text ?? '' };
 }
 
 /**

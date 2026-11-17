@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // fm-pane-match in the real app: a search result opened in the side pane shows the place that
 // matched, inside the pane's visible area without scrolling, for a passage beyond the first window
-// of a long file and for one below the fold of a file that fits in one window. Real Shell and Search
+// of a long file and for one below the fold of a file that fits in one window. Long files are found
+// through their chunks, as the Engine sends them (SearchResponseBuilder: a chunk hit's `fields` carry
+// `parent_doc_id`, `chunk_start_char`, `chunk_end_char` as strings, and its excerpt regions count from
+// the chunk's start); the short file is a whole-file hit with file positions. Real Shell and Search
 // in private headless Chromium over a private Vite server and a stubbed backend (no Engine, no
 // shared dev stack); `/api/preview` is served by offset. Run with
 // npx vitest run --config vitest.config.lockdown.ts src/shell-v0/chrome/FirstMinutes.paneMatch-lockdown.test.ts
@@ -17,6 +20,14 @@ vi.setConfig({ testTimeout: 30_000 });
 const FOLDER = '/home/reader/Documents';
 const LONG_PASSAGE = 'The harbour gate opens at dawn for the inspection boats and closes at dusk.';
 const SHORT_PASSAGE = 'Harbour note: the ferry waits by the northern pier until the tide turns.';
+const DEEP_PASSAGE = 'Deep passage: the harbour crane lifts the last container at noon.';
+/** deep-long.txt as the verifier saw it: the chunk starts at 249,619 and the region at 345 of it. */
+const DEEP_CHUNK_START = 249_619;
+const DEEP_AT = DEEP_CHUNK_START + 345;
+/** A file of identical lines (23 characters with the break); the passage is five of them in a chunk at line 2,400. */
+const SAME = 'The harbour wall line.';
+const REPEAT_CHUNK_START = 2400 * 23;
+const REPEAT_REGION = { start: 345, end: 345 + 5 * 23 - 1 };
 
 const HARNESS = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <link rel="stylesheet" href="/src/styles/tokens.css"></head><body><script type="module">
@@ -28,12 +39,24 @@ const manual = ['# Long manual', '', ...Array.from({ length: 300 }, (_, i) => 'S
 // Short notes: the whole file fits in one window, and the passage is far below the fold.
 const notes = [...Array.from({ length: 70 }, (_, i) => 'Note ' + pad(i) + ' about the garden beds.'), '${SHORT_PASSAGE}',
   ...Array.from({ length: 10 }, (_, i) => 'Tail ' + pad(i) + ' of the notes.')].join('\\n');
-const docs = { '${FOLDER}/long-manual.md': manual, '${FOLDER}/short-notes.txt': notes };
-const region = (doc, text) => { const startChar = docs[doc].indexOf(text); return { text, startChar, endChar: startChar + text.length, approxLine: 1, matchSpans: [] }; };
-const hit = (doc, text, i) => { const name = doc.split('/').pop(); return { id: 'doc-' + i, score: 1 - i / 10,
+// Lines of one length up to exactly that many characters; the deep passage then starts at 249,964.
+const fillTo = (length) => { let out = ''; for (let i = 0; length - out.length >= 48; i++) out += 'Deep filler ' + pad(i) + ' of the long log....\\n';
+  return out + '.'.repeat(length - out.length - 1) + '\\n'; };
+const deep = fillTo(${DEEP_AT}) + '${DEEP_PASSAGE}\\n' + fillTo(6000);
+const repeated = Array.from({ length: 3000 }, () => '${SAME}').join('\\n');
+const docs = { '${FOLDER}/long-manual.md': manual, '${FOLDER}/short-notes.txt': notes, '${FOLDER}/deep-long.txt': deep, '${FOLDER}/repeated.txt': repeated };
+window.docs = docs;
+// A whole-file hit's region is the passage's place in the file; a chunk hit's counts from its chunk's start.
+const region = (text, startChar) => ({ text, startChar, endChar: startChar + text.length, approxLine: 1, matchSpans: [] });
+const chunk = (doc, start, end) => ({ doc_id: 'chunk-' + start, parent_doc_id: doc, chunk_index: '3', chunk_total: '9',
+  chunk_start_char: String(start), chunk_end_char: String(end), chunk_start_line: '0', chunk_end_line: '0' });
+const hit = (doc, text, i, place) => { const name = doc.split('/').pop(); return { id: 'doc-' + i, score: 1 - i / 10,
   fields: { title: name, filename: name, path: doc, content_preview: text, collection: 'docs', mime: name.endsWith('.md') ? 'text/markdown' : 'text/plain',
-    mime_base: 'text', file_kind: name.endsWith('.md') ? 'markdown' : 'text', language: 'en', modified_at: '2025-06-15T10:30:00Z', size_bytes: String(docs[doc].length) },
-  matchedFields: ['content'], matchSpans: [], excerptRegions: [region(doc, text)] }; };
+    mime_base: 'text', file_kind: name.endsWith('.md') ? 'markdown' : 'text', language: 'en', modified_at: '2025-06-15T10:30:00Z', size_bytes: String(docs[doc].length),
+    ...(place.chunk ?? {}) },
+  matchedFields: ['content'], matchSpans: [], excerptRegions: [region(text, place.at)] }; };
+const manualAt = manual.indexOf('${LONG_PASSAGE}');
+const manualChunk = manualAt - 1500;
 window.previews = [];
 window.previewDelay = 0;
 window.fetch = async (input, init) => {
@@ -41,13 +64,19 @@ window.fetch = async (input, init) => {
   if (url.includes('/api/preview')) {
     const params = new URL(url, location.href).searchParams;
     const doc = params.get('docId'); const offset = Number(params.get('offsetChars')); const max = Number(params.get('maxChars'));
-    window.previews.push({ doc, offset });
+    window.previews.push({ doc, offset, max });
     if (window.previewDelay) await new Promise(resolve => setTimeout(resolve, window.previewDelay));
     const text = docs[doc] ?? '';
     return json({ content: text.slice(offset, offset + max), truncated: offset + max < text.length, offsetChars: offset, totalChars: text.length });
   }
-  if (url.includes('/api/knowledge/search')) return json({ totalHits: 2, matchCount: 2, tookMs: 4, nextCursor: null, facets: {}, facetsTruncated: false,
-    results: [hit('${FOLDER}/long-manual.md', '${LONG_PASSAGE}', 0), hit('${FOLDER}/short-notes.txt', '${SHORT_PASSAGE}', 1)] });
+  if (url.includes('/api/knowledge/search')) return json({ totalHits: 4, matchCount: 4, tookMs: 4, nextCursor: null, facets: {}, facetsTruncated: false,
+    results: [
+      hit('${FOLDER}/long-manual.md', '${LONG_PASSAGE}', 0, { at: manualAt - manualChunk, chunk: chunk('${FOLDER}/long-manual.md', manualChunk, manualChunk + 4000) }),
+      hit('${FOLDER}/short-notes.txt', '${SHORT_PASSAGE}', 1, { at: notes.indexOf('${SHORT_PASSAGE}') }),
+      hit('${FOLDER}/deep-long.txt', '${DEEP_PASSAGE}', 2, { at: 345, chunk: chunk('${FOLDER}/deep-long.txt', ${DEEP_CHUNK_START}, ${DEEP_CHUNK_START} + 1600) }),
+      hit('${FOLDER}/repeated.txt', repeated.slice(${REPEAT_CHUNK_START + REPEAT_REGION.start}, ${REPEAT_CHUNK_START + REPEAT_REGION.end}), 3,
+        { at: ${REPEAT_REGION.start}, chunk: chunk('${FOLDER}/repeated.txt', ${REPEAT_CHUNK_START}, ${REPEAT_CHUNK_START} + 1200) }),
+    ] });
   return json({ entries: [], conversations: [] });
 };
 window.EventSource = class { constructor() { this.readyState = 0; } addEventListener() {} removeEventListener() {} close() {} };
@@ -68,7 +97,7 @@ document.body.dataset.ready = 'true';
 </script></body></html>`;
 
 type Palette = 'dark' | 'light';
-type AppWindow = Window & { previews: Array<{ doc: string; offset: number }>; previewDelay: number };
+type AppWindow = Window & { previews: Array<{ doc: string; offset: number; max: number }>; previewDelay: number; docs: Record<string, string> };
 
 let server: ViteDevServer;
 let browserServer: BrowserServer;
@@ -166,8 +195,28 @@ async function passage(page: Page): Promise<{ text: string; marks: string[]; inP
 }
 const note = (page: Page): Promise<string | null> =>
   page.locator('jf-document-pane .window-note').first().textContent({ timeout: 1000 }).then(t => t?.trim() ?? null).catch(() => null);
-const previews = (page: Page): Promise<Array<{ doc: string; offset: number }>> =>
+const previews = (page: Page): Promise<Array<{ doc: string; offset: number; max: number }>> =>
   page.evaluate(() => (window as unknown as AppWindow).previews);
+
+/**
+ * Where in the FILE the pane's tinted lines are (source view): the pane's text is the end of the
+ * last served slice, so its first character's file position is known, and each tinted line's
+ * `data-line` gives its own. Returns the first tinted line's file position and how many are tinted.
+ */
+const tintedPlace = (page: Page, doc: string): Promise<{ at: number; lines: number; text: string } | null> =>
+  page.locator('jf-document-pane').first().evaluate((element, path) => {
+    const app = window as unknown as AppWindow;
+    const pane = element as HTMLElement & { content: string };
+    const spans = [...pane.shadowRoot!.querySelectorAll('pre.source span.hl-weak')];
+    if (spans.length === 0) return null;
+    const last = app.previews.filter(p => p.doc === path).at(-1)!;
+    const served = app.docs[path]!.slice(last.offset, last.offset + last.max);
+    if (!served.endsWith(pane.content)) throw new Error('the pane does not show the end of the served slice');
+    const contentAt = last.offset + served.length - pane.content.length;
+    const before = pane.content.split('\n').slice(0, Number(spans[0]!.getAttribute('data-line')));
+    return { at: contentAt + before.reduce((sum, line) => sum + line.length + 1, 0), lines: spans.length,
+      text: spans.map(span => (span.textContent ?? '').replace(/\n$/, '')).join('\n') };
+  }, doc);
 
 describe.each(['dark', 'light'] as const)('a result opened in the side pane shows its passage (%s, 1024x700)', palette => {
   it(`a long file: the window around the passage, the passage visible without scrolling, its found word marked (${palette})`, async () => {
@@ -178,6 +227,8 @@ describe.each(['dark', 'light'] as const)('a result opened in the side pane show
     const requested = await previews(page);
     expect(requested).toHaveLength(1);
     expect(requested[0]!.offset).toBeGreaterThan(0);
+    // A chunk hit: the window is around the chunk's start plus the region's, which lies past 12,000.
+    expect(requested[0]!.offset).toBeGreaterThan(8000);
     expect(await passage(page)).toMatchObject({ text: LONG_PASSAGE, marks: ['harbour'], inPane: true, inWindow: true });
     expect(await note(page)).toBe('Showing the part of this document around the match.');
   });
@@ -188,7 +239,7 @@ describe.each(['dark', 'light'] as const)('a result opened in the side pane show
     await rows(page).nth(1).focus();
     await page.keyboard.press('Enter');
     await shown(page);
-    expect(await previews(page)).toEqual([{ doc: `${FOLDER}/short-notes.txt`, offset: 0 }]);
+    expect((await previews(page)).map(({ doc, offset }) => ({ doc, offset }))).toEqual([{ doc: `${FOLDER}/short-notes.txt`, offset: 0 }]);
     const place = await passage(page);
     expect(place).toMatchObject({ text: SHORT_PASSAGE, marks: ['Harbour'], inPane: true, inWindow: true });
     expect(place!.scrolled).toBeGreaterThan(0);
@@ -238,5 +289,37 @@ describe('moving, late answers, a narrow window and switching areas', () => {
     await page.locator('jf-sv3-window').waitFor();
     await settle(page, 600);
     expect(await passage(page)).toMatchObject({ text: LONG_PASSAGE, inPane: true, inWindow: true });
+  });
+});
+
+describe('chunk hits far into a file land on their own place (R1, R3)', () => {
+  it('deep-long.txt, chunk at 249,619, region at 345: the window around 249,964, the passage tinted there and visible (dark)', async () => {
+    const page = await open('dark');
+    await search(page);
+    await rows(page).nth(2).click();
+    await shown(page);
+    const requested = await previews(page);
+    expect(requested).toHaveLength(1);
+    expect(requested[0]!.offset).toBeGreaterThan(DEEP_AT - 5000);
+    expect(requested[0]!.offset).toBeLessThanOrEqual(DEEP_AT);
+    expect(requested[0]!.offset + requested[0]!.max).toBeGreaterThanOrEqual(DEEP_AT + DEEP_PASSAGE.length);
+    expect(await tintedPlace(page, `${FOLDER}/deep-long.txt`)).toEqual({ at: DEEP_AT, lines: 1, text: DEEP_PASSAGE });
+    expect(await passage(page)).toMatchObject({ text: DEEP_PASSAGE, marks: ['harbour'], inPane: true, inWindow: true });
+    expect(await note(page)).toBe('Showing the part of this document around the match.');
+  });
+
+  it('a file of identical lines: the five lines at the chunk\'s place are tinted and visible, none near the top (light)', async () => {
+    const page = await open('light');
+    await search(page);
+    await rows(page).nth(3).click();
+    await shown(page);
+    const at = REPEAT_CHUNK_START + REPEAT_REGION.start;
+    const requested = await previews(page);
+    expect(requested).toHaveLength(1);
+    expect(requested[0]!.offset).toBeGreaterThan(at - 5000);
+    expect(requested[0]!.offset).toBeLessThanOrEqual(at);
+    expect(await tintedPlace(page, `${FOLDER}/repeated.txt`)).toMatchObject({ at, lines: 5 });
+    expect(await passage(page)).toMatchObject({ text: SAME, inPane: true, inWindow: true });
+    expect(await note(page)).toBe('Showing the part of this document around the match.');
   });
 });
