@@ -75,6 +75,14 @@
 
 !macro NSIS_HOOK_PREINSTALL
   !insertmacro JustSearch_KillProcesses_BestEffort
+  ; Tauri runs this hook before copying resources, including in /UPDATE mode.
+  ClearErrors
+  Delete "$INSTDIR\resources\headless\lib\*.jar"
+  ${If} ${Errors}
+    MessageBox MB_OK|MB_ICONSTOP "JustSearch could not remove existing Engine JARs. Close any programs using $INSTDIR\resources\headless\lib and run the installer again." /SD IDOK
+    SetErrorLevel 2
+    Abort "Could not remove existing JustSearch Engine JARs."
+  ${EndIf}
   !insertmacro JustSearch_EnsureProgramDataPolicyDir_BestEffort
 !macroend
 
