@@ -2968,7 +2968,7 @@ export class SettingsSurface extends JfElement {
             ?disabled=${this.updateBusy || repairRequired}
             .onActivate=${() => void this.checkForAppUpdate()}
           >
-            ${this.updateBusy && status?.state === 'checking' ? 'Checkingâ€¦' : SETTINGS_CONTROL_LABELS['app-updates'].check}
+            ${this.updateBusy && status?.state === 'checking' ? 'Checking…' : SETTINGS_CONTROL_LABELS['app-updates'].check}
           </jf-button>
           ${available
             ? html`<jf-button
