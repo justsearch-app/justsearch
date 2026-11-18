@@ -122,27 +122,16 @@ stdio bridge that finds the running app through its runtime manifest and sends t
 The flows below connect a client on the same computer straight to `http://127.0.0.1:<port>/mcp`
 without a credential. They work against a development-mode Engine, which is token-free. An
 installed Engine answers a credential-free MCP request that passes its host and origin checks with
-`401 UI_TOKEN_REQUIRED`; use the bridge above. Read the port from `head.apiPort` in the development
-Engine's runtime manifest (for the dev runner usually
-`modules/ui-web/.dev-data/runtime/manifest.json`); Gradle development tasks default to `33221`,
-which the examples use.
+`401 UI_TOKEN_REQUIRED`; use the bridge above.
 
-### Claude Desktop connector
+Start the development Engine, read `head.apiPort` from its runtime manifest (for the dev runner
+usually `modules/ui-web/.dev-data/runtime/manifest.json`), and use that port in every example. The
+Gradle `runHeadless` task defaults to `33221`, which the examples show. Wait for HTTP 200 from
+`/api/health`.
 
-1. **Start the development Engine.** The API is up when
-   `http://127.0.0.1:33221/api/health` answers in a browser.
-2. **Claude Desktop → Settings → Connectors → Add custom connector**, URL:
+### Claude Desktop
 
-   ```text
-   http://127.0.0.1:33221/mcp
-   ```
-
-3. **Done.** Ask Claude something about your indexed files; it will call `justsearch_answer` /
-   `justsearch_search`. (First useful answers require having pointed JustSearch at a folder and
-   letting it finish indexing.)
-
-If your Claude Desktop version has no Connectors UI, bridge stdio→HTTP with `mcp-remote`
-(needs Node.js) in `claude_desktop_config.json`:
+Use a local stdio bridge such as `mcp-remote` (needs Node.js) in `claude_desktop_config.json`:
 
 ```json
 {

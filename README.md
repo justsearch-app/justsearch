@@ -45,19 +45,19 @@ Download the package for your system from the
 |---|---|---|
 | **Package** | `JustSearch_<version>_x64-setup.exe` | `JustSearch_<version>_amd64.deb` |
 | **System** | Windows 11, 64-bit (tested). Windows 10 is expected to work but is not tested. | Ubuntu 24.04 or newer, x86_64 |
-| **Install** | Run the installer. It installs per user and does not ask for administrator rights. | In the download folder: `sudo apt install ./JustSearch_*_amd64.deb` |
-| **Answers** | With a supported NVIDIA graphics card of 8 GB or more | Not in this release: on Linux, Install AI offers search only |
+| **Install** | Run the installer. It installs per user and does not itself ask for administrator rights. | In the download folder, with one JustSearch package in it: `sudo apt install ./JustSearch_*_amd64.deb` |
+| **Answers** | With a supported NVIDIA graphics card sold as 8 GB or more (the app checks for at least 7.5 GB of graphics memory) | Not in this release: on Linux, Install AI offers search only |
 
 Then start JustSearch and add a folder. Searching by words works as soon as the first files are
-read. **AI Brain → Install AI** adds searching by meaning and, where supported, answers. It shows the
-downloads, their sizes and their terms before it starts: roughly 2–4 GB for searching by meaning,
-or about 10 GB for the full Windows setup with answers. Allow disk space for that and for the
-search index, which grows with your files. We recommend 16 GB of RAM; that is not a measured
+read. **AI Brain → Install AI** adds searching by meaning and, where supported, answers. Before the first
+download it shows the parts, their sizes and their terms: roughly 2–4 GB for searching by meaning,
+or about 10 GB for the full Windows setup with answers. Allow disk space for the downloads, the
+unpacked programs and the search index, which grows with your files. We recommend 16 GB of RAM; that is not a measured
 minimum.
 
 The Windows installer is code-signed; the publisher shown is **Elias Justus**. Windows SmartScreen
-may still show a reputation prompt, which should name that publisher. To check a download yourself, see
-[Verify your download](docs/how-to/verify-your-download.md). macOS is not supported
+may still show a reputation warning. To check that the signature is valid and names that publisher,
+see [Verify your download](docs/how-to/verify-your-download.md). macOS is not supported
 ([NON-GOALS](NON-GOALS.md)). To build from source, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 **Official downloads.** JustSearch is free. The app and its MCP bundle are published only on this
@@ -70,21 +70,22 @@ report it in an [issue](https://github.com/justsearch-app/justsearch/issues).
 
 JustSearch has a built-in MCP server, so an AI agent can search the files you have added, get
 passages with their sources, browse the added folders and ask to add files. JustSearch asks you
-in the app before it adds anything, unless you already allowed it. The app must be running. Each
+in the app before it adds anything, unless you already allowed it. The app must be running. The
 release includes a small bridge, `justsearch-mcp.mcpb`, that finds the running app and signs in to
-it by itself:
+it by itself. Use the one from the release you installed, and if you once set
+`JUSTSEARCH_API_PORT`, remove it so the bridge can find the app:
 
-- **Claude Desktop:** open the `.mcpb` file, or add it under Settings → Extensions.
-- **Any client that can launch a local MCP server, such as Claude Code:** the `.mcpb` file is a zip
-  archive. Unpack all of it into a folder and give the client the command below. It needs Node.js
-  18 or later, on the same computer and user account as JustSearch:
+- **Claude Desktop** (versions with Extensions): open the `.mcpb` file there.
+- **Other clients that can launch a local MCP server:** the `.mcpb` file is a zip archive. Unpack
+  all of it into a folder and set `node <folder>/server/index.js` as the server command. It needs
+  Node.js 18 or later, on the same computer and user account as JustSearch. For Claude Code:
 
   ```bash
   claude mcp add justsearch -- node /path/to/that-folder/server/index.js
   ```
 
-The passages and file paths an agent retrieves go, unredacted, to the client you connected, and a
-cloud-hosted client can send them on to its model provider. Details:
+The client you connect receives the retrieved passages and absolute file paths without redaction
+and may send them to its model provider. Details:
 [MCP server reference](docs/reference/mcp-production-server.md).
 
 ## Benchmarks
@@ -102,11 +103,12 @@ how well they match the question and how high the best ones appear; 1.0 is ideal
 | Legal (CLERC case-retrieval) | WITHHELD | Legal citation retrieval. Withheld: re-ranking missed its 200 ms deadline on 25 of 200 queries |
 
 How to read this: the numbers were measured on Linux with an NVIDIA RTX 4070, with words, meaning
-and re-ranking combined. On a computer without a supported graphics card, re-ranking is off by
-default; switch on **Best match first** in AI Brain to use it. The German and French tests searched
+and re-ranking combined. Automatic search on CPU leaves re-ranking off by default; turn on **Best match
+first** in AI Brain to use it. The German and French tests searched
 much smaller samples of Wikipedia than the published MIRACL benchmark, so those two scores are not
-comparable with published results. On SciFact, the score is in the range of strong published search
-models, which is the fair reading, not that it beats them. Everything behind the table, including how to reproduce it, is
+comparable with published results. On SciFact, the single-model retrievers we cite report 0.665–0.710
+under their own setups; a combined system is expected to score above single models, so this is not
+a like-for-like win. Everything behind the table, including how to reproduce it, is
 in the [methodology](docs/reference/benchmarks/methodology.md); CI checks the scores above against
 the release file. What the research project studies is in [`RESEARCH.md`](RESEARCH.md).
 
@@ -134,12 +136,13 @@ network only for these:
 
 - **Install AI** downloads models and the programs that run them from `github.com` and
   `huggingface.co`, after you agree.
-- **Update checks** run shortly after a release build starts. They reveal your IP address and the
-  time, and send no file content and no searches. You can switch the automatic check off, and an
+- **Update checks** run by default in desktop builds with a configured release URL, which includes
+  the published installers, about 30 seconds after the interface starts. They reveal your IP
+  address and the time, and send no file content and no searches. You can switch the automatic check off, and an
   update is downloaded only when you ask.
-- **Tools you connect receive what they ask for.** An AI agent gets passages and file paths,
-  unredacted, and may send them to its model provider. Tools you configure yourself handle data
-  their own way.
+- **An MCP client you connect** receives retrieved passages and absolute file paths without
+  redaction and may send them to its model provider. Other tools you configure receive the inputs
+  passed to them.
 - **Tracing** is off by default. If you enable it and configure a destination, that destination can
   receive file paths and excerpts of documents.
 
@@ -167,7 +170,7 @@ More in the [system overview](docs/explanation/01-system-overview.md) and the
 JustSearch is developed with AI coding agents (Claude Code and OpenAI Codex) working under a
 written agreement, [`AGENTS.md`](AGENTS.md): the agent that builds a change is never the
 only judge of it, and a failure that was reported on the running app is checked on the running app.
-Commits name the agent as co-author. The checks, the release steps and the design history are in
+The checks, the release steps and the design history are in
 this repository ([`MAINTAINING.md`](MAINTAINING.md),
 [cutting a release](docs/how-to/cut-a-release.md), `docs/tempdocs/`). Three decisions shape the
 project:
