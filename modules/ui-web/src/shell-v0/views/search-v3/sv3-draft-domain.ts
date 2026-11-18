@@ -193,6 +193,13 @@ export class Sv3DraftDomain {
 
   private reviewConfigured = false;
 
+  /**
+   * The pending review came only from a plain draft restored at app start: the raw slot, legacy
+   * adoption, or the session attachment's current draft on first connect. Any other review reason
+   * (a hand-off, navigation, a companion copy, Forget reselection) clears it.
+   */
+  private startupReview = false;
+
   private preparationRevision = 0;
 
   /** HO9 retires one-shot context, but its unchanged text is not an all-files choice. */
@@ -210,8 +217,9 @@ export class Sv3DraftDomain {
     this.host.requestUpdate();
   }
 
-  markDraftReview(proposal: Sv3Preparation | null = null): void {
+  markDraftReview(proposal: Sv3Preparation | null = null, startup = false): void {
     this.draftReviewValue = true;
+    this.startupReview = startup;
     this.draftProposalValue = proposal;
     this.reviewConfigured = false;
     this.preparationRevision += 1;
@@ -359,6 +367,17 @@ export class Sv3DraftDomain {
     this.host.requestUpdate();
   }
 
+  /**
+   * Plain Enter in Search mode on a plain draft restored at app start is the person's choice to
+   * search it: the same confirmation as "Use Search with current filters". Every other blocking
+   * reason is checked first and keeps its state. A failed save leaves the review pending.
+   */
+  confirmRestoredSearch(): void {
+    if (!this.draftReview || !this.startupReview || this.tier !== 'search' || this.departureBlocked
+      || this.handoffBlocked || this.retiredHandoffText !== null) return;
+    this.reviewDraft(true);
+  }
+
   draftMayIssue(retain = true): boolean {
     if (this.departureBlocked || this.draftReview || this.handoffBlocked || this.retiredHandoffText !== null) { this.host.requestUpdate(); return false; }
     return !retain || this.saveRecovery();
@@ -483,7 +502,7 @@ export class Sv3DraftDomain {
       // alone supplies the fresh composer; keep older format adoption compatible.
       const retainedHero = current.place === null && !hadRaw && payload.version === 3;
       if (!this.mountHasIncoming && !retainedHero && (this.composer.read() || this.draftHasInputs(current))) {
-        this.markDraftReview(current.preparation ?? null);
+        this.markDraftReview(current.preparation ?? null, true);
         if (!hadRaw) {
           this.reviewConfigured = current.preparation != null;
           this.host.writeDraft(current.text);
@@ -495,7 +514,7 @@ export class Sv3DraftDomain {
         && !this.recoveryDrafts.some(d => this.sameDraft(d, current))) this.recoveryDraftsValue.push(current);
     } else if (current !== undefined && this.draftHasInputs(current)) {
       if (!this.recoveryDrafts.some(d => this.sameDraft(d, current))) this.recoveryDraftsValue.push(current);
-      if (!this.mountHasIncoming && this.composer.read().trim()) this.markDraftReview(current.preparation ?? null);
+      if (!this.mountHasIncoming && this.composer.read().trim()) this.markDraftReview(current.preparation ?? null, true);
     }
     if (payload.task !== null) {
       this.humanTaskValue = {
@@ -1043,6 +1062,7 @@ export class Sv3DraftDomain {
     this.tier = tier; this.tierFollowsPlace = false;
     if (paths.length > 0 && shape !== 'core.workflow-run') this.search.prepare({ paths });
     this.draftReviewValue = review || blocked;
+    this.startupReview = false;
     this.draftProposalValue = this.draftReview ? preparation : null;
     this.reviewConfigured = this.draftReview;
     this.host.writeDraft(query);
@@ -1229,7 +1249,9 @@ export class Sv3DraftDomain {
     for (const [place, scope] of this.placeScopes) this.placeScopes.set(place, pruneScope(scope));
     this.recoveryDraftsValue = this.recoveryDrafts.map(draft => ({ ...draft, preparation: prunePreparation(draft.preparation ?? null) }))
       .filter((draft, index, drafts) => drafts.findIndex(other => this.sameDraft(draft, other)) === index);
-    this.draftProposalValue = prunePreparation(this.draftProposal);
+    const proposal = prunePreparation(this.draftProposal);
+    if (proposal !== this.draftProposal) this.startupReview = false;
+    this.draftProposalValue = proposal;
     if (this.preparedHandoff !== null) {
       const selection = pruneSelection(this.preparedHandoff.selection);
       if (selection !== this.preparedHandoff.selection) {
