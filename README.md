@@ -30,12 +30,11 @@ assistant answers on it too.
 - **Reads what you have.** PDF, Office, email and most common document formats, and the text in
   scanned pages and images.
 - **Works in many languages.** One setup for all of them; measured on English, German and French.
-- **Works offline.** After the optional AI download, searching and answering need no connection.
-  There is no account and no usage analytics.
+- **Works offline.** Searching by words works without internet from the start; searching by meaning
+  and built-in answers do once the optional models are installed. JustSearch needs no account and
+  has no built-in usage analytics.
 - **A tool for AI agents.** Claude, Codex, Cursor and other MCP clients can search your files
   through JustSearch.
-
-How it compares with other tools: [sourced comparison](docs/comparison.md).
 
 ## Install
 
@@ -45,17 +44,19 @@ Download the package for your system from the
 | | Windows | Linux |
 |---|---|---|
 | **Package** | `JustSearch_<version>_x64-setup.exe` | `JustSearch_<version>_amd64.deb` |
-| **System** | Windows 10 or 11, 64-bit (tested on Windows 11) | Ubuntu 24.04 or newer, x86_64 |
-| **Install** | Run the installer. It is per-user; no admin rights needed. | `sudo apt install ./JustSearch_<version>_amd64.deb` |
-| **Answers** | With an NVIDIA graphics card that has at least 8 GB of memory | Not yet: the Linux package searches, it does not answer |
+| **System** | Windows 11, 64-bit (tested). Windows 10 is expected to work but is not tested. | Ubuntu 24.04 or newer, x86_64 |
+| **Install** | Run the installer. It installs per user and does not ask for administrator rights. | In the download folder: `sudo apt install ./JustSearch_*_amd64.deb` |
+| **Answers** | With a supported NVIDIA graphics card of 8 GB or more | Not in this release: on Linux, Install AI offers search only |
 
 Then start JustSearch and add a folder. Searching by words works as soon as the first files are
-read. **AI Brain → Install AI** adds searching by meaning and, where supported, answers. It shows
-what it will download before it starts: 2–4 GB without a supported NVIDIA graphics card, about
-10 GB with one. Plan for 16 GB of RAM and 15 GB of free disk space for the full setup.
+read. **AI Brain → Install AI** adds searching by meaning and, where supported, answers. It shows the
+downloads, their sizes and their terms before it starts: roughly 2–4 GB for searching by meaning,
+or about 10 GB for the full Windows setup with answers. Allow disk space for that and for the
+search index, which grows with your files. We recommend 16 GB of RAM; that is not a measured
+minimum.
 
 The Windows installer is code-signed; the publisher shown is **Elias Justus**. Windows SmartScreen
-can still show a prompt while the certificate is new. To check a download yourself, see
+may still show a reputation prompt, which should name that publisher. To check a download yourself, see
 [Verify your download](docs/how-to/verify-your-download.md). macOS is not supported
 ([NON-GOALS](NON-GOALS.md)). To build from source, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
@@ -67,26 +68,29 @@ report it in an [issue](https://github.com/justsearch-app/justsearch/issues).
 
 ## Use it from an AI agent
 
-JustSearch has a built-in MCP server, so an AI agent can search your files, get passages with
-their sources, browse folders and ask to add files (you approve that in the app). The app must be
-running. Each release includes a small bridge, `justsearch-mcp.mcpb`, that finds the running app
-and signs in to it by itself:
+JustSearch has a built-in MCP server, so an AI agent can search the files you have added, get
+passages with their sources, browse the added folders and ask to add files. JustSearch asks you
+in the app before it adds anything, unless you already allowed it. The app must be running. Each
+release includes a small bridge, `justsearch-mcp.mcpb`, that finds the running app and signs in to
+it by itself:
 
-- **Claude Desktop:** open the `.mcpb` file (Settings → Extensions).
-- **Claude Code, Codex CLI, Cursor and other clients that start a local server:** the `.mcpb` file
-  is a zip archive. Unpack it and register its bridge, which needs Node.js:
+- **Claude Desktop:** open the `.mcpb` file, or add it under Settings → Extensions.
+- **Any client that can launch a local MCP server, such as Claude Code:** the `.mcpb` file is a zip
+  archive. Unpack all of it into a folder and give the client the command below. It needs Node.js
+  18 or later, on the same computer and user account as JustSearch:
 
   ```bash
-  claude mcp add justsearch -- node /path/to/justsearch-mcp/server/index.js
+  claude mcp add justsearch -- node /path/to/that-folder/server/index.js
   ```
 
-The passages an agent retrieves go to the client you connected. A cloud-hosted client forwards them
-to its model provider like any other tool result. Details:
+The passages and file paths an agent retrieves go, unredacted, to the client you connected, and a
+cloud-hosted client can send them on to its model provider. Details:
 [MCP server reference](docs/reference/mcp-production-server.md).
 
 ## Benchmarks
 
-How well the search finds the right passage, as nDCG@10 (1.0 is a perfect ranking), in release
+How well the search finds the right passages. The score, nDCG@10, looks at the first ten results:
+how well they match the question and how high the best ones appear; 1.0 is ideal. From release
 `linux-complete-qrels-2026-11-02`:
 
 | Collection | nDCG@10 | What it is |
@@ -95,14 +99,14 @@ How well the search finds the right passage, as nDCG@10 (1.0 is a perfect rankin
 | Enron-QA | 0.806 | Questions about business email |
 | MIRACL-de (German) | 0.986 | Wikipedia questions, small document pool |
 | MIRACL-fr (French) | 0.990 | Wikipedia questions, small document pool |
-| Legal (CLERC case-retrieval) | WITHHELD | The re-ranking model was too slow on these long queries |
+| Legal (CLERC case-retrieval) | WITHHELD | Legal citation retrieval. Withheld: re-ranking missed its 200 ms deadline on 25 of 200 queries |
 
 How to read this: the numbers were measured on Linux with an NVIDIA RTX 4070, with words, meaning
-and re-ranking combined. On a computer without a supported graphics card, re-ranking is off unless
-you switch on **Best match first** in AI Brain. The two MIRACL scores come from
-document pools much smaller than the published benchmark's, so they are not comparable with
-published results. The fair summary is that an offline system lands in the range of strong published
-retrievers, not that it beats them. Everything behind the table, including how to reproduce it, is
+and re-ranking combined. On a computer without a supported graphics card, re-ranking is off by
+default; switch on **Best match first** in AI Brain to use it. The German and French tests searched
+much smaller samples of Wikipedia than the published MIRACL benchmark, so those two scores are not
+comparable with published results. On SciFact, the score is in the range of strong published search
+models, which is the fair reading, not that it beats them. Everything behind the table, including how to reproduce it, is
 in the [methodology](docs/reference/benchmarks/methodology.md); CI checks the scores above against
 the release file. What the research project studies is in [`RESEARCH.md`](RESEARCH.md).
 
@@ -110,8 +114,8 @@ the release file. What the research project studies is in [`RESEARCH.md`](RESEAR
 
 **Agent-utility campaign freeze (2026-11-09):** Fresh and resumed live agent-utility campaigns are frozen. Their commands and runbooks remain available for historical reproduction and offline analysis, along with published evidence and offline replay. Neighboring experiments retain their existing status.
 
-Separate from retrieval quality above, we also measure *agent utility* (does an agent with JustSearch tools
-answer better than one without?) under a fail-closed publication policy:
+We also tested whether giving an AI agent JustSearch helps it answer more accurately or more
+efficiently. The rules for publishing the result were set before the test:
 
 <!-- agent-utility:generated:start - run: node scripts/docs/gen-public-agent-utility.mjs -->
 
@@ -130,23 +134,28 @@ network only for these:
 
 - **Install AI** downloads models and the programs that run them from `github.com` and
   `huggingface.co`, after you agree.
-- **Update checks** run shortly after the app starts. They send no file content and no searches,
-  and can be switched off.
-- **An AI agent you connect** receives the passages and file paths it asks for.
-- **Trace export** is off by default and sends data only to an address you configure.
+- **Update checks** run shortly after a release build starts. They reveal your IP address and the
+  time, and send no file content and no searches. You can switch the automatic check off, and an
+  update is downloaded only when you ask.
+- **Tools you connect receive what they ask for.** An AI agent gets passages and file paths,
+  unredacted, and may send them to its model provider. Tools you configure yourself handle data
+  their own way.
+- **Tracing** is off by default. If you enable it and configure a destination, that destination can
+  receive file paths and excerpts of documents.
 
-**Report a problem** only opens the bug report page in your browser. Every network path, the
-switches and what each request reveals are in the
+**Report a problem** copies a diagnostic summary when it can and opens the bug report page in your
+browser; you choose what to paste and send. The
 [threat model](docs/reference/security/threat-model.md) and the
-[policy reference](docs/explanation/15-enterprise-policy.md).
+[policy reference](docs/explanation/15-enterprise-policy.md) explain the network activity and its
+switches.
 
 ## How it is built
 
 - **Desktop shell:** Tauri (Rust), with a Lit web-components frontend. It starts and supervises the
   Engine.
 - **Engine:** one Java process that serves the local API and the MCP server and owns the Lucene
-  index and the search pipeline. Text extraction (Apache Tika, plus OCR) runs in separate child
-  processes.
+  index and the search pipeline. It reads simple formats itself and uses separate processes for
+  formats such as PDF, Office files and scanned images (Apache Tika, plus OCR).
 - **Models:** an embedding model
   ([gte-multilingual-base](https://huggingface.co/Alibaba-NLP/gte-multilingual-base)) and a
   re-ranking model run inside the Engine; answers come from a separate local `llama-server`
@@ -158,16 +167,18 @@ More in the [system overview](docs/explanation/01-system-overview.md) and the
 JustSearch is developed with AI coding agents (Claude Code and OpenAI Codex) working under a
 written agreement, [`AGENTS.md`](AGENTS.md): the agent that builds a change is never the
 only judge of it, and a failure that was reported on the running app is checked on the running app.
-The checks, the release steps and the design history are in this repository
-([`MAINTAINING.md`](MAINTAINING.md), [cutting a release](docs/how-to/cut-a-release.md),
-`docs/tempdocs/`). Three decisions shape the project:
+Commits name the agent as co-author. The checks, the release steps and the design history are in
+this repository ([`MAINTAINING.md`](MAINTAINING.md),
+[cutting a release](docs/how-to/cut-a-release.md), `docs/tempdocs/`). Three decisions shape the
+project:
 
 - **Your computer does the work.** Cloud processing would add running costs and privacy obligations
   this project cannot carry ([NON-GOALS](NON-GOALS.md)).
 - **Numbers are published under rules set beforehand.** A result that does not meet them is
   withheld or reported as it is, such as the legal row and the agent-utility result above.
-- **A release is the exact files that were tested.** Packages are built once, signed, tried on
-  clean machines and then published without rebuilding.
+- **A release is published without rebuilding.** The release process builds and signs a draft,
+  tests those same Windows and Linux packages, and publishes those files; the release guide says
+  which checks run.
 
 ## Status
 

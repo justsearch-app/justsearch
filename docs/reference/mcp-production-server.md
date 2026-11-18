@@ -100,36 +100,41 @@ MCP server on?" is exactly "which port is the API on?":
 
 ### Installed app: the release bridge (MCPB)
 
-An installed app authenticates every request to `/mcp` (see [Session credential](#session-credential)),
-and the credential changes at each start. Connect through the bridge attached to each release,
+An installed Engine requires its per-start session credential for MCP requests (see
+[Session credential](#session-credential)). Connect through the bridge attached to each release,
 `justsearch-mcp.mcpb` (sources in [`packaging/mcpb/`](../../packaging/mcpb/README.md)): a thin local
 stdio bridge that finds the running app through its runtime manifest and sends the credential itself.
 
 - **Claude Desktop:** download the `.mcpb` from the release page and open it with Claude Desktop
   (Settings → Extensions). No JSON editing.
-- **Other clients that start a local stdio server** (Claude Code, Codex CLI, Cursor): the `.mcpb` is
-  a zip archive. Unpack it and register `node <folder>/server/index.js` as the server command
-  (needs Node.js), for example:
+- **Any client that can launch a local stdio MCP server:** the `.mcpb` is a zip archive. Extract
+  the whole archive into a folder and run `node <folder>/server/index.js` with Node.js 18 or later,
+  on the same computer and user account as JustSearch. Leave `JUSTSEARCH_API_PORT` unset so the
+  bridge discovers the app. Release qualification exercises this bridge with MCP Inspector over
+  stdio; for Claude Code the command is:
 
   ```bash
-  claude mcp add justsearch -- node /path/to/justsearch-mcp/server/index.js
+  claude mcp add justsearch -- node /path/to/that-folder/server/index.js
   ```
 
 ### Development Engine: direct HTTP
 
-The flows below connect a client straight to `http://127.0.0.1:<port>/mcp` without a credential.
-They work against a development-mode Engine, which is token-free. An installed app answers such a
-request with `401` (`UI_TOKEN_REQUIRED`); use the bridge above.
+The flows below connect a client on the same computer straight to `http://127.0.0.1:<port>/mcp`
+without a credential. They work against a development-mode Engine, which is token-free. An
+installed Engine answers a credential-free MCP request that passes its host and origin checks with
+`401 UI_TOKEN_REQUIRED`; use the bridge above. Read the port from `head.apiPort` in the development
+Engine's runtime manifest (for the dev runner usually
+`modules/ui-web/.dev-data/runtime/manifest.json`); Gradle development tasks default to `33221`,
+which the examples use.
 
 ### Claude Desktop connector
 
-1. **Start the Engine.** The API is up when
-   `http://127.0.0.1:8080/api/health` answers in a browser. If it doesn't, read the actual
-   port (`head.apiPort`) from `%APPDATA%\io.justsearch.shell\runtime\manifest.json` and use that below.
+1. **Start the development Engine.** The API is up when
+   `http://127.0.0.1:33221/api/health` answers in a browser.
 2. **Claude Desktop → Settings → Connectors → Add custom connector**, URL:
 
    ```text
-   http://127.0.0.1:8080/mcp
+   http://127.0.0.1:33221/mcp
    ```
 
 3. **Done.** Ask Claude something about your indexed files; it will call `justsearch_answer` /
@@ -144,7 +149,7 @@ If your Claude Desktop version has no Connectors UI, bridge stdio→HTTP with `m
   "mcpServers": {
     "justsearch": {
       "command": "npx",
-      "args": ["mcp-remote", "http://127.0.0.1:8080/mcp"]
+      "args": ["mcp-remote", "http://127.0.0.1:33221/mcp"]
     }
   }
 }
@@ -158,7 +163,7 @@ Add to `.cursor/mcp.json` or equivalent:
 {
   "mcpServers": {
     "justsearch": {
-      "url": "http://127.0.0.1:8080/mcp"
+      "url": "http://127.0.0.1:33221/mcp"
     }
   }
 }
@@ -167,20 +172,18 @@ Add to `.cursor/mcp.json` or equivalent:
 ### Claude Code
 
 ```bash
-claude mcp add justsearch --transport http http://127.0.0.1:8080/mcp
+claude mcp add justsearch --transport http http://127.0.0.1:33221/mcp
 ```
 
-In all three: replace `8080` with the `head.apiPort` value from
-`%APPDATA%\io.justsearch.shell\runtime\manifest.json` if `8080` was taken on your machine
-(see [Which port?](#which-port)).
+In all three: replace `33221` with the `head.apiPort` value from the development Engine's runtime
+manifest if it differs (see [Which port?](#which-port)).
 
-Every flow above needs a build that serves `POST /mcp`; the v0.1.0 installer release may predate it.
 If a client reports no tools, probe the endpoint before debugging the client — it should answer with
 the seven tools, and a 404 means the running build has no MCP endpoint (use a newer release or a
 from-source build):
 
 ```bash
-curl -sS -X POST http://127.0.0.1:8080/mcp -H "Content-Type: application/json" \
+curl -sS -X POST http://127.0.0.1:33221/mcp -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
