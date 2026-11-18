@@ -20,9 +20,9 @@
 
 ## What this document is
 
-JustSearch claims to occupy a specific feature cell: **true hybrid retrieval** (lexical + dense, with cross-encoder reranking; learned-sparse retrieval as a separate mode) **× local indexing and inference × multilingual × OCR for scanned documents**, packaged as a Windows desktop app with an MCP retrieval backend. A claim like that is only worth anything if it is checkable, so this page is the public version of the survey behind it: one row per tool a buyer would realistically consider, every cell sourced, every competitor represented at its current best — including the places where it beats JustSearch.
+JustSearch claims to occupy a specific feature cell: **true hybrid retrieval** (lexical + dense, with cross-encoder reranking; learned-sparse retrieval as a separate mode) **× local indexing and inference × multilingual × OCR for scanned documents**, packaged as a desktop app for Windows and Ubuntu with an MCP retrieval backend. A claim like that is only worth anything if it is checkable, so this page is the public version of the survey behind it: one row per tool a buyer would realistically consider, every cell sourced, every competitor represented at its current best — including the places where it beats JustSearch.
 
-JustSearch's own weaknesses, stated up front and repeated in its table row: **Windows-only; alpha (0.1.0); unsigned installer (SmartScreen warnings); ~9 GB model download; very young and unproven (repo created June 2026, 2 GitHub stars at survey date); retrieval benchmarked only in English, German, and French** despite a 70+-language embedding model.
+JustSearch's own weaknesses, stated up front and repeated in its table row: **early (0.3.6); Windows and Ubuntu only, with answers only on Windows with a supported NVIDIA GPU; a new code-signing certificate, so SmartScreen may still show a reputation prompt; AI download of about 10 GB with a supported NVIDIA GPU or 2–4 GB without; very young and unproven (repo created June 2026, 1 GitHub star on 2026-11-18); retrieval benchmarked only in English, German, and French** despite a 70+-language embedding model.
 
 ---
 
@@ -34,9 +34,9 @@ Legend: **Offline** = indexing, retrieval, and built-in inference can work witho
 
 | Tool | Offline | Retrieval | Reranker | OCR | Multilingual | Cited answers | MCP | Formats | Platforms | License / price | Maturity |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| **JustSearch 0.1.0 (alpha)** | Yes for local processing after model download; desktop builds with an embedded release URL check for updates by default (including CI-built branch candidates and pre-releases). Current update controls: `JUSTSEARCH_AUTO_UPDATE_CHECK=false` suppresses automatic checks; policy `"appUpdatesEnabled": false` forbids all new updater checks and downloads. See [update controls and version caveat](reference/configuration/environment-variables.md#desktop-app-update-traffic-and-policy). | Hybrid: BM25 + dense embeddings with cross-encoder reranking; separate SPLADE learned-sparse mode | Yes, cross-encoder | Yes (scanned PDFs, images) | Claimed 70+ languages; **benchmarked only EN (BEIR/SciFact, Enron-QA, CLERC), DE (MIRACL-de), FR (MIRACL-fr)** | Yes (answers with cited passages) | Native server (6 tools in 0.1.0; 7 on main) | PDF, email, Office, "hundreds of formats" (claimed, not independently verified) | **Windows only** | Apache-2.0 / free | **Alpha.** Repo created 2026-06-23; 2 stars; unsigned installer; unproven |
+| **JustSearch 0.3.6** | Yes for local processing after model download; desktop builds with an embedded release URL check for updates by default (including CI-built branch candidates and pre-releases). Current update controls: `JUSTSEARCH_AUTO_UPDATE_CHECK=false` suppresses automatic checks; policy `"appUpdatesEnabled": false` forbids all new updater checks and downloads. See [update controls and version caveat](reference/configuration/environment-variables.md#desktop-app-update-traffic-and-policy). | Hybrid: BM25 + dense embeddings with cross-encoder reranking; separate SPLADE learned-sparse mode | Yes, cross-encoder | Yes (scanned PDFs, images) | Claimed 70+ languages; **benchmarked only EN (BEIR/SciFact, Enron-QA, CLERC), DE (MIRACL-de), FR (MIRACL-fr)** | Yes (answers with cited passages; on Windows with a supported NVIDIA GPU) | Native server (7 tools) | PDF, email, Office, "hundreds of formats" (claimed, not independently verified) | Windows 10/11 x64 installer; Ubuntu 24.04+ x86_64 `.deb` | Apache-2.0 / free | **Early.** Repo created 2026-06-23; 1 star (2026-11-18); code-signed Windows installer since 0.2.0; unproven |
 
-Sources: https://github.com/justsearch-app/justsearch (README) and https://api.github.com/repos/justsearch-app/justsearch — accessed 2026-07-14.
+Sources: https://github.com/justsearch-app/justsearch (README), the v0.3.6 release and https://api.github.com/repos/justsearch-app/justsearch — accessed 2026-11-18.
 
 JustSearch also downloads models and runtimes with consent. Trace export requires both enabled tracing and an OTLP endpoint; traces can include paths and excerpts. Connected MCP clients receive retrieved data. See [Privacy](../README.md#privacy) for the current network behavior.
 
@@ -228,7 +228,7 @@ The survey narrowed the broader MCP “no cited answers” claim on 2026-11-04: 
 
 - Replace "we're not aware of another local tool that combines these" with the narrowed desktop-app claim above, and **name RAGFlow, Open WebUI, and QAnything** as local server-class tools that do combine the four axes, plus **DigUp on macOS** as a desktop tool that combines the broader four axes without learned-sparse retrieval or cross-encoder reranking (the README promises to list such tools; here they are).
 - The "fast-but-literal" framing of Recoll should be softened or footnoted: Recoll has shipped OCR for image-only PDFs for years and has broad multilingual lexical support; it is literal, but not featureless.
-- Keep the honest weaknesses row wherever the claim is made: Windows-only, alpha, unsigned installer, ~9 GB models, 2-star young repo, benchmarked only EN/DE/FR.
+- Keep the honest weaknesses row wherever the claim is made: early version, Windows and Ubuntu only, answers only with a supported NVIDIA GPU on Windows, 2–10 GB models, young repo with few stars, benchmarked only EN/DE/FR.
 
 ---
 
