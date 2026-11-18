@@ -60,12 +60,14 @@ Create the release branch at that SHA. Edit only the canonical `version` in
 registry version, URL, bundle hash and the `shell` crate line in `THIRD_PARTY_NOTICES`.
 Root/frontend npm package versions identify tooling, not the shipped application.
 Add user-facing entries under `CHANGELOG.md`'s Unreleased section.
-Check `README.md` against this release for install steps, download links, package sizes and
-SHA-256 hashes, platform claims, screenshots and feature descriptions. If it needs changes, prepare
-a separate docs PR for `vX.Y.Z` and hold it for section 6. Once section 3 verifies the draft, take
-any listed sizes and hashes from the verified assets and their `SHA256SUMS`. If the candidate is
-replaced, close or update the held PR and repeat the check against the replacement.
-Before opening the PR, run these checks and the applicable
+Review `README.md` against the planned release for install steps, download links,
+package sizes and SHA-256 hashes, platform claims, screenshots and feature descriptions.
+After section 3 verifies the draft, repeat that review against the tagged source and
+verified packages. If changes are needed, prepare a separate docs PR for `vX.Y.Z` from
+current main and hold it for section 6. Measure any listed sizes from the verified assets
+and take hashes from their matching `SHA256SUMS`. If the candidate is replaced, close
+or update the held PR and repeat the review against the replacement.
+Before opening the release PR, run these checks and the applicable
 [subject checks](../reference/contributing/pre-merge-checks.md), with `VERSION` set to the new `X.Y.Z`:
 
 ```bash
@@ -344,10 +346,14 @@ retain the hidden candidate-identity marker as the first line. The draft include
 changelog section, extracted by `scripts/release/release-changelog.mjs`, plus platform, verification
 and qualification text; reshape it for a reader deciding whether to update. GitHub renders Markdown and
 limited HTML (`<details>`/`<summary>` folds; no CSS or scripts). Start with a few user-facing changes since the last
-published release, each backed by a changelog entry. Keep required upgrade steps, backup and restore
-instructions, and compatibility warnings visible under `Before you update`. Under `Download`, link
-the installers and `SHA256SUMS` for this tag and the download verification guide. Fill
-`Known issues` and `Not tested` from qualification. Put the full changelog in an
+published release, each backed by a changelog entry. Keep required upgrade steps, backup and restore instructions, and compatibility
+warnings visible under `Before you update`. Include any steps that still apply to
+users skipping releases. Under `Download`, label each installer with its platform,
+architecture and supported OS versions. Link to the installers and `SHA256SUMS`
+for this tag and to `docs/how-to/verify-your-download.md` using its absolute GitHub
+URL at the same tag. In `Known issues`, include limitations from the changelog that
+still apply and issues found during qualification. In `Not tested`, list the
+qualification gaps. Put the full changelog in an
 `All changes in X.Y.Z` fold and the packaged checks and checksum details in a second fold. Use
 `<details>` with a `<summary>` on its own line, followed by a blank line before the Markdown. Leave
 a blank line before `</details>`. When editing the draft through the REST API, send `tag_name` and
