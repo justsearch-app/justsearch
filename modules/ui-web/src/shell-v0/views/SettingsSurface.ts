@@ -156,6 +156,7 @@ import '../components/ConfirmBand.js';
 import { emitEphemeralToast } from '../components/advisory/ephemeralToast.js';
 import { ModalController } from '../primitives/modalController.js';
 import type { ConfirmBand } from '../components/ConfirmBand.js';
+import { openExternalUrl } from '../plugin-api/capabilities/platform.js';
 import {
   checkForAppUpdate as checkForAppUpdateFromHost,
   installAppUpdate as installAppUpdateFromHost,
@@ -179,6 +180,9 @@ interface AllSettings {
 }
 
 interface SearchShortcutStatus { enabled: boolean; active: boolean; reason: string | null; revision?: number }
+
+const RELEASE_NOTES_VERSION =
+  /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][\dA-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][\dA-Za-z-]*))*)?$/;
 
 function parseSearchShortcutStatus(value: unknown): SearchShortcutStatus {
   if (value === null || typeof value !== 'object'
@@ -2941,6 +2945,9 @@ export class SettingsSurface extends JfElement {
   private renderAppUpdates(): TemplateResult {
     const status = this.updateStatus;
     const available = status?.state === 'available' && status.availableVersion;
+    const releaseNotesUrl = typeof available === 'string' && RELEASE_NOTES_VERSION.test(available)
+      ? `https://github.com/justsearch-app/justsearch/releases/tag/v${available}`
+      : null;
     const repairRequired = status?.state === 'repair_required';
     return html`
       <div class="section" data-testid="settings-app-updates">
@@ -2961,7 +2968,7 @@ export class SettingsSurface extends JfElement {
             ?disabled=${this.updateBusy || repairRequired}
             .onActivate=${() => void this.checkForAppUpdate()}
           >
-            ${this.updateBusy && status?.state === 'checking' ? 'Checkingâ€¦' : SETTINGS_CONTROL_LABELS['app-updates'].check}
+            ${this.updateBusy && status?.state === 'checking' ? 'Checking…' : SETTINGS_CONTROL_LABELS['app-updates'].check}
           </jf-button>
           ${available
             ? html`<jf-button
@@ -2971,6 +2978,14 @@ export class SettingsSurface extends JfElement {
                 .onActivate=${() => void this.installAppUpdate()}
               >
                 Install ${status.availableVersion}
+              </jf-button>`
+            : nothing}
+          ${releaseNotesUrl
+            ? html`<jf-button
+                variant="secondary"
+                .onActivate=${() => openExternalUrl(releaseNotesUrl)}
+              >
+                What's new in ${available}
               </jf-button>`
             : nothing}
         </div>

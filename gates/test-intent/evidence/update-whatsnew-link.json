@@ -1,0 +1,87 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-18T15:10:19.828Z",
+  "revision": "b45d0a17c0346d9153a796aa619098083ab621b4",
+  "tree": "b44d3a3cf7aae2a23d5b2e2c5bc66b2676a4deee",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/SettingsSurface.appUpdate.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ya_uqja3/tmp/test-intent-vitest-1702-1795014613277.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2521
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#opens the release notes for 0.3.7 on activation",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates opens the release notes for 0.3.7 on activation",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#opens the release notes for 0.3.7-rc.1 on activation",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates opens the release notes for 0.3.7-rc.1 on activation",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": {
+    "ref": "f04e9c4ced",
+    "revision": "f04e9c4ced604f1dbdc67e40d7e05fd9c773fb6f",
+    "overlays": [],
+    "patches": [],
+    "runs": [
+      {
+        "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/SettingsSurface.appUpdate.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ya_uqja3/tmp/test-intent-vitest-1702-1795014617548.json\"",
+        "cwd": "<before-worktree>",
+        "exitCode": 1,
+        "durationMs": 2044,
+        "output": "JSON report written to /home/elias/.cache/am/ya_uqja3/tmp/test-intent-vitest-1702-1795014617548.json\n\n"
+      }
+    ],
+    "checks": [
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#opens the release notes for 0.3.7 on activation",
+        "classification": "assertion",
+        "detail": "SettingsSurface app updates opens the release notes for 0.3.7 on activation:  AssertionError: What's new in 0.3.7: expected undefined to be defined\n    at /home/elias/.cache/am/ya_uqja3/tmp/test-intent-before-iY9C3V/modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts:105:25\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout (node"
+      },
+      {
+        "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#opens the release notes for 0.3.7-rc.1 on activation",
+        "classification": "assertion",
+        "detail": "SettingsSurface app updates opens the release notes for 0.3.7-rc.1 on activation:  AssertionError: What's new in 0.3.7-rc.1: expected undefined to be defined\n    at /home/elias/.cache/am/ya_uqja3/tmp/test-intent-before-iY9C3V/modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts:105:25\n    at runNextTicks (node:internal/process/task_queues:65:5)\n    at listOnTimeout"
+      }
+    ]
+  },
+  "digest": "sha256:9acf36437917de06bec1b06a6c2bd4ef51c2c560c08d314e1a2bb562bd8d373c"
+}

@@ -1,0 +1,328 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-18T15:10:47.290Z",
+  "revision": "b45d0a17c0346d9153a796aa619098083ab621b4",
+  "tree": "70b290f6acb79670452228acbcf2e914d5bec466",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/SettingsSurface.appUpdate.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/ya_uqja3/tmp/test-intent-vitest-2009-1795014644562.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 2725
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates shows an authenticated available release and requires an explicit install action",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates invokes installation only after the user activates the install control",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates opens the release notes for 0.3.7 on activation",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates opens the release notes for 0.3.7-rc.1 on activation",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"../x\"",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"0.3.7 evil\"",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"0.3.7/../../x\"",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"\"",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"v0.3.7\"",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"0.3.7+build\"",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"0.3.7\\n\"",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"00.3.7\"",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"0.3.7-\"",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"0.3.7-rc..1\"",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"0.3.7-rc.01\"",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates omits release notes when up_to_date",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates omits release notes when checking",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates omits release notes when repair_required",
+          "status": "passed"
+        },
+        {
+          "name": "SettingsSurface app updates checks for updates when the user activates the check control",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#omits release notes for an invalid version \"../x\"",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"../x\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#omits release notes for an invalid version \"0.3.7 evil\"",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"0.3.7 evil\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#omits release notes for an invalid version \"0.3.7/../../x\"",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"0.3.7/../../x\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#omits release notes for an invalid version \"\"",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#omits release notes for an invalid version \"v0.3.7\"",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"v0.3.7\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#omits release notes for an invalid version \"0.3.7+build\"",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"0.3.7+build\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#omits release notes for an invalid version \"00.3.7\"",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"00.3.7\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#omits release notes for an invalid version \"0.3.7-\"",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"0.3.7-\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#omits release notes for an invalid version \"0.3.7-rc..1\"",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"0.3.7-rc..1\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#omits release notes for an invalid version \"0.3.7-rc.01\"",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates omits release notes for an invalid version \"0.3.7-rc.01\"",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#omits release notes when up_to_date",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates omits release notes when up_to_date",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#omits release notes when checking",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates omits release notes when checking",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#omits release notes when repair_required",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates omits release notes when repair_required",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts#checks for updates when the user activates the check control",
+      "file": "modules/ui-web/src/shell-v0/views/SettingsSurface.appUpdate.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:6cdb38bb83b72f02cd2daf5b65c60b7b51d2c33cecdce040fbea71f56995686f",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "SettingsSurface app updates checks for updates when the user activates the check control",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:ee71ddee3627b3f7ef85efc65d0d46b7aec40ccaaad7076ed44e8d50b50450fc"
+}
