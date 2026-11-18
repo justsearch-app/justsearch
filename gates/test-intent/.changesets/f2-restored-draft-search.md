@@ -9,10 +9,11 @@ author-session: 98e063d8-b77c-4ff7-bbe8-9668e0417bae
 
 Fix F2 for v0.3.6: a draft restored at app start must not block Search. On the base, Search waits
 for Enter (no search-as-you-type), and plain Enter on a restored draft did nothing until the person
-clicked a review button. The expectations are an agent choice under the quoted standing delegation,
-not owner-agreed words. The owner words establish only that a defect blocking Search for every user
-matters for a release; they do not choose this fix. No decision record or owner-sourced document
-at the base states a conflicting rule (see conflictSearch).
+clicked a review button. The expectations are an agent choice under the quoted release-workflow
+delegation (fix release blockers forward), not owner-agreed words. The owner words establish only
+that a defect blocking Search for every user matters for a release; they do not choose this fix.
+No decision record or owner-sourced document at the base states a conflicting rule (see
+conflictSearch).
 
 Repaired checks fail on 025fd3e9e0 with an assertion (no Search issued, the review prompt still
 shown, or the refused write not announced). Preservation checks pass both before and after.
@@ -30,9 +31,9 @@ shown, or the refused write not announced). Preservation checks pass both before
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "i think agents should not ask me for any input if they know better, which in most work related tasks is the case.",
-          "delegationLocation": "task t-20261027-4e4d6b request context: the user's standing preferences, recorded 2026-10-22",
-          "delegationScope": "Work decisions on the owner's assigned JustSearch tasks without asking the owner; here the v0.3.6 release fix F2 (a draft restored at app start must not block Search), scenarios F2-1 to F2-7 settled 2026-11-18.",
+          "delegationQuote": "once your task is fully implemented you can autonomously proceed with running the first release workflow btw",
+          "delegationLocation": "task t-20261027-4e4d6b user turn 2026-10-27T21:08Z",
+          "delegationScope": "running the release workflow autonomously up to the owner's final validation, including fixing release blockers forward per docs/how-to/cut-a-release.md section 4 (docs/how-to/cut-a-release.md:304 at 025fd3e9e0); resumed by the user on 2026-11-17: \"id like you to resume the release workflow. ... you need to determine how in depth this needs to be.\"",
           "choice": "Plain Enter in Search mode on a plain draft restored at app start (the raw slot, legacy adoption, or the session attachment's current draft on first connect) searches the text currently in the composer with the current filters. It counts as the same confirmation as 'Use Search with current filters', and the review prompt goes. It makes no AI request, applies no saved file choice and never widens chosen files to all files. A saved proposal stays a distinct companion recovery draft. Every other review rule stays. Ctrl/Cmd+Enter and non-Search modes stay blocked until review, and both review buttons only confirm. Hand-off blocks, retired hand-off text, the departure block, Forget reselection, drafts restored by navigating to a conversation and companion copies keep blocking plain Enter and keep their state. A refused or stale storage write is visible, keeps the text and companions, and searches nothing. After a successful write the saved preparation is Search.",
           "label": "agent choice"
         },
@@ -73,9 +74,9 @@ shown, or the refused write not announced). Preservation checks pass both before
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "i think agents should not ask me for any input if they know better, which in most work related tasks is the case.",
-          "delegationLocation": "task t-20261027-4e4d6b request context: the user's standing preferences, recorded 2026-10-22",
-          "delegationScope": "Work decisions on the owner's assigned JustSearch tasks without asking the owner; here the v0.3.6 release fix F2 (a draft restored at app start must not block Search), scenarios F2-1 to F2-7 settled 2026-11-18.",
+          "delegationQuote": "once your task is fully implemented you can autonomously proceed with running the first release workflow btw",
+          "delegationLocation": "task t-20261027-4e4d6b user turn 2026-10-27T21:08Z",
+          "delegationScope": "running the release workflow autonomously up to the owner's final validation, including fixing release blockers forward per docs/how-to/cut-a-release.md section 4 (docs/how-to/cut-a-release.md:304 at 025fd3e9e0); resumed by the user on 2026-11-17: \"id like you to resume the release workflow. ... you need to determine how in depth this needs to be.\"",
           "choice": "Plain Enter in Search mode on a plain draft restored at app start (the raw slot, legacy adoption, or the session attachment's current draft on first connect) searches the text currently in the composer with the current filters. It counts as the same confirmation as 'Use Search with current filters', and the review prompt goes. It makes no AI request, applies no saved file choice and never widens chosen files to all files. A saved proposal stays a distinct companion recovery draft. Every other review rule stays. Ctrl/Cmd+Enter and non-Search modes stay blocked until review, and both review buttons only confirm. Hand-off blocks, retired hand-off text, the departure block, Forget reselection, drafts restored by navigating to a conversation and companion copies keep blocking plain Enter and keep their state. A refused or stale storage write is visible, keeps the text and companions, and searches nothing. After a successful write the saved preparation is Search.",
           "label": "agent choice"
         }
@@ -106,9 +107,9 @@ shown, or the refused write not announced). Preservation checks pass both before
       "sources": [
         {
           "kind": "delegated-choice",
-          "delegationQuote": "i think agents should not ask me for any input if they know better, which in most work related tasks is the case.",
-          "delegationLocation": "task t-20261027-4e4d6b request context: the user's standing preferences, recorded 2026-10-22",
-          "delegationScope": "Work decisions on the owner's assigned JustSearch tasks without asking the owner; here the v0.3.6 release fix F2 (a draft restored at app start must not block Search), scenarios F2-1 to F2-7 settled 2026-11-18.",
+          "delegationQuote": "once your task is fully implemented you can autonomously proceed with running the first release workflow btw",
+          "delegationLocation": "task t-20261027-4e4d6b user turn 2026-10-27T21:08Z",
+          "delegationScope": "running the release workflow autonomously up to the owner's final validation, including fixing release blockers forward per docs/how-to/cut-a-release.md section 4 (docs/how-to/cut-a-release.md:304 at 025fd3e9e0); resumed by the user on 2026-11-17: \"id like you to resume the release workflow. ... you need to determine how in depth this needs to be.\"",
           "choice": "Plain Enter in Search mode on a plain draft restored at app start (the raw slot, legacy adoption, or the session attachment's current draft on first connect) searches the text currently in the composer with the current filters. It counts as the same confirmation as 'Use Search with current filters', and the review prompt goes. It makes no AI request, applies no saved file choice and never widens chosen files to all files. A saved proposal stays a distinct companion recovery draft. Every other review rule stays. Ctrl/Cmd+Enter and non-Search modes stay blocked until review, and both review buttons only confirm. Hand-off blocks, retired hand-off text, the departure block, Forget reselection, drafts restored by navigating to a conversation and companion copies keep blocking plain Enter and keep their state. A refused or stale storage write is visible, keeps the text and companions, and searches nothing. After a successful write the saved preparation is Search.",
           "label": "agent choice"
         },
