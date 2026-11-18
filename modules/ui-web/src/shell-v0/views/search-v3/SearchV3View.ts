@@ -1239,7 +1239,7 @@ export class SearchV3View extends JfElement {
       SV3_DRAFT_KEY,
       () => this.currentDraft(),
       (value) => {
-        if (value !== '') this.draftDomain.markDraftReview();
+        if (value !== '') this.draftDomain.markDraftReview(null, true);
         this.writeDraft(value);
         this.requestUpdate();
       },
@@ -2253,6 +2253,7 @@ export class SearchV3View extends JfElement {
     const detail = (event as CustomEvent<Sv3ComposerSubmit>).detail;
     const text = (detail?.query ?? '').trim();
     if (text === '') return;
+    if (detail?.tier === 'search') this.draftDomain.confirmRestoredSearch();
     if (!this.draftDomain.draftMayIssue(false)) return;
     // WP1.1 — a SEARCH is decided before the run is consulted at all: it is not a send into any
     // conversation, so it can never steer, answer or stop a run (S1.8).
