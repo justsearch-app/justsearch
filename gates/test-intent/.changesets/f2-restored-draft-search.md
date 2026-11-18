@@ -126,3 +126,14 @@ shown, or the refused write not announced). Preservation checks pass both before
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "3e66760d-d0e8-40f9-9212-eac3ab8654b7",
+  "verdict": "accept",
+  "digest": "sha256:665499d114bbaec422891dd4ad368179db33ec7cf2ac8580c2eccbd0baa57f4a",
+  "note": "Sources checked; conflict search repeated (none; owner-adopted SM2/SM3 agree); 17 repaired checks fail before by assertion, 12 preservation pass both; retired assertions are exactly the 9 listed"
+}
+```
