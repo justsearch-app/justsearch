@@ -125,3 +125,14 @@ The check-id syntax rewrites a backslash to `/`, so the case
 ```
 
 ## Acceptance records
+
+```json
+{
+  "kind": "acceptance",
+  "role": "verifier",
+  "session": "67c18bcc-72e6-476d-9d53-f7be8b5ba9c7",
+  "verdict": "accept",
+  "digest": "sha256:2a92dade5ebe8add595dfc2c4d4a7b21d306b1a9e820a1de56a677350821cbd9",
+  "note": "Adaptation keeps both old oracles (pass on f04e9c4ced and candidate); C1 checks fail-before by assertion, C2/C3 pass on both; expectations follow the delegated choice; reran on both trees."
+}
+```
