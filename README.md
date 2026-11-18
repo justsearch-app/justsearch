@@ -1,12 +1,13 @@
 # JustSearch
 
-**JustSearch finds what is inside your files, quickly and accurately, whether you know exactly what you are looking for or only vaguely. It is for anyone who keeps files on their computer, as a search app of its own or as a tool inside other apps and AI agents through MCP.** Under the hood: hybrid search (keyword + vector + cross-encoder reranking), a separate learned-sparse mode and an on-device AI assistant for cited answers, summaries and extraction, all running on your machine. Windows installer; on Linux, runs from source.
+**JustSearch finds what is inside your files, quickly and accurately, whether you know exactly what you are looking for or only vaguely. It is for anyone who keeps files on their computer, as a search app of its own or as a tool inside other apps and AI agents through MCP.**
 
+It is local-first: your files are read, indexed and searched on your own computer, and the built-in
+assistant answers on it too.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![CI](https://github.com/justsearch-app/justsearch/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/justsearch-app/justsearch/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/justsearch-app/justsearch?include_prereleases&label=release)](https://github.com/justsearch-app/justsearch/releases)
-<!-- badges: <<nDCG benchmark badge>> — deferred: no workflow publishes a benchmark badge yet -->
+[![Latest release](https://img.shields.io/github/v/release/justsearch-app/justsearch?label=release)](https://github.com/justsearch-app/justsearch/releases/latest)
 <!-- mcp-name: io.github.justsearch-app/justsearch -->
 <!-- ^ Official MCP Registry ownership marker (modelcontextprotocol.io/registry/package-types);
      must match "name" in packaging/mcpb/server.json. Do not remove. -->
@@ -20,46 +21,43 @@
        alt="JustSearch answers what the global search shortcut preserves, with citations and a passage from the keyboard shortcuts guide">
 </p>
 
-JustSearch is local-first: it indexes your local documents, such as PDF, email, Office and most common document
-formats (text extraction is backed by [Apache Tika](https://tika.apache.org/), plus OCR for scanned PDFs and
-images), and answers questions over them with cited passages, **with indexing, retrieval, and built-in AI inference on your machine.**
-It offers keyword, dense-vector and learned-sparse retrieval; explicit hybrid mode fuses keyword and
-vector results with cross-encoder reranking,
-and exposes that retrieval over the **Model Context Protocol (MCP)** so any AI agent — local or cloud — can
-use it as a **private retrieval backend**: indexing and retrieval stay on your device. The built-in
-assistant keeps the whole loop on-device. When you connect an external AI client, the retrieved passages
-and their metadata are handed to that client, and what happens to them from there is governed by that
-client and its model provider, not by JustSearch.
+## What it does
 
-It is multilingual by construction: the embedding model
-([gte-multilingual-base](https://huggingface.co/Alibaba-NLP/gte-multilingual-base)) supports 70+ languages;
-retrieval quality is benchmarked on English, German, and French (see [Benchmarks](#benchmarks)).
+- **Search by words or by meaning.** Type the exact phrase, or describe what you remember. Results
+  from both ways of searching are combined, and a second model can put the best matches first.
+- **Answers with sources.** Ask a question and get an answer that cites the passages it came from,
+  written by a model running on your computer.
+- **Reads what you have.** PDF, Office, email and most common document formats, and the text in
+  scanned pages and images.
+- **Works in many languages.** One setup for all of them; measured on English, German and French.
+- **Works offline.** After the optional AI download, searching and answering need no connection.
+  There is no account and no usage analytics.
+- **A tool for AI agents.** Claude, Codex, Cursor and other MCP clients can search your files
+  through JustSearch.
 
-## Install (Windows)
+How it compares with other tools: [sourced comparison](docs/comparison.md).
 
-1. **Download** [`JustSearch_0.3.0_x64-setup.exe`](https://github.com/justsearch-app/justsearch/releases/download/v0.3.0/JustSearch_0.3.0_x64-setup.exe)
-   (261 MB) from the [v0.3.0 release](https://github.com/justsearch-app/justsearch/releases/tag/v0.3.0).
-2. **Run it.** The installer is **code-signed** — the publisher shown is **Elias Justus**. Windows
-   SmartScreen may still show a reputation prompt while the signing certificate is new (reputation
-   accrues with downloads); if it does, the "More info" panel names the verified publisher. The
-   install is per-user; no admin rights needed.
-3. **Launch JustSearch** and point it at a folder. Use **AI Brain → Install AI** to download the optional
-   models and runtimes from `github.com` and `huggingface.co`. The dialog shows the exact download size
-   for your hardware: about **10 GB** on Windows with a supported NVIDIA GPU, or **2–4 GB** without one.
-   Search and built-in AI inference then work offline; the desktop app also checks for updates by default
-   when the build embeds a release URL (including CI-built branch candidates and pre-releases; see [Privacy](#privacy)).
+## Install
 
-Installer SHA-256 (also in [`SHA256SUMS`](https://github.com/justsearch-app/justsearch/releases/download/v0.3.0/SHA256SUMS)):
+Download the package for your system from the
+[latest release](https://github.com/justsearch-app/justsearch/releases/latest).
 
-```text
-465b9a90f763471bf5b6e33261d5eb17d3cf58981acb5d58d8d67dfd4da2d33f  JustSearch_0.3.0_x64-setup.exe
-```
+| | Windows | Linux |
+|---|---|---|
+| **Package** | `JustSearch_<version>_x64-setup.exe` | `JustSearch_<version>_amd64.deb` |
+| **System** | Windows 10 or 11, 64-bit (tested on Windows 11) | Ubuntu 24.04 or newer, x86_64 |
+| **Install** | Run the installer. It is per-user; no admin rights needed. | `sudo apt install ./JustSearch_<version>_amd64.deb` |
+| **Answers** | With an NVIDIA graphics card that has at least 8 GB of memory | Not yet: the Linux package searches, it does not answer |
 
-<!-- hash verified 2026-09-07 against the asset downloaded from the published v0.3.0 GitHub
-     release (Authenticode Valid, CN=Elias Justus, SSL.com timestamped; 261,223,328 bytes measured). -->
+Then start JustSearch and add a folder. Searching by words works as soon as the first files are
+read. **AI Brain → Install AI** adds searching by meaning and, where supported, answers. It shows
+what it will download before it starts: 2–4 GB without a supported NVIDIA graphics card, about
+10 GB with one. Plan for 16 GB of RAM and 15 GB of free disk space for the full setup.
 
-Full walkthrough (hash and publisher verification, Windows reputation guidance,
-build-from-source alternative): [`docs/how-to/verify-your-download.md`](docs/how-to/verify-your-download.md).
+The Windows installer is code-signed; the publisher shown is **Elias Justus**. Windows SmartScreen
+can still show a prompt while the certificate is new. To check a download yourself, see
+[Verify your download](docs/how-to/verify-your-download.md). macOS is not supported
+([NON-GOALS](NON-GOALS.md)). To build from source, see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 **Official downloads.** JustSearch is free. The app and its MCP bundle are published only on this
 repository's [Releases page](https://github.com/justsearch-app/justsearch/releases); the Windows installer there is
@@ -67,124 +65,46 @@ code-signed by Elias Justus.
 A copy sold for money, or offered by another store or site, does not come from this project; please
 report it in an [issue](https://github.com/justsearch-app/justsearch/issues).
 
-## System requirements
+## Use it from an AI agent
 
-| | |
-|---|---|
-| **OS** | **Windows 10 or 11, 64-bit (x64) only** for the installer. On Linux, JustSearch runs from source ([Quickstart](#quickstart-build-from-source)); there is no Linux installer. macOS is not in the current scope ([NON-GOALS](NON-GOALS.md)). Verified on Windows 11; Windows 10 x64 is the expected WebView2 baseline but is not yet explicitly tested. WebView2, the VC++ runtime, and a Java runtime are bundled by the installer; there is nothing to install first. |
-| **Disk** | 261 MB installer + ~0.7 GB installed + **about 10 GB for AI with a supported NVIDIA GPU (2–4 GB without one)** + the search index (grows with your corpus). Plan for **≥ 15 GB free**. |
-| **RAM** | **16 GB recommended.** 8 GB is a conservative floor for keyword/semantic search only (not a benchmarked minimum; chat needs the GPU below regardless of RAM). The on-device chat model (~5.9 GB file) is loaded into memory when answering. |
-| **GPU** | **Required for chat.** Search and semantic ranking run on CPU — no GPU needed for those. Chat requires an NVIDIA GPU with **≥ 8 GB VRAM** (the app needs ~7.5 GB free VRAM to run the chat model). Without a supported NVIDIA GPU, or below that VRAM floor, no install path offers the chat model — chat does **not** fall back to CPU, so the app is search-only. |
-| **Network** | AI downloads and default launch-time update checks in desktop builds with an embedded release URL; optional trace export when configured. See [Privacy](#privacy) for all network paths and update controls. |
+JustSearch has a built-in MCP server, so an AI agent can search your files, get passages with
+their sources, browse folders and ask to add files (you approve that in the app). The app must be
+running. Each release includes a small bridge, `justsearch-mcp.mcpb`, that finds the running app
+and signs in to it by itself:
 
-## Two ways to use it
+- **Claude Desktop:** open the `.mcpb` file (Settings → Extensions).
+- **Claude Code, Codex CLI, Cursor and other clients that start a local server:** the `.mcpb` file
+  is a zip archive. Unpack it and register its bridge, which needs Node.js:
 
-**As a private MCP retrieval backend for agents** *(the fast path for developers)*
-JustSearch exposes its retrieval over MCP at `POST /mcp` — **in-process Streamable HTTP** on the loopback API
-(no separate process, no Node.js). The desktop app listens on **`http://127.0.0.1:8080`** by default; if 8080
-is already taken it falls back to a random free port. To pin a port, set the `JUSTSEARCH_API_PORT` environment
-variable before launching; the actual port in use is always written as `head.apiPort` in
-`%APPDATA%\io.justsearch.shell\runtime\manifest.json` on Windows, or
-`~/.local/share/io.justsearch.shell/runtime/manifest.json` on Linux (under
-`$XDG_DATA_HOME/io.justsearch.shell/runtime/manifest.json` if `XDG_DATA_HOME` is set).
-For headless/dev launches with a data directory override, use
-`<JUSTSEARCH_DATA_DIR>/runtime/manifest.json`. Details + a 2-minute Claude Desktop walkthrough:
-[`docs/reference/mcp-production-server.md`](docs/reference/mcp-production-server.md). Connect your agent:
-
-- **Claude Code:** `claude mcp add justsearch --transport http http://127.0.0.1:8080/mcp`
-- **Codex CLI:** `codex mcp add justsearch --url http://127.0.0.1:8080/mcp`
-- **Cursor / VS Code** (clients that accept an HTTP `url` directly — e.g. `.cursor/mcp.json`):
-  ```json
-  { "mcpServers": { "justsearch": { "url": "http://127.0.0.1:8080/mcp" } } }
-  ```
-- **Claude Desktop** — add it as a **Connector** (Settings → Connectors → Add custom connector → the URL above),
-  or bridge stdio→HTTP with `mcp-remote` in `claude_desktop_config.json`:
-  ```json
-  { "mcpServers": { "justsearch": { "command": "npx", "args": ["mcp-remote", "http://127.0.0.1:8080/mcp"] } } }
+  ```bash
+  claude mcp add justsearch -- node /path/to/justsearch-mcp/server/index.js
   ```
 
-If an older build returns 404 for `POST /mcp`, use the current release or a from-source build.
-
-Seven tools: `justsearch_answer` (RAG, primary), `justsearch_search`, `justsearch_browse`, `justsearch_ingest`,
-`justsearch_status`, `justsearch_runtime_manifest`, `justsearch_operation_outcome`. The server binds to
-loopback and itself sends nothing anywhere beyond returning results to the connected client. The passages
-it returns go to whichever client you connected — a cloud-hosted agent will forward them to its model
-provider like any other tool result. Optional Engine trace export is described in [Privacy](#privacy).
-
-Does wiring an agent to these tools measurably improve its answers? We benchmark that under a fail-closed
-publication policy. The one accepted publication so far is *adoption-only*: agents used the tools, but no
-stratum showed an accuracy or efficiency improvement — see the
-[status note](#agent-utility-publication-status) below and
-[`docs/reference/benchmarks/agent-utility.md`](docs/reference/benchmarks/agent-utility.md).
-
-**As a desktop app** *(for non-developers)*
-Follow [Install (Windows)](#install-windows) above, point it at a folder, and search.
-*(Windows; alpha; code-signed as of v0.2.0 — see [Status](#status).)*
-
-## Why JustSearch
-
-Some desktop file-search tools are **fast-but-lexical** (Everything — filenames, instantly; Recoll — full-text and
-even OCR, but keyword matching only) or **smart-but-cloud** (NotebookLM, Copilot — capable, but your files
-leave your machine). Self-hosted server stacks (RAGFlow, Open WebUI, QAnything) can combine semantic retrieval,
-offline operation, multilingual models, and OCR — if you deploy and configure a Docker stack yourself.
-DigUp on macOS also combines hybrid search, offline processing, multilingual search and OCR in a
-single-install desktop app, without documented cross-encoder reranking. As far as we know, JustSearch
-is the only **single-install desktop app** that ships **{lexical + dense retrieval with cross-encoder
-reranking × offline search and AI × multilingual × OCR}** out of the box. See the
-[sourced comparison](docs/comparison.md); if we've missed a tool, please
-[open an issue](https://github.com/justsearch-app/justsearch/issues) and we'll list it.
-
-- **Hybrid retrieval, not single-model RAG** — keyword + dense vectors, fused and cross-encoder reranked; learned-sparse is a separate mode.
-  Most local RAG tools use one embedding model and basic chunking.
-- **Local search and AI** — indexing, retrieval, and built-in inference run on-device and work offline
-  after AI setup. The desktop app also checks for updates by default; [Privacy](#privacy) names the network paths
-  and the optional trace exporter.
-- **Multilingual by construction** — one locale-invariant pipeline (ICU + a multilingual model stack), no
-  per-language tuning. Measured on German and French dev queries in sampled document pools, as well as English corpora.
-- **Vision OCR** — extracts text from scanned PDFs and images, so they're searchable too.
-- **BYO-LLM** — runs your own local model via llama.cpp; no API keys, no per-token cost.
+The passages an agent retrieves go to the client you connected. A cloud-hosted client forwards them
+to its model provider like any other tool result. Details:
+[MCP server reference](docs/reference/mcp-production-server.md).
 
 ## Benchmarks
 
-Retrieval quality (nDCG@10) from release `linux-complete-qrels-2026-11-02`
-(`scripts/jseval/release.v1.json`): Linux 7.0 (x86_64), NVIDIA RTX 4070 12 GB,
-driver 580.178.04, ORT 1.24.3 with host CUDA 12.9/cuDNN 9; 200–343 queries per corpus.
-Explicit `hybrid` mode uses keyword + vector + cross-encoder reranking; learned-sparse is off.
-This is a new Linux measurement, not a rerun of the superseded Windows release.
+How well the search finds the right passage, as nDCG@10 (1.0 is a perfect ranking), in release
+`linux-complete-qrels-2026-11-02`:
 
-| Corpus | nDCG@10 | Note |
+| Collection | nDCG@10 | What it is |
 |---|---|---|
-| BEIR / SciFact | **0.759** | CE applied 299/300; 1 deadline drop; system vs. published single-model components |
-| Enron-QA | 0.806 | CE applied 277/300; 17 deterministic navigational skips, 6 deadline drops (2.0%; harness verdict ok) |
-| MIRACL-de (German) | 0.986 | dev split, complete positive judgments; CE applied 305/305, no drops; no per-language tuning |
-| MIRACL-fr (French) | 0.990 | dev split, complete positive judgments; CE applied 343/343, no drops |
-| Legal (CLERC case-retrieval) | WITHHELD | 25/200 CE deadline misses under the default 200 ms budget; ablations and caveat in the methodology |
+| BEIR / SciFact | **0.759** | Scientific claims, a standard public benchmark |
+| Enron-QA | 0.806 | Questions about business email |
+| MIRACL-de (German) | 0.986 | Wikipedia questions, small document pool |
+| MIRACL-fr (French) | 0.990 | Wikipedia questions, small document pool |
+| Legal (CLERC case-retrieval) | WITHHELD | The re-ranking model was too slow on these long queries |
 
-Legal has 198 documents, all judged relevant to at least one query, and roughly 260-word queries.
-Its hybrid result is not comparable: 12.5% deadline misses on this machine (60% in an earlier run
-under heavier load). The release retains lexical/vector/splade ablations and publishes no legal hybrid floor.
-
-External-baseline figures are cited from published papers (SIGIR/NAACL; sources + split caveats in
-`release.v1.json`) — **not** re-run by us, and not directly apples-to-apples: a hybrid+rerank *system* is
-expected to exceed single-model *components*, and our MIRACL dev queries use a much smaller document pool than the published dev baselines. The honest
-reading is "a reproducible offline hybrid system lands in the range of strong published retrievers," not
-"we beat them" — full comparison-class notes in
-[the methodology](docs/reference/benchmarks/methodology.md#how-to-read-the-comparison-system-vs-component).
-Per-corpus nDCG@10 floors are checked against a pinned baseline at release-composition time
-(`python -m jseval relevance-gate`, `scripts/jseval/relevance-ratchet-baselines.v1.json`); that is a
-local gate run when a release is composed, not an automated CI job.
-
-Reproduce (from `scripts/jseval`): `python -m jseval run --start-backend --dataset beir/scifact --modes hybrid`
-then `python -m jseval relevance-gate --dataset beir/scifact`. Slugs: `beir/scifact`, `mixed/enron-qa`,
-`mixed/legal-clerc-200`, `mixed/miracl-de-2k`, `mixed/miracl-fr-2k`.
-Full methodology, comparison-class caveats, and reproduction:
-[`docs/reference/benchmarks/methodology.md`](docs/reference/benchmarks/methodology.md). The table above is
-hand-written from `scripts/jseval/release.v1.json` (the current Linux release). CI compares each
-row's nDCG@10 value, or its WITHHELD marker, with that file (`scripts/ci/check-readme-benchmark-numbers.mjs`);
-the note column and the counts and percentages in the prose are copied from the release by hand and are
-not checked by CI.
-For what JustSearch's research project studies and the evidence published so far, see
-[`RESEARCH.md`](RESEARCH.md).
+How to read this: the numbers were measured on Linux with an NVIDIA RTX 4070, with words, meaning
+and re-ranking combined. On a computer without a supported graphics card, re-ranking is off unless
+you switch on **Best match first** in AI Brain. The two MIRACL scores come from
+document pools much smaller than the published benchmark's, so they are not comparable with
+published results. The fair summary is that an offline system lands in the range of strong published
+retrievers, not that it beats them. Everything behind the table, including how to reproduce it, is
+in the [methodology](docs/reference/benchmarks/methodology.md); CI checks the scores above against
+the release file. What the research project studies is in [`RESEARCH.md`](RESEARCH.md).
 
 ### Agent-utility publication status
 
@@ -203,99 +123,62 @@ Accuracy intervals are recomputed from the published observations under v5 quest
 
 <!-- agent-utility:generated:end -->
 
-## Quickstart (build from source)
-
-> Prereqs to **build + test**: **JDK 25** (the Gradle toolchain auto-resolves it) and **Node.js 24** (for the
-> `modules/ui-web` frontend). Building/contributing needs **no GPU, no Rust toolchain, and no model
-> download**; AI models are runtime-only (Install AI downloads them with your consent).
-
-```bash
-git clone https://github.com/justsearch-app/justsearch && cd justsearch
-./gradlew build                  # Linux, or Windows Git Bash
-```
-
-On Linux, install JDK 25, Node 24, a C compiler (`cc`) and Tesseract. GPU development also
-needs an NVIDIA driver, a CUDA-enabled llama-server built from the project's pinned llama.cpp
-version (`b8571`), and the ORT CUDA 12 libraries. Export the regular executable as
-`JUSTSEARCH_SERVER_EXE`; make it executable and put its required shared libraries on the loader's
-search path. Keep ORT's CUDA 12 dependencies available even if llama-server uses another CUDA
-version.
-
-To **run** the full desktop app, the easy path is the [installer](#install-windows) above; running the
-Engine stack from source is a developer workflow — see [`CONTRIBUTING.md`](CONTRIBUTING.md). The installed
-app offers **Install AI** with your consent (about **10 GB** on Windows or **8 GB** on Linux with a
-supported NVIDIA GPU; **2–4 GB** without one). On Windows, when downloads and GPU acceleration are
-permitted by policy, this includes a CUDA build of `llama-server` that is selected automatically on
-supported NVIDIA hardware, unless you set your own executable.
-Building from source does not download models: keyword search works without them, and
-`node scripts/dev/doctor.mjs` names the step to the next tier. See [Privacy](#privacy) for downloads,
-update checks, and optional trace export.
-
-## Architecture
-
-The Engine JVM hosts the loopback-only API gateway and the index half, composed through ports.
-
-- **Desktop shell** — Tauri hosts the Lit/web-components frontend and supervises the Engine.
-- **Engine** — API gateway, Lucene ownership in the index half, retrieval pipeline and extraction orchestration.
-- **Inference** — a separate local `llama-server` for chat/RAG.
-
-The Engine halves share an address space; application code reaches the index through ports. More: [`docs/explanation/01-system-overview.md`](docs/explanation/01-system-overview.md).
-The public API surface is mapped in [`docs/reference/api-contract-map.md`](docs/reference/api-contract-map.md).
-
 ## Privacy
 
-Indexing, retrieval, and built-in AI inference run locally. Network activity has these paths:
+Reading, indexing, searching and the built-in assistant run on your computer. JustSearch uses the
+network only for these:
 
-- **Install AI** downloads models and runtimes from `github.com` and `huggingface.co` (and their download
-  redirects), with your consent. Repair and upgrades can download them again. On Windows, supported NVIDIA
-  hardware also gets a CUDA build of `llama-server` when downloads and GPU acceleration are permitted by policy, selected automatically unless you chose your own executable.
-- **The desktop app checks for updates by default**, about 30 seconds after the desktop chrome mounts when a release URL is
-  embedded. CI-built installers embed the repository's configured URL, including branch candidates and pre-releases.
-  Discovery fetches `release.v2.json`, `release.v2.json.sig` and `latest.json` from GitHub, following download/CDN redirects;
-  installation rechecks `latest.json` and downloads installer bytes only on request. Contacted hosts see
-  your IP address and request time; these requests send no document content or queries.
-  Set `JUSTSEARCH_AUTO_UPDATE_CHECK=false` before starting a fresh desktop process to suppress automatic
-  checks; Settings and recovery manual checks still work when policy allows them. Set `{"schemaVersion": 1, "appUpdatesEnabled": false}` in
-  `policy.v1.json` to forbid all new updater checks and downloads, including with the Engine down.
-  Windows machine policy is `%PROGRAMDATA%\JustSearch\policy.v1.json`; user policy is in the shell's
-  app-data directory (passed to the Engine as `JUSTSEARCH_HOME`). User policy can only further restrict
-  machine policy. Rust reads policy at each discovery and install, and again before artifact download.
-  A discovery already in flight may finish its metadata requests; disabling updates preserves local
-  upgrade and rollback state. The optional key keeps schemaVersion 1; older releases ignore it, and the
-  first enforcing release will be named in its release notes. These switches cover app updates only.
-  Builds without a configured release URL do not check; debug builds can use an explicitly configured URL.
-- **Trace export is off by default.** Enabling API or index tracing writes local traces. If you also set
-  an `OTEL_EXPORTER_OTLP_*ENDPOINT`, traces go to that endpoint, which may be off-device. Traces can include
-  file paths and bounded document excerpts. An endpoint alone does not enable tracing. See the
-  [environment reference](docs/reference/configuration/environment-variables.md#trace-output-and-optional-otlp-export).
-- **The desktop CSP** restricts frontend `fetch`/XHR/WebSocket to loopback and Tauri IPC; it does not
-  govern the Rust updater or Engine downloads and trace export.
-- **External integrations receive what you give them.** The loopback MCP server returns passages and file
-  paths to the client you connect; a cloud-hosted client can forward them to its model provider. An optional
-  MCP host configuration also launches user-chosen tools, whose data handling and network access you control.
-  Links you open can launch an external browser.
+- **Install AI** downloads models and the programs that run them from `github.com` and
+  `huggingface.co`, after you agree.
+- **Update checks** run shortly after the app starts. They send no file content and no searches,
+  and can be switched off.
+- **An AI agent you connect** receives the passages and file paths it asks for.
+- **Trace export** is off by default and sends data only to an address you configure.
 
-**Report a problem** only opens the bug report page in your browser; JustSearch itself sends nothing.
+**Report a problem** only opens the bug report page in your browser. Every network path, the
+switches and what each request reveals are in the
+[threat model](docs/reference/security/threat-model.md) and the
+[policy reference](docs/explanation/15-enterprise-policy.md).
 
-There is no built-in usage analytics service. For the trust boundaries and verification anchors, see the
-[threat model](docs/reference/security/threat-model.md).
+## How it is built
+
+- **Desktop shell:** Tauri (Rust), with a Lit web-components frontend. It starts and supervises the
+  Engine.
+- **Engine:** one Java process that serves the local API and the MCP server and owns the Lucene
+  index and the search pipeline. Text extraction (Apache Tika, plus OCR) runs in separate child
+  processes.
+- **Models:** an embedding model
+  ([gte-multilingual-base](https://huggingface.co/Alibaba-NLP/gte-multilingual-base)) and a
+  re-ranking model run inside the Engine; answers come from a separate local `llama-server`
+  (llama.cpp).
+
+More in the [system overview](docs/explanation/01-system-overview.md) and the
+[API contract map](docs/reference/api-contract-map.md).
+
+JustSearch is developed with AI coding agents (Claude Code and OpenAI Codex) working under a
+written agreement, [`AGENTS.md`](AGENTS.md): the agent that builds a change is never the
+only judge of it, and a failure that was reported on the running app is checked on the running app.
+The checks, the release steps and the design history are in this repository
+([`MAINTAINING.md`](MAINTAINING.md), [cutting a release](docs/how-to/cut-a-release.md),
+`docs/tempdocs/`). Three decisions shape the project:
+
+- **Your computer does the work.** Cloud processing would add running costs and privacy obligations
+  this project cannot carry ([NON-GOALS](NON-GOALS.md)).
+- **Numbers are published under rules set beforehand.** A result that does not meet them is
+  withheld or reported as it is, such as the legal row and the agent-utility result above.
+- **A release is the exact files that were tested.** Packages are built once, signed, tried on
+  clean machines and then published without rebuilding.
 
 ## Status
 
-**Alpha** (`0.3.0`), **Windows installer only** (Linux runs from source; macOS is not in the current scope). The installer is
-**code-signed** (publisher: Elias Justus) as of v0.2.0; SmartScreen reputation for the new certificate
-accrues with downloads, so an early reputation prompt is possible and names the verified publisher. In active
-development since 2025; published 2026. Built in the open with heavy AI-agent assistance — the development
-tooling, the governance/discipline gates, and the design history (`docs/tempdocs/`) all live in this repo, and
-commits are co-authored.
+**Alpha.** Windows and Linux; public since June 2026. What changed in each version is in the
+[changelog](CHANGELOG.md).
 
 ## Contributing
 
-Contributions welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md) (CLA required). Please read
-[`NON-GOALS.md`](NON-GOALS.md) first so a change fits the project's scope. Security: [`SECURITY.md`](SECURITY.md).
-You **don't** need any of the agent/governance machinery to contribute — it's published as transparency
-([`MAINTAINING.md`](MAINTAINING.md)), not a required path. For the research project and its published
-evidence, see [`RESEARCH.md`](RESEARCH.md).
+Contributions welcome: see [`CONTRIBUTING.md`](CONTRIBUTING.md) (CLA required) and read
+[`NON-GOALS.md`](NON-GOALS.md) first so a change fits the project's scope. You do not need any of
+the agent machinery to contribute. Security: [`SECURITY.md`](SECURITY.md).
 
 ## License
 

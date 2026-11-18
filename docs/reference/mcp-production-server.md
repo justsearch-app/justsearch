@@ -98,21 +98,32 @@ MCP server on?" is exactly "which port is the API on?":
 
 ## Setup
 
-### Claude Desktop one-click (MCPB) — available from the next release
+### Installed app: the release bridge (MCPB)
 
-An MCPB bundle (`justsearch-mcp.mcpb`, sources in
-[`packaging/mcpb/`](../../packaging/mcpb/README.md)) will be attached to
-JustSearch releases **starting with the next release** — it is not on any
-published release yet, and it needs an app build that serves `POST /mcp`,
-which the v0.1.0 release may predate. Once shipped: download the `.mcpb` from
-the release page and open it with Claude Desktop (Settings → Extensions) —
-one click, no JSON editing. The bundle is a thin local stdio bridge to the
-running app's `/mcp` endpoint; it handles port discovery via the runtime
-manifest automatically. Until then, use the connector flow below.
+An installed app authenticates every request to `/mcp` (see [Session credential](#session-credential)),
+and the credential changes at each start. Connect through the bridge attached to each release,
+`justsearch-mcp.mcpb` (sources in [`packaging/mcpb/`](../../packaging/mcpb/README.md)): a thin local
+stdio bridge that finds the running app through its runtime manifest and sends the credential itself.
 
-### Claude Desktop in ~2 minutes, starting from "launch the app"
+- **Claude Desktop:** download the `.mcpb` from the release page and open it with Claude Desktop
+  (Settings → Extensions). No JSON editing.
+- **Other clients that start a local stdio server** (Claude Code, Codex CLI, Cursor): the `.mcpb` is
+  a zip archive. Unpack it and register `node <folder>/server/index.js` as the server command
+  (needs Node.js), for example:
 
-1. **Launch JustSearch** (Start menu). Wait for the window to load — the API is up when
+  ```bash
+  claude mcp add justsearch -- node /path/to/justsearch-mcp/server/index.js
+  ```
+
+### Development Engine: direct HTTP
+
+The flows below connect a client straight to `http://127.0.0.1:<port>/mcp` without a credential.
+They work against a development-mode Engine, which is token-free. An installed app answers such a
+request with `401` (`UI_TOKEN_REQUIRED`); use the bridge above.
+
+### Claude Desktop connector
+
+1. **Start the Engine.** The API is up when
    `http://127.0.0.1:8080/api/health` answers in a browser. If it doesn't, read the actual
    port (`head.apiPort`) from `%APPDATA%\io.justsearch.shell\runtime\manifest.json` and use that below.
 2. **Claude Desktop → Settings → Connectors → Add custom connector**, URL:
