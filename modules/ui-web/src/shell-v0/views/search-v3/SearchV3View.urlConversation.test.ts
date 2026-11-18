@@ -511,7 +511,7 @@ describe('New retention at the public boundary', () => {
   });
 });
 
-it('N14 DS1 every nonempty raw string requires review before an edit can stage Search', async () => {
+it('N14 DS1 F2 every nonempty raw string is reviewed: an edit stages no Search, and Enter searches the edit', async () => {
   deactivateProjection(); __resetStoreRegistryForTest(); __resetSurfaceSchemasForTest(); __resetBootstrapForTest(); registerCoreStores();
   setActiveConversation(null);
   localStorage.setItem('justsearch.draft.search-v3.composer', ' \n\t ');
@@ -519,13 +519,12 @@ it('N14 DS1 every nonempty raw string requires review before an edit can stage S
   const composer = el.shadowRoot!.querySelector('jf-sv3-composer')!;
   const input = composer.shadowRoot!.querySelector<HTMLTextAreaElement>('[data-testid="sv3-composer-input"]')!;
   expect(input.value).toBe(' \n\t ');
-  input.value = 'Meaningful text after whitespace'; input.dispatchEvent(new Event('input'));
-  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true })); await settle(el);
+  input.value = 'Meaningful text after whitespace'; input.dispatchEvent(new Event('input')); await settle(el);
   const searches = () => fetchMock.mock.calls.filter(c => String(c[0]).includes('/knowledge/search'));
   expect(searches()).toHaveLength(0);
-  const review = el.shadowRoot!.querySelector<HTMLButtonElement>('[data-testid="sv3-draft-review-search"]');
-  expect(review).not.toBeNull(); review!.click(); await settle(el); expect(searches()).toHaveLength(0);
+  expect(el.shadowRoot!.querySelector('[data-testid="sv3-draft-review"]')).not.toBeNull();
   input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, composed: true })); await settle(el);
+  expect(el.shadowRoot!.querySelector('[data-testid="sv3-draft-review"]')).toBeNull();
   expect(searches().length).toBeGreaterThan(0);
   expect(searches().every(c => JSON.parse((c[1] as RequestInit).body as string).query === 'Meaningful text after whitespace')).toBe(true);
 });
