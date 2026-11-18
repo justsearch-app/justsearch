@@ -60,7 +60,14 @@ Create the release branch at that SHA. Edit only the canonical `version` in
 registry version, URL, bundle hash and the `shell` crate line in `THIRD_PARTY_NOTICES`.
 Root/frontend npm package versions identify tooling, not the shipped application.
 Add user-facing entries under `CHANGELOG.md`'s Unreleased section.
-Before opening the PR, run these checks and the applicable
+Review `README.md` against the planned release for install steps, download links,
+package sizes and SHA-256 hashes, platform claims, screenshots and feature descriptions.
+After section 3 verifies the draft, repeat that review against the tagged source and
+verified packages. If changes are needed, prepare a separate docs PR for `vX.Y.Z` from
+current main and hold it for section 6. Measure any listed sizes from the verified assets
+and take hashes from their matching `SHA256SUMS`. If the candidate is replaced, close
+or update the held PR and repeat the review against the replacement.
+Before opening the release PR, run these checks and the applicable
 [subject checks](../reference/contributing/pre-merge-checks.md), with `VERSION` set to the new `X.Y.Z`:
 
 ```bash
@@ -335,7 +342,24 @@ known issues. Include every `ownerValidation` item and its evidence:
   crash records; record the collection gap even when no crash was found. This item has no screenshot.
 
 Update the draft's notes from that summary, filling `Not tested` and `Known issues`;
-retain the hidden candidate-identity marker. The owner tries the result for about **10 minutes**
+retain the hidden candidate-identity marker as the first line. The draft includes the tagged version's
+changelog section, extracted by `scripts/release/release-changelog.mjs`, plus platform, verification
+and qualification text; reshape it for a reader deciding whether to update. GitHub renders Markdown and
+limited HTML (`<details>`/`<summary>` folds; no CSS or scripts). Start with a few user-facing changes since the last
+published release, each backed by a changelog entry. Keep required upgrade steps, backup and restore instructions, and compatibility
+warnings visible under `Before you update`. Include any steps that still apply to
+users skipping releases. Under `Download`, label each installer with its platform,
+architecture and supported OS versions. Link to the installers and `SHA256SUMS`
+for this tag and to `docs/how-to/verify-your-download.md` using its absolute GitHub
+URL at the same tag. In `Known issues`, include limitations from the changelog that
+still apply and issues found during qualification. In `Not tested`, list the
+qualification gaps. Put the full changelog in an
+`All changes in X.Y.Z` fold and the packaged checks and checksum details in a second fold. Use
+`<details>` with a `<summary>` on its own line, followed by a blank line before the Markdown. Leave
+a blank line before `</details>`. When editing the draft through the REST API, send `tag_name` and
+`target_commitish` with the body: a draft PATCH with only the body resets its tag to `untagged-…`.
+Preview the saved draft on GitHub before inviting the owner; the publish workflow promotes that
+body as saved. The owner tries the result for about **10 minutes**
 and replies **"publish"** or names what is wrong. Agents handle preparation, evidence and
 triage. Estimate: 15–30 minutes preparation per VM plus indexing/download time.
 
@@ -350,7 +374,10 @@ gh run list --workflow publish-release.yml --limit 5
 hashes, updater signatures, saved provenance, original tag/commit and published sequence floor,
 then promotes the existing draft as latest. It **never rebuilds or re-signs**. The production
 feed is `https://github.com/justsearch-app/justsearch/releases/latest/download/release.v2.json`.
-Confirm the latest release/feed resolves to the promoted bytes. Estimate: 5–15 minutes plus queue.
+Confirm the latest release and feed resolve to the promoted bytes. If a README PR was needed,
+verify its download links, sizes and hashes against that published release, then merge it through
+the normal main checks.
+Estimate: 5–15 minutes plus queue.
 Publication of the same candidate is idempotent; a failed promotion can be retried on the same tag.
 
 An agent watches new issues for a week, triages using the same blocker rule and fixes forward.
