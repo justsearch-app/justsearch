@@ -11,7 +11,7 @@
 > deployments. DigUp also combines BM25/dense hybrid search, offline processing, multilingual search and OCR
 > in a single-install macOS app. What survives, as far as we know: no **single-install desktop app** ships
 > lexical + dense retrieval with cross-encoder reranking together with the other three axes
-> out of the box (reranking is on by default with a GPU and one switch on CPU), no surveyed tool documents a SPLADE
+> out of the box (automatic reranking is off when the reranker would run on the CPU; one switch turns it on), no surveyed tool documents a SPLADE
 > learned-sparse retrieval mode, and no MCP retrieval server documents OCR for scanned documents. The survey narrowed
 > the desktop and cited-answer claims on 2026-11-04: DigUp covers the broader desktop cell, and xerj documents cited extracts.
 > Details in the [Verdict](#verdict-does-the-uniqueness-claim-survive) section.
@@ -213,7 +213,7 @@ The README claim evaluated in the original survey said JustSearch combines "{tru
 
 A narrower, still-checkable claim survives this survey:
 
-> **Among single-install desktop applications, we found no tool that ships {lexical + dense hybrid retrieval with cross-encoder reranking} × {local indexing and inference} × {multilingual} × {OCR} out of the box.** (JustSearch's reranking is on by default with a GPU and one switch on CPU.) DigUp on macOS combines the broader four axes in a desktop app, but does not document learned-sparse retrieval or cross-encoder reranking; the more specific combination above still has no surveyed desktop counterexample. RAGFlow, Open WebUI and QAnything are self-hosted Docker/server deployments requiring technical setup, and in Open WebUI's case the combination is opt-in configuration rather than default behavior. The tools that come closest are listed below — if you know another, open an issue and we will add it.
+> **Among single-install desktop applications, we found no tool that ships {lexical + dense hybrid retrieval with cross-encoder reranking} × {local indexing and inference} × {multilingual} × {OCR} out of the box.** (JustSearch's automatic reranking is off when the reranker would run on the CPU; one switch turns it on.) DigUp on macOS combines the broader four axes in a desktop app, but does not document learned-sparse retrieval or cross-encoder reranking; the more specific combination above still has no surveyed desktop counterexample. RAGFlow, Open WebUI and QAnything are self-hosted Docker/server deployments requiring technical setup, and in Open WebUI's case the combination is opt-in configuration rather than default behavior. The tools that come closest are listed below — if you know another, open an issue and we will add it.
 
 The nearest misses, by deployment class:
 - **Desktop apps:** DigUp on macOS (hybrid + offline + multilingual + OCR; no learned-sparse leg or cross-encoder documented); AnythingLLM (3/4 — offline + OCR + optional reranker; vector-only, no lexical leg); Cherry Studio (~2.5/4 — local OCR options; embedding-only retrieval, cloud default preprocessor); Msty (vector-only, cloud-key reranker, no documented OCR).
