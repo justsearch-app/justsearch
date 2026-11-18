@@ -60,6 +60,9 @@ Create the release branch at that SHA. Edit only the canonical `version` in
 registry version, URL, bundle hash and the `shell` crate line in `THIRD_PARTY_NOTICES`.
 Root/frontend npm package versions identify tooling, not the shipped application.
 Add user-facing entries under `CHANGELOG.md`'s Unreleased section.
+Also check `README.md` against this release: install steps, download links, platform claims,
+screenshots and feature descriptions. Prepare any update as a separate docs PR, held until
+promotion (section 6), because the README describes the published release.
 Before opening the PR, run these checks and the applicable
 [subject checks](../reference/contributing/pre-merge-checks.md), with `VERSION` set to the new `X.Y.Z`:
 
@@ -335,7 +338,14 @@ known issues. Include every `ownerValidation` item and its evidence:
   crash records; record the collection gap even when no crash was found. This item has no screenshot.
 
 Update the draft's notes from that summary, filling `Not tested` and `Known issues`;
-retain the hidden candidate-identity marker. The owner tries the result for about **10 minutes**
+retain the hidden candidate-identity marker as the first line. The generated notes are the whole
+changelog section; reshape them for a reader deciding whether to update. GitHub renders Markdown and
+limited HTML (`<details>`/`<summary>` folds; no CSS or scripts). Order: what's new since the last
+published release (a few bullets, each backed by a changelog entry), before you update, download,
+known issues, not tested, then `<details><summary>All changes in X.Y.Z</summary>` with the full
+changelog section, and a second fold for packaged checks and checksums. Leave a blank line after
+each `<summary>` line and before `</details>`. When editing the draft through the API, send
+`tag_name` and `target_commitish` with the body. The owner tries the result for about **10 minutes**
 and replies **"publish"** or names what is wrong. Agents handle preparation, evidence and
 triage. Estimate: 15–30 minutes preparation per VM plus indexing/download time.
 
@@ -350,7 +360,8 @@ gh run list --workflow publish-release.yml --limit 5
 hashes, updater signatures, saved provenance, original tag/commit and published sequence floor,
 then promotes the existing draft as latest. It **never rebuilds or re-signs**. The production
 feed is `https://github.com/justsearch-app/justsearch/releases/latest/download/release.v2.json`.
-Confirm the latest release/feed resolves to the promoted bytes. Estimate: 5–15 minutes plus queue.
+Confirm the latest release/feed resolves to the promoted bytes, then merge the held README PR.
+Estimate: 5–15 minutes plus queue.
 Publication of the same candidate is idempotent; a failed promotion can be retried on the same tag.
 
 An agent watches new issues for a week, triages using the same blocker rule and fixes forward.
