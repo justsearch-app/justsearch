@@ -13,11 +13,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 
 ## [Unreleased]
 
-## [0.3.5] - 2026-11-17
+## [0.3.6] - 2026-11-18
 
 #### Before you update from 0.3.0
 
-- **0.3.0 cannot update in the app. Install 0.3.5 over your existing installation to keep your data.** (#993, #1053, #1054)
+- **0.3.0 cannot update in the app. Install 0.3.6 over your existing installation to keep your data.** (#993, #1053, #1054)
 - **A change in how the app extracts text triggers one re-read of eligible files in watched folders as they're checked. Libraries with many scans may take longer, since text recognition took about twice as long per page in testing.** (#1209, #1229, #1231)
 - **Re-import old one-off folders to refresh their extracted text.** (#1231, #1236)
 - **Keep a copy of your app data before updating if you may need to go back to 0.3.2 or 0.3.0, and restore that copy before starting the older version.** Those versions cannot use the upgraded index and databases (#1109, #1128, #1150)
@@ -77,6 +77,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 - Windows and Linux installers include the project licence and third-party notices beside the Engine, with maintainer attribution and corrected BSD attribution (#1080, #1130, #1178)
 
 ### Fixed
+- Updating from inside the Windows app removes leftover Engine files that could prevent search from working after the update (#1290)
+- If you left text in the Search field when you closed the app, pressing Enter after reopening it runs the search with your current filters (#1291)
 - PDF extraction keeps word boundaries, rejoins words split by a line-end hyphen when the next line starts with a lowercase letter, and retains distinct page-edge text. More running headers can remain, and some letter-spaced headings may no longer match keyword searches (#1070, #1142, #1198, #1209)
 - Tables keep wider rows and text before a content limit, and words in table cells and list items stay separate in Word, HTML and OpenDocument files. HTML table captions come before their tables (#1070, #1142, #1198, #1209, #1256, #1261)
 - Office files with many slides, images or package parts can be indexed, and reading Office files leaves out hidden picture filenames and duplicate page previews. Word keeps footnote text without the markers (#1070, #1142, #1198, #1209, #1261)
@@ -122,6 +124,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html) once it reache
 - On a slow Engine, Activate downloaded models can briefly show a duplicate confirmation while activation proceeds (#1250)
 - The Other files filter can include mail. Some `.msg` and `.mbox` files are labeled Mail in results and can be missing from the Mail filter (#1279)
 - Drive protection for watched folders applies at the watched root and leaves child mounts unprotected. One-off imports miss edits that leave the file's size and modification time unchanged (#1236)
+- At the end of Install AI, the Engine can restart once on its own, making search briefly unavailable until it comes back (#727)
+- On Windows, adding the suggested Documents folder can show “Some subfolders couldn't be read” and “Problems right now” because JustSearch can't read Windows' My Music, My Pictures and My Videos links inside Documents. Search still works for files the app can read (#1192)
 
 ## [0.3.2] - 2026-10-30
 
