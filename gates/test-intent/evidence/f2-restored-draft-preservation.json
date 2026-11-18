@@ -1,0 +1,211 @@
+{
+  "schema": "test-intent-evidence.v1",
+  "producer": {
+    "script": "scripts/governance/gates/test-intent/run-evidence.mjs",
+    "scriptDigest": "sha256:ee823e21c24e9435fc1a4fd1c1a860b00c0ad5b026749078e72a949d85508aa7"
+  },
+  "createdAt": "2026-11-18T07:27:44.138Z",
+  "revision": "6deb7fd715111cf433355ed4cd0e3545b9b27df8",
+  "tree": "8429c72f31c7802a2cbf07253a71b49c076738eb",
+  "environment": {
+    "platform": "linux",
+    "arch": "x64",
+    "osRelease": "7.0.0-43-generic",
+    "node": "v24.22.3",
+    "java": null,
+    "cargo": null,
+    "ci": false
+  },
+  "runs": [
+    {
+      "command": "node \"node_modules/vitest/vitest.mjs\" run \"src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts\" --reporter=json --outputFile=\"/home/elias/.cache/am/i1pzbwe9/tmp/test-intent-vitest-1133-1794986851599.json\"",
+      "cwd": "modules/ui-web",
+      "exitCode": 0,
+      "durationMs": 12531
+    }
+  ],
+  "checks": [
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#DS1 review establishes current intent without issuing it keeps typed A separate from same bytes A until current review",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2a2b33390b73604ce528048f09ec04ceffecf9d1c51da94d622e4262eedeab0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DS1 review establishes current intent without issuing it keeps typed A separate from same bytes A until current review",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#DS1 review establishes current intent without issuing it keeps typed A separate from newer raw B until current review",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2a2b33390b73604ce528048f09ec04ceffecf9d1c51da94d622e4262eedeab0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DS1 review establishes current intent without issuing it keeps typed A separate from newer raw B until current review",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#DS1 review establishes current intent without issuing it real chosen-row preparation survives same-tab reload as data requiring explicit review",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2a2b33390b73604ce528048f09ec04ceffecf9d1c51da94d622e4262eedeab0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "DS1 review establishes current intent without issuing it real chosen-row preparation survives same-tab reload as data requiring explicit review",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F2 a draft restored at app start does not block Search F2-4 Ctrl+Enter and ask mode stay blocked while the review is pending",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2a2b33390b73604ce528048f09ec04ceffecf9d1c51da94d622e4262eedeab0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F2 a draft restored at app start does not block Search F2-4 Ctrl+Enter and ask mode stay blocked while the review is pending",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F2 a draft restored at app start does not block Search F2-4 Ctrl+Enter and delegate mode stay blocked while the review is pending",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2a2b33390b73604ce528048f09ec04ceffecf9d1c51da94d622e4262eedeab0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F2 a draft restored at app start does not block Search F2-4 Ctrl+Enter and delegate mode stay blocked while the review is pending",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F2 a draft restored at app start does not block Search F2-4 Use reviewed settings only confirms, and a later send uses exactly the reviewed scope",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2a2b33390b73604ce528048f09ec04ceffecf9d1c51da94d622e4262eedeab0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F2 a draft restored at app start does not block Search F2-4 Use reviewed settings only confirms, and a later send uses exactly the reviewed scope",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F2 a draft restored at app start does not block Search F2-4 the Search review button only confirms; a later Enter searches with that scope",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2a2b33390b73604ce528048f09ec04ceffecf9d1c51da94d622e4262eedeab0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F2 a draft restored at app start does not block Search F2-4 the Search review button only confirms; a later Enter searches with that scope",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F2 a draft restored at app start does not block Search F2-5 a blocked hand-off stays blocked and keeps its notice",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2a2b33390b73604ce528048f09ec04ceffecf9d1c51da94d622e4262eedeab0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F2 a draft restored at app start does not block Search F2-5 a blocked hand-off stays blocked and keeps its notice",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F2 a draft restored at app start does not block Search F2-5 retired hand-off text and the departure block keep blocking a restored draft",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2a2b33390b73604ce528048f09ec04ceffecf9d1c51da94d622e4262eedeab0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F2 a draft restored at app start does not block Search F2-5 retired hand-off text and the departure block keep blocking a restored draft",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F2 a draft restored at app start does not block Search F2-5 a Forget that requires reselection keeps the restored draft blocked",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2a2b33390b73604ce528048f09ec04ceffecf9d1c51da94d622e4262eedeab0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F2 a draft restored at app start does not block Search F2-5 a Forget that requires reselection keeps the restored draft blocked",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F2 a draft restored at app start does not block Search F2-5 a draft restored by navigating to a conversation keeps blocking Search",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2a2b33390b73604ce528048f09ec04ceffecf9d1c51da94d622e4262eedeab0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F2 a draft restored at app start does not block Search F2-5 a draft restored by navigating to a conversation keeps blocking Search",
+          "status": "passed"
+        }
+      ]
+    },
+    {
+      "id": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts#F2 a draft restored at app start does not block Search F2-5 a companion copy taken up for review keeps blocking Search",
+      "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
+      "runner": "vitest",
+      "contentDigest": "sha256:2a2b33390b73604ce528048f09ec04ceffecf9d1c51da94d622e4262eedeab0c",
+      "executed": true,
+      "skipped": false,
+      "outcome": "passed",
+      "cases": [
+        {
+          "name": "F2 a draft restored at app start does not block Search F2-5 a companion copy taken up for review keeps blocking Search",
+          "status": "passed"
+        }
+      ]
+    }
+  ],
+  "failBefore": null,
+  "digest": "sha256:f1af6b9124bc2a9cf975a1f30787c14629f89195b3464a8c3dd6dae856a1b93c"
+}

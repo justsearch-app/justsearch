@@ -574,7 +574,7 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
-          "test": "X8 restored quoted Search draft keeps its text and requires the existing review before Search"
+          "test": "X8 F2 restored quoted Search draft keeps its text, runs nothing until Enter, and Enter searches it as typed"
         },
         {
           "layer": "view",
@@ -2153,7 +2153,7 @@
         {
           "layer": "view",
           "file": "modules/ui-web/src/shell-v0/views/search-v3/SearchV3View.searchMode.test.ts",
-          "test": "X8 restored quoted Search draft keeps its text and requires the existing review before Search"
+          "test": "X8 F2 restored quoted Search draft keeps its text, runs nothing until Enter, and Enter searches it as typed"
         },
         {
           "layer": "view",

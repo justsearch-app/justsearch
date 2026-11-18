@@ -119,6 +119,7 @@ import {
   __resetDraftProvidersForTest,
 } from '../../controllers/draftPersistence.js';
 import { __resetDraftKeptForTest } from '../../controllers/draftKeptHint.js';
+import { parkSearchV3Handoff } from '../../utils/compose.js';
 import { BRANCH_MENU_RETRY, SV3_DRAFT_KEY } from './fixtures.js';
 import { SV3_COMPOSER_SUBMIT, type Sv3ComposerSubmit } from './Sv3Composer.js';
 
@@ -1242,7 +1243,7 @@ describe('S1.10 — the composer, the heading and the rows describe the one shar
 
 /* ── S1.11 — the palette searches through Search mode ─────────────────────────────────────────── */
 
-it('X8 restored quoted Search draft keeps its text and requires the existing review before Search', async () => {
+it('X8 F2 restored quoted Search draft keeps its text, runs nothing until Enter, and Enter searches it as typed', async () => {
   const query = '"budget review" -draft';
   localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), query);
   const el = await mount(); await settle(el);
@@ -1250,12 +1251,9 @@ it('X8 restored quoted Search draft keeps its text and requires the existing rev
   expect(backend.searches).toHaveLength(0);
   expect(await results(el)).toBeNull();
   await pressEnter(el); await settle(el);
-  expect(backend.searches).toHaveLength(0);
-  ds1Button(el, 'sv3-draft-review-search').click(); await settle(el);
-  expect(backend.searches).toHaveLength(0);
-  await pressEnter(el); await settle(el);
   expect(backend.searches).toHaveLength(1);
   expect(backend.searches[0]).toMatchObject({ query, querySyntax: 'search' });
+  expect(el.shadowRoot!.querySelector('[data-testid=sv3-draft-review]')).toBeNull();
 });
 
 describe('S1.11 — the palette’s search uses Search mode', () => {
@@ -1325,13 +1323,15 @@ describe('S1.13 — Back and Forward between results and a conversation', () => 
 
 // DS1: raw persistence has no task provenance; requests are observed at the real shared-store seam.
 describe('DS1 ambiguous restored draft ownership', () => {
-  it.each(['search-v3.composer', 'unified-chat.composer'])('does not issue an unscoped Enter from restored %s', async (key) => {
+  it.each(['search-v3.composer', 'unified-chat.composer'])('F2 Enter on restored %s only searches it, and never sends it to AI', async (key) => {
     aiOnline();
     localStorage.setItem('justsearch.draft.' + key, 'Boundary needle');
     const el = await mount(); await settle(el);
     expect((await fieldOf(el)).value).toBe('Boundary needle');
-    await pressEnter(el); await settle(el);
     expect(backend.searches).toHaveLength(0);
+    await pressEnter(el); await settle(el);
+    expect(backend.searches).toHaveLength(1);
+    expect(backend.searches[0]).toMatchObject({ query: 'Boundary needle' });
     expect(backend.streams).toHaveLength(0);
     expect(ctrl.send).not.toHaveBeenCalled();
   });
@@ -1367,7 +1367,8 @@ describe('DS1 review establishes current intent without issuing it', () => {
     const el = await mount(); await settle(el);
     expect((await fieldOf(el)).value).toBe(raw);
     expect(el.shadowRoot!.textContent).toContain('docs/alpha.md');
-    for (const opts of [{}, { ctrlKey: true }]) await pressEnter(el, opts);
+    // F2: plain Enter in Search mode would search the composer text; every send stays blocked.
+    await pressEnter(el, { ctrlKey: true });
     await chooseTier(el, 'delegate'); await pressEnter(el);
     expect(backend.searches).toHaveLength(0); expect(backend.streams).toHaveLength(0); expect(ctrl.send).not.toHaveBeenCalled();
     // A mode click configures a proposal, and never confirms it. Pick the retained Ask data explicitly.
@@ -1399,8 +1400,10 @@ describe('DS1 review establishes current intent without issuing it', () => {
     await searchInOtherWindow('independent C'); await settle(el);
     expect(backend.searches.length).toBeGreaterThan(0);
     expect((await fieldOf(el)).value).toBe('ambiguous B');
-    await pressEnter(el); await settle(el);
     expect(backend.searches.every(body => !JSON.stringify(body).includes('ambiguous B'))).toBe(true);
+    // F2: Enter is the person's choice to search the restored text.
+    await pressEnter(el); await settle(el);
+    expect(backend.searches.at(-1)).toMatchObject({ query: 'ambiguous B' });
   });
   it('real chosen-row preparation survives same-tab reload as data requiring explicit review', async () => {
     aiOnline(); backend.corpus.lease = [wireHit('a', 'docs/alpha.md')];
@@ -1410,8 +1413,9 @@ describe('DS1 review establishes current intent without issuing it', () => {
     const el = await mount(); await settle(el);
     expect((await fieldOf(el)).value).toBe('Boundary needle');
     expect(el.shadowRoot!.textContent).toContain('docs/alpha.md');
-    const before = backend.searches.length; await pressEnter(el); await settle(el);
-    expect(backend.searches).toHaveLength(before); expect(backend.streams).toHaveLength(0);
+    // F2: plain Enter in Search mode would search; a send (Ctrl+Enter) stays blocked until review.
+    const before = backend.searches.length; await pressEnter(el, { ctrlKey: true }); await settle(el);
+    expect(backend.searches).toHaveLength(before); expect(backend.streams).toHaveLength(0); expect(ctrl.send).not.toHaveBeenCalled();
     ds1Button(el, 'sv3-draft-review-confirm').click(); await settle(el);
     expect(backend.streams).toHaveLength(0);
     await pressEnter(el); await settle(el);
@@ -1896,7 +1900,7 @@ describe('fm-rest Q1-Q5 — emptying the search field returns Search to its idle
     expect(localStorage.getItem(draftKey) ?? '').toBe('');
   });
 
-  it('emptying a restored draft under review neither approves nor discards the review', async () => {
+  it('emptying a restored draft under review neither approves nor discards the review; Enter then searches (F2-2)', async () => {
     localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), 'northfield lease');
     aiOnline();
     const el = await mount();
@@ -1907,8 +1911,10 @@ describe('fm-rest Q1-Q5 — emptying the search field returns Search to its idle
     await type(el, 'northfield lease');
     await settle(el);
     expect(el.shadowRoot!.querySelector('[data-testid=sv3-draft-review]')).not.toBeNull();
-    await pressEnter(el); await settle(el);
     expect(backend.searches).toHaveLength(0);
+    await pressEnter(el); await settle(el);
+    expect(backend.searches).toHaveLength(1);
+    expect(backend.searches[0]).toMatchObject({ query: 'northfield lease' });
   });
 
   it('leaving Search and coming back with a query present still shows its results', async () => {
@@ -1933,5 +1939,227 @@ describe('fm-rest Q1-Q5 — emptying the search field returns Search to its idle
     const el = await mount();
     await settle(el);
     expect(await shownState(el)).toEqual(idle);
+  });
+});
+
+/* ── F2 — a draft restored at app start does not block Search ─────────────────────────────────── */
+
+describe('F2 a draft restored at app start does not block Search', () => {
+  const reviewPrompt = (el: Mounted): Element | null => el.shadowRoot!.querySelector('[data-testid=sv3-draft-review]');
+  const draftOf = (el: Mounted): { departureBlocked: boolean; retiredHandoffText: string | null; draftReview: boolean;
+    reconcileForgotten(path: string, scope: 'FILE'): void } =>
+    (el as unknown as { draftDomain: ReturnType<typeof draftOf> }).draftDomain;
+  const savedAttachment = (): { drafts: Array<{ text: string; preparation: unknown }> } =>
+    (JSON.parse(sessionStorage.getItem(ds1Attachment) ?? '{}') as { payload: { drafts: Array<{ text: string; preparation: unknown }> } }).payload;
+
+  it.each([
+    ['raw text only', () => {}],
+    ['saved Search settings', () => ds1SavedProposal('orchid', { kind: 'search' })],
+  ])('F2-1 Enter on a restored draft with %s searches it with the current filters', async (_, saved) => {
+    backend.corpus.orchid = [wireHit('o', 'docs/orchid.md')];
+    aiOnline(); saved();
+    localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), 'orchid');
+    setFilters({ pathPrefix: '/garden/' });
+    const el = await mount(); await settle(el);
+    expect((await fieldOf(el)).value).toBe('orchid');
+    expect(reviewPrompt(el)).not.toBeNull();
+    expect(backend.searches).toHaveLength(0); expect(backend.streams).toHaveLength(0);
+    await pressEnter(el); await settle(el);
+    expect(backend.searches, el.shadowRoot!.textContent ?? '').toHaveLength(1);
+    expect(backend.searches[0]).toMatchObject({ query: 'orchid' });
+    expect(JSON.stringify(backend.searches[0])).toContain('/garden/');
+    expect(backend.streams).toHaveLength(0); expect(ctrl.send).not.toHaveBeenCalled();
+    expect(reviewPrompt(el)).toBeNull();
+    await vi.waitFor(async () => expect(await rowTitles(el)).toEqual(['orchid.md']));
+  });
+
+  it('F2-2 clearing the restored text and searching a new query searches it, then behaves as a normal session', async () => {
+    backend.corpus.lighthouse = [wireHit('l', 'docs/lighthouse.md')];
+    backend.corpus.harbour = [wireHit('h', 'docs/harbour.md')];
+    aiOnline(); localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), 'orchid');
+    const el = await mount(); await settle(el);
+    await type(el, ''); await settle(el);
+    await type(el, 'lighthouse'); await pressEnter(el); await settle(el);
+    expect(backend.searches.map(body => body.query), el.shadowRoot!.textContent ?? '').toEqual(['lighthouse']);
+    await vi.waitFor(async () => expect(await rowTitles(el)).toEqual(['lighthouse.md']));
+    expect(reviewPrompt(el)).toBeNull();
+    await searchFor(el, 'harbour');
+    expect(backend.searches.at(-1)).toMatchObject({ query: 'harbour' });
+    await vi.waitFor(async () => expect(await rowTitles(el)).toEqual(['harbour.md']));
+    expect(backend.streams).toHaveLength(0);
+  });
+
+  it.each([
+    ['Ask over all files', { kind: 'ask', scope: { kind: 'all' } }],
+    ['Ask over chosen files', { kind: 'ask', scope: { kind: 'files', paths: ['docs/alpha.md'] } }],
+    ['Summarize', { kind: 'summarize', scope: { kind: 'files', paths: ['docs/alpha.md'] } }],
+    ['Structured', { kind: 'structured', schema: '{"type":"object"}', scope: { kind: 'files', paths: ['docs/alpha.md'] } }],
+    ['Delegate', { kind: 'delegate' }],
+    ['model-only', { kind: 'model' }],
+  ])('F2-3 a restored %s proposal shown in Search mode: Enter only searches the composer text', async (_, preparation) => {
+    backend.corpus['newer orchid'] = [wireHit('o', 'docs/orchid.md')];
+    aiOnline(); ds1SavedProposal('orchid', preparation);
+    localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), 'newer orchid');
+    const el = await mount(); await settle(el);
+    expect(el.tier).toBe('search');
+    expect(reviewPrompt(el)).not.toBeNull();
+    await pressEnter(el); await settle(el);
+    expect(backend.searches, el.shadowRoot!.textContent ?? '').toHaveLength(1);
+    expect(backend.searches[0]).toMatchObject({ query: 'newer orchid' });
+    expect(JSON.stringify(backend.searches[0])).not.toContain('docs/alpha.md');
+    expect(backend.streams).toHaveLength(0); expect(ctrl.send).not.toHaveBeenCalled();
+    expect(el.tier).toBe('search');
+    const composer = await region(el, 'jf-sv3-composer');
+    expect(q(composer, 'sv3-composer-scope')).toBeNull();
+    // The saved proposal stays a distinct companion recovery draft, with its own settings.
+    expect(savedAttachment().drafts).toContainEqual(expect.objectContaining({ text: 'orchid', preparation }));
+    expect(el.shadowRoot!.querySelector('[data-testid=sv3-recovery-review-copy]')).not.toBeNull();
+  });
+
+  it.each(['ask', 'delegate'] as const)('F2-4 Ctrl+Enter and %s mode stay blocked while the review is pending', async tier => {
+    aiOnline(); ds1SavedProposal('orchid', { kind: 'ask', scope: { kind: 'files', paths: ['docs/alpha.md'] } });
+    localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), 'orchid');
+    const el = await mount(); await settle(el);
+    expect((await fieldOf(el)).value).toBe('orchid');
+    await pressEnter(el, { ctrlKey: true }); await settle(el);
+    await chooseTier(el, tier); await pressEnter(el); await settle(el);
+    await pressEnter(el, { ctrlKey: true }); await settle(el);
+    expect(backend.searches).toHaveLength(0); expect(backend.streams).toHaveLength(0); expect(ctrl.send).not.toHaveBeenCalled();
+    expect(reviewPrompt(el)).not.toBeNull();
+  });
+
+  it('F2-4 Use reviewed settings only confirms, and a later send uses exactly the reviewed scope', async () => {
+    aiOnline(); ds1SavedProposal('orchid', { kind: 'ask', scope: { kind: 'files', paths: ['docs/alpha.md'] } });
+    const el = await mount(); await settle(el);
+    await pressEnter(el, { ctrlKey: true }); await settle(el);
+    expect(ctrl.send).not.toHaveBeenCalled();
+    ds1Button(el, 'sv3-draft-review-confirm').click(); await settle(el);
+    expect(backend.searches).toHaveLength(0); expect(backend.streams).toHaveLength(0);
+    expect(el.tier).toBe('ask');
+    await pressEnter(el); await settle(el);
+    expect(backend.searches).toHaveLength(0);
+    expect(backend.streams).toHaveLength(1);
+    expect(backend.streams[0]!.body).toMatchObject({ shapeId: 'core.rag-ask', question: 'orchid', docIds: ['docs/alpha.md'] });
+  });
+
+  it('F2-4 the Search review button only confirms; a later Enter searches with that scope', async () => {
+    aiOnline(); localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), 'orchid');
+    const el = await mount(); await settle(el);
+    ds1Button(el, 'sv3-draft-review-search').click(); await settle(el);
+    expect(backend.searches).toHaveLength(0); expect(reviewPrompt(el)).toBeNull();
+    await pressEnter(el); await settle(el);
+    expect(backend.searches).toHaveLength(1); expect(backend.streams).toHaveLength(0);
+  });
+
+  async function stillBlocked(el: Mounted): Promise<void> {
+    await pressEnter(el); await settle(el);
+    expect(backend.searches, el.shadowRoot!.textContent ?? '').toHaveLength(0);
+    expect(backend.streams).toHaveLength(0); expect(ctrl.send).not.toHaveBeenCalled();
+  }
+
+  it('F2-5 a blocked hand-off stays blocked and keeps its notice', async () => {
+    aiOnline(); localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), 'orchid');
+    parkSearchV3Handoff({ query: 'orchid', mode: 'bogus' });
+    const el = await mount(); await settle(el);
+    expect(el.tier).toBe('search');
+    const notice = 'Unknown hand-off mode. Review the task before sending.';
+    expect((await region(el, 'jf-sv3-composer')).shadowRoot!.textContent).toContain(notice);
+    await stillBlocked(el);
+    expect(reviewPrompt(el)).not.toBeNull();
+    expect((await region(el, 'jf-sv3-composer')).shadowRoot!.textContent).toContain(notice);
+  });
+
+  it('F2-5 retired hand-off text and the departure block keep blocking a restored draft', async () => {
+    aiOnline(); localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), 'orchid');
+    const el = await mount(); await settle(el);
+    const draft = draftOf(el);
+    draft.departureBlocked = true;
+    await stillBlocked(el);
+    expect(draft.departureBlocked).toBe(true); expect(draft.draftReview).toBe(true);
+    draft.departureBlocked = false;
+    (draft as unknown as { retiredHandoffTextValue: string }).retiredHandoffTextValue = 'orchid';
+    await stillBlocked(el);
+    expect(draft.retiredHandoffText).toBe('orchid'); expect(draft.draftReview).toBe(true);
+  });
+
+  it('F2-5 a Forget that requires reselection keeps the restored draft blocked', async () => {
+    aiOnline(); ds1SavedProposal('orchid', { kind: 'ask', scope: { kind: 'files', paths: ['docs/alpha.md'] } });
+    const el = await mount(); await settle(el);
+    draftOf(el).reconcileForgotten('docs/alpha.md', 'FILE'); await settle(el);
+    await stillBlocked(el);
+    expect(reviewPrompt(el)).not.toBeNull();
+  });
+
+  it('F2-5 a draft restored by navigating to a conversation keeps blocking Search', async () => {
+    recordTurn('uc-old', 'who is the landlord?', 'Acme.');
+    aiOnline();
+    sessionStorage.setItem(ds1Attachment, JSON.stringify({ version: 1, incarnation: 'saved-data', payload: {
+      version: 2, task: null, drafts: [{ place: null, text: '', preparation: null },
+        { place: 'uc-old', text: 'orchid', preparation: { kind: 'search' } }],
+    } }));
+    const el = await mount(); await settle(el);
+    expect(reviewPrompt(el)).toBeNull();
+    restoreActiveConversation('uc-old'); await settle(el);
+    expect(el.sessions.activeId).toBe('uc-old');
+    expect((await fieldOf(el)).value).toBe('orchid');
+    expect(reviewPrompt(el)).not.toBeNull();
+    await chooseTier(el, 'search');
+    await stillBlocked(el);
+    expect(reviewPrompt(el)).not.toBeNull();
+  });
+
+  it('F2-5 a companion copy taken up for review keeps blocking Search', async () => {
+    aiOnline(); ds1SavedProposal('older orchid', { kind: 'search' });
+    localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), 'orchid');
+    const el = await mount(); await settle(el);
+    ds1Button(el, 'sv3-recovery-review-copy').click(); await settle(el);
+    expect((await fieldOf(el)).value).toBe('older orchid');
+    await stillBlocked(el);
+    expect(reviewPrompt(el)).not.toBeNull();
+  });
+
+  it('F2-6 a refused or stale attachment write is visible, keeps the text and companions, and searches nothing', async () => {
+    aiOnline(); ds1SavedProposal('older orchid', { kind: 'ask', scope: { kind: 'files', paths: ['docs/alpha.md'] } });
+    localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), 'orchid');
+    const el = await mount(); await settle(el);
+    // Another writer moved the attachment: this window's next write is stale and refused.
+    const other = JSON.stringify({ version: 1, incarnation: 'other-writer', payload: savedAttachment() });
+    sessionStorage.setItem(ds1Attachment, other);
+    await pressEnter(el); await settle(el);
+    expect(backend.searches).toHaveLength(0); expect(backend.streams).toHaveLength(0);
+    expect((await fieldOf(el)).value).toBe('orchid');
+    expect(el.shadowRoot!.querySelector('[data-testid=sv3-residency-notice] [role=alert]')?.textContent ?? '',
+      'the refused write is announced').toContain('Recovery could not be saved safely');
+    expect(sessionStorage.getItem(ds1Attachment)).toBe(other);
+    expect(el.shadowRoot!.textContent).toContain('older orchid');
+    expect(reviewPrompt(el)).not.toBeNull();
+  });
+
+  it('F2-6 after a successful Search the saved preparation is Search and survives reload and a full reopen', async () => {
+    backend.corpus.orchid = [wireHit('o', 'docs/orchid.md')];
+    aiOnline(); localStorage.setItem(__draftStorageKey(SV3_DRAFT_KEY), 'orchid');
+    const first = await mount(); await settle(first);
+    await pressEnter(first); await settle(first);
+    expect(backend.searches).toHaveLength(1);
+    expect(savedAttachment().drafts[0]).toMatchObject({ preparation: { kind: 'search' } });
+    expect(first.shadowRoot!.querySelector('[data-testid=sv3-residency-notice] [role=alert]')).toBeNull();
+    // Same-WebView reload: the tab session keeps the Search preparation.
+    window.dispatchEvent(new Event('pagehide')); first.remove(); __resetDraftProvidersForTest(); resetSearchState();
+    const reloaded = await mount(); await settle(reloaded);
+    expect((await fieldOf(reloaded)).value).toBe('orchid');
+    expect(JSON.stringify(savedAttachment())).toContain('"kind":"search"');
+    expect(JSON.stringify(savedAttachment())).not.toContain('"kind":"ask"');
+    await pressEnter(reloaded); await settle(reloaded);
+    expect(backend.searches).toHaveLength(2);
+    // Full quit and reopen: only the raw text survives; Enter searches it again.
+    window.dispatchEvent(new Event('pagehide')); reloaded.remove(); __resetDraftProvidersForTest(); resetSearchState();
+    sessionStorage.clear();
+    const reopened = await mount(); await settle(reopened);
+    expect((await fieldOf(reopened)).value).toBe('orchid');
+    expect(backend.searches).toHaveLength(2);
+    await pressEnter(reopened); await settle(reopened);
+    expect(backend.searches).toHaveLength(3);
+    expect(backend.searches[2]).toMatchObject({ query: 'orchid' });
+    expect(backend.streams).toHaveLength(0);
   });
 });

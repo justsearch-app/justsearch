@@ -7,12 +7,12 @@
     "url": "https://github.com/justsearch-app/justsearch",
     "source": "github"
   },
-  "version": "0.3.5",
+  "version": "0.3.6",
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/justsearch-app/justsearch/releases/download/v0.3.5/justsearch-mcp.mcpb",
-      "fileSha256": "2857625a9ae251032c7cf3ceb1743ee89297c17361a99b9c58c0cd41e0eb1115",
+      "identifier": "https://github.com/justsearch-app/justsearch/releases/download/v0.3.6/justsearch-mcp.mcpb",
+      "fileSha256": "60cc12f6e1a17685aa235afbb711f1f66c6368d797c8b9755e8c0d8de44a475b",
       "transport": {
         "type": "stdio"
       }

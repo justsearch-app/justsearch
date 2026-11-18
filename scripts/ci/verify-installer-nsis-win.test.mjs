@@ -49,3 +49,26 @@ test('Windows smoke requires all legal files beside the installed Engine jar', (
   assert.match(legal[2], /Join-Path -Path \$headlessDir -ChildPath "legal\/\$legalFile"/);
   assert.match(legal[2], /Assert \(Test-Path -LiteralPath \$legalPath -PathType Leaf\) "Installed payload missing legal\/\$legalFile at \$legalPath"/);
 });
+
+test('Windows smoke checks the Engine jar set after an update and before booting the backend', () => {
+  const steps = [
+    '$installProc = Start-Process',
+    '$engineJarsBeforeUpdate = @(Get-EngineJarSnapshot',
+    'New-Item -ItemType File -Path $obsoleteJarPath',
+    '$updateArgs = @("/S", "/UPDATE", "/ARGS", "/D=$InstallDir")',
+    '$updateProc = Start-Process -FilePath $SetupExePath -ArgumentList $updateArgs -Wait -PassThru',
+    'Assert ($updateProc.ExitCode -eq 0)',
+    'Assert (-not (Test-Path -LiteralPath $obsoleteJarPath)) "NSIS update left the obsolete jar',
+    '$engineJarsAfterUpdate = @(Get-EngineJarSnapshot',
+    'Compare-Object -ReferenceObject $engineJarsBeforeUpdate -DifferenceObject $engineJarsAfterUpdate',
+    'Assert (-not $engineJarChanges)',
+    '$boot = Start-HeadlessBackend',
+    '$ready = Wait-ForBackendReady',
+  ];
+  let previous = -1;
+  for (const step of steps) {
+    const position = script.indexOf(step);
+    assert(position > previous, `missing or out of order: ${step}`);
+    previous = position;
+  }
+});

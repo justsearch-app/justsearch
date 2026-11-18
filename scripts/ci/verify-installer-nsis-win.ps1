@@ -141,6 +141,14 @@ function Assert {
   if (-not $Condition) { throw $Message }
 }
 
+function Get-EngineJarSnapshot {
+  param([Parameter(Mandatory = $true)][string]$LibDir)
+  Get-ChildItem -LiteralPath $LibDir -Filter "*.jar" -File -Force | ForEach-Object {
+    $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+    "$($_.Name) $hash"
+  }
+}
+
 function Get-HttpBody {
   param(
     [Parameter(Mandatory = $true)][System.Net.Http.HttpClient]$Client,
@@ -618,6 +626,25 @@ try {
   } else {
     Add-Content -LiteralPath $evidenceFile -Value "WARN: Could not find uninstaller exe under install dir (cleanup will be best-effort)."
   }
+
+  # /S keeps CI unattended. /UPDATE still selects Tauri's update mode, and /D
+  # targets the smoke test's install directory. /D must be the last argument.
+  $engineJarsBeforeUpdate = @(Get-EngineJarSnapshot -LibDir $engineLibDir)
+  $obsoleteJarPath = Join-Path -Path $engineLibDir -ChildPath "obsolete-0.0.1.jar"
+  Assert (-not (Test-Path -LiteralPath $obsoleteJarPath)) "Obsolete jar fixture already exists at $obsoleteJarPath"
+  New-Item -ItemType File -Path $obsoleteJarPath | Out-Null
+
+  $updateArgs = @("/S", "/UPDATE", "/ARGS", "/D=$InstallDir")
+  $updateProc = Start-Process -FilePath $SetupExePath -ArgumentList $updateArgs -Wait -PassThru
+  Register-FixtureProcess $updateProc
+  Assert ($updateProc.ExitCode -eq 0) "NSIS update failed (exit=$($updateProc.ExitCode)). Evidence=$evidenceFile"
+  Assert (-not (Test-Path -LiteralPath $obsoleteJarPath)) "NSIS update left the obsolete jar at $obsoleteJarPath"
+
+  $engineJarsAfterUpdate = @(Get-EngineJarSnapshot -LibDir $engineLibDir)
+  Assert ($engineJarsAfterUpdate.Count -eq $engineJarsBeforeUpdate.Count) "NSIS update changed the Engine jar count from $($engineJarsBeforeUpdate.Count) to $($engineJarsAfterUpdate.Count) at $engineLibDir"
+  $engineJarChanges = Compare-Object -ReferenceObject $engineJarsBeforeUpdate -DifferenceObject $engineJarsAfterUpdate -CaseSensitive
+  Assert (-not $engineJarChanges) "NSIS update changed Engine jar names or SHA-256 hashes at $engineLibDir"
+  Add-Content -LiteralPath $evidenceFile -Value "INFO: NSIS update removed the obsolete jar and restored the original Engine jar names and SHA-256 hashes."
 
   # ---------------------------------------------------------------------------
   # 4) Boot the bundled backend from installed payload and assert readiness
