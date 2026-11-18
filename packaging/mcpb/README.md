@@ -75,7 +75,9 @@ network beyond `127.0.0.1` — no npx fetches, no downloads, ever.
 
 The desktop app indexes and runs built-in inference locally. It checks for
 updates on launch when its build embeds a release URL, including CI-built branch
-candidates and pre-releases; there is no off switch yet. Install AI downloads
+candidates and pre-releases. `JUSTSEARCH_AUTO_UPDATE_CHECK=false` stops the automatic
+check, and the policy `"appUpdatesEnabled": false` blocks all update checks and downloads
+(see [update controls](../../docs/reference/configuration/environment-variables.md#desktop-app-update-traffic-and-policy)). Install AI downloads
 models and runtimes from `github.com` and `huggingface.co` with consent.
 Trace export is off by default; enabling tracing and setting an OTLP endpoint
 sends traces there, potentially including paths and document excerpts.
@@ -84,14 +86,14 @@ a cloud-hosted client can forward them to its model provider. See
 [Privacy](../../README.md#privacy) for the network paths.
 
 The bundle does **not** contain JustSearch itself. The desktop app
-(Windows-only) must be installed and running:
+(Windows or Ubuntu) must be installed and running:
 <https://github.com/justsearch-app/justsearch/releases>.
 
 ## Files
 
 | File | Purpose |
 |---|---|
-| `manifest.json` | MCPB manifest (schema v0.4) — metadata, the 6 tools, `win32`-only compatibility |
+| `manifest.json` | MCPB manifest (schema v0.4) — metadata, the 6 tools, `win32` and `linux` compatibility |
 | `server/index.js` | The stdio→HTTP bridge (zero dependencies) |
 | `server/engine-discovery.cjs` | Desktop data folder + validated manifest selection (shared with `scripts/prod/justsearch-mcp`) |
 | `server.json` | Official MCP Registry metadata (registry schema `2025-12-11`) — **not yet published** |
