@@ -50,7 +50,7 @@ described below.
 - **No correctness or compliance guarantees.** Answers are grounded in your documents and cited — always check
   the citation. Like any AI it can be wrong; the guarantee here is *privacy*, not infallibility, so don't act on
   an unverified answer in high-stakes work. No warranty (see [LICENSE](LICENSE)).
-- **Windows and Linux only.** The installer is Windows-only; on Linux JustSearch runs from source. macOS is **not in
+- **Windows and Linux only.** Releases have a Windows installer and a Linux `.deb` for Ubuntu 24.04 or newer. macOS is **not in
   the current scope** — not ruled out forever, but not planned now.
 
 ### Engineering scope
