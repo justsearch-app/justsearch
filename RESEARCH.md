@@ -2,10 +2,16 @@
 
 **Agent-utility campaign freeze (2026-11-09):** Fresh and resumed live agent-utility campaigns are frozen. Their commands and runbooks remain available for historical reproduction and offline analysis, along with published evidence and offline replay. Neighboring experiments retain their existing status.
 
-JustSearch is also a research project. It asks what can be done with what JustSearch learns
-about a collection of files when it indexes it, beyond answering a search, and which of those
-things are worth anything to a person or an AI assistant. Improving search itself is part of
-it. Questions are tried in JustSearch itself; a finding does not by itself change what the
+JustSearch is also a research project, with two lines of work.
+
+- **Uses.** What can be done with what JustSearch learns about a collection of files when it
+  indexes it, beyond answering a search, and which of those things are worth anything to a
+  person or an AI assistant. Improving search itself is part of it.
+- **Foundation.** Which of the things JustSearch is built on are worth replacing, with what,
+  and what that would gain or cost. In particular, whether AI agents can write replacements
+  for long-established libraries that hold up on real files.
+
+Questions are tried in JustSearch itself; a finding does not by itself change what the
 product is for (see [NON-GOALS](NON-GOALS.md)).
 
 Findings stay internal by default; "this did not help" is a result too. A finding is
