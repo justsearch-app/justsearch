@@ -156,7 +156,7 @@ dependencies {
   // spawns. The fixture moved into worker-services' test fixtures so both it and the in-process
   // sibling (:modules:app-engine's EngineExtractionSandboxChaosTest) can reach one copy.
   add("integrationTestImplementation", testFixtures(project(":modules:worker-services")))
-  add("integrationTestImplementation", "org.junit.jupiter:junit-jupiter-params:5.14.3")
+  add("integrationTestImplementation", "org.junit.jupiter:junit-jupiter-params:6.1.3")
   add("systemTestImplementation", project(":modules:indexing"))
   add("systemTestImplementation", project(":modules:gpu-bridge"))
   // Lane F stage A item A12 — the surviving system tests compose the Engine's index half
@@ -165,7 +165,7 @@ dependencies {
   add("systemTestImplementation", project(":modules:app-engine"))
   add("systemTestImplementation", project(":modules:configuration"))
   add("systemTestImplementation", testFixtures(project(":modules:worker-services")))
-  add("systemTestImplementation", "org.junit.jupiter:junit-jupiter-params:5.14.3")
+  add("systemTestImplementation", "org.junit.jupiter:junit-jupiter-params:6.1.3")
 }
 
 // Integration test task (Golden Corpus, Relevance)
