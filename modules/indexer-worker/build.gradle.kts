@@ -42,7 +42,7 @@ tasks.withType<Test>().configureEach {
 dependencies {
   add(release030HeadlessRuntime.name, project(":modules:ui"))
   testImplementation(project(":modules:app-services"))
-  testImplementation("org.apache.pdfbox:pdfbox:3.0.6")
+  testImplementation("org.apache.pdfbox:pdfbox:3.0.8")
   testImplementation(testFixtures(project(":modules:adapters-lucene")))
   testImplementation(testFixtures(project(":modules:core")))
   implementation(project(":modules:app-api"))

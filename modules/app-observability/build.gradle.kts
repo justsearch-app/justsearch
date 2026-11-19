@@ -48,10 +48,10 @@ dependencies {
 
 // Direct declarations for transitive test dependencies (per dependency-analysis advice).
 dependencies {
-  testImplementation("com.fasterxml:classmate:1.7.2")
-  testImplementation("net.jqwik:jqwik-api:1.9.3")
-  testRuntimeOnly("net.jqwik:jqwik-time:1.9.3")
-  testRuntimeOnly("net.jqwik:jqwik-web:1.9.3")
+  testImplementation("com.fasterxml:classmate:1.8.0")
+  testImplementation("net.jqwik:jqwik-api:1.10.2")
+  testRuntimeOnly("net.jqwik:jqwik-time:1.10.2")
+  testRuntimeOnly("net.jqwik:jqwik-web:1.10.2")
 }
 
 testing {

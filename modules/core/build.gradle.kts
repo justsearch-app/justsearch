@@ -16,9 +16,9 @@ dependencies {
   testRuntimeOnly(libs.jackson.core)
 
   // Direct declarations for transitive test dependencies (per dependency-analysis advice).
-  testImplementation("net.jqwik:jqwik-api:1.9.3")
-  testRuntimeOnly("net.jqwik:jqwik-time:1.9.3")
-  testRuntimeOnly("net.jqwik:jqwik-web:1.9.3")
+  testImplementation("net.jqwik:jqwik-api:1.10.2")
+  testRuntimeOnly("net.jqwik:jqwik-time:1.10.2")
+  testRuntimeOnly("net.jqwik:jqwik-web:1.10.2")
 }
 
 configurations.configureEach {
@@ -57,8 +57,8 @@ testing {
         runtimeOnly(libs.junit.jupiter.engine)
         runtimeOnly(libs.junit.platform.launcher)
         // DAP: integrationTest transitive runtime deps (declared directly).
-        runtimeOnly("net.jqwik:jqwik-time:1.9.3")
-        runtimeOnly("net.jqwik:jqwik-web:1.9.3")
+        runtimeOnly("net.jqwik:jqwik-time:1.10.2")
+        runtimeOnly("net.jqwik:jqwik-web:1.10.2")
       }
       targets { all { testTask.configure { shouldRunAfter(tasks.named("test")) } } }
     }
